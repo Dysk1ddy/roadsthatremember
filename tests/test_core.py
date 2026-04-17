@@ -668,7 +668,7 @@ class CoreTests(unittest.TestCase):
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
         )
-        answers = iter(["1", "2", "1", "1", "1"])
+        answers = iter(["1", "1", "2", "1", "1", "1"])
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=lambda _: None, rng=random.Random(90083))
         game.state = GameState(
             player=player,
@@ -694,7 +694,7 @@ class CoreTests(unittest.TestCase):
             class_skill_choices=["Athletics", "Survival"],
         )
         companions = [create_tolan_ironshield(), create_elira_dawnmantle(), create_kaelis_starling()]
-        answers = iter(["1", "2", "1", "1", "1"])
+        answers = iter(["1", "1", "2", "1", "1", "1"])
         encounters: list[Encounter] = []
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=lambda _: None, rng=random.Random(900831))
         game.state = GameState(
@@ -711,11 +711,142 @@ class CoreTests(unittest.TestCase):
         game.run_encounter = capture_encounter  # type: ignore[method-assign]
         game.scene_old_owl_well()
         boss_encounter = next(encounter for encounter in encounters if encounter.title == "Miniboss: Vaelith Marr")
+        self.assertTrue(game.state.flags["old_owl_ritual_sabotaged"])
         self.assertEqual(len(boss_encounter.enemies), 3)
         self.assertEqual(boss_encounter.enemies[0].name, "Vaelith Marr")
         self.assertEqual(boss_encounter.enemies[0].archetype, "vaelith_marr")
+        self.assertEqual(boss_encounter.enemies[0].current_hp, boss_encounter.enemies[0].max_hp - 4)
+        self.assertIn("reeling", boss_encounter.enemies[0].conditions)
         self.assertGreater(boss_encounter.enemies[0].max_hp, 26)
         self.assertTrue(any(enemy.name == "Carrion Lash Crawler" for enemy in boss_encounter.enemies[1:]))
+
+    def test_old_owl_notes_unlock_cinderfall_route_and_reduce_ashen_strength(self) -> None:
+        player = build_character(
+            name="Vale",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(900833))
+        game.state = GameState(
+            player=player,
+            current_scene="old_owl_well",
+            flags={"miners_exchange_lead": True},
+        )
+        game.ensure_state_integrity()
+        dungeon = game.current_act1_dungeon()
+        assert dungeon is not None
+        game.complete_map_room(dungeon, "well_ring")
+        game._old_owl_supply_trench(dungeon, dungeon.rooms["supply_trench"])
+        self.assertTrue(game.state.flags["hidden_route_unlocked"])
+        self.assertTrue(game.state.flags["old_owl_notes_found"])
+        self.assertEqual(game.act1_metric_value("act1_ashen_strength"), 3)
+        self.assertTrue(any("Cinderfall" in clue for clue in game.state.clues))
+
+    def test_act1_personal_quests_unlock_for_trusted_companions(self) -> None:
+        player = build_character(
+            name="Vale",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        bryn = create_bryn_underbough()
+        bryn.disposition = 3
+        elira = create_elira_dawnmantle()
+        elira.disposition = 3
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(9008331))
+        game.state = GameState(player=player, companions=[bryn, elira], current_scene="phandalin_hub")
+        game.maybe_offer_act1_personal_quests()
+        self.assertIn("bryn_loose_ends", game.state.quests)
+        self.assertIn("elira_faith_under_ash", game.state.quests)
+
+    def test_bryn_loose_ends_resolution_completes_quest(self) -> None:
+        player = build_character(
+            name="Vale",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        bryn = create_bryn_underbough()
+        starting_disposition = bryn.disposition
+        answers = iter(["1"])
+        game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=lambda _: None, rng=random.Random(9008332))
+        game.state = GameState(
+            player=player,
+            companions=[bryn],
+            current_scene="phandalin_hub",
+            flags={"bryn_cache_found": True, "act1_town_fear": 2},
+        )
+        game.grant_quest("bryn_loose_ends")
+        game.maybe_resolve_bryn_loose_ends()
+        self.assertEqual(game.state.quests["bryn_loose_ends"].status, "completed")
+        self.assertTrue(game.state.flags["bryn_ledger_burned"])
+        self.assertEqual(game.state.flags["act1_town_fear"], 1)
+        self.assertGreater(bryn.disposition, starting_disposition)
+
+    def test_cinderfall_conflict_event_splits_bryn_and_rhogar(self) -> None:
+        player = build_character(
+            name="Vale",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        bryn = create_bryn_underbough()
+        bryn.disposition = 6
+        rhogar = create_rhogar_valeguard()
+        rhogar.disposition = 6
+        bryn_before = bryn.disposition
+        rhogar_before = rhogar.disposition
+        answers = iter(["2"])
+        game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=lambda _: None, rng=random.Random(9008333))
+        game.state = GameState(
+            player=player,
+            companions=[bryn, rhogar],
+            current_scene="phandalin_hub",
+            flags={"cinderfall_relay_destroyed": True},
+        )
+        game.maybe_run_act1_companion_conflict()
+        self.assertEqual(game.state.flags["act1_companion_conflict_side"], "rhogar")
+        self.assertEqual(rhogar.disposition, rhogar_before + 1)
+        self.assertEqual(bryn.disposition, bryn_before - 1)
+
+    def test_wyvern_followup_flags_buff_brughor_setup(self) -> None:
+        player = build_character(
+            name="Vale",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        game = TextDnDGame(input_fn=lambda _: "3", output_fn=lambda _: None, rng=random.Random(9008334))
+        game.state = GameState(
+            player=player,
+            companions=[create_tolan_ironshield()],
+            current_scene="wyvern_tor",
+            flags={"edermath_orchard_lead": True},
+        )
+        game.ensure_state_integrity()
+        dungeon = game.current_act1_dungeon()
+        assert dungeon is not None
+        answers = iter(["3", "3", "3"])
+        encounters: list[Encounter] = []
+        game.input_fn = lambda _: next(answers)
+        game.run_encounter = lambda encounter: encounters.append(encounter) or "victory"  # type: ignore[method-assign]
+        game._wyvern_drover_hollow(dungeon, dungeon.rooms["drover_hollow"])
+        game._wyvern_high_shelf(dungeon, dungeon.rooms["high_shelf"])
+        boss_encounter = encounters[-1]
+        self.assertTrue(game.state.flags["wyvern_beast_stampede"])
+        self.assertIn("surprised", boss_encounter.enemies[1].conditions)
+        self.assertLess(boss_encounter.enemies[1].current_hp, boss_encounter.enemies[1].max_hp)
 
     def test_phandalin_hub_marks_wyvern_tor_as_recommended_level_three_when_underleveled(self) -> None:
         player = build_character(
@@ -1680,6 +1811,34 @@ class CoreTests(unittest.TestCase):
         self.assertTrue(game.state.flags["ashfall_watch_cleared"])
         self.assertEqual(game.state.quests["secure_miners_road"].status, "ready_to_turn_in")
 
+    def test_phandalin_hub_can_travel_to_cinderfall_when_hidden_route_is_unlocked(self) -> None:
+        player = build_character(
+            name="Vale",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        selected: list[str] = []
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(900834))
+        game.state = GameState(
+            player=player,
+            current_scene="phandalin_hub",
+            flags={"phandalin_arrived": True, "hidden_route_unlocked": True},
+        )
+        game.run_phandalin_council_event = lambda: None  # type: ignore[method-assign]
+        game.run_after_watch_gathering = lambda: None  # type: ignore[method-assign]
+
+        def choose_route(prompt: str, options: list[str], **kwargs) -> int:
+            self.assertEqual(prompt, "Where do you go next?")
+            return next(index for index, option in enumerate(options, start=1) if "Cinderfall Ruins" in option)
+
+        game.scenario_choice = choose_route  # type: ignore[method-assign]
+        game.travel_to_act1_node = lambda node_id: selected.append(node_id)  # type: ignore[method-assign]
+        game.scene_phandalin_hub()
+        self.assertEqual(selected, ["cinderfall_ruins"])
+
     def test_post_combat_random_encounter_pool_has_fifteen_plus_entries(self) -> None:
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(810))
         self.assertGreaterEqual(len(game.post_combat_random_encounter_ids()), 15)
@@ -1861,6 +2020,48 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(seen_count, 1)
         self.assertEqual(unseen_count, 10)
 
+    def test_saved_messenger_unlocks_follow_up_reward_until_claimed(self) -> None:
+        player = build_character(
+            name="Vale",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(8171))
+        game.state = GameState(
+            player=player,
+            current_scene="phandalin_hub",
+            flags={"saved_wounded_messenger": True},
+        )
+        unlocked_pool = game.weighted_post_combat_random_encounter_pool()
+        self.assertTrue(any(entry[0] == "messenger_returns_with_reward" for entry in unlocked_pool))
+        game.state.flags["messenger_return_paid"] = True
+        locked_pool = game.weighted_post_combat_random_encounter_pool()
+        self.assertFalse(any(entry[0] == "messenger_returns_with_reward" for entry in locked_pool))
+
+    def test_smuggler_cookfire_unlocks_bryn_cache_and_revenge_chain(self) -> None:
+        player = build_character(
+            name="Vale",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        bryn = create_bryn_underbough()
+        answers = iter(["2"])
+        game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=lambda _: None, rng=random.Random(8172))
+        game.state = GameState(player=player, companions=[bryn], current_scene="phandalin_hub")
+        game.grant_quest("bryn_loose_ends")
+        game.skill_check = lambda actor, skill, dc, context: True
+        game.random_encounter_smuggler_cookfire()
+        pool = game.weighted_post_combat_random_encounter_pool()
+        self.assertTrue(game.state.flags["bryn_cache_found"])
+        self.assertTrue(game.state.flags["smuggler_revenge_pending"])
+        self.assertTrue(any(entry[0] == "smuggler_revenge_squad" for entry in pool))
+
     def test_random_encounter_intro_uses_typed_narration(self) -> None:
         player = build_character(
             name="Vale",
@@ -1902,6 +2103,107 @@ class CoreTests(unittest.TestCase):
         self.assertFalse(captured[0].allow_post_combat_random_encounter)
         self.assertFalse(captured[1].allow_post_combat_random_encounter)
         self.assertFalse(captured[2].allow_post_combat_random_encounter)
+
+    def test_cinderfall_ruins_clear_relay_and_update_act1_metrics(self) -> None:
+        player = build_character(
+            name="Vale",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        answers = iter(["1", "1", "1", "1", "1"])
+        game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=lambda _: None, rng=random.Random(900835))
+        game.state = GameState(
+            player=player,
+            current_scene="cinderfall_ruins",
+            flags={
+                "hidden_route_unlocked": True,
+                "act1_ashen_strength": 1,
+                "act1_town_fear": 2,
+                "act1_survivors_saved": 1,
+            },
+        )
+        game.run_encounter = lambda encounter: "victory"
+        game.scene_cinderfall_ruins()
+        self.assertEqual(game.state.current_scene, "phandalin_hub")
+        self.assertTrue(game.state.flags["cinderfall_ruins_cleared"])
+        self.assertTrue(game.state.flags["cinderfall_relay_destroyed"])
+        self.assertEqual(game.state.flags["act1_ashen_strength"], 0)
+        self.assertEqual(game.state.flags["act1_survivors_saved"], 3)
+        self.assertEqual(game.state.flags["act1_town_fear"], 1)
+
+    def test_cinderfall_sabotage_thins_ashfall_barracks_and_removes_rukhar_temp_hp(self) -> None:
+        player = build_character(
+            name="Vale",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        answers = ["3", "3", "1", "3"]
+        baseline_encounters: list[Encounter] = []
+        sabotage_encounters: list[Encounter] = []
+
+        baseline_game = TextDnDGame(input_fn=lambda _: answers.pop(0), output_fn=lambda _: None, rng=random.Random(900836))
+        baseline_game.state = GameState(
+            player=player,
+            current_scene="ashfall_watch",
+            flags={"act1_ashen_strength": 1},
+        )
+        baseline_game.run_encounter = lambda encounter: baseline_encounters.append(encounter) or "victory"  # type: ignore[method-assign]
+        baseline_game.scene_ashfall_watch()
+
+        answers = ["3", "3", "1", "3"]
+        sabotage_game = TextDnDGame(input_fn=lambda _: answers.pop(0), output_fn=lambda _: None, rng=random.Random(900837))
+        sabotage_game.state = GameState(
+            player=build_character(
+                name="Vale",
+                race="Human",
+                class_name="Fighter",
+                background="Soldier",
+                base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+                class_skill_choices=["Athletics", "Survival"],
+            ),
+            current_scene="ashfall_watch",
+            flags={"act1_ashen_strength": 0, "cinderfall_relay_destroyed": True},
+        )
+        sabotage_game.run_encounter = lambda encounter: sabotage_encounters.append(encounter) or "victory"  # type: ignore[method-assign]
+        sabotage_game.scene_ashfall_watch()
+
+        self.assertEqual(len(baseline_encounters[1].enemies), len(sabotage_encounters[1].enemies) + 1)
+        self.assertEqual(baseline_encounters[2].enemies[0].temp_hp, 4)
+        self.assertEqual(sabotage_encounters[2].enemies[0].temp_hp, 0)
+
+    def test_act1_epilogue_flags_capture_clean_and_fractured_victories(self) -> None:
+        player = build_character(
+            name="Vale",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(9008371))
+        game.state = GameState(
+            player=player,
+            current_scene="emberhall_cellars",
+            flags={"act1_town_fear": 1, "act1_ashen_strength": 1, "act1_survivors_saved": 3},
+        )
+        self.assertEqual(game.act1_record_epilogue_flags(), "clean_victory")
+        self.assertEqual(game.state.flags["act2_starting_pressure"], 0)
+        game.state.flags.update(
+            {
+                "act1_town_fear": 4,
+                "act1_ashen_strength": 3,
+                "act1_survivors_saved": 0,
+                "bryn_ledger_sold": True,
+            }
+        )
+        self.assertEqual(game.act1_record_epilogue_flags(), "fractured_victory")
+        self.assertEqual(game.state.flags["act2_starting_pressure"], 4)
 
     def test_turning_in_quest_grants_rewards(self) -> None:
         player = build_character(
@@ -2354,6 +2656,57 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(len(game.state.companions), 3)
         self.assertEqual(len(game.state.camp_companions), 1)
         self.assertEqual(game.state.camp_companions[0].name, "Rhogar Valeguard")
+
+    def test_active_party_recruit_catches_up_to_current_party_level(self) -> None:
+        player = build_character(
+            name="Velkor",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        game = TextDnDGame(
+            input_fn=lambda _: (_ for _ in ()).throw(AssertionError("companion catch-up should not prompt")),
+            output_fn=lambda _: None,
+            rng=random.Random(331),
+        )
+        game.state = GameState(player=player, current_scene="phandalin_hub")
+        for next_level in (2, 3):
+            game.level_up_character_automatically(player, next_level, announce=False)
+        companion = create_tolan_ironshield()
+        self.assertEqual(companion.level, 1)
+        game.recruit_companion(companion)
+        self.assertEqual(companion.level, 3)
+        self.assertIs(game.state.companions[0], companion)
+
+    def test_companion_from_camp_catches_up_when_joining_active_party(self) -> None:
+        player = build_character(
+            name="Velkor",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        game = TextDnDGame(
+            input_fn=lambda _: (_ for _ in ()).throw(AssertionError("companion catch-up should not prompt")),
+            output_fn=lambda _: None,
+            rng=random.Random(332),
+        )
+        game.state = GameState(player=player, current_scene="phandalin_hub")
+        for next_level in (2, 3, 4):
+            game.level_up_character_automatically(player, next_level, announce=False)
+        game.recruit_companion(create_tolan_ironshield())
+        game.recruit_companion(create_kaelis_starling())
+        game.recruit_companion(create_elira_dawnmantle())
+        game.recruit_companion(create_rhogar_valeguard())
+        rhogar = game.state.camp_companions[0]
+        self.assertEqual(rhogar.level, 1)
+        game.move_companion_to_camp(game.state.companions[0])
+        self.assertTrue(game.move_companion_to_party(rhogar))
+        self.assertEqual(rhogar.level, 4)
+        self.assertIn(rhogar, game.state.companions)
 
     def test_talking_to_companion_improves_disposition(self) -> None:
         player = build_character(
@@ -4430,6 +4783,55 @@ class CoreTests(unittest.TestCase):
         game.player_choice_output(game.action_option("Take the writ and head for the High Road."))
         self.assertEqual(log[-2], "*Take the writ and head for the High Road.")
         self.assertEqual(log[-1], "")
+
+    def test_companion_combat_openers_apply_shadow_volley_and_hold_the_line(self) -> None:
+        player = build_character(
+            name="Velkor",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        kaelis = create_kaelis_starling()
+        kaelis.disposition = 6
+        tolan = create_tolan_ironshield()
+        tolan.disposition = 6
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(4301))
+        game.state = GameState(player=player, companions=[kaelis, tolan], current_scene="road_ambush")
+        heroes = [player, kaelis, tolan]
+        game.apply_companion_combat_openers(
+            heroes,
+            [create_enemy("bandit")],
+            Encounter(title="Openers", description="", enemies=[create_enemy("bandit")], allow_flee=False),
+        )
+        for hero in heroes:
+            self.assertIn("invisible", hero.conditions)
+            self.assertIn("guarded", hero.conditions)
+
+    def test_ash_brand_enforcer_prioritizes_buffed_hero_when_no_mark_exists(self) -> None:
+        player = build_character(
+            name="Velkor",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        player.current_hp = 5
+        companion = create_tolan_ironshield()
+        companion.current_hp = companion.max_hp
+        enemy = create_enemy("ash_brand_enforcer")
+        enemy.resources["punishing_strike"] = 0
+        targeted: list[str] = []
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(4302))
+        game.state = GameState(player=player, companions=[companion], current_scene="road_ambush")
+        game.apply_status(player, "blessed", 2, source="test setup")
+        game.perform_enemy_attack = (
+            lambda attacker, target, heroes, enemies, dodging: targeted.append(target.name) or False
+        )
+        game.enemy_turn(enemy, [player, companion], [enemy], SimpleNamespace(), set())
+        self.assertEqual(targeted, [player.name])
 
     def test_official_conditions_are_all_defined(self) -> None:
         official_conditions = {

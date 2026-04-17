@@ -63,6 +63,247 @@ ACT2_SCENE_TO_NODE_ID = {node.scene_key: node_id for node_id, node in ACT2_ENEMY
 class MapSystemMixin:
     MAP_STATE_KEY = "map_state"
     ACT2_MAP_STATE_KEY = "act2_map_state"
+    ACT1_METRIC_NAMES = {
+        "act1_town_fear": "Town Fear",
+        "act1_ashen_strength": "Ashen Strength",
+        "act1_survivors_saved": "Survivors Saved",
+    }
+    ACT1_METRIC_LIMITS = {
+        "act1_town_fear": 5,
+        "act1_ashen_strength": 5,
+    }
+    ACT1_METRIC_LABELS = {
+        "act1_town_fear": ("Steady", "Wary", "Rattled", "Afraid", "Panicked", "Breaking"),
+        "act1_ashen_strength": ("Broken", "Shaken", "Pressed", "Active", "Entrenched", "Dominant"),
+    }
+
+    def act1_initialize_metrics(self) -> None:
+        assert self.state is not None
+        defaults = {
+            "act1_town_fear": 2,
+            "act1_ashen_strength": 3,
+            "act1_survivors_saved": 0,
+        }
+        for metric_key, default_value in defaults.items():
+            value = self.state.flags.get(metric_key)
+            if isinstance(value, bool) or not isinstance(value, int | float):
+                self.state.flags[metric_key] = default_value
+
+    def act1_metric_value(self, metric_key: str) -> int:
+        assert self.state is not None
+        self.act1_initialize_metrics()
+        value = self.state.flags.get(metric_key, 0)
+        if isinstance(value, bool) or not isinstance(value, int | float):
+            return 0
+        return int(value)
+
+    def act1_adjust_metric(self, metric_key: str, delta: int) -> int:
+        assert self.state is not None
+        current = self.act1_metric_value(metric_key)
+        updated = current + delta
+        limit = self.ACT1_METRIC_LIMITS.get(metric_key)
+        if limit is None:
+            updated = max(0, updated)
+        else:
+            updated = max(0, min(limit, updated))
+        self.state.flags[metric_key] = updated
+        return updated
+
+    def can_visit_cinderfall_ruins(self) -> bool:
+        assert self.state is not None
+        return bool(self.state.flags.get("hidden_route_unlocked") or self.state.flags.get("cinderfall_ruins_cleared"))
+
+    def unlock_act1_hidden_route(self, reveal_text: str) -> bool:
+        assert self.state is not None
+        if self.state.flags.get("hidden_route_unlocked"):
+            return False
+        self.state.flags["hidden_route_unlocked"] = True
+        self.add_journal("A hidden route through Cinderfall Ruins can be used before the Ashfall assault.")
+        self.say(reveal_text)
+        self._clear_map_view_cache("overworld")
+        return True
+
+    def act1_relay_sabotaged(self) -> bool:
+        assert self.state is not None
+        return bool(self.state.flags.get("cinderfall_relay_destroyed")) or self.act1_metric_value("act1_ashen_strength") <= 0
+
+    def active_companion_by_id(self, companion_id: str, *, minimum_disposition: int = -99):
+        assert self.state is not None
+        for companion in self.state.companions:
+            if companion.dead or companion.companion_id != companion_id:
+                continue
+            if companion.disposition >= minimum_disposition:
+                return companion
+        return None
+
+    def any_companion_by_id(self, companion_id: str, *, minimum_disposition: int = -99):
+        assert self.state is not None
+        seen_ids: set[int] = set()
+        for companion in [*self.state.companions, *self.state.camp_companions]:
+            if id(companion) in seen_ids or companion.dead or companion.companion_id != companion_id:
+                continue
+            seen_ids.add(id(companion))
+            if companion.disposition >= minimum_disposition:
+                return companion
+        return None
+
+    def maybe_offer_act1_personal_quests(self) -> None:
+        assert self.state is not None
+        if self.state.current_act >= 2:
+            return
+        bryn = self.any_companion_by_id("bryn_underbough", minimum_disposition=3)
+        if bryn is not None and not self.has_quest("bryn_loose_ends") and not self.quest_is_completed("bryn_loose_ends"):
+            self.grant_quest(
+                "bryn_loose_ends",
+                note="Bryn thinks one of her old smuggler caches is being folded into the Ashen Brand's back-road trade.",
+            )
+        elira = self.any_companion_by_id("elira_dawnmantle", minimum_disposition=3)
+        if elira is not None and not self.has_quest("elira_faith_under_ash") and not self.quest_is_completed("elira_faith_under_ash"):
+            self.grant_quest(
+                "elira_faith_under_ash",
+                note="Elira wants to know whether your mercy still holds once the Ashen Brand starts begging for it.",
+            )
+
+    def maybe_resolve_bryn_loose_ends(self) -> None:
+        assert self.state is not None
+        if not self.has_quest("bryn_loose_ends"):
+            return
+        if self.state.flags.get("bryn_loose_ends_resolved") or not self.state.flags.get("bryn_cache_found"):
+            return
+        bryn = self.any_companion_by_id("bryn_underbough")
+        if bryn is None:
+            return
+        self.say(
+            "Back in Phandalin, Bryn unwraps the smoke-stained ledger from the old cache. The names inside are part smugglers, part frightened teamsters, and part people who still live close enough to get hurt for what they once did."
+        )
+        choice = self.scenario_choice(
+            "What do you tell Bryn to do with the ledger?",
+            [
+                self.action_option("Burn the ledger and bury the route with it."),
+                self.action_option("Sell the names quietly and turn old dirt into useful coin."),
+            ],
+            allow_meta=False,
+        )
+        if choice == 1:
+            self.player_action("Burn the ledger and bury the route with it.")
+            self.state.flags["bryn_ledger_burned"] = True
+            self.act1_adjust_metric("act1_town_fear", -1)
+            self.adjust_companion_disposition(bryn, 1, "you chose mercy over profit in Bryn's old trade")
+            self.say("Bryn watches the page curl to ash and exhales like she has finally stopped carrying one particular exit route in her head.")
+        else:
+            self.player_action("Sell the names quietly and turn old dirt into useful coin.")
+            self.state.gold += 25
+            self.state.flags["bryn_ledger_sold"] = True
+            self.state.flags["act2_bonus_whisper_pressure"] = int(self.state.flags.get("act2_bonus_whisper_pressure", 0)) + 1
+            self.adjust_companion_disposition(bryn, -1, "you turned Bryn's old ledger into coin")
+            self.say("The ledger buys clean coin, but Bryn looks at the purse like it weighs more than the gold should.")
+        self.reward_party(xp=20, reason="resolving Bryn's loose ends")
+        self.state.flags["bryn_loose_ends_resolved"] = True
+        self.refresh_quest_statuses(announce=False)
+        self.turn_in_quest("bryn_loose_ends")
+
+    def maybe_run_act1_companion_conflict(self) -> None:
+        assert self.state is not None
+        if self.state.flags.get("act1_companion_conflict_resolved"):
+            return
+        if not self.state.flags.get("cinderfall_relay_destroyed"):
+            return
+        bryn = self.any_companion_by_id("bryn_underbough", minimum_disposition=6)
+        rhogar = self.any_companion_by_id("rhogar_valeguard", minimum_disposition=6)
+        if bryn is None or rhogar is None:
+            return
+        self.say("Bryn and Rhogar collide the moment the Cinderfall maps hit the table. One sees vulnerable names; the other sees a duty to warn them before the Ashen Brand regroups around the same roads.")
+        self.speaker("Bryn Underbough", "Burn the route list. Leave the town breathing and let the guilty keep their fear.")
+        self.speaker("Rhogar Valeguard", "No. People cannot defend what they are not told to fear in time.")
+        choice = self.scenario_choice(
+            "Who do you back?",
+            [
+                self.action_option("Side with Bryn and keep the ugliest names off the public board."),
+                self.action_option("Side with Rhogar and warn the town plainly, no matter who it shames."),
+            ],
+            allow_meta=False,
+        )
+        if choice == 1:
+            self.player_action("Keep the ugliest names off the public board.")
+            self.adjust_companion_disposition(bryn, 1, "you protected the vulnerable over public example")
+            self.adjust_companion_disposition(rhogar, -1, "you kept the warning narrower than he wanted")
+            self.state.flags["act1_companion_conflict_side"] = "bryn"
+            self.say("Bryn softens. Rhogar does not argue further, but the silence he keeps is the kind that remembers.")
+        else:
+            self.player_action("Warn the town plainly, no matter who it shames.")
+            self.adjust_companion_disposition(rhogar, 1, "you chose duty over comfort")
+            self.adjust_companion_disposition(bryn, -1, "you chose exposure over discretion")
+            self.state.flags["act1_companion_conflict_side"] = "rhogar"
+            self.say("Rhogar nods once like a vow has been answered. Bryn folds in on herself for a moment before the humor comes back brittle.")
+        self.state.flags["act1_companion_conflict_resolved"] = True
+
+    def resolve_elira_faith_under_ash(self) -> None:
+        assert self.state is not None
+        if not self.has_quest("elira_faith_under_ash"):
+            return
+        if self.state.flags.get("elira_faith_under_ash_resolved"):
+            return
+        elira = self.any_companion_by_id("elira_dawnmantle")
+        if elira is None:
+            return
+        self.say("In the wrecked barracks you find one gutter zealot alive under a collapsed bunk, too wounded to keep lying convincingly and too proud to beg well.")
+        self.speaker("Elira Dawnmantle", "This is the moment that matters more than speeches ever do.")
+        choice = self.scenario_choice(
+            "What do you do with the captive cultist?",
+            [
+                self.action_option("Spare them, bind the wound, and send them out alive under warning."),
+                self.action_option("Pass sentence here and make Ashfall fear what mercy costs."),
+            ],
+            allow_meta=False,
+        )
+        if choice == 1:
+            self.player_action("Spare them, bind the wound, and send them out alive under warning.")
+            self.state.flags["elira_mercy_blessing"] = True
+            self.act1_adjust_metric("act1_town_fear", -1)
+            self.adjust_companion_disposition(elira, 1, "you chose mercy under ash")
+            self.say("Elira's expression steadies into something fierce and grateful. Word of mercy travels faster than terror when people are desperate enough to need proof it still exists.")
+        else:
+            self.player_action("Pass sentence here and make Ashfall fear what mercy costs.")
+            self.state.flags["elira_hard_verdict"] = True
+            self.adjust_companion_disposition(elira, -1, "you chose execution where Elira wanted mercy")
+            self.say("The barracks go quiet around the verdict. It will travel through the fort faster than any order board.")
+        self.reward_party(xp=20, reason="deciding Elira's question under fire")
+        self.state.flags["elira_faith_under_ash_resolved"] = True
+        self.refresh_quest_statuses(announce=False)
+        self.turn_in_quest("elira_faith_under_ash")
+
+    def act1_victory_tier(self) -> str:
+        assert self.state is not None
+        town_fear = self.act1_metric_value("act1_town_fear")
+        ashen_strength = self.act1_metric_value("act1_ashen_strength")
+        survivors_saved = self.act1_metric_value("act1_survivors_saved")
+        strained = any(
+            (
+                self.state.flags.get("bryn_ledger_sold"),
+                self.state.flags.get("elira_hard_verdict"),
+                self.state.flags.get("act1_companion_conflict_side"),
+            )
+        )
+        if town_fear <= 1 and ashen_strength <= 1 and survivors_saved >= 3 and not strained:
+            return "clean_victory"
+        if town_fear >= 4 or ashen_strength >= 3 or (strained and survivors_saved <= 1):
+            return "fractured_victory"
+        return "costly_victory"
+
+    def act1_record_epilogue_flags(self) -> str:
+        assert self.state is not None
+        tier = self.act1_victory_tier()
+        pressure = 0
+        if tier == "costly_victory":
+            pressure += 1
+        elif tier == "fractured_victory":
+            pressure += 2
+        if self.act1_metric_value("act1_town_fear") > 3:
+            pressure += 1
+        pressure += int(self.state.flags.get("bryn_ledger_sold", False))
+        self.state.flags["act1_victory_tier"] = tier
+        self.state.flags["act2_starting_pressure"] = pressure
+        return tier
 
     def ensure_state_integrity(self) -> None:
         super().ensure_state_integrity()
@@ -777,6 +1018,7 @@ class MapSystemMixin:
 
     def scene_phandalin_hub(self) -> None:
         assert self.state is not None
+        self.act1_initialize_metrics()
         self._sync_map_state_with_scene(force_node_id="phandalin_hub")
         self.banner("Phandalin")
         if not self.state.flags.get("phandalin_arrived"):
@@ -812,6 +1054,13 @@ class MapSystemMixin:
                     self.add_clue(
                         "Phandalin's fear points in three directions: the east road, the old manor hill, and the few locals still holding the place together."
                     )
+                    self.add_clue(
+                        "Old evacuation marks and nervous traffic patterns point toward Cinderfall Ruins, an abandoned relay east of Ashfall Watch."
+                    )
+                    self.unlock_act1_hidden_route(
+                        "Reading Phandalin's fear exposes a third route: the abandoned Cinderfall Ruins, where Ashfall's reserve line still flickers behind the main road."
+                    )
+                    self.act1_adjust_metric("act1_town_fear", -1)
                     self.reward_party(xp=10, reason="reading Phandalin's mood on arrival")
                 else:
                     self.say("The town's fear is real, but too tangled to untangle in one glance.")
@@ -820,6 +1069,7 @@ class MapSystemMixin:
                 success = self.skill_check(self.state.player, "Persuasion", 12, context="to steady the town's nerves")
                 if success:
                     self.say("A few shoulders ease as your words sound more like a promise than a performance.")
+                    self.act1_adjust_metric("act1_town_fear", -1)
                     self.reward_party(xp=10, gold=6, reason="reassuring Phandalin on arrival")
                 else:
                     self.say("People listen, but frontier caution clings harder than hope.")
@@ -836,6 +1086,9 @@ class MapSystemMixin:
         self.run_phandalin_council_event()
         self.run_after_watch_gathering()
         self._sync_story_beats_from_flags()
+        self.maybe_offer_act1_personal_quests()
+        self.maybe_resolve_bryn_loose_ends()
+        self.maybe_run_act1_companion_conflict()
 
         while True:
             self.banner("Phandalin")
@@ -865,6 +1118,12 @@ class MapSystemMixin:
                         f"Hunt the raiders at Wyvern Tor (recommended level {self.wyvern_tor_recommended_level()})"
                     )
                 options.append(("wyvern", label))
+            if (
+                not self.state.flags.get("ashfall_watch_cleared")
+                and not self.state.flags.get("cinderfall_ruins_cleared")
+                and self.can_visit_cinderfall_ruins()
+            ):
+                options.append(("cinderfall", self.action_option("Investigate Cinderfall Ruins")))
             if not self.state.flags.get("ashfall_watch_cleared"):
                 label = self.action_option("Ride for Ashfall Watch")
                 if not self.act1_side_paths_cleared():
@@ -912,6 +1171,12 @@ class MapSystemMixin:
                     continue
                 self.travel_to_act1_node("wyvern_tor")
                 return
+            elif selection_key == "cinderfall":
+                if not self.can_visit_cinderfall_ruins():
+                    self.say("You do not have a clean enough read on the hidden relay route yet.")
+                    continue
+                self.travel_to_act1_node("cinderfall_ruins")
+                return
             elif selection_key == "ashfall":
                 if not self.act1_side_paths_cleared():
                     self.say("Ashfall Watch is still too dangerous to take cleanly without dealing with the outer threats first.")
@@ -933,6 +1198,9 @@ class MapSystemMixin:
 
     def scene_wyvern_tor(self) -> None:
         self.run_act1_dungeon("wyvern_tor")
+
+    def scene_cinderfall_ruins(self) -> None:
+        self.run_act1_dungeon("cinderfall_ruins")
 
     def scene_ashfall_watch(self) -> None:
         self.run_act1_dungeon("ashfall_watch")
@@ -975,6 +1243,7 @@ class MapSystemMixin:
 
     def run_act1_dungeon(self, node_id: str) -> None:
         assert self.state is not None
+        self.act1_initialize_metrics()
         self._sync_map_state_with_scene(force_node_id=node_id)
         node = ACT1_HYBRID_MAP.nodes[node_id]
         dungeon = ACT1_HYBRID_MAP.dungeons[str(node.enters_dungeon_id)]
@@ -1029,6 +1298,10 @@ class MapSystemMixin:
             ("wyvern_tor", "drover_hollow"): self._wyvern_drover_hollow,
             ("wyvern_tor", "shrine_ledge"): self._wyvern_shrine_ledge,
             ("wyvern_tor", "high_shelf"): self._wyvern_high_shelf,
+            ("cinderfall_ruins", "collapsed_gate"): self._cinderfall_collapsed_gate,
+            ("cinderfall_ruins", "ash_chapel"): self._cinderfall_ash_chapel,
+            ("cinderfall_ruins", "broken_storehouse"): self._cinderfall_broken_storehouse,
+            ("cinderfall_ruins", "ember_relay"): self._cinderfall_ember_relay,
             ("ashfall_watch", "breach_gate"): self._ashfall_breach_gate,
             ("ashfall_watch", "prisoner_yard"): self._ashfall_prisoner_yard,
             ("ashfall_watch", "signal_basin"): self._ashfall_signal_basin,
@@ -3058,6 +3331,36 @@ class MapSystemMixin:
                 enemies[0].current_hp = max(1, enemies[0].current_hp - 4)
                 hero_bonus += 2
                 self.say("You are inside the ward-ring before the first skull-lantern turns your way.")
+                followup = self.scenario_choice(
+                    "You have one clean opening inside the ring. How do you spend it?",
+                    [
+                        self.action_option("Sabotage the ritual salt before the gravecaller feels the breach."),
+                        self.action_option("Pick off the nearest sentry before it can join the line."),
+                        self.action_option("Slip deeper toward the well mouth and keep the initiative for later."),
+                    ],
+                    allow_meta=False,
+                )
+                if followup == 1:
+                    self.player_action("Sabotage the ritual salt before the gravecaller feels the breach.")
+                    self.state.flags["old_owl_ritual_sabotaged"] = True
+                    for enemy in enemies[1:]:
+                        self.apply_status(enemy, "reeling", 1, source="your ritual sabotage")
+                    hero_bonus += 1
+                    self.say("The ward-salt breaks into the wrong pattern and the whole ring starts answering itself badly.")
+                elif followup == 2:
+                    self.player_action("Pick off the nearest sentry before it can join the line.")
+                    self.state.flags["old_owl_sentry_picked"] = True
+                    sentry = enemies[-1]
+                    sentry.current_hp = max(1, sentry.current_hp - 5)
+                    self.apply_status(sentry, "surprised", 1, source="your silent opening strike")
+                    hero_bonus += 1
+                    self.say("One defender goes down half-ready, and the ring loses a piece of itself before the fight even forms.")
+                else:
+                    self.player_action("Slip deeper toward the well mouth and keep the initiative for later.")
+                    self.state.flags["old_owl_deeper_infiltration"] = True
+                    self.apply_status(self.state.player, "invisible", 1, source="your deeper infiltration")
+                    hero_bonus += 1
+                    self.say("You learn the shape of the ground all the way to the buried dark lip before the alarm finally catches up.")
             else:
                 self.apply_status(self.state.player, "reeling", 1, source="loose stone and a snapped old bucket chain")
                 self.say("A snapped chain and shower of stone give the site plenty of warning.")
@@ -3143,18 +3446,24 @@ class MapSystemMixin:
             self.player_action("Break the cart brace, drag them clear, and let the camp sort itself out later.")
             self.say("You haul the prospector clear and leave the salt cart collapsed in the trench, ruining any quick reset of the ring.")
 
+        self.act1_adjust_metric("act1_survivors_saved", 1)
+        self.act1_adjust_metric("act1_town_fear", -1)
         self.complete_map_room(dungeon, room.room_id)
 
     def _old_owl_supply_trench(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
         assert self.state is not None
         self.say("Half-buried trench ledgers and soot-black route slips still cling to the damp soil under the supply tarp.")
+        bryn = self.active_companion_by_id("bryn_underbough", minimum_disposition=6)
+        options = [
+            self.quoted_option("INVESTIGATION", "Read the notes and sketch the route chain before the wind ruins them."),
+            self.quoted_option("ARCANA", "The ink itself looks wrong. I want to know what was mixed into it."),
+            self.action_option("Pocket the cleanest pages and kick the rest into the trench water."),
+        ]
+        if bryn is not None:
+            options.append(self.action_option("Let Bryn skim the soot ledgers for smuggler marks she used to know."))
         choice = self.scenario_choice(
             "What do you do with the recovered notes?",
-            [
-                self.quoted_option("INVESTIGATION", "Read the notes and sketch the route chain before the wind ruins them."),
-                self.quoted_option("ARCANA", "The ink itself looks wrong. I want to know what was mixed into it."),
-                self.action_option("Pocket the cleanest pages and kick the rest into the trench water."),
-            ],
+            options,
             allow_meta=False,
         )
         if choice == 1:
@@ -3175,10 +3484,22 @@ class MapSystemMixin:
                 self.reward_party(xp=10, reason="decoding the tainted ledgers at Old Owl Well")
             else:
                 self.say("The ritual residue is obvious, but the deeper trail slips away from you.")
-        else:
+        elif choice == 3:
             self.player_action("Pocket the cleanest pages and kick the rest into the trench water.")
             self.say("You take the useful scraps and ruin the rest rather than leave them for the next scavenger.")
+        else:
+            self.player_action("Let Bryn skim the soot ledgers for smuggler marks she used to know.")
+            self.say("Bryn crouches over the pages for only a few breaths before old route habits click back into place.")
+            self.add_clue("Bryn recognizes old smuggler shorthand in the trench ledgers, tying the Ashen Brand's salvage line to one of her abandoned caches.")
+            if self.has_quest("bryn_loose_ends") and not self.state.flags.get("bryn_cache_found"):
+                self.state.flags["bryn_cache_found"] = True
+                self.say("One note in Bryn's old hand marks the cache site she hoped had stayed buried with the rest of that life.")
+            self.reward_party(xp=10, reason="letting Bryn read the trench ledgers")
 
+        self.add_clue("The recovered route slips mention Cinderfall Ruins, a backup ember relay still feeding Ashfall Watch from the east scrub.")
+        self.unlock_act1_hidden_route(
+            "The soot-black route slips expose a hidden approach: Cinderfall Ruins, an abandoned ember relay still feeding Ashfall's reserve line."
+        )
         self.complete_map_room(dungeon, room.room_id)
 
     def _old_owl_gravecaller_lip(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
@@ -3197,6 +3518,15 @@ class MapSystemMixin:
         if party_size >= 4:
             boss_enemies.append(self.act1_pick_enemy(("skeletal_sentry", "graveblade_wight", "lantern_fen_wisp")))
         boss_bonus = int(self.state.flags.get("old_owl_prospector_rescued", False)) + int(self.state.flags.get("old_owl_notes_found", False))
+        if self.state.flags.get("old_owl_ritual_sabotaged"):
+            boss_enemies[0].current_hp = max(1, boss_enemies[0].current_hp - 4)
+            self.apply_status(boss_enemies[0], "reeling", 1, source="the sabotaged dig-ring")
+            self.say("The broken ritual ring is still fighting Vaelith's control, and the gravecaller feels it.")
+        if self.state.flags.get("old_owl_sentry_picked") and len(boss_enemies) > 1:
+            picked_guard = boss_enemies.pop()
+            self.say(f"{picked_guard.name} never reaches the well lip. Your earlier sentry kill left the gravecaller short one answer to the alarm.")
+        if self.state.flags.get("old_owl_deeper_infiltration"):
+            boss_bonus += 1
         choice = self.scenario_choice(
             "How do you answer the gravecaller?",
             [
@@ -3250,6 +3580,7 @@ class MapSystemMixin:
             self.return_to_phandalin("You break contact and retreat to Phandalin with the well still active behind you.")
             return
 
+        self.act1_adjust_metric("act1_ashen_strength", -1)
         self.complete_map_room(dungeon, room.room_id)
         self.add_clue("Old Owl Well is cleared, and its notes tie grave-salvage, Ashfall Watch, and the manor hill into one supply chain.")
         self.add_journal("You silenced Old Owl Well and broke one of the Ashen Brand's outer operations.")
@@ -3365,18 +3696,48 @@ class MapSystemMixin:
             self.player_action("Cut them loose, arm them, and send them downslope before the chief arrives.")
             self.say("The drover staggers away with a stolen knife and a promise to tell Phandalin exactly what waits on this hill.")
 
+        self.act1_adjust_metric("act1_survivors_saved", 1)
+        self.act1_adjust_metric("act1_town_fear", -1)
+        followup = self.scenario_choice(
+            "With the drover free, what do you ask of them next?",
+            [
+                self.action_option("Send them hard for town with the cleanest warning they can carry."),
+                self.action_option("Keep them hidden below the shelf to signal when Brughor commits his line."),
+                self.action_option("Have them loose the remaining beasts uphill and turn the camp against itself."),
+            ],
+            allow_meta=False,
+        )
+        if followup == 1:
+            self.player_action("Send them hard for town with the cleanest warning they can carry.")
+            self.say("The drover leaves fast, taking one true account of Wyvern Tor back toward people who still have time to listen.")
+        elif followup == 2:
+            self.player_action("Keep them hidden below the shelf to signal when Brughor commits his line.")
+            self.state.flags["wyvern_spotter_signal"] = True
+            self.say("The drover slips into a crack in the rock with a shepherd's whistle and a look that promises they will use it at the exact right second.")
+        else:
+            self.player_action("Have them loose the remaining beasts uphill and turn the camp against itself.")
+            self.state.flags["wyvern_beast_stampede"] = True
+            self.say("A moment later the upper shelf erupts in bells, hooves, and furious shouting as the pack animals tear through the camp line.")
+        self.add_clue("The rescued drover heard raiders talk about Cinderfall, an abandoned relay they used to keep Ashfall supplied off the main road.")
+        self.unlock_act1_hidden_route(
+            "The freed drover points you toward Cinderfall Ruins, a hidden relay route the raiders still use when Ashfall needs reserve supplies unseen."
+        )
         self.complete_map_room(dungeon, room.room_id)
 
     def _wyvern_shrine_ledge(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
         assert self.state is not None
         self.say("A cairn shrine to Tempus leans in the wind beside the raiders' remaining tethers and a scatter of stolen tack.")
+        rhogar = self.active_companion_by_id("rhogar_valeguard", minimum_disposition=6)
+        options = [
+            self.quoted_option("RELIGION", "Set the cairn shrine right. I want the chief fighting under a bad sign."),
+            self.action_option("Cut the pack tethers and send the remaining beasts into the upper camp."),
+            self.action_option("Strip the tack, ruin the tethers, and leave the ledge empty."),
+        ]
+        if rhogar is not None:
+            options.append(self.action_option("Let Rhogar reset the cairn and call the hill to witness against Brughor."))
         choice = self.scenario_choice(
             "What do you do on the ledge?",
-            [
-                self.quoted_option("RELIGION", "Set the cairn shrine right. I want the chief fighting under a bad sign."),
-                self.action_option("Cut the pack tethers and send the remaining beasts into the upper camp."),
-                self.action_option("Strip the tack, ruin the tethers, and leave the ledge empty."),
-            ],
+            options,
             allow_meta=False,
         )
         if choice == 1:
@@ -3391,9 +3752,14 @@ class MapSystemMixin:
         elif choice == 2:
             self.player_action("Cut the pack tethers and send the remaining beasts into the upper camp.")
             self.say("Goats and half-starved pack animals scatter uphill in a chaos of bells and hooves, dragging the upper camp's attention sideways.")
-        else:
+        elif choice == 3:
             self.player_action("Strip the tack, ruin the tethers, and leave the ledge empty.")
             self.say("You leave the ledge useless as a staging point and deny the upper shelf one more clean response.")
+        else:
+            self.player_action("Let Rhogar reset the cairn and call the hill to witness against Brughor.")
+            self.apply_status(self.state.player, "blessed", 2, source="Rhogar's shrine oath")
+            self.state.flags["wyvern_rhogar_omen"] = True
+            self.say("Rhogar rights the cairn with soldier-care and speaks one short oath into the wind. Even the raiders' ledge feels less owned after that.")
 
         self.complete_map_room(dungeon, room.room_id)
 
@@ -3411,6 +3777,15 @@ class MapSystemMixin:
         if party_size >= 4:
             boss_enemies.append(self.act1_pick_enemy(("orc_raider", "bugbear_reaver")))
         boss_bonus = int(self.state.flags.get("wyvern_drover_rescued", False)) + int(self.state.flags.get("wyvern_shrine_secured", False))
+        if self.state.flags.get("wyvern_spotter_signal"):
+            boss_bonus += 1
+            self.say("A sharp whistle from below the shelf warns you exactly when Brughor commits his weight forward.")
+        if self.state.flags.get("wyvern_beast_stampede") and len(boss_enemies) > 1:
+            self.apply_status(boss_enemies[1], "surprised", 1, source="the stampede ripping through the shelf")
+            boss_enemies[1].current_hp = max(1, boss_enemies[1].current_hp - 4)
+            self.say("The camp stampede tears across the high shelf first, leaving Brughor's support line scrambling to regain itself.")
+        if self.state.flags.get("wyvern_rhogar_omen"):
+            boss_enemies[0].current_hp = max(1, boss_enemies[0].current_hp - 2)
         choice = self.scenario_choice(
             "How do you answer the blood-chief?",
             [
@@ -3463,12 +3838,233 @@ class MapSystemMixin:
             self.return_to_phandalin("You pull clear of the upper shelf and retreat to Phandalin to regroup.")
             return
 
+        self.act1_adjust_metric("act1_ashen_strength", -1)
         self.complete_map_room(dungeon, room.room_id)
         self.add_clue("Wyvern Tor is cleared, and its raiders were coordinating with Ashfall Watch rather than acting alone.")
         self.add_journal("You broke the raiders at Wyvern Tor and stripped another outer shield away from the Ashen Brand.")
         self.refresh_quest_statuses(announce=False)
         self.add_inventory_item("greater_healing_draught", source="Brughor's travel chest")
         self.return_to_phandalin("Wyvern Tor falls behind you as the ridge wind finally goes clean.")
+
+    def _cinderfall_collapsed_gate(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
+        assert self.state is not None
+        self.say(
+            "Cinderfall Ruins crouch around a half-buried relay road: a collapsed gatehouse, a burned chapel, and broken store sheds still feeding one stubborn ember node deeper in.",
+            typed=True,
+        )
+        party_size = self.act1_party_size()
+        enemies = [create_enemy("bandit", name="Relay Cutout"), create_enemy("carrion_stalker")]
+        if party_size >= 3:
+            enemies.append(self.act1_pick_enemy(("cinder_kobold", "ashstone_percher", "gutter_zealot")))
+        hero_bonus = 0
+        choice = self.scenario_choice(
+            "How do you break into the relay ruin?",
+            [
+                self.skill_tag("STEALTH", self.action_option("Slide through the collapsed arch before the sentries settle.")),
+                self.quoted_option("INVESTIGATION", "Show me the weak braces. I want the gate failing on my timing."),
+                self.skill_tag("ATHLETICS", self.action_option("Rip the jammed gate wide enough that subtlety stops mattering.")),
+            ],
+            allow_meta=False,
+        )
+        if choice == 1:
+            self.player_action("Slide through the collapsed arch before the sentries settle.")
+            success = self.skill_check(self.state.player, "Stealth", 13, context="to slip through the broken relay gate unseen")
+            if success:
+                self.apply_status(enemies[0], "surprised", 1, source="your silent breach")
+                enemies[0].current_hp = max(1, enemies[0].current_hp - 3)
+                hero_bonus += 2
+                self.say("You are inside the ruin before the first relay runner realizes the gate already failed.")
+            else:
+                self.apply_status(self.state.player, "reeling", 1, source="shifting masonry")
+                self.say("The broken arch gives under your boot and the ruin wakes up shouting.")
+        elif choice == 2:
+            self.player_speaker("Show me the weak braces. I want the gate failing on my timing.")
+            success = self.skill_check(self.state.player, "Investigation", 13, context="to read the collapsed relay gate under pressure")
+            if success:
+                self.apply_status(enemies[-1], "reeling", 1, source="your perfectly timed breach")
+                hero_bonus += 1
+                self.say("You pull the right stone at the right second and the ruin's defenders lose their footing with it.")
+            else:
+                self.say("You find the weak point, just not before the sentries hear the search.")
+        else:
+            self.player_action("Rip the jammed gate wide enough that subtlety stops mattering.")
+            success = self.skill_check(self.state.player, "Athletics", 13, context="to force open the collapsed relay gate")
+            if success:
+                self.apply_status(self.state.player, "emboldened", 2, source="bursting into Cinderfall")
+                hero_bonus += 2
+                self.say("The gate tears open in one ugly wrench and the relay line never gets a clean first volley.")
+            else:
+                self.apply_status(self.state.player, "reeling", 1, source="the collapsing hinge-stone")
+                self.say("The gate gives, but not before the whole ruin hears it happen.")
+
+        outcome = self.run_encounter(
+            Encounter(
+                title="Cinderfall Gate",
+                description="Hidden relay sentries rush the collapsed gate to keep their reserve line alive.",
+                enemies=enemies,
+                allow_flee=True,
+                allow_parley=False,
+                hero_initiative_bonus=hero_bonus,
+                allow_post_combat_random_encounter=False,
+            )
+        )
+        if outcome == "defeat":
+            self.handle_defeat("Cinderfall's hidden relay stays in enemy hands.")
+            return
+        if outcome == "fled":
+            self.return_to_phandalin("You break away from Cinderfall before the relay line can close around you.")
+            return
+
+        self.complete_map_room(dungeon, room.room_id)
+        self.say("Inside the ruin, one wing still shelters smoke-sick survivors in a chapel shell while the other holds reserve crates and route slates in a broken storehouse.")
+
+    def _cinderfall_ash_chapel(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
+        assert self.state is not None
+        self.say("A burned-out chapel still shelters two smoke-sick teamsters and a novice acolyte hiding behind fallen pews.")
+        choice = self.scenario_choice(
+            "How do you handle the chapel?",
+            [
+                self.quoted_option("MEDICINE", "Stay with me. I'll get the worst of the smoke out of your lungs first."),
+                self.quoted_option("RELIGION", "The shrine still matters. Let me steady the room before we move." ),
+                self.action_option("Break the rear wall wider and rush the survivors out through the ash scrub."),
+            ],
+            allow_meta=False,
+        )
+        if choice == 1:
+            self.player_speaker("Stay with me. I'll get the worst of the smoke out of your lungs first.")
+            success = self.skill_check(self.state.player, "Medicine", 12, context="to stabilize the smoke-sick survivors in the chapel")
+            if success:
+                self.say("You get all three moving under their own power, with enough breath left to describe nightly crates bound for Ashfall Watch.")
+                self.add_clue("Cinderfall's chapel survivors confirm the ruin is still feeding reserve crates toward Ashfall Watch.")
+                self.reward_party(xp=10, reason="stabilizing Cinderfall's trapped survivors")
+            else:
+                self.say("You keep them alive and moving, even if the answers come back ragged.")
+        elif choice == 2:
+            self.player_speaker("The shrine still matters. Let me steady the room before we move.")
+            success = self.skill_check(self.state.player, "Religion", 12, context="to calm the ash-choked chapel before moving the survivors")
+            if success:
+                self.apply_status(self.state.player, "blessed", 1, source="the chapel's steadied hush")
+                self.say("The room stops feeling like a trap and starts feeling like an escape lane again.")
+                self.add_clue("An acolyte in the chapel saw relay couriers carrying Emberhall seals through Cinderfall at dusk.")
+                self.reward_party(xp=10, reason="steadying the chapel at Cinderfall")
+            else:
+                self.say("The prayer helps, but the escape still has to happen in a rush.")
+        else:
+            self.player_action("Break the rear wall wider and rush the survivors out through the ash scrub.")
+            self.say("Fresh air and bad footing beat smoke and collapsing stone. You force an escape lane before the ruin can think better of it.")
+
+        self.act1_adjust_metric("act1_survivors_saved", 2)
+        self.act1_adjust_metric("act1_town_fear", -1)
+        self.complete_map_room(dungeon, room.room_id)
+
+    def _cinderfall_broken_storehouse(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
+        assert self.state is not None
+        self.say("The broken storehouse still holds relay tags, burst powder sacks, and spare basin fuel lined up for a road that was never supposed to exist on paper.")
+        choice = self.scenario_choice(
+            "What do you do in the storehouse?",
+            [
+                self.quoted_option("INVESTIGATION", "Read the manifests. I want to know what Ashfall still thinks it can call on."),
+                self.quoted_option("SLEIGHT OF HAND", "Tuck the powder where it will matter most once the relay starts shouting."),
+                self.action_option("Kick the reserve crates open and ruin whatever they can still carry from here."),
+            ],
+            allow_meta=False,
+        )
+        if choice == 1:
+            self.player_speaker("Read the manifests. I want to know what Ashfall still thinks it can call on.")
+            success = self.skill_check(self.state.player, "Investigation", 12, context="to read Cinderfall's reserve manifests before they scatter")
+            if success:
+                self.say("The manifests make it plain: Cinderfall is Ashfall's fallback line for fresh bowstrings, tonic crates, and ridge signal fuel.")
+                self.add_clue("Cinderfall is the fallback relay feeding Ashfall's reserves, signal fuel, and emergency runners.")
+                self.reward_party(xp=10, reason="reading the Cinderfall reserve manifests")
+            else:
+                self.say("You learn enough to know the ruin matters, just not enough to name every reserve moving through it.")
+        elif choice == 2:
+            self.player_speaker("Tuck the powder where it will matter most once the relay starts shouting.")
+            success = self.skill_check(self.state.player, "Sleight of Hand", 12, context="to sabotage Cinderfall's reserve crates without losing the element of surprise")
+            if success:
+                self.say("You hide the failure inside the stockpile itself. The next hard pull on the relay will tear something important loose.")
+                self.reward_party(xp=10, reason="planting a quiet sabotage line in Cinderfall's storehouse")
+            else:
+                self.say("You ruin some powder, but not cleanly enough to trust it as a plan all by itself.")
+        else:
+            self.player_action("Kick the reserve crates open and ruin whatever they can still carry from here.")
+            self.say("Food tins split, powder fouls, and relay tarps go dark under ash and boot leather.")
+
+        self.complete_map_room(dungeon, room.room_id)
+
+    def _cinderfall_ember_relay(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
+        assert self.state is not None
+        self.say(
+            "At the ruin's heart, a soot-black relay basin still glows behind broken stone while the last reserve crew tries to keep Ashfall's emergency line alive."
+        )
+        party_size = self.act1_party_size()
+        boss_enemies = [
+            create_enemy("ember_channeler", name="Ember Relay Keeper"),
+            create_enemy("ash_brand_enforcer", name="Ashen Brand Runner"),
+        ]
+        if party_size >= 3:
+            boss_enemies.append(self.act1_pick_enemy(("carrion_stalker", "cinder_kobold", "gutter_zealot", "ashstone_percher")))
+        boss_bonus = int(self.state.flags.get("cinderfall_chapel_secured", False)) + int(
+            self.state.flags.get("cinderfall_storehouse_searched", False)
+        )
+        choice = self.scenario_choice(
+            "How do you hit the relay before it can warn Ashfall?",
+            [
+                self.skill_tag("STEALTH", self.action_option("Slip to the basin braces and cut the line before the crew settles.")),
+                self.quoted_option("ARCANA", "The coals are being driven too hard. I can turn that against them."),
+                self.action_option("Charge the keeper and break the relay in plain sight."),
+            ],
+            allow_meta=False,
+        )
+        if choice == 1:
+            self.player_action("Slip to the basin braces and cut the line before the crew settles.")
+            success = self.skill_check(self.state.player, "Stealth", 13, context="to sabotage the ember relay before the crew can rally")
+            if success:
+                self.apply_status(boss_enemies[0], "surprised", 1, source="your sabotage run")
+                boss_enemies[0].current_hp = max(1, boss_enemies[0].current_hp - 4)
+                boss_bonus += 1
+                self.say("You cut the relay line first and the keeper spends the opening moments trying to save smoke instead of men.")
+            else:
+                self.say("You reach the basin, but not quietly enough to stop the crew from fighting for it.")
+        elif choice == 2:
+            self.player_speaker("The coals are being driven too hard. I can turn that against them.")
+            success = self.skill_check(self.state.player, "Arcana", 13, context="to overload the ember relay without getting caught in it")
+            if success:
+                self.apply_status(boss_enemies[-1], "reeling", 2, source="the relay flaring back into the crew")
+                boss_bonus += 1
+                self.say("The relay spits hot ash back through its own crew and the whole defense comes apart around the basin.")
+            else:
+                self.say("The relay flares wrong and ugly, but not cleanly enough to ruin the defenders on its own.")
+        else:
+            self.player_action("Charge the keeper and break the relay in plain sight.")
+            boss_enemies[0].current_hp = max(1, boss_enemies[0].current_hp - 3)
+            boss_bonus += 2
+            self.say("You hit the relay crew hard enough that they have to defend the basin and themselves at the same time.")
+
+        outcome = self.run_encounter(
+            Encounter(
+                title="Cinderfall Ember Relay",
+                description="The last reserve crew tries to keep Ashfall's hidden supply line alive.",
+                enemies=boss_enemies,
+                allow_flee=True,
+                allow_parley=False,
+                hero_initiative_bonus=boss_bonus,
+                allow_post_combat_random_encounter=False,
+            )
+        )
+        if outcome == "defeat":
+            self.handle_defeat("Cinderfall's relay burns on and Ashfall keeps its reserve line.")
+            return
+        if outcome == "fled":
+            self.return_to_phandalin("You pull out of Cinderfall before the relay crew can pin you in the ruin.")
+            return
+
+        self.complete_map_room(dungeon, room.room_id)
+        self.act1_adjust_metric("act1_ashen_strength", -1)
+        self.add_clue("Destroying the Cinderfall relay cuts Ashfall Watch off from its reserve line and emergency signal fuel.")
+        self.add_journal("You broke the hidden Cinderfall relay before the Ashfall assault.")
+        self.reward_party(xp=35, gold=12, reason="breaking the Cinderfall relay")
+        self.return_to_phandalin("Cinderfall goes dark behind you. Whatever waits at Ashfall will now be doing it with thinner reserves and worse timing.")
 
     def _ashfall_breach_gate(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
         assert self.state is not None
@@ -3670,11 +4266,16 @@ class MapSystemMixin:
     def _ashfall_lower_barracks(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
         assert self.state is not None
         party_size = self.act1_party_size()
-        second_enemies = [create_enemy("bandit"), create_enemy("bandit_archer", name="Ashen Brand Barracks Archer")]
+        second_enemies = [create_enemy("ash_brand_enforcer"), create_enemy("bandit_archer", name="Ashen Brand Barracks Archer")]
         if party_size >= 2:
-            second_enemies.append(self.act1_pick_enemy(("bandit", "orc_raider", "gutter_zealot", "ashstone_percher")))
+            second_enemies.append(self.act1_pick_enemy(("ember_channeler", "bandit", "orc_raider", "gutter_zealot", "ashstone_percher")))
         if party_size >= 4:
             second_enemies.append(self.act1_pick_enemy(("orc_raider", "rust_shell_scuttler", "bugbear_reaver")))
+        if self.act1_relay_sabotaged() and len(second_enemies) > 1:
+            missing_reinforcement = second_enemies.pop()
+            self.say(
+                f"{missing_reinforcement.name} never makes the barracks line. Cinderfall's ruined relay has the reserve route bleeding men and time."
+            )
         hero_bonus = int(self.state.flags.get("ashfall_signal_basin_silenced", False)) * 2
         if self.state.flags.get("ashfall_prisoners_freed"):
             hero_bonus += 2
@@ -3700,6 +4301,7 @@ class MapSystemMixin:
             self.return_to_phandalin("You drag the party clear of the lower yard and retreat before the courtyard can close on you.")
             return
 
+        self.resolve_elira_faith_under_ash()
         self.complete_map_room(dungeon, room.room_id)
         if not self.state.flags.get("ashfall_signal_basin_silenced"):
             self.say("The barracks are broken, but the command post is still shielded by the active signal line. Another wing needs clearing first.")
@@ -3713,11 +4315,22 @@ class MapSystemMixin:
         )
         party_size = self.act1_party_size()
         boss_enemies = [create_enemy("rukhar")]
+        if not self.act1_relay_sabotaged():
+            boss_enemies[0].grant_temp_hp(4)
+            self.say("Reserve draughts and spare armor plates still reached Rukhar before you did. He squares up behind the fort's last full edge.")
+        else:
+            self.say("Rukhar is still dangerous, but Cinderfall's ruined relay leaves him without the fort's last reserve edge.")
         if party_size >= 2:
-            boss_enemies.append(self.act1_pick_enemy(("bandit", "gutter_zealot", "bugbear_reaver")))
+            boss_enemies.append(self.act1_pick_enemy(("ash_brand_enforcer", "gutter_zealot", "bugbear_reaver")))
         if party_size >= 4:
             boss_enemies.append(self.act1_pick_enemy(("orc_raider", "rust_shell_scuttler")))
         boss_bonus = 1 if self.state.flags.get("ashfall_orders_read") else 0
+        if self.state.flags.get("elira_mercy_blessing"):
+            self.apply_status(self.state.player, "blessed", 2, source="Elira's answer under ash")
+            boss_bonus += 1
+        if self.state.flags.get("elira_hard_verdict"):
+            boss_bonus += 1
+            boss_enemies[0].current_hp = max(1, boss_enemies[0].current_hp - 2)
         choice = self.scenario_choice(
             "Rukhar raises his blade and waits to see how you answer.",
             [
@@ -4160,7 +4773,7 @@ class MapSystemMixin:
     def _emberhall_varyn_sanctum(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
         assert self.state is not None
         party_size = self.act1_party_size()
-        boss_enemies = [create_enemy("varyn"), create_enemy("bandit", name="Ashen Brand Enforcer"), create_enemy("bandit_archer")]
+        boss_enemies = [create_enemy("varyn"), create_enemy("ash_brand_enforcer"), create_enemy("ember_channeler")]
         if party_size >= 3:
             boss_enemies.append(self.act1_pick_enemy(("bandit", "cinderflame_skull", "whispermaw_blob")))
         if party_size >= 4:
@@ -4232,6 +4845,13 @@ class MapSystemMixin:
             "Varyn falls, the remaining brigands scatter, and the pressure that has bent every road into Phandalin finally breaks. Among the captain's ledgers are references to older powers stirring beneath the Sword Mountains, "
             "with whispers pointing toward deeper ruins, buried wealth, and unfinished business near Wave Echo Cave."
         )
+        victory_tier = self.act1_record_epilogue_flags()
+        if victory_tier == "clean_victory":
+            self.say("Phandalin takes the news like a town finally allowed to breathe. The roads are scarred, but not broken, and the company leaves Act I with loyalty mostly intact.")
+        elif victory_tier == "costly_victory":
+            self.say("The win holds, but it costs blood, trust, and more sleepless eyes than anyone in town will admit out loud. Phandalin survives this act tired rather than whole.")
+        else:
+            self.say("Varyn is dead, but too many threads were left burning behind him. The Ashen Brand is beaten without being cleanly erased, and the next descent will begin under pressure.")
         self.add_journal("You broke the Ashen Brand and secured Phandalin through the end of Act 1.")
         self.reward_party(xp=250, gold=80, reason="securing Phandalin at the end of Act I")
         if 1 not in self.state.completed_acts:

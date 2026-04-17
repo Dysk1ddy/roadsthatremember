@@ -110,4 +110,44 @@ ACT_1_QUESTS: dict[str, QuestDefinition] = {
             "Daran nods once, the kind of nod old soldiers reserve for work done cleanly. The hills will still be dangerous tomorrow, but at least now they will be honestly dangerous."
         ),
     ),
+    "bryn_loose_ends": QuestDefinition(
+        quest_id="bryn_loose_ends",
+        title="Loose Ends",
+        giver="Bryn Underbough",
+        location="The road and whatever old cache still remembers her",
+        summary=(
+            "Bryn suspects one of her abandoned smuggler caches has been folded into the Ashen Brand's side traffic. She wants the ledger inside found and judged before someone else profits from it."
+        ),
+        objective="Track down Bryn's old cache trail and decide what to do with the ledger inside it.",
+        turn_in="Resolve the ledger question with Bryn once the cache is found.",
+        completion_flags=("bryn_loose_ends_resolved",),
+        reward=QuestReward(),
+        accepted_text=(
+            "Bryn admits this one quietly: there is an old cache she never meant anyone worth saving to find. If the Brand reached it first, she wants your help ending the story cleanly."
+        ),
+        ready_text="Bryn's cache has been found. She needs your call on whether the ledger burns or gets sold.",
+        turn_in_text=(
+            "Bryn takes your answer without pretending it costs nothing. Whatever route that ledger once kept alive ends here, one way or another."
+        ),
+    ),
+    "elira_faith_under_ash": QuestDefinition(
+        quest_id="elira_faith_under_ash",
+        title="Faith Under Ash",
+        giver="Elira Dawnmantle",
+        location="Wherever mercy has to stand under pressure",
+        summary=(
+            "Elira wants to see what kind of justice survives once the Ashen Brand is beaten badly enough to beg. She is asking about you as much as about them."
+        ),
+        objective="Face a captive servant of the Ashen Brand and decide whether mercy or fear carries the day.",
+        turn_in="Make the call when Elira asks for it in the field.",
+        completion_flags=("elira_faith_under_ash_resolved",),
+        reward=QuestReward(),
+        accepted_text=(
+            "Elira says it gently, which somehow makes it harder: anyone can sound righteous before the blood is close. What matters is the answer you choose after."
+        ),
+        ready_text="Elira's question has reached the point where a real answer is needed, not another good intention.",
+        turn_in_text=(
+            "Elira does not praise or condemn you cheaply. She simply carries your answer forward, which is heavier in its own way than either reaction would have been."
+        ),
+    ),
 }

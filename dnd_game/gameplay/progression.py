@@ -154,6 +154,7 @@ class ProgressionMixin:
         new_level: int,
         *,
         randomize_skill_choice: bool = False,
+        announce: bool = True,
     ) -> None:
         actor.level = new_level
         hp_gain = max(1, actor.hit_die // 2 + 1 + actor.ability_mod("CON"))
@@ -166,9 +167,10 @@ class ProgressionMixin:
             if randomize_skill_choice
             else self.auto_choose_level_up_skill(actor)
         )
-        summary_parts = [f"{actor.name} gains {hp_gain} max HP"]
-        if picked is not None:
-            summary_parts.append(f"learns {picked}")
-        self.say(", and ".join(summary_parts) + ".")
-        for line in feature_lines:
-            self.say(f"{actor.name}: {line}")
+        if announce:
+            summary_parts = [f"{actor.name} gains {hp_gain} max HP"]
+            if picked is not None:
+                summary_parts.append(f"learns {picked}")
+            self.say(", and ".join(summary_parts) + ".")
+            for line in feature_lines:
+                self.say(f"{actor.name}: {line}")

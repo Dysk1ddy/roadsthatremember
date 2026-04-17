@@ -328,6 +328,9 @@ class CombatResolutionMixin:
             outcome_kind="damage",
         )
         damage = max(1, damage_roll.total + attacker.damage_bonus())
+        if self.has_status(target, "marked"):
+            damage += 2
+            self.say(f"The ember mark on {target.name} flares and gives {attacker.name} a cleaner wound to drive into.")
         actual = self.apply_damage(target, damage, damage_type=weapon_item.damage_type if weapon_item is not None else "")
         self.say(f"{self.style_name(attacker)} hits {self.style_name(target)} for {self.style_damage(actual)} damage.")
         self.announce_downed_target(target)
@@ -366,6 +369,8 @@ class CombatResolutionMixin:
         if attacker.archetype == "briar_twig" and target.is_conscious():
             if not self.saving_throw(target, "STR", 11, context=f"against {attacker.name}'s snagging thorns"):
                 self.apply_status(target, "reeling", 2, source=f"{attacker.name}'s snagging thorns")
+        if attacker.archetype == "carrion_stalker" and target.is_conscious():
+            self.apply_status(target, "bleeding", 2, source=f"{attacker.name}'s serrated talons")
         if attacker.archetype == "bandit" and d20.kept >= 18 and target.is_conscious():
             if not self.saving_throw(target, "STR", 11, context=f"against {attacker.name}'s clinch"):
                 self.apply_status(target, "grappled", 1, source=attacker.name)

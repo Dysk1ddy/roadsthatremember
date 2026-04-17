@@ -80,6 +80,11 @@ COMPANION_PROFILES: dict[str, dict[str, object]] = {
         "great_bonuses": {"Stealth": 1, "initiative": 1},
         "exceptional_bonuses": {"Perception": 1},
         "scene_support": {
+            "old_owl_well": {
+                "text": "Bryn quietly points out the blind angles in the dig ring and the one trench line nobody is properly watching.",
+                "hero_bonus": 1,
+                "ally_statuses": {"invisible": 1},
+            },
             "emberhall_cellars": {
                 "text": "Bryn spots the safest shadow-line through the cellar and hands the party a cleaner opening.",
                 "hero_bonus": 1,
@@ -160,6 +165,11 @@ COMPANION_PROFILES: dict[str, dict[str, object]] = {
         "great_bonuses": {"Perception": 1, "initiative": 1},
         "exceptional_bonuses": {"attack": 1},
         "scene_support": {
+            "wyvern_tor": {
+                "text": "Kaelis reads the shelf wind and the worg tracks in one glance, giving you the cleaner first angle.",
+                "hero_bonus": 1,
+                "ally_statuses": {"emboldened": 1},
+            },
             "road_ambush": {
                 "text": "Kaelis reads the brush like a page and murmurs the exact second to strike.",
                 "hero_bonus": 1,

@@ -56,6 +56,18 @@ STATUS_DEFINITIONS: dict[str, dict[str, object]] = {
         "attack_bonus": 1,
         "save_bonus": 2,
     },
+    "guarded": {
+        "name": "Guarded",
+        "combat_only": True,
+        "ac_bonus": 1,
+    },
+    "marked": {"name": "Marked", "combat_only": True},
+    "bleeding": {
+        "name": "Bleeding",
+        "combat_only": True,
+        "ongoing_damage": "1d4",
+        "damage_type": "bleeding",
+    },
     "cursed": {
         "name": "Cursed",
         "combat_only": False,
@@ -98,7 +110,7 @@ class StatusEffectMixin:
         return total
 
     def effective_armor_class(self, actor) -> int:
-        return max(1, actor.armor_class - self.status_value(actor, "ac_penalty"))
+        return max(1, actor.armor_class + self.status_value(actor, "ac_bonus") - self.status_value(actor, "ac_penalty"))
 
     def apply_status(self, actor, status: str, duration: int, *, source: str = "") -> None:
         definition = self.status_definition(status)

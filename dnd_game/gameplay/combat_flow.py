@@ -33,6 +33,10 @@ class CombatFlowMixin:
             heroes = [member for member in self.state.party_members() if not member.dead]
             enemies = encounter.enemies
             self.introduce_encounter_characters(enemies)
+            self.apply_companion_combat_openers(heroes, enemies, encounter)
+            for enemy in enemies:
+                if enemy.is_conscious() and enemy.archetype == "carrion_stalker" and not self.has_status(enemy, "invisible"):
+                    self.apply_status(enemy, "invisible", 1, source=f"{enemy.name}'s stalking entry")
             dodging: set[str] = set()
             initiative = self.roll_initiative(
                 heroes,
@@ -103,6 +107,47 @@ class CombatFlowMixin:
             label = getattr(encounter, "title", "") or getattr(self.state, "current_scene", "combat")
             create_autosave(label=label)
         return "victory"
+
+    def marked_priority_target(self, heroes: list[Character]) -> Character | None:
+        marked = [hero for hero in heroes if hero.is_conscious() and self.has_status(hero, "marked")]
+        if not marked:
+            return None
+        return max(marked, key=lambda hero: (hero.attack_bonus(), hero.current_hp))
+
+    def apply_companion_combat_openers(
+        self,
+        heroes: list[Character],
+        enemies: list[Character],
+        encounter: Encounter,
+    ) -> None:
+        if self.state is None:
+            return
+        kaelis = next(
+            (
+                hero
+                for hero in heroes
+                if hero.is_conscious() and hero.companion_id == "kaelis_starling" and hero.disposition >= 6
+            ),
+            None,
+        )
+        if kaelis is not None:
+            self.say(f"{kaelis.name} opens with a Shadow Volley that keeps the whole company under cover for one decisive beat.")
+            for hero in heroes:
+                if hero.is_conscious():
+                    self.apply_status(hero, "invisible", 1, source=f"{kaelis.name}'s Shadow Volley")
+        tolan = next(
+            (
+                hero
+                for hero in heroes
+                if hero.is_conscious() and hero.companion_id == "tolan_ironshield" and hero.disposition >= 6
+            ),
+            None,
+        )
+        if tolan is not None:
+            self.say(f"{tolan.name} plants his feet and calls Hold the Line before steel ever meets steel.")
+            for hero in heroes:
+                if hero.is_conscious():
+                    self.apply_status(hero, "guarded", 2, source=f"{tolan.name}'s Hold the Line")
 
     def hero_turn(
         self,
@@ -792,8 +837,55 @@ class CombatFlowMixin:
         if not conscious_heroes:
             return
         conscious_allies = [enemy for enemy in enemies if enemy.is_conscious() and enemy is not actor]
+        marked_target = self.marked_priority_target(conscious_heroes)
         if not self.can_make_hostile_action(actor):
             self.say(f"{self.style_name(actor)} falters and cannot press a hostile attack while Charmed.")
+            return
+        if actor.archetype == "ash_brand_enforcer" and actor.resources.get("punishing_strike", 0) > 0:
+            target = next(
+                (
+                    hero
+                    for hero in conscious_heroes
+                    if any(self.has_status(hero, status) for status in ("blessed", "emboldened", "invisible"))
+                ),
+                marked_target,
+            )
+            if target is not None:
+                actor.resources["punishing_strike"] = 0
+                self.say(f"{actor.name} lunges at {target.name}, aiming to turn their own momentum against them.")
+                hit = self.perform_enemy_attack(actor, target, heroes, enemies, dodging)
+                if hit and target.is_conscious():
+                    extra = self.apply_damage(
+                        target,
+                        self.roll_with_display_bonus(
+                            "1d6",
+                            style="damage",
+                            context_label=f"{actor.name}'s punishing strike",
+                            outcome_kind="damage",
+                        ).total,
+                        damage_type="slashing",
+                    )
+                    self.say(f"{actor.name} drives the opening deeper for {self.style_damage(extra)} extra damage.")
+                    self.announce_downed_target(target)
+                    if self.has_status(target, "blessed"):
+                        self.clear_status(target, "blessed")
+                        self.say(f"{target.name}'s blessing gutters out under the hit.")
+                return
+        if actor.archetype == "ember_channeler" and actor.resources.get("ember_mark", 0) > 0 and marked_target is None:
+            target = max(conscious_heroes, key=lambda hero: (hero.attack_bonus(), hero.current_hp))
+            actor.resources["ember_mark"] = 0
+            self.say(f"{actor.name} traces a burning sigil toward {target.name} and lets the whole enemy line see it.")
+            if not self.saving_throw(target, "WIS", 12, context=f"against {actor.name}'s ember mark"):
+                self.apply_status(target, "marked", 2, source=f"{actor.name}'s ember mark")
+                if target.is_conscious():
+                    self.apply_status(target, "reeling", 1, source=f"{actor.name}'s ember mark")
+            else:
+                self.say(f"{target.name} shakes off the worst of the ember sign before it can settle.")
+            return
+        if actor.archetype == "carrion_stalker" and actor.resources.get("shadow_hide", 0) > 0 and not self.has_status(actor, "invisible"):
+            actor.resources["shadow_hide"] = 0
+            self.apply_status(actor, "invisible", 1, source=f"{actor.name}'s shadow hide")
+            self.say(f"{actor.name} melts back into the blind angles of the fight.")
             return
         if actor.archetype == "cult_lookout" and actor.resources.get("blind_dust", 0) > 0:
             target = max(conscious_heroes, key=lambda hero: (hero.attack_bonus(), hero.current_hp))
@@ -1387,6 +1479,19 @@ class CombatFlowMixin:
             target = next((hero for hero in conscious_heroes if hero.name == marked), None)
             if target is None:
                 target = min(conscious_heroes, key=lambda hero: hero.current_hp)
+        elif actor.archetype == "ash_brand_enforcer":
+            target = marked_target or max(
+                conscious_heroes,
+                key=lambda hero: (
+                    1 if any(self.has_status(hero, status) for status in ("blessed", "emboldened", "invisible")) else 0,
+                    hero.attack_bonus(),
+                    hero.current_hp,
+                ),
+            )
+        elif actor.archetype == "ember_channeler":
+            target = marked_target or max(conscious_heroes, key=lambda hero: (hero.attack_bonus(), hero.current_hp))
+        elif actor.archetype == "carrion_stalker":
+            target = marked_target or min(conscious_heroes, key=lambda hero: (hero.current_hp, hero.armor_class))
         elif actor.archetype == "whispermaw_blob":
             target = max(conscious_heroes, key=lambda hero: (hero.attack_bonus(), hero.current_hp))
         else:

@@ -10,9 +10,11 @@ ACT_1_POST_COMBAT_RANDOM_ENCOUNTERS: tuple[tuple[str, str, str], ...] = (
     ("abandoned_cottage", "Abandoned Cottage", "random_encounter_abandoned_cottage"),
     ("bandit_toll_line", "Bandit Toll Line", "random_encounter_bandit_toll_line"),
     ("wounded_messenger", "Wounded Messenger", "random_encounter_wounded_messenger"),
+    ("messenger_returns_with_reward", "Messenger Returns", "random_encounter_messenger_returns_with_reward"),
     ("hunter_snare", "Hunter's Snare", "random_encounter_hunter_snare"),
     ("lone_wolf", "Lone Wolf at the Kill", "random_encounter_lone_wolf"),
     ("smuggler_cookfire", "Smuggler Cookfire", "random_encounter_smuggler_cookfire"),
+    ("smuggler_revenge_squad", "Smuggler Revenge Squad", "random_encounter_smuggler_revenge_squad"),
     ("shrine_of_tymora", "Shrine of Tymora", "random_encounter_shrine_of_tymora"),
     ("half_sunk_satchel", "Half-Sunk Satchel", "random_encounter_half_sunk_satchel"),
     ("ruined_wayhouse", "Ruined Wayhouse", "random_encounter_ruined_wayhouse"),
@@ -61,6 +63,15 @@ class RandomEncounterMixin:
     def random_encounter_intro(self, text: str) -> None:
         self.say(text, typed=True)
 
+    def random_encounter_unlocked(self, encounter_id: str) -> bool:
+        if self.state is None:
+            return True
+        if encounter_id == "messenger_returns_with_reward":
+            return bool(self.state.flags.get("saved_wounded_messenger")) and not bool(self.state.flags.get("messenger_return_paid"))
+        if encounter_id == "smuggler_revenge_squad":
+            return bool(self.state.flags.get("smuggler_revenge_pending")) and not bool(self.state.flags.get("smuggler_revenge_resolved"))
+        return True
+
     def weighted_post_combat_random_encounter_pool(self) -> list[tuple[str, str, str]]:
         entries = list(self.post_combat_random_encounter_entries())
         if self.state is None:
@@ -69,6 +80,8 @@ class RandomEncounterMixin:
         weighted: list[tuple[str, str, str]] = []
         for encounter in entries:
             encounter_id = encounter[0]
+            if not self.random_encounter_unlocked(encounter_id):
+                continue
             weight = 1 if encounter_id in seen else 10
             weighted.extend([encounter] * weight)
         return weighted
@@ -485,6 +498,9 @@ class RandomEncounterMixin:
 
     def random_encounter_abandoned_cottage(self) -> None:
         assert self.state is not None
+        special_survivor = bool(self.state.flags.get("bryn_cache_found")) and not bool(
+            self.state.flags.get("abandoned_cottage_survivor_met")
+        )
         self.random_encounter_intro(
             "A soot-stained cottage slumps beside the trail, with one shutter hanging open and a cellar door that looks newer than the walls around it."
         )
@@ -498,6 +514,10 @@ class RandomEncounterMixin:
         if choice == 1:
             if self.skill_check(self.state.player, "Perception", 12, context="to read the cottage from the yard"):
                 self.grant_random_encounter_rewards(reason="the cottage rafters", gold=4, items={"camp_stew_jar": 1, "bread_round": 1})
+                if special_survivor:
+                    self.state.flags["abandoned_cottage_survivor_met"] = True
+                    self.say("A soot-streaked cellar holdout only crawls out after the yard settles. They whisper one useful thing before fleeing: Varyn's people call the deeper route under town Emberhall.")
+                    self.add_clue("A terrified holdout in the cottage names Emberhall as the Ashen Brand's deeper cellar route under Phandalin.")
             else:
                 self.say("A loose shutter bangs open, and the squatters inside answer with drawn steel.")
                 self.resolve_random_encounter_fight(
@@ -508,6 +528,10 @@ class RandomEncounterMixin:
         elif choice == 2:
             if self.skill_check(self.state.player, "Persuasion", 11, context="to promise safe passage to whoever is hiding inside"):
                 self.grant_random_encounter_rewards(reason="the cottage table", gold=6, items={"goat_cheese": 1})
+                if special_survivor:
+                    self.state.flags["abandoned_cottage_survivor_met"] = True
+                    self.say("Your offer pulls a hidden survivor out of the cellar. Between panicked breaths they mention Emberhall and the black-ink ledgers moving beneath town.")
+                    self.add_clue("A hidden cottage survivor ties Emberhall to the Ashen Brand's cellar ledgers beneath town.")
             else:
                 self.say("The reply is a crossbow quarrel through the boards.")
                 self.resolve_random_encounter_fight(
@@ -574,6 +598,7 @@ class RandomEncounterMixin:
             if self.skill_check(self.state.player, "Medicine", 11, context="to stop the bleeding in time"):
                 self.grant_random_encounter_rewards(reason="the grateful messenger", gold=9, items={"bread_round": 1})
                 self.add_clue("A roadside messenger mentioned more Ashen Brand scouts probing side trails around Phandalin.")
+                self.state.flags["saved_wounded_messenger"] = True
             else:
                 self.say("You slow the bleeding, but the messenger can only rasp thanks before passing out.")
         elif choice == 2:
@@ -583,6 +608,33 @@ class RandomEncounterMixin:
                 self.say("You find little that still matters and lose time in the reeds.")
         else:
             self.say("You leave water within reach and let the road take the rest of the choice from you.")
+
+    def random_encounter_messenger_returns_with_reward(self) -> None:
+        assert self.state is not None
+        self.random_encounter_intro(
+            "The wounded messenger finds you on the road two battles later, walking stiffly but upright with a fresh bandage and a sealed runner's tube held out in both hands."
+        )
+        options = [
+            self.quoted_option("PERSUASION", "What did you learn once you made it back alive?"),
+            self.action_option("Take the reward and tell the messenger to keep breathing."),
+            self.action_option("Refuse the coin and tell them to spend it in Phandalin instead."),
+        ]
+        choice = self.scenario_choice("How do you answer the messenger's return?", options, allow_meta=False)
+        self.player_choice_output(options[choice - 1])
+        self.state.flags["messenger_return_paid"] = True
+        if choice == 1:
+            if self.skill_check(self.state.player, "Persuasion", 12, context="to settle the messenger enough for the useful details"):
+                self.grant_random_encounter_rewards(reason="the messenger's return", gold=8, items={"potion_healing": 1})
+                self.add_clue("The recovered messenger confirms the Ashen Brand has been leaning on more side roads than the town realized.")
+            else:
+                self.grant_random_encounter_rewards(reason="the messenger's return", gold=5)
+        elif choice == 2:
+            self.grant_random_encounter_rewards(reason="the messenger's return", gold=7, items={"bread_round": 1})
+        else:
+            self.say("The messenger keeps the coin and promises it will land where Phandalin actually bleeds.")
+            adjust_metric = getattr(self, "act1_adjust_metric", None)
+            if callable(adjust_metric):
+                adjust_metric("act1_town_fear", -1)
 
     def random_encounter_hunter_snare(self) -> None:
         assert self.state is not None
@@ -658,9 +710,12 @@ class RandomEncounterMixin:
 
     def random_encounter_smuggler_cookfire(self) -> None:
         assert self.state is not None
+        bryn_cache_live = self.has_quest("bryn_loose_ends") and not bool(self.state.flags.get("bryn_cache_found"))
         self.random_encounter_intro(
             "A narrow plume of smoke rises from a hidden cookfire ahead, where half-packed bundles sit under a tarp and someone has been careful not to camp on the road itself."
         )
+        if bryn_cache_live:
+            self.say("Bryn goes very still for half a second. The tarp knots and ash marks are old smuggler shorthand she recognizes immediately.")
         options = [
             self.skill_tag("STEALTH", self.action_option("Circle wide and lift what you can before the campers notice.")),
             self.quoted_option("DECEPTION", "Riders are coming from Neverwinter. Run while you still can."),
@@ -668,26 +723,83 @@ class RandomEncounterMixin:
         ]
         choice = self.scenario_choice("How do you approach the hidden fire?", options, allow_meta=False)
         self.player_choice_output(options[choice - 1])
+        camp_disrupted = False
+        cache_recovered = False
         if choice == 1:
+            camp_disrupted = True
             if self.skill_check(self.state.player, "Stealth", 12, context="to reach the tarp without a snapped twig giving you away"):
                 self.grant_random_encounter_rewards(reason="the smuggler tarp", gold=4, items={"potion_healing": 1})
+                cache_recovered = True
             else:
-                self.resolve_random_encounter_fight(
+                outcome = self.resolve_random_encounter_fight(
                     title="Smuggler Camp",
                     description="The hidden campers catch you in the act and come up armed.",
                     enemies=self.random_bandit_pair(),
                 )
+                cache_recovered = outcome == "victory"
         elif choice == 2:
+            camp_disrupted = True
             if self.skill_check(self.state.player, "Deception", 12, context="to sell the story of riders on the road"):
                 self.grant_random_encounter_rewards(reason="the abandoned cookfire", gold=7, items={"bread_round": 1})
+                cache_recovered = True
             else:
-                self.resolve_random_encounter_fight(
+                outcome = self.resolve_random_encounter_fight(
                     title="Smuggler Panic",
                     description="The campers spot the lie, snatch up their weapons, and rush the tree line.",
                     enemies=self.random_bandit_pair(),
                 )
+                cache_recovered = outcome == "victory"
         else:
             self.say("You let the hidden camp keep its secrets and deny the road one more reason to bleed tonight.")
+        if camp_disrupted:
+            self.state.flags["smuggler_revenge_pending"] = True
+        if bryn_cache_live and cache_recovered:
+            self.state.flags["bryn_cache_found"] = True
+            self.say("Among the abandoned bundles is a smoke-wrapped ledger case Bryn knows instantly. One old cache just stopped being theoretical.")
+
+    def random_encounter_smuggler_revenge_squad(self) -> None:
+        assert self.state is not None
+        self.state.flags["smuggler_revenge_resolved"] = True
+        self.state.flags["smuggler_revenge_pending"] = False
+        self.random_encounter_intro(
+            "The retaliation comes on a stretch of brush road where the birds have already gone quiet. Smuggler lookouts and Ashen Brand muscle are waiting where they expect the score to settle."
+        )
+        enemies = [create_enemy("ash_brand_enforcer"), create_enemy("bandit_archer")]
+        if len(self.state.party_members()) >= 3:
+            enemies.append(create_enemy("ember_channeler"))
+        options = [
+            self.skill_tag("STEALTH", self.action_option("Spot the ambush first and break their line before it closes.")),
+            self.quoted_option("INTIMIDATION", "Walk out and tell them exactly how badly this is about to go."),
+            self.action_option("Meet the revenge squad head on."),
+        ]
+        choice = self.scenario_choice("How do you answer the revenge squad?", options, allow_meta=False)
+        self.player_choice_output(options[choice - 1])
+        if choice == 1:
+            if self.skill_check(self.state.player, "Stealth", 13, context="to catch the ambush line before it catches you"):
+                self.grant_random_encounter_rewards(reason="the broken revenge line", gold=8, items={"scroll_clarity": 1})
+            else:
+                self.resolve_random_encounter_fight(
+                    title="Smuggler Revenge Squad",
+                    description="The hidden reprisals cell springs the trap with Ashen Brand backing behind it.",
+                    enemies=enemies,
+                )
+        elif choice == 2:
+            if self.skill_check(self.state.player, "Intimidation", 13, context="to break the revenge squad's nerve before the charge"):
+                self.grant_random_encounter_rewards(reason="the shaken revenge squad", gold=9)
+            else:
+                self.resolve_random_encounter_fight(
+                    title="Smuggler Revenge Squad",
+                    description="The threatened smugglers decide they have come too far to turn back now.",
+                    enemies=enemies,
+                )
+        else:
+            outcome = self.resolve_random_encounter_fight(
+                title="Smuggler Revenge Squad",
+                description="Steel answers old grudges in the brush road dark.",
+                enemies=enemies,
+            )
+            if outcome == "victory":
+                self.grant_random_encounter_rewards(reason="the revenge squad", gold=6)
 
     def random_encounter_shrine_of_tymora(self) -> None:
         assert self.state is not None

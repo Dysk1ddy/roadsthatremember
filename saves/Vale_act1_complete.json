@@ -474,7 +474,12 @@
     "introduced_characters": [
       "Varyn Sable"
     ],
-    "act1_complete": true
+    "act1_complete": true,
+    "act1_town_fear": 2,
+    "act1_ashen_strength": 3,
+    "act1_survivors_saved": 0,
+    "act1_victory_tier": "fractured_victory",
+    "act2_starting_pressure": 2
   },
   "clues": [],
   "journal": [

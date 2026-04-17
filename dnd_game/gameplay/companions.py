@@ -15,6 +15,10 @@ class CompanionSystemMixin:
         assert self.state is not None
         return len(self.state.party_members())
 
+    def highest_active_party_level(self) -> int:
+        assert self.state is not None
+        return max(member.level for member in self.state.party_members())
+
     def active_companion_limit(self) -> int:
         return ACTIVE_COMPANION_LIMIT
 
@@ -74,6 +78,17 @@ class CompanionSystemMixin:
         self.say(f"{companion.name} decides they can no longer trust you and leaves the company.")
         self.add_journal(f"{companion.name} left the party after trust collapsed ({reason}).")
 
+    def sync_companion_to_active_party_level(self, companion) -> bool:
+        assert self.state is not None
+        target_level = self.highest_active_party_level()
+        if companion.level >= target_level:
+            return False
+        previous_level = companion.level
+        for next_level in range(companion.level + 1, target_level + 1):
+            self.level_up_character_automatically(companion, next_level, announce=False)
+        self.say(f"{companion.name} catches up from level {previous_level} to level {target_level} to match the active party.")
+        return True
+
     def recruit_companion(self, companion) -> None:
         assert self.state is not None
         if self.has_companion(companion.name):
@@ -97,6 +112,7 @@ class CompanionSystemMixin:
             self.say(f"{companion.name} joins your wider company, but the active party is full. They head to camp for now.")
         else:
             self.state.companions.append(companion)
+            self.sync_companion_to_active_party_level(companion)
             self.add_journal(f"{companion.name} joined the active party.")
         self.sync_equipment(companion)
 
@@ -117,6 +133,7 @@ class CompanionSystemMixin:
             return False
         self.state.camp_companions.remove(companion)
         self.state.companions.append(companion)
+        self.sync_companion_to_active_party_level(companion)
         self.say(f"{companion.name} returns from camp and joins the active party.")
         return True
 
