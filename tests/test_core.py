@@ -290,6 +290,70 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(choice, 1)
         self.assertEqual(pauses, ["pause", "pause"])
 
+    def test_non_combat_choose_uses_keyboard_menu_when_supported(self) -> None:
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(900731))
+        captured: dict[str, object] = {}
+        game.keyboard_choice_menu_supported = lambda: True
+
+        def fake_run(prompt, options, *, title=None):
+            captured["prompt"] = prompt
+            captured["options"] = list(options)
+            captured["title"] = title
+            return 2
+
+        game.run_keyboard_choice_menu = fake_run
+        choice = game.choose("Choose a path.", ["First", "Second"], allow_meta=False, show_hud=False)
+        self.assertEqual(choice, 2)
+        self.assertEqual(captured["prompt"], "Choose a path.")
+        self.assertEqual(captured["options"], ["First", "Second"])
+        self.assertIsNone(captured["title"])
+
+    def test_combat_choose_uses_keyboard_menu_when_supported(self) -> None:
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(900732))
+        captured: dict[str, object] = {}
+        game.keyboard_choice_menu_supported = lambda: True
+
+        def fake_run(prompt, options, *, title=None):
+            captured["prompt"] = prompt
+            captured["options"] = list(options)
+            captured["title"] = title
+            return 2
+
+        game.run_keyboard_choice_menu = fake_run
+        game._in_combat = True
+        choice = game.choose("Choose a path.", ["First", "Second"], allow_meta=False)
+        self.assertEqual(choice, 2)
+        self.assertEqual(captured["prompt"], "Choose a path.")
+        self.assertEqual(captured["options"], ["First", "Second"])
+        self.assertIsNone(captured["title"])
+
+    def test_keyboard_choice_reader_treats_ctrl_c_as_game_interrupted(self) -> None:
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(900733))
+        with patch("dnd_game.gameplay.io.msvcrt", SimpleNamespace(getwch=lambda: "\x03")):
+            with self.assertRaises(gameplay_base.GameInterrupted):
+                game.read_keyboard_choice_wchar()
+
+    def test_keyboard_choice_menu_hides_instructions_after_first_prompt(self) -> None:
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(900734))
+        game.should_use_keyboard_choice_menu = lambda: True
+        seen: list[bool] = []
+        actions = iter([("down", None), ("enter", None), ("enter", None)])
+        game.read_keyboard_choice_key = lambda: next(actions)
+        game.build_keyboard_choice_menu = (
+            lambda prompt, options, *, title, selected_index, typed_buffer, feedback, show_instructions: (
+                seen.append(show_instructions) or "menu"
+            )
+        )
+        self.assertEqual(game.run_keyboard_choice_menu("Choose a path.", ["First", "Second"]), 2)
+        self.assertEqual(game.run_keyboard_choice_menu("Choose another path.", ["First", "Second"]), 1)
+        self.assertEqual(seen, [True, False, False])
+
+    def test_safe_rich_render_width_does_not_exceed_detected_terminal_width(self) -> None:
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(900735))
+        game.rich_console_width = lambda: 120
+        game.detected_terminal_width = lambda: 94
+        self.assertEqual(game.safe_rich_render_width(), 94)
+
     def test_dice_animation_skip_fast_forwards_but_keeps_final_pause(self) -> None:
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(90071), animate_dice=True)
         rendered: list[bool] = []
@@ -1306,10 +1370,11 @@ class CoreTests(unittest.TestCase):
             class_skill_choices=["Athletics", "Survival"],
         )
         encounters: list[Encounter] = []
-        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(900870))
+        log: list[str] = []
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(900870))
         game.state = GameState(
             player=player,
-            companions=[create_irielle_ashwake()],
+            companions=[create_nim_ardentglass(), create_irielle_ashwake()],
             current_act=2,
             current_scene="forge_of_spells",
             flags={
@@ -1319,6 +1384,7 @@ class CoreTests(unittest.TestCase):
                 "black_lake_barracks_raided": True,
                 "black_lake_barracks_orders_taken": True,
                 "black_lake_causeway_shaken": True,
+                "nim_countermeasure_notes": True,
                 "south_adit_counter_cadence_learned": True,
                 "act2_town_stability": 3,
                 "act2_route_control": 3,
@@ -1375,6 +1441,9 @@ class CoreTests(unittest.TestCase):
             "You broke the shard channels and turned the Forge's hidden pressure seam into a wound instead of a weapon.",
             game.state.journal,
         )
+        rendered = self.plain_output(log)
+        self.assertIn("The chamber's still honest in the margins. Read the traffic, not the glow", rendered)
+        self.assertIn("The lens wants one obedience note under everything else.", rendered)
 
     def test_act2_status_and_journal_summarize_rescues_and_route_intel(self) -> None:
         player = build_character(
@@ -1460,9 +1529,13 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(state.flags["act3_forge_route_state"], "broken")
         self.assertEqual(state.flags["act3_forge_subroutes_cleared"], ["forge_choir_pit_silenced", "forge_pact_rhythm_found"])
         self.assertEqual(state.flags["act3_forge_lens_state"], "mapped")
+        self.assertIn("hazardous cargo corridors that must stay locked down.", rendered)
         self.assertIn("Inside the Forge, you silenced the choir pit and recovered the Pact anvil's rhythm", rendered)
         self.assertIn("one live subroute stayed dangerous to the end.", rendered)
         self.assertIn("mapped the resonance lens from inside before the chamber broke.", rendered)
+        self.assertIn("Act 3 inherits a Forge where you already silenced the choir pit", rendered)
+        self.assertIn("one forge line still escaped a clean ruin.", rendered)
+        self.assertIn("reliable read on how Caldra held witness, ritual", rendered)
 
     def test_help_menu_lists_map_command(self) -> None:
         player = build_character(
@@ -2163,6 +2236,36 @@ class CoreTests(unittest.TestCase):
         self.assertIn("better story and a sharper tongue", rendered)
         self.assertIn("Reward gained for Bard identity choice: 10 XP, 6 gp.", rendered)
 
+    def test_neverwinter_briefing_routes_response_menu_through_keyboard_choice_menu(self) -> None:
+        player = build_character(
+            name="Vale",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(3011))
+        game.state = GameState(player=player, current_scene="neverwinter_briefing", flags={"briefing_seen": True})
+        game.scene_identity_options = lambda scene_key: []
+        game.offer_early_companion = lambda: None
+        game.player_choice_output = lambda text: None
+        game.keyboard_choice_menu_supported = lambda: True
+        seen: dict[str, object] = {}
+        game.add_journal = lambda entry: seen.setdefault("journal_entries", []).append(entry)
+
+        def fake_run(prompt, options, *, title=None):
+            seen["prompt"] = prompt
+            seen["options"] = list(options)
+            seen["title"] = title
+            return len(options)
+
+        game.run_keyboard_choice_menu = fake_run
+        game.scene_neverwinter_briefing()
+        self.assertEqual(seen["prompt"], "Choose your response to Mira.")
+        self.assertIn("*Take the writ and head for the High Road.", seen["options"])
+        self.assertEqual(game.state.current_scene, "road_ambush")
+
     def test_race_identity_option_appears_on_phandalin_arrival(self) -> None:
         player = build_character(
             name="Cairn",
@@ -2790,6 +2893,95 @@ class CoreTests(unittest.TestCase):
         game.skill_check = lambda actor, skill, dc, context: True
         game.help_downed_ally(player, ally)
         self.assertEqual(ally.current_hp, 1)
+
+    def test_god_mode_prevents_party_damage(self) -> None:
+        player = build_character(
+            name="Velkor",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        enemy = create_enemy("goblin_skirmisher")
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(161))
+        game.state = GameState(player=player, current_scene="road_ambush")
+        game.state.flags[game.DEV_GOD_MODE_FLAG] = True
+        before = player.current_hp
+        self.assertEqual(game.apply_damage(player, 9, damage_type="slashing"), 0)
+        self.assertEqual(player.current_hp, before)
+        self.assertEqual(game.apply_damage(enemy, 9, damage_type="slashing"), 9)
+
+    def test_pass_every_dice_check_forces_player_skill_and_save_success(self) -> None:
+        player = build_character(
+            name="Velkor",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        game = TextDnDGame(
+            input_fn=lambda _: (_ for _ in ()).throw(AssertionError("developer auto-leveling should not prompt")),
+            output_fn=lambda _: None,
+            rng=random.Random(162),
+        )
+        game.state = GameState(player=player, current_scene="road_ambush")
+        game.state.flags[game.DEV_PASS_CHECKS_FLAG] = True
+        game.auto_fail_save = lambda actor, ability: True
+        self.assertTrue(game.skill_check(player, "Athletics", 35, context="to bully an impossible gate open"))
+        self.assertTrue(game.saving_throw(player, "DEX", 99, context="against a dev-test trap"))
+
+    def test_level_up_party_instantly_levels_company_without_prompting(self) -> None:
+        player = build_character(
+            name="Velkor",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        companion = create_tolan_ironshield()
+        game = TextDnDGame(
+            input_fn=lambda _: (_ for _ in ()).throw(AssertionError("developer auto-leveling should not prompt")),
+            output_fn=lambda _: None,
+            rng=random.Random(163),
+        )
+        game.state = GameState(player=player, companions=[companion], current_scene="phandalin_hub")
+        leveled = game.level_up_party_instantly()
+        self.assertEqual(leveled, 2)
+        self.assertEqual(game.state.xp, 300)
+        self.assertEqual(player.level, 2)
+        self.assertEqual(companion.level, 2)
+
+    def test_jump_to_act2_developer_start_builds_level_four_test_company(self) -> None:
+        player = build_character(
+            name="Velkor",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(164))
+        game.state = GameState(player=player, current_scene="neverwinter_briefing", gold=25)
+        game.confirm = lambda prompt: True
+        self.assertTrue(game.jump_to_act2_developer_start())
+        self.assertEqual(game.state.current_act, 2)
+        self.assertEqual(game.state.current_scene, "act2_claims_council")
+        self.assertEqual(game.state.completed_acts, [1])
+        self.assertTrue(game.state.flags["act2_started"])
+        self.assertTrue(game.state.flags["act2_scaffold_enabled"])
+        self.assertTrue(game.state.flags["elira_helped"])
+        self.assertTrue(game.state.flags["miners_exchange_dispute_resolved"])
+        self.assertEqual(
+            {companion.name for companion in game.state.companions},
+            {"Bryn Underbough", "Elira Dawnmantle", "Tolan Ironshield"},
+        )
+        self.assertEqual(len(game.state.companions), 3)
+        self.assertEqual(len(game.state.camp_companions), 0)
+        self.assertTrue(all(member.level == 4 for member in game.state.party_members()))
+        self.assertTrue(all(member.current_hp == member.max_hp for member in game.state.party_members()))
 
     def test_spell_slots_start_with_bg3_style_class_tables(self) -> None:
         wizard = build_character(
@@ -3635,7 +3827,26 @@ class CoreTests(unittest.TestCase):
         self.assertIn("quit: Return to the main menu, or close the program if you are already there.", rendered)
         self.assertIn("camp: Open camp when you are not in combat.", rendered)
         self.assertIn("inventory / backpack / bag", rendered)
+        self.assertIn("dev: Open developer tools", rendered)
         self.assertIn("settings: Open the settings menu", rendered)
+
+    def test_dev_command_opens_developer_tools_menu_from_prompt(self) -> None:
+        player = build_character(
+            name="Velkor",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        answers = iter(["dev", "2"])
+        opened: list[str] = []
+        game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=lambda _: None, rng=random.Random(4011))
+        game.state = GameState(player=player, current_scene="phandalin_hub")
+        game.open_developer_tools_menu = lambda: opened.append("dev")
+        choice = game.choose("Choose one.", ["First", "Second"])
+        self.assertEqual(choice, 2)
+        self.assertEqual(opened, ["dev"])
 
     def test_choose_displays_compact_hud_for_active_game_prompts(self) -> None:
         player = build_character(
@@ -3682,6 +3893,35 @@ class CoreTests(unittest.TestCase):
         self.assertNotIn("[Act I]", rendered)
         self.assertIn("Choose a target.", rendered)
 
+    def test_choose_target_uses_keyboard_menu_in_combat(self) -> None:
+        player = build_character(
+            name="Velkor",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        enemy = create_enemy("goblin_skirmisher")
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(40021))
+        game.state = GameState(player=player, current_scene="road_ambush")
+        game._in_combat = True
+        captured: dict[str, object] = {}
+        game.keyboard_choice_menu_supported = lambda: True
+
+        def fake_run(prompt, options, *, title=None):
+            captured["prompt"] = prompt
+            captured["options"] = list(options)
+            captured["title"] = title
+            return 1
+
+        game.run_keyboard_choice_menu = fake_run
+        target = game.choose_target([enemy], prompt="Choose a target.", allow_back=True)
+        self.assertIs(target, enemy)
+        self.assertEqual(captured["prompt"], "Choose a target.")
+        self.assertEqual(captured["options"], [game.describe_combatant(enemy), "Back"])
+        self.assertIsNone(captured["title"])
+
     def test_grouped_combat_menu_renders_action_sections(self) -> None:
         player = build_character(
             name="Velkor",
@@ -3711,6 +3951,82 @@ class CoreTests(unittest.TestCase):
         if RICH_AVAILABLE:
             self.assertIn("Party", rendered)
             self.assertIn("Enemies", rendered)
+
+    def test_choose_grouped_combat_option_uses_single_row_panel_layout(self) -> None:
+        player = build_character(
+            name="Velkor",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(40051))
+        game.state = GameState(player=player, current_scene="road_ambush", inventory={"potion_healing": 1})
+        game._in_combat = True
+        enemy = create_enemy("goblin_skirmisher")
+        options = game.get_player_combat_options(
+            player,
+            SimpleNamespace(allow_parley=True, allow_flee=True),
+            turn_state=TurnState(),
+            heroes=[player],
+        )
+        captured: dict[str, object] = {}
+
+        def fake_panel_row(panels, *, ratios=None, width=None, padding=(0, 1)):
+            captured["panel_count"] = len(panels)
+            captured["ratios"] = ratios
+            captured["width"] = width
+            captured["padding"] = padding
+            return False
+
+        game.emit_rich_panel_row = fake_panel_row
+        selected = game.choose_grouped_combat_option("Your turn.", options, actor=player, heroes=[player], enemies=[enemy])
+        self.assertEqual(selected, f"Attack with {player.weapon.name}")
+        self.assertEqual(captured["panel_count"], 3)
+        self.assertEqual(captured["ratios"], [3, 4, 3])
+        self.assertEqual(captured["width"], game.safe_rich_render_width())
+
+    def test_choose_grouped_combat_option_uses_keyboard_combat_menu_when_supported(self) -> None:
+        player = build_character(
+            name="Velkor",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(40052))
+        game.state = GameState(player=player, current_scene="road_ambush", inventory={"potion_healing": 1})
+        game._in_combat = True
+        enemy = create_enemy("goblin_skirmisher")
+        options = game.get_player_combat_options(
+            player,
+            SimpleNamespace(allow_parley=True, allow_flee=True),
+            turn_state=TurnState(),
+            heroes=[player],
+        )
+        captured: dict[str, object] = {}
+        expected = options[-1]
+
+        def fake_run(prompt, menu_options, sections, *, actor, heroes, enemies):
+            captured["prompt"] = prompt
+            captured["options"] = list(menu_options)
+            captured["sections"] = [(section, list(grouped)) for section, grouped in sections]
+            captured["actor"] = actor
+            captured["heroes"] = list(heroes)
+            captured["enemies"] = list(enemies)
+            return expected
+
+        game.run_grouped_combat_keyboard_menu = fake_run
+        selected = game.choose_grouped_combat_option("Your turn.", options, actor=player, heroes=[player], enemies=[enemy])
+        self.assertEqual(selected, expected)
+        self.assertEqual(captured["prompt"], "Your turn.")
+        self.assertEqual(captured["options"], options)
+        self.assertEqual(captured["actor"], player)
+        self.assertEqual(captured["heroes"], [player])
+        self.assertEqual(captured["enemies"], [enemy])
+        self.assertTrue(any(section == "Action" for section, _ in captured["sections"]))
 
     def test_equipment_comparison_preview_shows_deltas(self) -> None:
         player = build_character(

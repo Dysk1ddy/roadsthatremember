@@ -14,8 +14,9 @@ Act 1 is fully playable. The game now includes:
 - Recruitable companions with camp interactions, relationship growth, support bonuses, party/camp management, and camp resurrection for fallen allies with a `Scroll of Revivify`
 - Post-combat random encounters with non-forced outcomes, optional fights, loot scenes, road events, ruins, shrines, smugglers, bandits, animals, and abandoned locations
 
-Act 2 is not playable yet, but its approved framework is now documented. The project also includes:
+Act 2 is now playable as a scaffolded expedition campaign, and the project also includes:
 
+- A live Act 2 route framework with the claims council, expedition hub, Act II pressure tracking, playable local maps for `Stonehollow Dig`, `Broken Prospect`, `South Adit`, `Wave Echo Outer Galleries`, `Black Lake Causeway`, and the `Forge of Spells`, plus an Act II completion handoff into Act 3 state
 - A full Act 2 content reference built around Phandalin's claim war, Wave Echo Cave, branching expedition routes, companion side arcs, two new recruitable companions, a cult-agent boss, and Act 3 foreshadowing
 - Act 2-exclusive item entries in the source item catalog so future quest rewards, loot tables, and merchants can reference them directly
 
@@ -42,6 +43,10 @@ Act 2 is not playable yet, but its approved framework is now documented. The pro
   node-based overworld travel in Phandalin
   room-based dungeon maps in combat sites
   Rich-powered panels when `rich` is installed, with plain-text fallback if not
+- Act 2 expedition status support:
+  Act II pressure and route panels in the map UI
+  journal and campaign snapshots for rescue, clue, and route state
+  a compact camp digest so expedition fallout stays visible outside the hub
 - Skill-tagged dialogue only when a real check is involved, plus action-style options for non-dialogue choices
 - Consistent blank-line spacing after non-conversation action choices
 - Failed checks now avoid repetitive canned failure text
@@ -136,6 +141,7 @@ That suite now includes coverage for:
 - branching room progression in the live map system
 - Ashfall Watch regression behavior
 - existing Act 1 scene flow compatibility
+- Act 2 local-map progression, route-order consequences, companion recruitment, pressure/digest UI, forge finale routing, and Act 3 handoff flags
 
 ## Reference docs
 
@@ -195,6 +201,6 @@ The setting and mechanics are shaped by official D&D / Forgotten Realms referenc
 
 ## Scope
 
-Act 1 is implemented and now runs as a much longer frontier campaign: Neverwinter and the High Road lead into Phandalin, then out through Old Owl Well and Wyvern Tor in either order, then back through Ashfall Watch, Tresendar Manor, and Emberhall for the finale. Later acts are still scaffolded through story hooks and structure, but are not yet implemented as full playable campaigns.
+Act 1 is implemented and now runs as a much longer frontier campaign: Neverwinter and the High Road lead into Phandalin, then out through Old Owl Well and Wyvern Tor in either order, then back through Ashfall Watch, Tresendar Manor, and Emberhall for the finale.
 
-Act 2's current approved direction is a Phandelver / Wave Echo expedition arc with branching early leads, midpoint sponsor pressure in Phandalin, deeper companion development, a cult agent manipulating an obelisk shard, and clear setup for a weirder cosmic Act 3.
+Act 2 now runs as a playable scaffolded Phandelver / Wave Echo expedition arc with branching early leads, midpoint sponsor pressure in Phandalin, deeper companion development, route-order consequences, multi-room Wave Echo maps, a cult agent manipulating an obelisk shard, and explicit state handoff into a weirder cosmic Act 3. Act 3 itself is still roadmap-only.

@@ -67,9 +67,7 @@
       "second_wind": 1
     },
     "inventory": {},
-    "conditions": {
-      "emboldened": 1
-    },
+    "conditions": {},
     "equipment_bonuses": {
       "Athletics": 1,
       "Intimidation": 1
@@ -118,6 +116,15 @@
   "flags": {
     "act1_started": true,
     "background_prologue_pending": "Soldier",
+    "map_state": {
+      "current_node_id": "neverwinter_briefing",
+      "current_dungeon_id": null,
+      "current_room_id": null,
+      "visited_nodes": [],
+      "cleared_rooms": [],
+      "seen_story_beats": [],
+      "room_history": []
+    },
     "introduced_characters": [
       "Ashen Brand Runner"
     ]
@@ -126,16 +133,14 @@
   "journal": [
     "Your soldier's opening leaves you with a live look at how hard Neverwinter is leaning on thin patrol lines and tired veterans to protect the road south.",
     "Word reaches you that Mira Thann is quietly gathering capable hands in Neverwinter against a new bandit threat around Phandalin.",
-    "Reward from South Barracks Breakout: 50 XP, 8 gp.",
-    "Looted Potion of Healing x1 from South Barracks Breakout.",
-    "Looted Roadworn Shortsword x1 from South Barracks Breakout."
+    "Reward from South Barracks Breakout: 50 XP, 8 gp."
   ],
   "quests": {},
   "completed_acts": [],
   "xp": 50,
   "gold": 28,
   "inventory": {
-    "potion_healing": 3,
+    "potion_healing": 2,
     "bread_round": 4,
     "travel_biscuits": 4,
     "dried_fish": 3,
@@ -145,8 +150,7 @@
     "antitoxin_vial": 1,
     "chain_mail_common": 1,
     "longsword_common": 1,
-    "shield_common": 1,
-    "shortsword_common": 1
+    "shield_common": 1
   },
   "short_rests_remaining": 2
 }

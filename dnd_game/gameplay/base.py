@@ -13,7 +13,12 @@ try:
 except ImportError:  # pragma: no cover - Windows-only polling
     msvcrt = None
 
-from ..content import ACTS
+from ..content import (
+    ACTS,
+    create_bryn_underbough,
+    create_elira_dawnmantle,
+    create_tolan_ironshield,
+)
 from ..data.story.lore import LORE_INTRO, TITLE_LORE_SECTIONS, manual_text_for_entry
 from ..dice import roll
 from ..items import (
@@ -27,7 +32,7 @@ from ..items import (
 from ..models import Character, GameState, Weapon
 from ..ui.colors import rich_style_name, strip_ansi
 from ..ui.rich_render import Columns, Group, Panel, Table, Text, box, render_rich_lines
-from .constants import InputFn, MENU_PAGE_SIZE, OutputFn
+from .constants import InputFn, LEVEL_XP_THRESHOLDS, MENU_PAGE_SIZE, OutputFn
 
 
 class GameInterrupted(Exception):
@@ -126,6 +131,8 @@ class GameBase:
         "act2_expedition_hub",
         "act2_scaffold_complete",
     }
+    DEV_GOD_MODE_FLAG = "dev_god_mode"
+    DEV_PASS_CHECKS_FLAG = "dev_pass_every_dice_check"
     NAMED_CHARACTER_INTROS = {
         "Mira Thann": "Mira Thann is a sharp-eyed Neverwinter officer who wears quiet authority like armor and studies every answer for weakness or leverage.",
         "Tessa Harrow": "Tessa Harrow is Phandalin's exhausted steward, all ink-stained hands, sleepless focus, and frontier resolve held together by sheer will.",
@@ -1678,6 +1685,9 @@ class GameBase:
         if lowered == "help":
             self.show_global_commands()
             return True
+        if lowered == "dev":
+            self.open_developer_tools_menu()
+            return True
         if lowered == "settings":
             self.open_settings_menu()
             return True
@@ -1728,9 +1738,170 @@ class GameBase:
             return True
         return False
 
+    def is_party_member_actor(self, actor) -> bool:
+        if self.state is None:
+            return False
+        return any(member is actor for member in self.state.party_members())
+
+    def developer_flag_enabled(self, flag_key: str) -> bool:
+        if self.state is None:
+            return False
+        return bool(self.state.flags.get(flag_key, False))
+
+    def god_mode_enabled(self) -> bool:
+        return self.developer_flag_enabled(self.DEV_GOD_MODE_FLAG)
+
+    def always_pass_dice_checks_enabled(self) -> bool:
+        return self.developer_flag_enabled(self.DEV_PASS_CHECKS_FLAG)
+
+    def set_developer_flag(self, flag_key: str, enabled: bool) -> None:
+        assert self.state is not None
+        self.state.flags[flag_key] = bool(enabled)
+
+    def toggle_god_mode(self) -> bool:
+        assert self.state is not None
+        enabled = not self.god_mode_enabled()
+        self.set_developer_flag(self.DEV_GOD_MODE_FLAG, enabled)
+        if enabled:
+            for member in self.state.party_members():
+                if member.dead:
+                    continue
+                if member.current_hp <= 0:
+                    member.current_hp = 1
+                    member.stable = False
+                    member.death_successes = 0
+                    member.death_failures = 0
+        self.say(f"God mode for the party is now {'ON' if enabled else 'OFF'}.")
+        return enabled
+
+    def toggle_pass_every_dice_check(self) -> bool:
+        assert self.state is not None
+        enabled = not self.always_pass_dice_checks_enabled()
+        self.set_developer_flag(self.DEV_PASS_CHECKS_FLAG, enabled)
+        self.say(f"Pass every player dice check is now {'ON' if enabled else 'OFF'}.")
+        return enabled
+
+    def add_developer_gold(self, amount: int = 10_000) -> int:
+        assert self.state is not None
+        self.state.gold += amount
+        self.say(f"Developer tools add {amount:,} gp. Total gold: {self.state.gold:,} gp.")
+        return self.state.gold
+
+    def level_up_party_instantly(self, *, target_level: int | None = None, randomize_skill_choices: bool = True) -> int | None:
+        assert self.state is not None
+        max_level = max(LEVEL_XP_THRESHOLDS)
+        desired_level = target_level if target_level is not None else self.state.player.level + 1
+        desired_level = max(1, min(desired_level, max_level))
+        company = [self.state.player, *self.state.all_companions()]
+        if all(member.level >= desired_level for member in company):
+            if desired_level >= max_level:
+                self.say(f"The company is already at the maximum implemented level ({max_level}).")
+            else:
+                self.say(f"The company is already at level {desired_level} or higher.")
+            return None
+        self.state.xp = max(self.state.xp, LEVEL_XP_THRESHOLDS[desired_level])
+        for member in company:
+            for next_level in range(member.level + 1, desired_level + 1):
+                self.level_up_character_automatically(
+                    member,
+                    next_level,
+                    randomize_skill_choice=randomize_skill_choices,
+                )
+        self.ensure_state_integrity()
+        self.say(f"The company is now level {desired_level}.")
+        return desired_level
+
+    def reset_party_for_developer_snapshot(self) -> None:
+        assert self.state is not None
+        for member in self.state.party_members():
+            member.reset_for_rest()
+        self.state.short_rests_remaining = 2
+        self._in_combat = False
+
+    def jump_to_act2_developer_start(self) -> bool:
+        if self.state is None:
+            self.say("Start or load an adventure before jumping to the Act II test snapshot.")
+            return False
+        if self._in_combat:
+            self.say("Finish or leave combat before rebuilding the run into the Act II test snapshot.")
+            return False
+        if not self.confirm(
+            "Reset this run into a level 4 Act II test start? Current scene progress, quest state, journal, and roster setup will be replaced."
+        ):
+            self.say("The current run stays where it is.")
+            return False
+
+        preserved_flags = {
+            self.DEV_GOD_MODE_FLAG: self.god_mode_enabled(),
+            self.DEV_PASS_CHECKS_FLAG: self.always_pass_dice_checks_enabled(),
+        }
+        self.state.companions = []
+        self.state.camp_companions = []
+        self.state.flags = {
+            "act1_started": True,
+            "briefing_seen": True,
+            "phandalin_council_seen": True,
+            "steward_vow_made": True,
+            "miners_exchange_dispute_resolved": True,
+            "miners_exchange_ledgers_checked": True,
+            "elira_helped": True,
+            **preserved_flags,
+        }
+        self.state.completed_acts = [1]
+        self.state.clues = []
+        self.state.journal = [
+            "You broke the Ashen Brand and secured Phandalin through the end of Act 1.",
+        ]
+        self.state.quests = {}
+
+        for factory in (create_bryn_underbough, create_elira_dawnmantle, create_tolan_ironshield):
+            self.recruit_companion(factory())
+
+        self.level_up_party_instantly(target_level=4, randomize_skill_choices=True)
+        self.reset_party_for_developer_snapshot()
+        self.start_act2_scaffold()
+        self.ensure_state_integrity()
+        self._compact_hud_last_scene_key = None
+        refresh_scene_music = getattr(self, "refresh_scene_music", None)
+        if callable(refresh_scene_music):
+            refresh_scene_music()
+        self.say("Developer snapshot loaded: Act II begins with Bryn, Elira, and Tolan at level 4.")
+        return True
+
+    def open_developer_tools_menu(self) -> None:
+        if self.state is None:
+            self.say("Start or load an adventure before using developer tools.")
+            return
+        while True:
+            self.banner("Developer Tools")
+            self.say("These tools affect the current run immediately and any save made afterward will keep the changes.")
+            options = [
+                f"Toggle god mode for the party [{'ON' if self.god_mode_enabled() else 'OFF'}]",
+                f"Toggle pass every dice check [{'ON' if self.always_pass_dice_checks_enabled() else 'OFF'}]",
+                "Add 10,000 gp instantly",
+                "Level up the company instantly",
+                "Jump to the start of Act II with a level 4 test company",
+                "Back",
+            ]
+            choice = self.choose("Choose a developer tool.", options, allow_meta=False, show_hud=False)
+            if choice == 1:
+                self.toggle_god_mode()
+            elif choice == 2:
+                self.toggle_pass_every_dice_check()
+            elif choice == 3:
+                self.add_developer_gold()
+            elif choice == 4:
+                self.level_up_party_instantly()
+            elif choice == 5:
+                if self.jump_to_act2_developer_start():
+                    return
+            else:
+                return
+
     def show_global_commands(self) -> None:
         commands = [
             ("help", "Show the list of global commands and what they do."),
+            ("dev", "Open developer tools for debug toggles, instant leveling, and the Act II test snapshot."),
             ("settings", "Open the settings menu for audio and presentation toggles."),
             ("save", "Save the current run to a named slot."),
             ("load", "Load another save slot immediately and continue from there."),

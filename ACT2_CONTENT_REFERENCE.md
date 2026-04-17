@@ -146,6 +146,10 @@ Act 2 should not start from a blank emotional or strategic slate. Several Act 1 
   - if `Whisper Pressure` stayed low, Act 3 begins as containment after a near miss
   - if `Whisper Pressure` stayed medium, Act 3 begins with fragments already leaking into dreams, notes, and rituals
   - if `Whisper Pressure` stayed high, Act 3 begins with the party having carried part of the signal out themselves
+  - if `act3_forge_route_state` is `mastered`, Act 3 begins with the Forge already broken across all three subroutes
+  - if `act3_forge_route_state` is `broken` or `partial`, later scenes should remember exactly which Forge lines were actually cleared through `act3_forge_subroutes_cleared`
+  - if `act3_forge_lens_state` is `mapped`, later dialogue can speak concretely about how Caldra held witness, ritual, and shard pressure together
+  - if `act3_forge_lens_state` is `shattered_blind`, later scenes should work from rumor, damage patterns, and surviving echoes instead of a clean explanation
 
 ## New Companion Reference
 
@@ -158,8 +162,9 @@ Act 2 should not start from a blank emotional or strategic slate. Several Act 1 
 
 - Nim: `stonehollow_dig`, gives hero bonus and player Blessed
 - Nim: `wave_echo_outer_galleries`, gives hero bonus and enemy Reeling
+- Nim: `forge_of_spells`, reads support traffic aloud at the threshold so the Forge feels like routework as well as spectacle
 - Irielle: `south_adit`, gives hero bonus and player Invisible
-- Irielle: `forge_of_spells`, gives hero bonus and enemy Frightened
+- Irielle: `forge_of_spells`, gives hero bonus and enemy Frightened, and now speaks into the resonance-lens / counter-cadence reads directly
 
 ## Companion Arc Hooks
 
@@ -336,6 +341,9 @@ Implementation note for later: add an act-scope field such as `act_exclusive` or
 - `act3_phandalin_state`
 - `act3_claims_balance`
 - `act3_whisper_state`
+- `act3_forge_route_state`
+- `act3_forge_subroutes_cleared`
+- `act3_forge_lens_state`
 
 ## Debugging Pointers
 

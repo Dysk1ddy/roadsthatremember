@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from ..items import get_item
 from ..models import Character
 from ..ui.colors import rich_style_name
-from ..ui.rich_render import Columns, Group, Panel, box
+from ..ui.rich_render import Console, Group, Live, Panel, Table, Text, box
 from .encounter import Encounter
 from .spell_slots import has_spell_slots
 
@@ -417,6 +417,182 @@ class CombatFlowMixin:
             return "Tactical"
         return "Action"
 
+    def build_grouped_combat_keyboard_menu(
+        self,
+        prompt: str,
+        sections: list[tuple[str, list[tuple[int, str]]]],
+        *,
+        actor: Character | None,
+        heroes: list[Character],
+        enemies: list[Character],
+        selected_index: int,
+        typed_buffer: str,
+        feedback: str | None,
+        show_instructions: bool,
+    ):
+        hero_lines = [self.describe_combatant(hero) for hero in heroes if not hero.dead]
+        enemy_lines = [self.describe_combatant(enemy) for enemy in enemies if not enemy.dead]
+        action_items: list[object] = [self.rich_text(prompt, bold=True)]
+        if show_instructions:
+            action_items.append(
+                self.rich_text(
+                    "Arrows move. Enter confirms. Type a number or command. Esc clears.",
+                    "white",
+                    dim=True,
+                )
+            )
+        action_items.append(self.rich_text("", dim=True))
+        for section_index, (section, grouped_options) in enumerate(sections):
+            action_items.append(self.rich_text(f"{section}:", "light_yellow", bold=True))
+            option_table = Table.grid(expand=True, padding=(0, 0))
+            option_table.add_column(width=1)
+            option_table.add_column(width=3)
+            option_table.add_column(ratio=1)
+            for display_index, option in grouped_options:
+                active = display_index - 1 == selected_index
+                marker = self.rich_text(">", "light_green", bold=True) if active else self.rich_text(" ", dim=True)
+                number = self.rich_text(f"{display_index}.", "light_yellow" if active else "white", bold=active)
+                label = self.rich_from_ansi(self.format_option_text(option))
+                if Text is not None and isinstance(label, Text) and active:
+                    label.stylize("bold")
+                row_style = "on rgb(28,36,46)" if active else None
+                option_table.add_row(marker, number, label, style=row_style)
+            action_items.append(option_table)
+            if section_index < len(sections) - 1:
+                action_items.append(self.rich_text("", dim=True))
+
+        input_line = self.rich_text(f"> {typed_buffer}_", "light_green", bold=True) if typed_buffer else self.rich_text("> ", "white")
+        action_items.append(self.rich_text("", dim=True))
+        action_items.append(input_line)
+        if feedback:
+            action_items.append(self.rich_text(feedback, "light_red"))
+
+        party_panel = Panel(
+            Group(*(self.rich_from_ansi(line) for line in (hero_lines or ["No one is still standing."]))),
+            title=self.rich_text("Party", "light_aqua", bold=True),
+            border_style=rich_style_name("light_aqua"),
+            box=box.ROUNDED,
+            padding=(0, 1),
+        )
+        action_panel_title = "Action Box" if actor is None else f"{actor.name}'s Turn"
+        action_panel = Panel(
+            Group(*action_items),
+            title=self.rich_text(action_panel_title, "light_yellow", bold=True),
+            border_style=rich_style_name("light_yellow"),
+            box=box.ROUNDED,
+            padding=(0, 1),
+        )
+        enemy_panel = Panel(
+            Group(*(self.rich_from_ansi(line) for line in (enemy_lines or ["Enemies routed."]))),
+            title=self.rich_text("Enemies", "light_red", bold=True),
+            border_style=rich_style_name("light_red"),
+            box=box.ROUNDED,
+            padding=(0, 1),
+        )
+        return self.rich_panel_row_renderable([party_panel, action_panel, enemy_panel], ratios=[3, 4, 3], padding=(0, 1))
+
+    def run_grouped_combat_keyboard_menu(
+        self,
+        prompt: str,
+        options: list[str],
+        sections: list[tuple[str, list[tuple[int, str]]]],
+        *,
+        actor: Character | None,
+        heroes: list[Character],
+        enemies: list[Character],
+    ) -> str | None:
+        if not self.keyboard_choice_menu_supported():
+            return None
+        if Console is None or Live is None or Panel is None or Group is None or Table is None or box is None:
+            return None
+
+        selected_index = 0
+        typed_buffer = ""
+        feedback: str | None = None
+        console = Console(
+            force_terminal=True,
+            color_system="truecolor",
+            legacy_windows=False,
+            highlight=False,
+            width=self.safe_rich_render_width(),
+        )
+        show_instructions = self.begin_keyboard_choice_session()
+
+        while True:
+            submitted_text: str | None = None
+            with Live(
+                self.build_grouped_combat_keyboard_menu(
+                    prompt,
+                    sections,
+                    actor=actor,
+                    heroes=heroes,
+                    enemies=enemies,
+                    selected_index=selected_index,
+                    typed_buffer=typed_buffer,
+                    feedback=feedback,
+                    show_instructions=show_instructions,
+                ),
+                console=console,
+                transient=True,
+                auto_refresh=False,
+            ) as live:
+                while True:
+                    action, payload = self.read_keyboard_choice_key()
+                    hide_instructions_after_update = show_instructions
+                    if action == "up":
+                        selected_index = (selected_index - 1) % len(options)
+                        feedback = None
+                    elif action == "down":
+                        selected_index = (selected_index + 1) % len(options)
+                        feedback = None
+                    elif action == "backspace":
+                        typed_buffer = typed_buffer[:-1]
+                        feedback = None
+                    elif action == "escape":
+                        typed_buffer = ""
+                        feedback = None
+                    elif action == "char" and payload is not None:
+                        if not typed_buffer and len(options) <= 9 and payload.isdigit():
+                            value = int(payload)
+                            if 1 <= value <= len(options):
+                                return options[value - 1]
+                        typed_buffer += payload
+                        feedback = None
+                    elif action == "enter":
+                        if typed_buffer.strip():
+                            submitted_text = typed_buffer.strip()
+                            typed_buffer = ""
+                            show_instructions = False
+                            break
+                        return options[selected_index]
+                    if hide_instructions_after_update:
+                        show_instructions = False
+                    live.update(
+                        self.build_grouped_combat_keyboard_menu(
+                            prompt,
+                            sections,
+                            actor=actor,
+                            heroes=heroes,
+                            enemies=enemies,
+                            selected_index=selected_index,
+                            typed_buffer=typed_buffer,
+                            feedback=feedback,
+                            show_instructions=show_instructions,
+                        ),
+                        refresh=True,
+                    )
+
+            if submitted_text is None:
+                continue
+            if submitted_text.isdigit():
+                value = int(submitted_text)
+                if 1 <= value <= len(options):
+                    return options[value - 1]
+            if self.handle_meta_command(submitted_text):
+                feedback = None
+                continue
+            feedback = "Type a listed number, use the arrows, or enter a global command."
+
     def choose_grouped_combat_option(
         self,
         prompt: str,
@@ -438,8 +614,19 @@ class CombatFlowMixin:
                     sections.append((section, section_lookup[section]))
                 section_lookup[section].append((display_index, option))
                 indexed[display_index] = option
+            if heroes is not None and enemies is not None:
+                selected_option = self.run_grouped_combat_keyboard_menu(
+                    prompt,
+                    options,
+                    sections,
+                    actor=actor,
+                    heroes=heroes,
+                    enemies=enemies,
+                )
+                if selected_option is not None:
+                    return selected_option
             rendered_dashboard = False
-            if self.rich_enabled() and heroes is not None and enemies is not None and Panel is not None and Columns is not None and Group is not None and box is not None:
+            if self.rich_enabled() and heroes is not None and enemies is not None and Panel is not None and Group is not None and box is not None:
                 hero_lines = [self.describe_combatant(hero) for hero in heroes if not hero.dead]
                 enemy_lines = [self.describe_combatant(enemy) for enemy in enemies if not enemy.dead]
                 action_lines = [self.rich_from_ansi(prompt), self.rich_text("", dim=True)]
@@ -470,9 +657,10 @@ class CombatFlowMixin:
                     box=box.ROUNDED,
                     padding=(0, 1),
                 )
-                rendered_dashboard = self.emit_rich(
-                    Columns([party_panel, action_panel, enemy_panel], expand=True, equal=False),
-                    width=max(112, self.rich_console_width()),
+                rendered_dashboard = self.emit_rich_panel_row(
+                    [party_panel, action_panel, enemy_panel],
+                    ratios=[3, 4, 3],
+                    width=self.safe_rich_render_width(),
                 )
             if not rendered_dashboard:
                 self.say(prompt)

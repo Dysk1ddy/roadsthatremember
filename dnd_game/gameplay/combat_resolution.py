@@ -5,7 +5,7 @@ from contextlib import contextmanager
 from ..dice import D20Outcome, roll, roll_d20
 from ..items import ITEMS
 from ..ui.colors import rich_style_name
-from ..ui.rich_render import Columns, Group, Panel, box
+from ..ui.rich_render import Group, Panel, box
 from .difficulty_policy import ACT_DIFFICULTY_BANDS, clamp_dc_to_band
 from .spell_slots import spend_spell_slot
 
@@ -1110,6 +1110,8 @@ class CombatResolutionMixin:
     def apply_damage(self, target, amount: int, *, damage_type: str = "") -> int:
         if target.dead:
             return 0
+        if self.god_mode_enabled() and self.is_party_member_actor(target):
+            return 0
         previous_hp = target.current_hp
         damage = max(0, amount)
         if self.has_status(target, "petrified"):
@@ -1239,6 +1241,9 @@ class CombatResolutionMixin:
         return success
 
     def saving_throw(self, actor, ability: str, dc: int, *, context: str, against_poison: bool = False) -> bool:
+        if self.always_pass_dice_checks_enabled() and self.is_party_member_actor(actor):
+            self.say(f"{self.style_name(actor)} automatically clears the {ability} save {context}.")
+            return True
         if self.auto_fail_save(actor, ability):
             self.say(f"{self.style_name(actor)} automatically fails the {ability} save {context}.")
             return False
@@ -1282,6 +1287,12 @@ class CombatResolutionMixin:
         style: str | None = None,
         outcome_kind: str | None = None,
     ) -> D20Outcome:
+        if self.always_pass_dice_checks_enabled() and self.is_party_member_actor(actor):
+            kept = 20
+            if target_number is not None:
+                kept = max(2, target_number - modifier)
+            forced_rolls = [kept, kept] if advantage_state != 0 else [kept]
+            return D20Outcome(kept=kept, rolls=forced_rolls, rerolls=[], advantage_state=advantage_state)
         with self.temporary_roll_animation_metadata(
             target_number=target_number,
             target_label=target_label,
@@ -1349,7 +1360,7 @@ class CombatResolutionMixin:
     def print_battlefield(self, heroes, enemies) -> None:
         hero_lines = [self.describe_combatant(hero) for hero in heroes if not hero.dead]
         enemy_lines = [self.describe_combatant(enemy) for enemy in enemies if not enemy.dead]
-        if self.rich_enabled() and Panel is not None and Columns is not None and Group is not None and box is not None:
+        if self.rich_enabled() and Panel is not None and Group is not None and box is not None:
             party_panel = Panel(
                 Group(*(self.rich_from_ansi(line) for line in (hero_lines or ["No one is still standing."]))),
                 title=self.rich_text("Party", "light_aqua", bold=True),
@@ -1364,7 +1375,11 @@ class CombatResolutionMixin:
                 box=box.ROUNDED,
                 padding=(0, 1),
             )
-            if self.emit_rich(Columns([party_panel, enemy_panel], expand=True, equal=True), width=max(100, self.rich_console_width())):
+            if self.emit_rich_panel_row(
+                [party_panel, enemy_panel],
+                ratios=[1, 1],
+                width=self.safe_rich_render_width(),
+            ):
                 return
         self.say("Party: " + " | ".join(hero_lines))
         self.say("Enemies: " + " | ".join(enemy_lines))

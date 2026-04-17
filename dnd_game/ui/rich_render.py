@@ -7,21 +7,21 @@ from .colors import strip_ansi
 try:
     from rich import box
     from rich.columns import Columns
-    from rich.console import Group
+    from rich.console import Console, Group
+    from rich.live import Live
     from rich.panel import Panel
     from rich.table import Table
     from rich.text import Text
 
     RICH_AVAILABLE = True
 except Exception:  # pragma: no cover - optional dependency fallback
-    box = Columns = Group = Panel = Table = Text = None
+    box = Columns = Console = Group = Live = Panel = Table = Text = None
     RICH_AVAILABLE = False
 
 
 def render_rich_lines(renderable, *, width: int = 100, force_terminal: bool = False) -> list[str]:
-    if not RICH_AVAILABLE:
+    if not RICH_AVAILABLE or Console is None:
         return []
-    from rich.console import Console
 
     buffer = StringIO()
     console = Console(

@@ -2642,6 +2642,18 @@ class MapSystemMixin:
             or self.state.flags.get("black_lake_anchor_weak_point_found")
         ):
             self.state.flags["forge_shard_route_exposed"] = True
+        nim = self.find_companion("Nim Ardentglass")
+        if nim is not None and nim in self.state.companions:
+            if self.state.flags.get("nim_countermeasure_notes"):
+                self.speaker(
+                    "Nim Ardentglass",
+                    "The chamber's still honest in the margins. Read the traffic, not the glow, and it cannot lie about where it is feeding itself.",
+                )
+            else:
+                self.speaker(
+                    "Nim Ardentglass",
+                    "Old routework always betrays who it still serves. The forge-light is a distraction; the traffic lines are the truth.",
+                )
         choice = self.scenario_choice(
             "What do you read first in the forge chamber?",
             [
@@ -2844,6 +2856,18 @@ class MapSystemMixin:
         self.say(
             "A lattice of humming shard-light hangs over the Forge's heart. This is where Caldra turns every side route into certainty and every witness into part of the instrument."
         )
+        irielle = self.find_companion("Irielle Ashwake")
+        if irielle is not None and irielle in self.state.companions:
+            if self.state.flags.get("south_adit_counter_cadence_learned") or self.state.flags.get("irielle_counter_cadence"):
+                self.speaker(
+                    "Irielle Ashwake",
+                    "There. The lens wants one obedience note under everything else. Answer it wrong on purpose and Caldra loses her clean certainty.",
+                )
+            else:
+                self.speaker(
+                    "Irielle Ashwake",
+                    "This is the part the Choir never lets witnesses describe twice. Trust the second thought, not the first one it gives you.",
+                )
         dc = 15
         if self.state.flags.get("black_lake_shrine_purified"):
             dc -= 1
@@ -2884,6 +2908,8 @@ class MapSystemMixin:
                 self.state.flags["forge_lens_truth_named"] = True
         self.complete_act2_map_room(dungeon, room.room_id)
         if success:
+            if self.state.flags.get("south_adit_counter_cadence_learned") and irielle is not None:
+                self.state.flags["irielle_counter_cadence"] = True
             if self.state.flags.get("forge_choir_pit_silenced"):
                 self.state.flags["forge_support_line_broken"] = True
             if self.state.flags.get("forge_pact_rhythm_found"):

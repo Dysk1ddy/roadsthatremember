@@ -980,11 +980,11 @@ Key confrontation routes:
 - `Persuasion`,
 - immediate assault.
 
-This scene matters narratively because winning does not fully solve the problem. It proves the mine is part of something older and that Caldra was listening for a deeper answer.
+This scene matters narratively because winning does not fully solve the problem. It proves the mine is part of something older and that Caldra was listening for a deeper answer, and it now records which Forge subroutes were actually broken before the final confrontation.
 
 ### Act 2 epilogue states
 
-The scaffold records three final state families for the next act:
+The scaffold now records four final state families for the next act:
 
 - town outcome:
   - `united`,
@@ -997,9 +997,20 @@ The scaffold records three final state families for the next act:
 - whisper outcome:
   - `contained`,
   - `lingering`,
-  - `carried_out`.
+  - `carried_out`,
+- forge outcome:
+  - route state:
+    - `mastered`,
+    - `broken`,
+    - `partial`,
+    - `direct`,
+  - lens state:
+    - `mapped`,
+    - `shattered_blind`,
+  - cleared subroutes:
+    - stored as `act3_forge_subroutes_cleared` so later scenes can name which Forge lines the party actually broke.
 
-This means Act 2 is designed less like a single fixed finale and more like a state-setting bridge into a darker Act 3.
+This means Act 2 is designed less like a single fixed finale and more like a state-setting bridge into a darker Act 3, with sponsor fallout and later dialogue able to remember how thoroughly the Forge was actually unraveled.
 
 ## Act 2 Random Encounter Story Pool
 

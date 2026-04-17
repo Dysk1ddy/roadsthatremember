@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This draft extends the Act 1 hybrid map idea into a more complex Act 2 structure without replacing the current playable scaffold.
+This draft extends the Act 1 hybrid map idea into a more complex Act 2 structure and now feeds the current playable scaffold.
 
 Act 1 is mostly a hub-and-branch adventure with short local maps. Act 2 should feel more like an expedition theater:
 
@@ -17,6 +17,16 @@ The companion blueprint lives in:
 
 - `dnd_game/drafts/map_system/data/act2_enemy_map.py`
 - preview command: `python -m dnd_game.drafts.map_system.examples.act2_preview`
+
+## Current implementation snapshot
+
+The live code now covers most of this route shape:
+
+- richer requirement support is wired into the draft/runtime layer and consumed by the playable Act 2 map state
+- the Act 2 hub can render route availability and local site previews through the in-game `map` command
+- `Stonehollow Dig`, `Broken Prospect`, `South Adit`, `Wave Echo Outer Galleries`, `Black Lake Crossing`, and the `Forge of Spells` all exist as playable local maps
+- Act II pressure, rescue, clue, and late-route consequences now surface through map status panels, journal snapshots, and the camp digest
+- the Act II completion scene now records Forge-specific Act 3 handoff flags for route state, cleared subroutes, and resonance-lens state
 
 ## Enemy-First Design
 
@@ -109,13 +119,13 @@ This keeps the text-based map readable while making Act 2 feel wider and more re
    - Keep the existing Act 2 scene flow intact.
    - Let the map render available routes next to the current hub options.
    - Feed real Act 2 flags and metric values into `DraftMapState` so the blueprint can unlock sabotage night from any two early leads directly.
-   - Read-only route rendering now exists through the in-game `map` command; local site maps render as draft previews when the current scene is inside an Act 2 site.
+  - Read-only route rendering now exists through the in-game `map` command; local site maps render against live Act 2 state when the current scene is inside a converted site.
 
 6. Convert one site at a time
-   - Start with `Stonehollow Dig`, because it has clear enemies, a companion hook, and a simple rescue outcome.
-   - `Stonehollow Dig` is now the first playable Act 2 local map. It uses `act2_map_state`, room navigation, room-specific encounters/events, Nim recruitment, and the original route-control/whisper consequences.
-   - Then convert `South Adit`, because it tests order consequences and companion recruitment.
-   - Leave `Forge of Spells` for last, because it needs boss-modifier support.
+  - Start with `Stonehollow Dig`, because it has clear enemies, a companion hook, and a simple rescue outcome.
+  - `Stonehollow Dig` is now the first playable Act 2 local map. It uses `act2_map_state`, room navigation, room-specific encounters/events, Nim recruitment, and the original route-control/whisper consequences.
+  - Then convert `South Adit`, because it tests order consequences and companion recruitment.
+  - `Broken Prospect`, `South Adit`, `Wave Echo Outer Galleries`, `Black Lake Crossing`, and `Forge of Spells` are now also playable local maps, with the later sites carrying order-sensitive fallout into the finale.
 
 7. Add enemy-pressure overlays
    - Instead of only showing room symbols, expose the enemy package:
@@ -124,12 +134,14 @@ This keeps the text-based map readable while making Act 2 feel wider and more re
      - `pact_haunting`
      - `quiet_choir`
      - `black_lake`
-   - Later, this can influence random encounters and room text.
+  - Later, this can influence random encounters and room text.
+  - The live game now also surfaces pressure through the Act II status panel and room text, even though the overlay model is still lighter than the full draft vision.
 
 8. Save and test
-   - Add Act 2 map state into saves beside the existing map payload.
-   - Test travel availability, delayed lead consequences, late-route order, and final route unlocking.
-   - Keep the preview script as a fast visual smoke test.
+  - Add Act 2 map state into saves beside the existing map payload.
+  - Test travel availability, delayed lead consequences, late-route order, and final route unlocking.
+  - Keep the preview script as a fast visual smoke test.
+  - The live scaffold now also stores Forge-specific Act 3 handoff flags: `act3_forge_route_state`, `act3_forge_subroutes_cleared`, and `act3_forge_lens_state`.
 
 ## Integration Guardrails
 

@@ -138,3 +138,37 @@ class ProgressionMixin:
         actor.skill_proficiencies.append(picked)
         actor.skill_proficiencies.sort()
         return picked
+
+    def random_choose_level_up_skill(self, actor: Character) -> str | None:
+        available = [skill for skill in CLASSES[actor.class_name]["skill_choices"] if skill not in actor.skill_proficiencies]
+        if not available:
+            return None
+        picked = self.rng.choice(available)
+        actor.skill_proficiencies.append(picked)
+        actor.skill_proficiencies.sort()
+        return picked
+
+    def level_up_character_automatically(
+        self,
+        actor: Character,
+        new_level: int,
+        *,
+        randomize_skill_choice: bool = False,
+    ) -> None:
+        actor.level = new_level
+        hp_gain = max(1, actor.hit_die // 2 + 1 + actor.ability_mod("CON"))
+        actor.max_hp += hp_gain
+        actor.current_hp += hp_gain
+        self.scale_level_resources(actor)
+        feature_lines = self.apply_class_level_features(actor, new_level, announce=False)
+        picked = (
+            self.random_choose_level_up_skill(actor)
+            if randomize_skill_choice
+            else self.auto_choose_level_up_skill(actor)
+        )
+        summary_parts = [f"{actor.name} gains {hp_gain} max HP"]
+        if picked is not None:
+            summary_parts.append(f"learns {picked}")
+        self.say(", and ".join(summary_parts) + ".")
+        for line in feature_lines:
+            self.say(f"{actor.name}: {line}")

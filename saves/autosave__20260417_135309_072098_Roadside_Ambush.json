@@ -67,9 +67,7 @@
       "second_wind": 1
     },
     "inventory": {},
-    "conditions": {
-      "emboldened": 1
-    },
+    "conditions": {},
     "equipment_bonuses": {
       "Athletics": 1,
       "Intimidation": 1
@@ -163,7 +161,7 @@
         "stealth_disadvantage": true
       },
       "hit_die": 10,
-      "current_hp": 11,
+      "current_hp": 3,
       "max_hp": 11,
       "shield": true,
       "spellcasting_ability": "CHA",
@@ -173,12 +171,10 @@
         "Gaming Set"
       ],
       "resources": {
-        "lay_on_hands": 5,
-        "spell_slots": 2
+        "lay_on_hands": 5
       },
       "max_resources": {
-        "lay_on_hands": 5,
-        "spell_slots": 2
+        "lay_on_hands": 5
       },
       "inventory": {},
       "conditions": {},
@@ -236,6 +232,15 @@
   "current_scene": "road_ambush",
   "flags": {
     "act1_started": true,
+    "map_state": {
+      "current_node_id": "neverwinter_briefing",
+      "current_dungeon_id": null,
+      "current_room_id": null,
+      "visited_nodes": [],
+      "cleared_rooms": [],
+      "seen_story_beats": [],
+      "room_history": []
+    },
     "introduced_characters": [
       "Ashen Brand Runner",
       "Mira Thann",
@@ -243,46 +248,54 @@
     ],
     "background_prologue_completed": "Soldier",
     "briefing_seen": true,
-    "early_companion_recruited": "Rhogar Valeguard",
+    "briefing_q_neverwinter": true,
+    "briefing_q_brand": true,
+    "briefing_q_phandalin": true,
+    "identity_neverwinter_briefing_class_fighter_map": true,
     "neverwinter_preparation_done": true,
+    "early_companion_recruited": "Rhogar Valeguard",
     "road_approach_chosen": true
   },
   "clues": [
     "A stolen dispatch confirms the attacks around Phandalin are organized enough to rattle Neverwinter's quartermasters.",
+    "Mira marks the switchback, likely scout perches, and the rough spacing the gang prefers when collapsing on a wagon.",
     "Dockside rumors say the Ashen Brand sells stolen ore through quiet middlemen."
   ],
   "journal": [
     "Your soldier's opening leaves you with a live look at how hard Neverwinter is leaning on thin patrol lines and tired veterans to protect the road south.",
     "Word reaches you that Mira Thann is quietly gathering capable hands in Neverwinter against a new bandit threat around Phandalin.",
     "Reward from South Barracks Breakout: 50 XP, 8 gp.",
-    "Looted Roadworn Leather Armor x1 from South Barracks Breakout.",
-    "Looted Potion of Healing x1 from South Barracks Breakout.",
+    "Looted Antitoxin Vial x1 from South Barracks Breakout.",
+    "Looted Frontier Ale x1 from South Barracks Breakout.",
     "Reward from holding the barracks line: 15 XP, 6 gp.",
     "Clue: A stolen dispatch confirms the attacks around Phandalin are organized enough to rattle Neverwinter's quartermasters.",
     "Your soldier prologue ends with the trail leading toward Mira Thann's private briefing in Neverwinter.",
-    "Rhogar Valeguard joined the active party.",
+    "Clue: Mira marks the switchback, likely scout perches, and the rough spacing the gang prefers when collapsing on a wagon.",
+    "Reward from Fighter identity choice: 10 XP.",
+    "You treated the contract like a fighter's field briefing and forced it into useful shape.",
     "Clue: Dockside rumors say the Ashen Brand sells stolen ore through quiet middlemen.",
     "Reward from working the rumor mill: 15 XP, 12 gp.",
+    "Rhogar Valeguard joined the active party.",
     "Mira Thann sent you south with a writ for Phandalin's steward.",
-    "Reward from Roadside Ambush: 100 XP, 10 gp."
+    "Reward from Roadside Ambush: 100 XP, 11 gp.",
+    "Looted Dried Fish x1 from Roadside Ambush."
   ],
   "quests": {},
   "completed_acts": [],
-  "xp": 180,
-  "gold": 56,
+  "xp": 190,
+  "gold": 57,
   "inventory": {
-    "potion_healing": 4,
+    "potion_healing": 3,
     "bread_round": 4,
     "travel_biscuits": 4,
-    "dried_fish": 3,
+    "dried_fish": 4,
     "goat_cheese": 2,
-    "frontier_ale": 2,
+    "frontier_ale": 3,
     "root_vegetables": 2,
-    "antitoxin_vial": 1,
+    "antitoxin_vial": 2,
     "chain_mail_common": 2,
     "longsword_common": 2,
-    "shield_common": 2,
-    "leather_armor_common": 1
+    "shield_common": 2
   },
   "short_rests_remaining": 2
 }

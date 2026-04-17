@@ -88,6 +88,18 @@ class StoryAct2ScaffoldMixin:
         assert self.state is not None
         return [label for flag_name, label in self.ACT2_FORGE_SUBROUTES if self.state.flags.get(flag_name)]
 
+    def act3_forge_cleared_subroute_labels(self) -> list[str]:
+        assert self.state is not None
+        labels_by_flag = dict(self.ACT2_FORGE_SUBROUTES)
+        stored = self.state.flags.get("act3_forge_subroutes_cleared", [])
+        if not isinstance(stored, list):
+            return []
+        labels: list[str] = []
+        for flag_name in stored:
+            if isinstance(flag_name, str):
+                labels.append(labels_by_flag.get(flag_name, flag_name.replace("_", " ")))
+        return labels
+
     def act2_forge_route_summary_line(self) -> str | None:
         assert self.state is not None
         cleared = self.act2_forge_cleared_subroutes()
@@ -108,6 +120,81 @@ class StoryAct2ScaffoldMixin:
         if self.state.flags.get("forge_lens_mapped") and self.state.flags.get("caldra_defeated"):
             return f"{line} You also mapped the resonance lens from inside before the chamber broke."
         return line
+
+    def act3_forge_handoff_line(self) -> str | None:
+        assert self.state is not None
+        route_state = str(self.state.flags.get("act3_forge_route_state", "")).strip()
+        lens_state = str(self.state.flags.get("act3_forge_lens_state", "")).strip()
+        cleared = self.act3_forge_cleared_subroute_labels()
+        if not route_state and not lens_state and not cleared:
+            return None
+        if route_state == "mastered" and cleared:
+            line = f"Act 3 inherits a Forge where you already {self.act2_join_phrases(cleared)}."
+        elif route_state == "broken" and cleared:
+            line = f"Act 3 inherits a Forge where you already {self.act2_join_phrases(cleared)}, but one forge line still escaped a clean ruin."
+        elif route_state == "partial" and cleared:
+            line = f"Act 3 only inherits one clean break in the Forge: you {cleared[0]}."
+        else:
+            line = "Act 3 inherits the Forge mostly as aftermath rather than as a fully read instrument."
+        if lens_state == "mapped":
+            return f"{line} The mapped resonance lens gives later scenes a reliable read on how Caldra held witness, ritual, and shard pressure together."
+        if lens_state == "shattered_blind":
+            return f"{line} The lens broke before it could be fully read, so later scenes have to work from fallout, rumor, and surviving echoes."
+        return line
+
+    def act2_sponsor_fallout_line(self) -> str:
+        assert self.state is not None
+        sponsor = str(self.state.flags.get("act2_sponsor", "council"))
+        claims_state = str(self.state.flags.get("act3_claims_balance", "contested"))
+        forge_state = str(self.state.flags.get("act3_forge_route_state", "direct"))
+        lens_state = str(self.state.flags.get("act3_forge_lens_state", "shattered_blind"))
+        if sponsor == "exchange":
+            if claims_state == "secured":
+                line = "Halia's Exchange comes out of the cave with the fastest ledgers and the ugliest leverage over what Wave Echo becomes next."
+            elif claims_state == "contested":
+                line = "Halia still has crews, cash, and hard proof in the field, but every claim she makes now has witnesses arguing the moral cost."
+            else:
+                line = "Exchange money is still moving, but the claims race has slipped so far that Halia's grip looks more like opportunism than governance."
+            if lens_state == "mapped":
+                return f"{line} Her people are already talking about the mapped lens lines like inventory."
+            if forge_state in {"partial", "direct"}:
+                return f"{line} That ambition is still aimed at a forge nobody fully unraveled."
+            return f"{line} Even the Exchange cannot pretend the place is safe to own cleanly."
+        if sponsor == "lionshield":
+            if claims_state == "secured":
+                line = "Linene's supply line ends the act controlling the practical routes, which steadies caravans and turns Wave Echo into guarded infrastructure."
+            elif claims_state == "contested":
+                line = "Linene can keep people fed and moving, but not settle whose version of the route gets called legitimate."
+            else:
+                line = "Lionshield discipline keeps some wagons moving, but not enough to make the claims war feel governed."
+            if lens_state == "mapped":
+                return f"{line} She starts treating the mapped lens lanes like hazardous cargo corridors that must stay locked down."
+            if forge_state in {"partial", "direct"}:
+                return f"{line} That order still stops at a forge whose internals were never fully tamed."
+            return f"{line} It is stability under quarantine, not a clean victory."
+        if sponsor == "wardens":
+            if claims_state == "secured":
+                line = "Elira and Daran come out with the strongest moral authority over the deepest routework, even if profit has to wait behind burial, warding, and witness."
+            elif claims_state == "contested":
+                line = "The wardens are trusted by the people who saw the worst of the cave, but not obeyed by everyone still counting ore and salvage."
+            else:
+                line = "The wardens are still right about the danger, but the aftermath is too splintered to let caution rule cleanly."
+            if lens_state == "mapped":
+                return f"{line} The mapped lens gives them a real case for quarantine instead of sounding like superstition."
+            if forge_state in {"partial", "direct"}:
+                return f"{line} Their warnings only sharpen because some of the forge still had to be left half-read."
+            return f"{line} Their victory reads as containment first and ownership a distant second."
+        if claims_state == "secured":
+            line = "The council stays barely cooperative because no single bloc can claim the whole win without the others."
+        elif claims_state == "contested":
+            line = "The council remains a bargaining table, not a verdict. Everyone has part of the truth and none of them trust the rest with all of it."
+        else:
+            line = "The council is still meeting, but mostly to stop rival claims from turning into open theft and panic."
+        if lens_state == "mapped":
+            return f"{line} The mapped resonance lens keeps at least one argument anchored in something concrete."
+        if forge_state in {"partial", "direct"}:
+            return f"{line} None of them get to speak as if the forge was ever fully understood."
+        return f"{line} The forge damage keeps any one faction from sounding fully triumphant."
 
     def act2_companion_digest_line(self) -> str | None:
         assert self.state is not None
@@ -1919,7 +2006,6 @@ class StoryAct2ScaffoldMixin:
         claims_state = self.state.flags.get("act3_claims_balance", "contested")
         whisper_state = self.state.flags.get("act3_whisper_state", "lingering")
         forge_state = str(self.state.flags.get("act3_forge_route_state", "direct"))
-        sponsor = self.ACT2_SPONSOR_LABELS.get(str(self.state.flags.get("act2_sponsor", "council")), "a loose council")
         captive_outcome = str(self.state.flags.get("act2_captive_outcome", "uncertain"))
         if town_state == "united":
             town_line = "Phandalin comes through the act bloodied but unmistakably more united than it began."
@@ -1927,12 +2013,7 @@ class StoryAct2ScaffoldMixin:
             town_line = "Phandalin survives, but in the careful, tired way frontier towns survive when everyone is counting what almost went worse."
         else:
             town_line = "Phandalin survives in pieces. The town still stands, but the act leaves strain that Act 3 can exploit."
-        if claims_state == "secured":
-            claims_line = f"The route war ends with {sponsor} holding the stronger hand over Wave Echo's aftermath."
-        elif claims_state == "contested":
-            claims_line = f"The claims race is still messy. {sponsor} matters, but nobody owns the whole truth cleanly."
-        else:
-            claims_line = f"The claims race has become chaos. {sponsor} still exists, but it no longer feels like control."
+        claims_line = self.act2_sponsor_fallout_line()
         if whisper_state == "contained":
             whisper_line = "You kept the mine's wrong music from spreading far past the cave."
         elif whisper_state == "lingering":
@@ -1955,6 +2036,7 @@ class StoryAct2ScaffoldMixin:
                 forge_line = "You hurt the Forge badly, but one surviving side route still shapes how dangerous its aftermath will be."
             else:
                 forge_line = "You reached Caldra directly, which saved the act but left the Forge's side wounds less thoroughly explored."
+        handoff_line = self.act3_forge_handoff_line()
         self.say(
             town_line,
             typed=True,
@@ -1963,6 +2045,8 @@ class StoryAct2ScaffoldMixin:
         self.say(whisper_line)
         self.say(captive_line)
         self.say(forge_line)
+        if handoff_line is not None:
+            self.say(handoff_line)
         if 2 not in self.state.completed_acts:
             self.state.completed_acts.append(2)
         self.state.current_act = 2

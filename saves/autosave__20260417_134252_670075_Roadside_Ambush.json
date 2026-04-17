@@ -67,7 +67,9 @@
       "second_wind": 1
     },
     "inventory": {},
-    "conditions": {},
+    "conditions": {
+      "emboldened": 1
+    },
     "equipment_bonuses": {
       "Athletics": 1,
       "Intimidation": 1
@@ -171,12 +173,10 @@
         "Gaming Set"
       ],
       "resources": {
-        "lay_on_hands": 5,
-        "spell_slots": 2
+        "lay_on_hands": 5
       },
       "max_resources": {
-        "lay_on_hands": 5,
-        "spell_slots": 2
+        "lay_on_hands": 5
       },
       "inventory": {},
       "conditions": {},
@@ -250,45 +250,54 @@
     ],
     "background_prologue_completed": "Soldier",
     "briefing_seen": true,
+    "neverwinter_preparation_done": true,
+    "briefing_q_phandalin": true,
+    "briefing_q_neverwinter": true,
+    "briefing_q_brand": true,
+    "identity_neverwinter_briefing_class_fighter_map": true,
     "early_companion_recruited": "Rhogar Valeguard",
     "road_approach_chosen": true
   },
   "clues": [
-    "A stolen dispatch confirms the attacks around Phandalin are organized enough to rattle Neverwinter's quartermasters."
+    "A stolen dispatch confirms the attacks around Phandalin are organized enough to rattle Neverwinter's quartermasters.",
+    "Mira marks the switchback, likely scout perches, and the rough spacing the gang prefers when collapsing on a wagon."
   ],
   "journal": [
     "Your soldier's opening leaves you with a live look at how hard Neverwinter is leaning on thin patrol lines and tired veterans to protect the road south.",
     "Word reaches you that Mira Thann is quietly gathering capable hands in Neverwinter against a new bandit threat around Phandalin.",
     "Reward from South Barracks Breakout: 50 XP, 8 gp.",
-    "Looted Frontier Ale x1 from South Barracks Breakout.",
-    "Looted Roadworn Leather Armor x1 from South Barracks Breakout.",
-    "Looted Potion of Healing x1 from South Barracks Breakout.",
     "Reward from holding the barracks line: 15 XP, 6 gp.",
     "Clue: A stolen dispatch confirms the attacks around Phandalin are organized enough to rattle Neverwinter's quartermasters.",
     "Your soldier prologue ends with the trail leading toward Mira Thann's private briefing in Neverwinter.",
+    "Reward from working the rumor mill: 4 gp.",
+    "Clue: Mira marks the switchback, likely scout perches, and the rough spacing the gang prefers when collapsing on a wagon.",
+    "Reward from Fighter identity choice: 10 XP.",
+    "You treated the contract like a fighter's field briefing and forced it into useful shape.",
     "Rhogar Valeguard joined the active party.",
     "Mira Thann sent you south with a writ for Phandalin's steward.",
     "Reward from Roadside Ambush: 125 XP, 4 gp.",
+    "Looted Roadworn Dagger x1 from Roadside Ambush.",
     "Looted Roadworn Leather Armor x1 from Roadside Ambush.",
     "Looted Potion of Healing x1 from Roadside Ambush."
   ],
   "quests": {},
   "completed_acts": [],
-  "xp": 190,
-  "gold": 38,
+  "xp": 200,
+  "gold": 42,
   "inventory": {
-    "potion_healing": 5,
+    "potion_healing": 4,
     "bread_round": 4,
     "travel_biscuits": 4,
     "dried_fish": 3,
     "goat_cheese": 2,
-    "frontier_ale": 3,
+    "frontier_ale": 2,
     "root_vegetables": 2,
     "antitoxin_vial": 1,
     "chain_mail_common": 2,
     "longsword_common": 2,
     "shield_common": 2,
-    "leather_armor_common": 2
+    "dagger_common": 1,
+    "leather_armor_common": 1
   },
   "short_rests_remaining": 2
 }

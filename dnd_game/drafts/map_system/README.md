@@ -1,6 +1,6 @@
 # Hybrid Map System Draft
 
-This folder is a draft-only add-on for a future map layer. Nothing here is wired into the current playable game.
+This folder started as a draft-only add-on for a future map layer. Parts of it now feed the playable game through the Act 1 and Act 2 map work, while the docs, examples, and helper runtime here still serve as the source-facing design sandbox.
 
 ## Subfolders
 
@@ -23,6 +23,16 @@ The presentation pass now uses native `rich` layout and panels when available, w
 - overworld map panel
 - local map panel for dungeon mode
 - rich scene panel and plain-text fallback
+
+## Live integration status
+
+The current playable game now uses ideas from this draft in several places:
+
+- richer Act 2 map requirements such as flag counts, numeric thresholds, and route-order checks
+- read-only Act 2 route rendering through the in-game `map` command
+- playable local maps for `Stonehollow Dig`, `Broken Prospect`, `South Adit`, `Wave Echo Outer Galleries`, `Black Lake Causeway`, and the `Forge of Spells`
+- Act II pressure panels, journal summaries, and camp digest surfaces tied to the expedition state
+- Act 3 handoff flags for Forge route state, cleared subroutes, and resonance-lens outcome
 
 ## Preview
 

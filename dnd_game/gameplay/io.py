@@ -5,11 +5,17 @@ import json
 from pathlib import Path
 import re
 import shutil
+import sys
 import textwrap
+
+try:
+    import msvcrt
+except ImportError:  # pragma: no cover - Windows-only keyboard support
+    msvcrt = None
 
 from ..models import GameState
 from ..ui.colors import ANSI_RE, colorize, rarity_color, rich_style_name, strip_ansi
-from ..ui.rich_render import Columns, Group, Panel, RICH_AVAILABLE, Table, Text, box, render_rich_lines, text_from_ansi
+from ..ui.rich_render import Columns, Console, Group, Live, Panel, RICH_AVAILABLE, Table, Text, box, render_rich_lines, text_from_ansi
 from .constants import MENU_PAGE_SIZE
 
 
@@ -62,6 +68,16 @@ class GameIOMixin:
         except OSError:
             return fallback
 
+    def detected_terminal_width(self) -> int:
+        fallback = 108 if getattr(self, "_interactive_output", False) else 100
+        try:
+            return max(1, shutil.get_terminal_size((fallback, 30)).columns)
+        except OSError:
+            return fallback
+
+    def safe_rich_render_width(self) -> int:
+        return min(self.rich_console_width(), self.detected_terminal_width())
+
     def emit_rich(self, renderable, *, width: int | None = None) -> bool:
         if not self.rich_enabled():
             return False
@@ -75,6 +91,42 @@ class GameIOMixin:
         for line in rendered_lines:
             self.output_fn(line)
         return True
+
+    def rich_panel_row_renderable(
+        self,
+        panels: list[object],
+        *,
+        ratios: list[int] | None = None,
+        padding: tuple[int, int] = (0, 1),
+    ):
+        if not panels or Table is None:
+            return None
+        resolved_ratios = ratios or [1] * len(panels)
+        if len(resolved_ratios) != len(panels):
+            raise ValueError("Panel ratios must match the number of panels.")
+        row = Table.grid(expand=True, padding=padding)
+        for ratio in resolved_ratios:
+            row.add_column(ratio=ratio, vertical="top")
+        row.add_row(*panels)
+        return row
+
+    def emit_rich_panel_row(
+        self,
+        panels: list[object],
+        *,
+        ratios: list[int] | None = None,
+        width: int | None = None,
+        padding: tuple[int, int] = (0, 1),
+    ) -> bool:
+        renderable = self.rich_panel_row_renderable(panels, ratios=ratios, padding=padding)
+        if renderable is None:
+            return False
+        return self.emit_rich(renderable, width=width or self.safe_rich_render_width())
+
+    def begin_keyboard_choice_session(self) -> bool:
+        show_instructions = not bool(getattr(self, "_keyboard_choice_instructions_seen", False))
+        self._keyboard_choice_instructions_seen = True
+        return show_instructions
 
     def rich_text(self, text: object, color: str | None = None, *, bold: bool = False, dim: bool = False):
         content = strip_ansi(str(text))
@@ -276,6 +328,221 @@ class GameIOMixin:
             sticky_trailing_options=sticky_trailing_options,
         )
 
+    def keyboard_choice_menu_supported(self) -> bool:
+        if not self.should_use_rich_ui():
+            return False
+        if Console is None or Live is None or msvcrt is None:
+            return False
+        try:
+            stdin_ready = not hasattr(sys.stdin, "isatty") or sys.stdin.isatty()
+            stdout_ready = not hasattr(sys.stdout, "isatty") or sys.stdout.isatty()
+        except Exception:
+            return False
+        return bool(stdin_ready and stdout_ready)
+
+    def should_use_keyboard_choice_menu(self) -> bool:
+        return self.keyboard_choice_menu_supported()
+
+    def keyboard_choice_menu_title(self) -> str:
+        if self.state is None:
+            return "Choice Menu"
+        current_scene = str(self.state.current_scene)
+        scene_label = getattr(self, "SCENE_LABELS", {}).get(current_scene)
+        if scene_label:
+            return scene_label
+        return "Choice Menu"
+
+    def build_keyboard_choice_menu(
+        self,
+        prompt: str,
+        options: list[str],
+        *,
+        title: str,
+        selected_index: int,
+        typed_buffer: str,
+        feedback: str | None,
+        show_instructions: bool,
+    ):
+        prompt_block = Text()
+        prompt_block.append(prompt, style="bold bright_white")
+        if show_instructions:
+            prompt_block.append("\n", style="dim")
+            prompt_block.append("Arrows move. Enter confirms. ", style="dim")
+            if len(options) <= 9:
+                prompt_block.append("1-9 jumps. ", style="dim")
+            prompt_block.append("Type a number or command. Esc clears.", style="dim")
+
+        option_table = Table.grid(expand=True, padding=(0, 0))
+        option_table.add_column(width=1)
+        option_table.add_column(width=3)
+        option_table.add_column(ratio=1)
+        for index, option in enumerate(options, start=1):
+            active = index - 1 == selected_index
+            marker = self.rich_text(">", "light_green", bold=True) if active else self.rich_text(" ", dim=True)
+            number = self.rich_text(f"{index}.", "light_yellow" if active else "white", bold=active)
+            label = self.rich_from_ansi(self.format_option_text(option))
+            if Text is not None and isinstance(label, Text) and active:
+                label.stylize("bold")
+            row_style = "on rgb(28,36,46)" if active else None
+            option_table.add_row(marker, number, label, style=row_style)
+
+        if typed_buffer:
+            input_line = self.rich_text(f"> {typed_buffer}_", "light_green", bold=True)
+        else:
+            input_line = self.rich_text("> ", "white")
+
+        footer_items = [input_line]
+        if feedback:
+            footer_items.append(self.rich_text(feedback, "light_red"))
+
+        return Panel(
+            Group(
+                prompt_block,
+                self.rich_text("", dim=True),
+                option_table,
+                self.rich_text("", dim=True),
+                *footer_items,
+            ),
+            title=self.rich_text(title, "light_yellow", bold=True),
+            subtitle=self.rich_text("Keyboard Choice Menu", "light_aqua", bold=True),
+            border_style=rich_style_name("light_green"),
+            box=box.ROUNDED,
+            padding=(0, 1),
+        )
+
+    def read_keyboard_choice_wchar(self) -> str:
+        assert msvcrt is not None
+        try:
+            key = msvcrt.getwch()
+        except KeyboardInterrupt as exc:
+            self.output_fn("")
+            from .base import GameInterrupted
+
+            raise GameInterrupted() from exc
+        if key == "\x03":
+            self.output_fn("")
+            from .base import GameInterrupted
+
+            raise GameInterrupted()
+        return key
+
+    def read_keyboard_choice_key(self) -> tuple[str, str | None]:
+        assert msvcrt is not None
+        key = self.read_keyboard_choice_wchar()
+        if key in {"\x00", "\xe0"}:
+            extended = self.read_keyboard_choice_wchar()
+            keymap = {
+                "H": "up",
+                "P": "down",
+            }
+            return (keymap.get(extended, "noop"), None)
+        if key == "\r":
+            return ("enter", None)
+        if key == "\x08":
+            return ("backspace", None)
+        if key == "\x1b":
+            return ("escape", None)
+        if key == "\t":
+            return ("down", None)
+        if key.isprintable():
+            return ("char", key)
+        return ("noop", None)
+
+    def run_keyboard_choice_menu(
+        self,
+        prompt: str,
+        options: list[str],
+        *,
+        title: str | None = None,
+    ) -> int | None:
+        if not options or not self.should_use_keyboard_choice_menu():
+            return None
+
+        selected_index = 0
+        typed_buffer = ""
+        feedback: str | None = None
+        menu_width = max(96, min(120, self.rich_console_width()))
+        console = Console(
+            force_terminal=True,
+            color_system="truecolor",
+            legacy_windows=False,
+            highlight=False,
+            width=menu_width,
+        )
+        resolved_title = title or self.keyboard_choice_menu_title()
+        show_instructions = self.begin_keyboard_choice_session()
+
+        while True:
+            submitted_text: str | None = None
+            with Live(
+                self.build_keyboard_choice_menu(
+                    prompt,
+                    options,
+                    title=resolved_title,
+                    selected_index=selected_index,
+                    typed_buffer=typed_buffer,
+                    feedback=feedback,
+                    show_instructions=show_instructions,
+                ),
+                console=console,
+                transient=True,
+                auto_refresh=False,
+            ) as live:
+                while True:
+                    action, payload = self.read_keyboard_choice_key()
+                    hide_instructions_after_update = show_instructions
+                    if action == "up":
+                        selected_index = (selected_index - 1) % len(options)
+                        feedback = None
+                    elif action == "down":
+                        selected_index = (selected_index + 1) % len(options)
+                        feedback = None
+                    elif action == "backspace":
+                        typed_buffer = typed_buffer[:-1]
+                        feedback = None
+                    elif action == "escape":
+                        typed_buffer = ""
+                        feedback = None
+                    elif action == "char" and payload is not None:
+                        if not typed_buffer and len(options) <= 9 and payload.isdigit():
+                            value = int(payload)
+                            if 1 <= value <= len(options):
+                                return value
+                        typed_buffer += payload
+                        feedback = None
+                    elif action == "enter":
+                        if typed_buffer.strip():
+                            submitted_text = typed_buffer.strip()
+                            typed_buffer = ""
+                            show_instructions = False
+                            break
+                        return selected_index + 1
+                    if hide_instructions_after_update:
+                        show_instructions = False
+                    live.update(
+                        self.build_keyboard_choice_menu(
+                            prompt,
+                            options,
+                            title=resolved_title,
+                            selected_index=selected_index,
+                            typed_buffer=typed_buffer,
+                            feedback=feedback,
+                            show_instructions=show_instructions,
+                        ),
+                        refresh=True,
+                    )
+
+            if submitted_text is None:
+                continue
+            if submitted_text.isdigit():
+                value = int(submitted_text)
+                if 1 <= value <= len(options):
+                    return value
+            if self.handle_meta_command(submitted_text):
+                feedback = None
+                continue
+            feedback = "Type a listed number, use the arrows, or enter a global command."
+
     def render_choice_options(self, options: list[str], *, staggered: bool) -> None:
         pause = getattr(self, "pause_for_option_reveal", None)
         for index, option in enumerate(options, start=1):
@@ -423,7 +690,21 @@ class GameIOMixin:
                     nav_map[len(labels)] = "next"
                 self.output_fn("")
                 self.maybe_render_compact_hud(show_hud=show_hud)
-                self.say(f"{prompt} (page {page + 1})")
+                paged_prompt = f"{prompt} (page {page + 1})"
+                if self.should_use_keyboard_choice_menu():
+                    selected = self.run_keyboard_choice_menu(paged_prompt, labels)
+                    if selected is None:
+                        continue
+                    if selected in nav_map:
+                        page = page - 1 if nav_map[selected] == "prev" else page + 1
+                        continue
+                    if selected in sticky_map:
+                        return sticky_map[selected]
+                    if 1 <= selected <= len(visible):
+                        return start + selected
+                    self.say("Please enter a listed number.")
+                    continue
+                self.say(paged_prompt)
                 self.render_choice_options(labels, staggered=staggered)
                 raw = self.read_input("> ").strip()
                 if self.handle_meta_command(raw):
@@ -441,6 +722,11 @@ class GameIOMixin:
         while True:
             self.output_fn("")
             self.maybe_render_compact_hud(show_hud=show_hud)
+            if self.should_use_keyboard_choice_menu():
+                selected = self.run_keyboard_choice_menu(prompt, options)
+                if selected is not None:
+                    return selected
+                continue
             self.say(prompt)
             self.render_choice_options(options, staggered=staggered)
             raw = self.read_input("> ").strip()
