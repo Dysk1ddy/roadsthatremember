@@ -459,6 +459,13 @@
       "current_dungeon_id": null,
       "current_room_id": null,
       "visited_nodes": [
+        "neverwinter_briefing",
+        "high_road_ambush",
+        "phandalin_hub",
+        "old_owl_well",
+        "wyvern_tor",
+        "ashfall_watch",
+        "tresendar_manor",
         "emberhall_cellars"
       ],
       "cleared_rooms": [

@@ -62,6 +62,132 @@ class JournalMixin:
             padding=(0, 1),
         )
 
+    def character_sheet_panel(self, title: str, color: str, content):
+        return Panel(
+            content,
+            title=self.rich_text(title, color, bold=True),
+            border_style=rich_style_name(color),
+            box=box.ROUNDED,
+            padding=(0, 1),
+        )
+
+    def character_sheet_grid(self, rows: list[tuple[object, object]]):
+        grid = Table.grid(expand=True, padding=(0, 0))
+        grid.add_column(ratio=1, vertical="top")
+        grid.add_column(ratio=1, vertical="top")
+        for left_panel, right_panel in rows:
+            grid.add_row(left_panel, right_panel)
+        return grid
+
+    def character_sheet_render_width(self) -> int:
+        safe_width_getter = getattr(self, "safe_rich_render_width", None)
+        if callable(safe_width_getter):
+            return min(98, safe_width_getter())
+        return min(98, self.rich_console_width())
+
+    def build_character_sheet_rich_renderable(self, member):
+        header = Table.grid(expand=True, padding=(0, 1))
+        header.add_column(style=f"bold {rich_style_name('light_yellow')}", width=14)
+        header.add_column(ratio=1)
+        header.add_row("Lineage", f"Level {member.level} {member.race} {member.class_name}")
+        header.add_row("Background", member.background)
+        header.add_row("Status", strip_ansi(self.character_health_summary(member)))
+        header.add_row("Armor Class", str(member.armor_class))
+        header.add_row("Proficiency", f"+{member.proficiency_bonus}")
+        if getattr(member, "companion_id", ""):
+            header.add_row("Relationship", f"{self.relationship_label_for(member)} ({member.disposition})")
+
+        abilities = Table(box=box.SIMPLE_HEAVY, expand=True, pad_edge=False)
+        abilities.add_column("Ability", style=f"bold {rich_style_name('light_yellow')}")
+        abilities.add_column("Score", justify="center")
+        abilities.add_column("Mod", justify="center")
+        for ability in ABILITY_ORDER:
+            score = member.ability_scores[ability]
+            abilities.add_row(ability, str(score), f"{member.ability_mod(ability):+d}")
+
+        combat = Table.grid(expand=True, padding=(0, 1))
+        combat.add_column(style=f"bold {rich_style_name('light_red')}", width=12)
+        combat.add_column(ratio=1)
+        combat.add_row("Weapon", member.weapon.name)
+        combat.add_row("Attack", f"+{member.attack_bonus()}")
+        combat.add_row("Damage bonus", f"+{member.damage_bonus()}")
+        combat.add_row("Hit die", f"d{member.hit_die}")
+        combat.add_row("Temp HP", str(member.temp_hp))
+        combat.add_row("Conditions", self.character_condition_summary(member))
+        if member.spellcasting_ability is not None:
+            spell_attack = self.spell_attack_bonus(member, member.spellcasting_ability)
+            combat.add_row("Spellcasting", member.spellcasting_ability)
+            combat.add_row("Spell attack", f"+{spell_attack}")
+            combat.add_row("Spell slots", spell_slot_summary(member))
+
+        saves = Table(box=box.SIMPLE_HEAVY, expand=True, pad_edge=False)
+        saves.add_column("Save", style=f"bold {rich_style_name('light_aqua')}")
+        saves.add_column("Bonus", justify="center")
+        for ability in ABILITY_ORDER:
+            proficient = "*" if ability in member.saving_throw_proficiencies else ""
+            saves.add_row(f"{ability}{proficient}", f"{member.save_bonus(ability):+d}")
+
+        skills = Table(box=box.SIMPLE_HEAVY, expand=True, pad_edge=False)
+        skills.add_column("Skill", style=f"bold {rich_style_name('light_green')}")
+        skills.add_column("Bonus", justify="center")
+        skills.add_column("Tags")
+        for skill in sorted(SKILL_TO_ABILITY):
+            markers = []
+            if skill in member.skill_proficiencies:
+                markers.append("prof")
+            if skill in member.skill_expertise:
+                markers.append("expertise")
+            skills.add_row(skill, f"{member.skill_bonus(skill):+d}", ", ".join(markers) or "-")
+
+        feature_lines = [
+            self.rich_text(
+                ", ".join(self.format_feature_name(feature) for feature in member.features) if member.features else "None",
+                "light_yellow",
+            ),
+            self.rich_text(
+                "Background / bonus proficiencies: "
+                + (", ".join(member.bonus_proficiencies) if member.bonus_proficiencies else "None"),
+                "light_green",
+            ),
+        ]
+        resources_text = self.member_resource_summary(member)
+        if resources_text != "None":
+            feature_lines.append(self.rich_text(f"Resources: {resources_text}", "light_aqua"))
+
+        equipment_lines = [
+            self.rich_text(
+                f"{self.equipment_slot_label(slot)}: {get_item(item_id).name if item_id is not None else 'Empty'}",
+                "light_aqua",
+            )
+            for slot, item_id in member.equipment_slots.items()
+        ]
+
+        stats_grid = self.character_sheet_grid(
+            [
+                (
+                    self.character_sheet_panel("Ability Scores", "light_yellow", abilities),
+                    self.character_sheet_panel("Saving Throws", "light_aqua", saves),
+                ),
+                (
+                    self.character_sheet_panel("Combat", "light_red", combat),
+                    self.character_sheet_panel("Skills", "light_green", skills),
+                ),
+            ]
+        )
+        detail_grid = self.character_sheet_grid(
+            [
+                (
+                    self.character_sheet_panel("Features & Proficiencies", "light_yellow", Group(*feature_lines)),
+                    self.character_sheet_panel("Equipment", "light_aqua", Group(*equipment_lines)),
+                ),
+            ]
+        )
+        return Group(
+            self.character_sheet_panel(f"Character Sheet: {member.name}", "light_yellow", header),
+            stats_grid,
+            detail_grid,
+        )
+
     def render_rich_journal_view(
         self,
         *,
@@ -369,120 +495,9 @@ class JournalMixin:
     def show_character_sheet(self, member) -> None:
         self.banner(f"Character Sheet: {member.name}")
         if self.rich_ledger_enabled():
-            header = Table.grid(expand=True, padding=(0, 1))
-            header.add_column(style=f"bold {rich_style_name('light_yellow')}", width=14)
-            header.add_column(ratio=1)
-            header.add_row("Lineage", f"Level {member.level} {member.race} {member.class_name}")
-            header.add_row("Background", member.background)
-            header.add_row("Status", strip_ansi(self.character_health_summary(member)))
-            header.add_row("Armor Class", str(member.armor_class))
-            header.add_row("Proficiency", f"+{member.proficiency_bonus}")
-            if getattr(member, "companion_id", ""):
-                header.add_row("Relationship", f"{self.relationship_label_for(member)} ({member.disposition})")
-
-            abilities = Table(box=box.SIMPLE_HEAVY, expand=True, pad_edge=False)
-            abilities.add_column("Ability", style=f"bold {rich_style_name('light_yellow')}")
-            abilities.add_column("Score", justify="center")
-            abilities.add_column("Mod", justify="center")
-            for ability in ABILITY_ORDER:
-                score = member.ability_scores[ability]
-                abilities.add_row(ability, str(score), f"{member.ability_mod(ability):+d}")
-
-            combat = Table.grid(expand=True, padding=(0, 1))
-            combat.add_column(style=f"bold {rich_style_name('light_red')}", width=12)
-            combat.add_column(ratio=1)
-            combat.add_row("Weapon", member.weapon.name)
-            combat.add_row("Attack", f"+{member.attack_bonus()}")
-            combat.add_row("Damage bonus", f"+{member.damage_bonus()}")
-            combat.add_row("Hit die", f"d{member.hit_die}")
-            combat.add_row("Temp HP", str(member.temp_hp))
-            combat.add_row("Conditions", self.character_condition_summary(member))
-            if member.spellcasting_ability is not None:
-                spell_attack = self.spell_attack_bonus(member, member.spellcasting_ability)
-                combat.add_row("Spellcasting", member.spellcasting_ability)
-                combat.add_row("Spell attack", f"+{spell_attack}")
-                combat.add_row(
-                    "Spell slots",
-                    spell_slot_summary(member),
-                )
-
-            saves = Table(box=box.SIMPLE_HEAVY, expand=True, pad_edge=False)
-            saves.add_column("Save", style=f"bold {rich_style_name('light_aqua')}")
-            saves.add_column("Bonus", justify="center")
-            for ability in ABILITY_ORDER:
-                proficient = "*" if ability in member.saving_throw_proficiencies else ""
-                saves.add_row(f"{ability}{proficient}", f"{member.save_bonus(ability):+d}")
-
-            skills = Table(box=box.SIMPLE_HEAVY, expand=True, pad_edge=False)
-            skills.add_column("Skill", style=f"bold {rich_style_name('light_green')}")
-            skills.add_column("Bonus", justify="center")
-            skills.add_column("Tags")
-            for skill in sorted(SKILL_TO_ABILITY):
-                markers = []
-                if skill in member.skill_proficiencies:
-                    markers.append("prof")
-                if skill in member.skill_expertise:
-                    markers.append("expertise")
-                skills.add_row(skill, f"{member.skill_bonus(skill):+d}", ", ".join(markers) or "-")
-
-            feature_lines = [
-                self.rich_text(
-                    ", ".join(self.format_feature_name(feature) for feature in member.features) if member.features else "None",
-                    "light_yellow",
-                ),
-                self.rich_text(
-                    "Background / bonus proficiencies: "
-                    + (", ".join(member.bonus_proficiencies) if member.bonus_proficiencies else "None"),
-                    "light_green",
-                ),
-            ]
-            resources_text = self.member_resource_summary(member)
-            if resources_text != "None":
-                feature_lines.append(self.rich_text(f"Resources: {resources_text}", "light_aqua"))
-
-            equipment_lines = [
-                self.rich_text(
-                    f"{self.equipment_slot_label(slot)}: {get_item(item_id).name if item_id is not None else 'Empty'}",
-                    "light_aqua",
-                )
-                for slot, item_id in member.equipment_slots.items()
-            ]
-
             if self.emit_rich(
-                Group(
-                    Panel(
-                        header,
-                        title=self.rich_text(f"Character Sheet: {member.name}", "light_yellow", bold=True),
-                        border_style=rich_style_name("light_yellow"),
-                        box=box.ROUNDED,
-                        padding=(0, 1),
-                    ),
-                    Columns(
-                        [
-                            Panel(abilities, title=self.rich_text("Ability Scores", "light_yellow", bold=True), border_style=rich_style_name("light_yellow"), box=box.ROUNDED, padding=(0, 1)),
-                            Panel(saves, title=self.rich_text("Saving Throws", "light_aqua", bold=True), border_style=rich_style_name("light_aqua"), box=box.ROUNDED, padding=(0, 1)),
-                        ],
-                        expand=True,
-                        equal=True,
-                    ),
-                    Columns(
-                        [
-                            Panel(combat, title=self.rich_text("Combat", "light_red", bold=True), border_style=rich_style_name("light_red"), box=box.ROUNDED, padding=(0, 1)),
-                            Panel(skills, title=self.rich_text("Skills", "light_green", bold=True), border_style=rich_style_name("light_green"), box=box.ROUNDED, padding=(0, 1)),
-                        ],
-                        expand=True,
-                        equal=True,
-                    ),
-                    Columns(
-                        [
-                            Panel(Group(*feature_lines), title=self.rich_text("Features & Proficiencies", "light_yellow", bold=True), border_style=rich_style_name("light_yellow"), box=box.ROUNDED, padding=(0, 1)),
-                            Panel(Group(*equipment_lines), title=self.rich_text("Equipment", "light_aqua", bold=True), border_style=rich_style_name("light_aqua"), box=box.ROUNDED, padding=(0, 1)),
-                        ],
-                        expand=True,
-                        equal=True,
-                    ),
-                ),
-                width=max(108, self.rich_console_width()),
+                self.build_character_sheet_rich_renderable(member),
+                width=self.character_sheet_render_width(),
             ):
                 return
         self.say(

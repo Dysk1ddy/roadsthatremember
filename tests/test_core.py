@@ -37,15 +37,17 @@ from dnd_game.drafts.map_system.runtime import (
     FlagValueRequirement,
     NumericFlagRequirement,
     Requirement,
+    build_overworld_panel_text,
     requirement_met,
 )
+from dnd_game.drafts.map_system.data.act1_hybrid_map import ACT1_HYBRID_MAP
 from dnd_game.data.story.lore import APPENDIX_LORE
 from dnd_game.data.quests import QuestLogEntry
 from dnd_game.items import ITEMS, format_inventory_line
 from dnd_game.models import GameState
 from dnd_game.gameplay.status_effects import STATUS_DEFINITIONS
 from dnd_game.ui.colors import colorize, strip_ansi
-from dnd_game.ui.rich_render import RICH_AVAILABLE
+from dnd_game.ui.rich_render import RICH_AVAILABLE, render_rich_lines
 
 
 class CoreTests(unittest.TestCase):
@@ -581,9 +583,23 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(90082))
         game.state = GameState(player=player, current_scene="phandalin_hub", flags={"phandalin_arrived": True})
         game.ensure_state_integrity()
-        self.assertEqual(game.state.flags["map_state"]["current_node_id"], "phandalin_hub")
-        self.assertIsNone(game.state.flags["map_state"]["current_dungeon_id"])
-        self.assertIn("phandalin_hub", game.state.flags["map_state"]["visited_nodes"])
+        map_state = game.state.flags["map_state"]
+        self.assertEqual(map_state["current_node_id"], "phandalin_hub")
+        self.assertIsNone(map_state["current_dungeon_id"])
+        self.assertIn("neverwinter_briefing", map_state["visited_nodes"])
+        self.assertIn("high_road_ambush", map_state["visited_nodes"])
+        self.assertIn("phandalin_hub", map_state["visited_nodes"])
+
+        rendered_map = build_overworld_panel_text(
+            ACT1_HYBRID_MAP,
+            DraftMapState(
+                current_node_id=map_state["current_node_id"],
+                visited_nodes=set(map_state["visited_nodes"]),
+            ),
+        )
+        self.assertIn("NEVERWINTER", rendered_map)
+        self.assertIn("HIGH ROAD", rendered_map)
+        self.assertIn("(  PHANDALIN  )", rendered_map)
 
     def test_map_requirement_supports_flag_count_groups(self) -> None:
         requirement = Requirement(
@@ -3755,6 +3771,34 @@ class CoreTests(unittest.TestCase):
         self.assertIn("\n\nSkills:", rendered)
         self.assertIn("Skills:\n- Acrobatics", rendered)
         self.assertIn("Equipment:", rendered)
+
+    def test_character_sheet_rich_layout_uses_a_compact_aligned_stat_grid(self) -> None:
+        if not RICH_AVAILABLE:
+            self.skipTest("Rich is not available")
+
+        player = build_character(
+            name="Velkor",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        companion = create_kaelis_starling()
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(184))
+        game.state = GameState(player=player, companions=[companion], current_scene="phandalin_hub")
+
+        renderable = game.build_character_sheet_rich_renderable(companion)
+        lines = render_rich_lines(renderable, width=game.character_sheet_render_width())
+
+        top_titles = next(line for line in lines if "Ability Scores" in line and "Saving Throws" in line)
+        bottom_titles = next(line for line in lines if "Combat" in line and "Skills" in line)
+        saving_throws_start = top_titles.index("Saving Throws")
+        skills_start = bottom_titles.index("Skills")
+
+        self.assertLess(saving_throws_start - top_titles.index("Ability Scores"), 52)
+        self.assertLess(skills_start - bottom_titles.index("Combat"), 52)
+        self.assertLess(abs(saving_throws_start - skills_start), 4)
 
     def test_selling_item_adds_gold_with_merchant(self) -> None:
         player = build_character(

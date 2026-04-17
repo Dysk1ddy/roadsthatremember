@@ -454,6 +454,61 @@ class MapSystemMixin:
             seen.add("lantern_vigil")
         payload["seen_story_beats"] = sorted(seen)
 
+    def _remember_act1_nodes(self, payload: dict[str, Any], *node_ids: str) -> None:
+        visited = payload["visited_nodes"]
+        for node_id in node_ids:
+            if node_id and node_id not in visited:
+                visited.append(node_id)
+
+    def _backfill_act1_visited_nodes(self, payload: dict[str, Any], current_node_id: str) -> None:
+        assert self.state is not None
+        if current_node_id == "neverwinter_briefing":
+            self._remember_act1_nodes(payload, "neverwinter_briefing")
+            return
+        if current_node_id == "high_road_ambush":
+            self._remember_act1_nodes(payload, "neverwinter_briefing", "high_road_ambush")
+            return
+
+        # Reaching any Phandalin-era node means the briefing and road ambush already happened.
+        self._remember_act1_nodes(payload, "neverwinter_briefing", "high_road_ambush", "phandalin_hub")
+
+        later_than_branches = {"ashfall_watch", "tresendar_manor", "emberhall_cellars"}
+        later_than_ashfall = {"tresendar_manor", "emberhall_cellars"}
+
+        if current_node_id == "old_owl_well" or current_node_id in later_than_branches or bool(self.state.flags.get("old_owl_well_cleared")):
+            self._remember_act1_nodes(payload, "old_owl_well")
+        if current_node_id == "wyvern_tor" or current_node_id in later_than_branches or bool(self.state.flags.get("wyvern_tor_cleared")):
+            self._remember_act1_nodes(payload, "wyvern_tor")
+        if current_node_id == "cinderfall_ruins" or any(
+            self.state.flags.get(flag_name)
+            for flag_name in (
+                "cinderfall_gate_opened",
+                "cinderfall_chapel_secured",
+                "cinderfall_storehouse_searched",
+                "cinderfall_relay_destroyed",
+                "cinderfall_ruins_cleared",
+            )
+        ):
+            self._remember_act1_nodes(payload, "cinderfall_ruins")
+        if (
+            current_node_id == "ashfall_watch"
+            or current_node_id in later_than_ashfall
+            or bool(self.state.flags.get("ashfall_gate_breached"))
+            or bool(self.state.flags.get("ashfall_watch_cleared"))
+        ):
+            self._remember_act1_nodes(payload, "ashfall_watch")
+        if (
+            current_node_id == "tresendar_manor"
+            or current_node_id == "emberhall_cellars"
+            or self.state.current_scene == "act1_complete"
+            or bool(self.state.flags.get("tresendar_revealed"))
+            or bool(self.state.flags.get("tresendar_cleared"))
+            or bool(self.state.flags.get("emberhall_revealed"))
+        ):
+            self._remember_act1_nodes(payload, "tresendar_manor")
+        if current_node_id == "emberhall_cellars" or self.state.current_scene == "act1_complete" or bool(self.state.flags.get("act1_complete")):
+            self._remember_act1_nodes(payload, "emberhall_cellars")
+
     def _sync_map_state_with_scene(self, *, force_node_id: str | None = None) -> None:
         assert self.state is not None
         payload = self._map_state_payload()
@@ -465,8 +520,7 @@ class MapSystemMixin:
             return
         node = ACT1_HYBRID_MAP.nodes[node_id]
         payload["current_node_id"] = node_id
-        if node_id not in payload["visited_nodes"]:
-            payload["visited_nodes"].append(node_id)
+        self._backfill_act1_visited_nodes(payload, node_id)
         if node.enters_dungeon_id is None or self.state.current_scene != node.scene_key:
             payload["current_dungeon_id"] = None
             payload["current_room_id"] = None
