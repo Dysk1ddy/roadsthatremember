@@ -6,7 +6,7 @@ This folder is a draft-only add-on for a future map layer. Nothing here is wired
 
 - `docs/`: design notes and flow documentation
 - `runtime/`: draft models, unlock logic, and presentation helpers
-- `data/`: Act 1 sample blueprint
+- `data/`: Act 1 sample blueprint and Act 2 enemy-driven blueprint
 - `examples/`: small preview script
 
 ## Design direction
@@ -28,4 +28,5 @@ The presentation pass now uses native `rich` layout and panels when available, w
 
 ```bash
 python -m dnd_game.drafts.map_system.examples.act1_preview
+python -m dnd_game.drafts.map_system.examples.act2_preview
 ```

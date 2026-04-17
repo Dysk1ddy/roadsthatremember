@@ -36,6 +36,11 @@ class StoryAct2ScaffoldMixin:
         "wardens": "Elira and Daran's cautious wardens",
         "council": "a divided but cooperative council",
     }
+    ACT2_FORGE_SUBROUTES = (
+        ("forge_choir_pit_silenced", "silenced the choir pit"),
+        ("forge_pact_rhythm_found", "recovered the Pact anvil's rhythm"),
+        ("forge_shard_channels_disrupted", "shattered the shard channels"),
+    )
 
     def act2_pick_enemy(self, templates, *, name: str | None = None):
         return create_enemy(self.rng.choice(tuple(templates)), name=name)
@@ -69,6 +74,63 @@ class StoryAct2ScaffoldMixin:
     def act2_metric_label(self, metric_key: str) -> str:
         value = max(0, min(self.act2_metric_value(metric_key), self.ACT2_METRIC_LIMITS[metric_key]))
         return self.ACT2_METRIC_LABELS[metric_key][value]
+
+    def act2_join_phrases(self, phrases: list[str]) -> str:
+        if not phrases:
+            return ""
+        if len(phrases) == 1:
+            return phrases[0]
+        if len(phrases) == 2:
+            return f"{phrases[0]} and {phrases[1]}"
+        return f"{', '.join(phrases[:-1])}, and {phrases[-1]}"
+
+    def act2_forge_cleared_subroutes(self) -> list[str]:
+        assert self.state is not None
+        return [label for flag_name, label in self.ACT2_FORGE_SUBROUTES if self.state.flags.get(flag_name)]
+
+    def act2_forge_route_summary_line(self) -> str | None:
+        assert self.state is not None
+        cleared = self.act2_forge_cleared_subroutes()
+        if not cleared and not self.state.flags.get("forge_threshold_crossed") and not self.state.flags.get("caldra_defeated"):
+            return None
+        if len(cleared) == 3:
+            line = f"Inside the Forge, you {self.act2_join_phrases(cleared)} before Caldra could stabilize any of them."
+        elif len(cleared) == 2:
+            line = f"Inside the Forge, you {self.act2_join_phrases(cleared)} before the final fight, but one live subroute stayed dangerous to the end."
+        elif len(cleared) == 1:
+            line = f"Inside the Forge, you only {cleared[0]} before confronting Caldra directly."
+        elif self.state.flags.get("caldra_defeated"):
+            line = "Caldra fell before the Forge's side routes were fully broken, which left the chamber dangerous right up to the end."
+        else:
+            line = "The Forge threshold is breached, but most of its side routes are still live."
+        if self.state.flags.get("forge_lens_mapped") and not self.state.flags.get("caldra_defeated"):
+            return f"{line} The resonance lens is already mapped from inside."
+        if self.state.flags.get("forge_lens_mapped") and self.state.flags.get("caldra_defeated"):
+            return f"{line} You also mapped the resonance lens from inside before the chamber broke."
+        return line
+
+    def act2_companion_digest_line(self) -> str | None:
+        assert self.state is not None
+        notes: list[str] = []
+        nim = self.find_companion("Nim Ardentglass")
+        if nim is not None:
+            if nim in self.state.companions:
+                notes.append("Nim Ardentglass is with the active party keeping the route notes honest")
+            else:
+                notes.append("Nim Ardentglass is at camp turning Stonehollow's salvage into usable maps")
+        irielle = self.find_companion("Irielle Ashwake")
+        if irielle is not None:
+            irielle_line = "Irielle Ashwake is with the active party"
+            if irielle not in self.state.companions:
+                irielle_line = "Irielle Ashwake is at camp"
+            if self.state.flags.get("south_adit_counter_cadence_learned") or self.state.flags.get("irielle_counter_cadence"):
+                irielle_line += " carrying the adit's counter-cadence"
+            else:
+                irielle_line += " as one of the clearest witnesses against the Choir"
+            notes.append(irielle_line)
+        if not notes:
+            return None
+        return f"Company state: {'; '.join(notes)}."
 
     def act2_shift_metric(self, metric_key: str, delta: int, reason: str) -> None:
         assert self.state is not None
@@ -129,6 +191,128 @@ class StoryAct2ScaffoldMixin:
         self.state.flags.setdefault("act2_captive_outcome", "uncertain")
         self.state.flags["act2_metrics_initialized"] = True
 
+    def act2_late_route_hub_recap(self) -> str | None:
+        assert self.state is not None
+        first_late_route = str(self.state.flags.get("act2_first_late_route", "")).strip()
+        if first_late_route == "broken_prospect":
+            if self.state.flags.get("south_adit_cleared") and self.state.flags.get("act2_captive_outcome") == "few_saved":
+                return "Broken Prospect went first, and South Adit never recovered cleanly from that delay."
+            if self.state.flags.get("south_adit_cleared"):
+                return "Broken Prospect went first, and South Adit had to be reclaimed after the damage was already in motion."
+            return "Broken Prospect went first. South Adit is still paying for that delay."
+        if first_late_route == "south_adit":
+            if self.state.flags.get("broken_prospect_cleared"):
+                return "South Adit went first, and Broken Prospect had to be recovered after the claims race tightened."
+            return "South Adit went first. Broken Prospect is still hardening around that choice."
+        return None
+
+    def act2_campaign_focus_lines(self) -> list[str]:
+        assert self.state is not None
+        lines: list[str] = []
+        first_late_route = str(self.state.flags.get("act2_first_late_route", "")).strip()
+        if first_late_route == "broken_prospect":
+            if self.state.flags.get("south_adit_cleared") and self.state.flags.get("act2_captive_outcome") == "few_saved":
+                lines.append("Late-route commitment: Broken Prospect first; South Adit only yielded partial rescues.")
+            elif self.state.flags.get("south_adit_cleared"):
+                lines.append("Late-route commitment: Broken Prospect first; South Adit was recovered after the delay.")
+            else:
+                lines.append("Late-route commitment: Broken Prospect first; South Adit remains under delay pressure.")
+        elif first_late_route == "south_adit":
+            if self.state.flags.get("broken_prospect_cleared"):
+                lines.append("Late-route commitment: South Adit first; Broken Prospect was recovered after the route race hardened.")
+            else:
+                lines.append("Late-route commitment: South Adit first; Broken Prospect is still hardening.")
+
+        rescue_parts: list[str] = []
+        if self.state.flags.get("stonehollow_scholars_found"):
+            if self.state.flags.get("nim_countermeasure_notes") or self.state.flags.get("stonehollow_notes_preserved"):
+                rescue_parts.append("Stonehollow scholars escaped with usable survey testimony")
+            else:
+                rescue_parts.append("Stonehollow survivors were pulled out alive")
+        captive_outcome = str(self.state.flags.get("act2_captive_outcome", "uncertain"))
+        if captive_outcome == "many_saved":
+            rescue_parts.append("South Adit yielded many survivors")
+        elif captive_outcome == "few_saved":
+            rescue_parts.append("South Adit only yielded partial rescues")
+        elif captive_outcome == "captives_endangered":
+            rescue_parts.append("South Adit's captives are still endangered")
+        if self.state.flags.get("irielle_contact_made"):
+            irielle = self.find_companion("Irielle Ashwake")
+            if irielle is None:
+                rescue_parts.append("Irielle Ashwake escaped the adit and reached the wider company")
+            elif irielle in self.state.companions:
+                rescue_parts.append("Irielle Ashwake is traveling with the active party")
+            else:
+                rescue_parts.append("Irielle Ashwake is sheltering at camp with the company")
+        if rescue_parts:
+            lines.append(f"Rescue summary: {'; '.join(rescue_parts)}.")
+
+        route_parts: list[str] = []
+        if self.state.flags.get("nim_countermeasure_notes"):
+            route_parts.append("Nim's Stonehollow countermeasure notes survived")
+        if self.state.flags.get("prospect_markers_decoded") or self.state.flags.get("prospect_route_cache_read"):
+            route_parts.append("Broken Prospect exposed the deeper Pact approach")
+        if self.state.flags.get("wave_echo_outer_cleared"):
+            route_parts.append("the outer galleries now hold as a real expedition line")
+        elif self.state.flags.get("outer_survey_marks_read") or self.state.flags.get("outer_false_echo_named"):
+            route_parts.append("the outer galleries are starting to read cleanly")
+        if self.state.flags.get("black_lake_crossed"):
+            route_parts.append("the Black Lake threshold is open")
+        elif self.state.flags.get("black_lake_shrine_purified") or self.state.flags.get("black_lake_barracks_raided"):
+            route_parts.append("the Black Lake crossing is being prepared from multiple angles")
+        if self.state.flags.get("forge_lens_mapped") and not self.state.flags.get("caldra_defeated"):
+            route_parts.append("the Forge's resonance lens has been mapped from inside")
+        elif self.state.flags.get("forge_threshold_crossed") and not self.state.flags.get("caldra_defeated"):
+            route_parts.append("the Forge threshold is under direct pressure")
+        elif self.state.flags.get("caldra_defeated"):
+            route_parts.append("the Forge lens has been broken")
+        if route_parts:
+            lines.append(f"Route intelligence: {'; '.join(route_parts)}.")
+        forge_route_line = self.act2_forge_route_summary_line()
+        if forge_route_line is not None:
+            lines.append(f"Forge route: {forge_route_line}")
+
+        if (
+            self.state.flags.get("quiet_choir_identified")
+            or self.state.flags.get("south_adit_witness_found")
+            or self.state.flags.get("south_adit_counter_cadence_learned")
+            or self.state.flags.get("black_lake_barracks_orders_taken")
+        ):
+            choir_parts: list[str] = []
+            if self.state.flags.get("quiet_choir_identified") or self.state.flags.get("south_adit_witness_found"):
+                choir_parts.append("captives have named the Quiet Choir's prison cadence")
+            if self.state.flags.get("south_adit_counter_cadence_learned"):
+                choir_parts.append("Irielle's augur notes carry a counter-cadence into the forge route")
+            if self.state.flags.get("black_lake_barracks_orders_taken"):
+                choir_parts.append("barracks orders confirm the Forge-side reserve plan")
+            lines.append(f"Choir intelligence: {'; '.join(choir_parts)}.")
+
+        return lines
+
+    def journal_snapshot_lines(self) -> list[str]:
+        if self.state is None or not self.state.flags.get("act2_started"):
+            return []
+        return self.act2_campaign_focus_lines()
+
+    def act2_camp_digest_lines(self) -> list[str]:
+        assert self.state is not None
+        if not self.state.flags.get("act2_started"):
+            return []
+        lines = [
+            f"Town {self.act2_metric_value('act2_town_stability')}/5 ({self.act2_metric_label('act2_town_stability')}) | "
+            f"Route {self.act2_metric_value('act2_route_control')}/5 ({self.act2_metric_label('act2_route_control')}) | "
+            f"Whisper {self.act2_metric_value('act2_whisper_pressure')}/5 ({self.act2_metric_label('act2_whisper_pressure')})"
+        ]
+        late_route_recap = self.act2_late_route_hub_recap()
+        if late_route_recap is not None:
+            lines.append(late_route_recap)
+        companion_line = self.act2_companion_digest_line()
+        if companion_line is not None:
+            lines.append(companion_line)
+        focus_lines = [line for line in self.act2_campaign_focus_lines() if not line.startswith("Late-route commitment:")]
+        lines.extend(focus_lines[:3])
+        return lines[:5]
+
     def act2_campaign_snapshot_lines(self) -> list[str]:
         assert self.state is not None
         lines = [
@@ -142,11 +326,7 @@ class StoryAct2ScaffoldMixin:
             resolved = bool(self.state.flags.get(delayed_lead))
             status = "recovered late" if resolved else "still unresolved"
             lines.append(f"- Delayed lead: {self.ACT2_BRANCH_LABELS[delayed_lead]} ({status})")
-        first_late_route = str(self.state.flags.get("act2_first_late_route", "")).strip()
-        if first_late_route == "broken_prospect":
-            lines.append("- Late-route priority: Broken Prospect went first, and the prisoners paid for the delay.")
-        elif first_late_route == "south_adit":
-            lines.append("- Late-route priority: South Adit went first, and the route race tightened elsewhere.")
+        lines.extend(f"- {line}" for line in self.act2_campaign_focus_lines())
         return lines
 
     def show_act2_campaign_status(self, *, banner: bool = True) -> None:
@@ -261,14 +441,54 @@ class StoryAct2ScaffoldMixin:
                 "the South Adit line is broken before the Choir can finish all its work there",
             )
 
+    def confirm_act2_late_route_priority(self, route_key: str) -> bool:
+        assert self.state is not None
+        if self.state.flags.get("act2_first_late_route"):
+            return True
+        if route_key == "broken_prospect":
+            self.say(
+                "Choosing Broken Prospect first commits the expedition to the cleaner cave approach. Route control improves, "
+                "but South Adit's prisoners remain below while the Choir keeps sorting them."
+            )
+            options = [
+                self.action_option("Commit to Broken Prospect first."),
+                self.action_option("Back to the expedition table."),
+            ]
+        else:
+            self.say(
+                "Choosing South Adit first puts living prisoners ahead of the route race. More captives may survive, "
+                "but Broken Prospect will have longer to harden with rivals, sentries, and bad claims."
+            )
+            options = [
+                self.action_option("Commit to South Adit first."),
+                self.action_option("Back to the expedition table."),
+            ]
+        choice = self.scenario_choice(
+            "This first late-route choice will change the other route. Proceed?",
+            options,
+            allow_meta=False,
+        )
+        return choice == 1
+
     def act2_record_epilogue_flags(self) -> None:
         assert self.state is not None
         town = self.act2_metric_value("act2_town_stability")
         route = self.act2_metric_value("act2_route_control")
         whisper = self.act2_metric_value("act2_whisper_pressure")
+        forge_cleared = [flag_name for flag_name, _ in self.ACT2_FORGE_SUBROUTES if self.state.flags.get(flag_name)]
         self.state.flags["act3_phandalin_state"] = "united" if town >= 4 else "holding" if town >= 2 else "fractured"
         self.state.flags["act3_claims_balance"] = "secured" if route >= 4 else "contested" if route >= 2 else "chaotic"
         self.state.flags["act3_whisper_state"] = "contained" if whisper <= 1 else "lingering" if whisper <= 3 else "carried_out"
+        self.state.flags["act3_forge_subroutes_cleared"] = forge_cleared
+        if len(forge_cleared) == 3:
+            self.state.flags["act3_forge_route_state"] = "mastered"
+        elif len(forge_cleared) == 2:
+            self.state.flags["act3_forge_route_state"] = "broken"
+        elif len(forge_cleared) == 1:
+            self.state.flags["act3_forge_route_state"] = "partial"
+        else:
+            self.state.flags["act3_forge_route_state"] = "direct"
+        self.state.flags["act3_forge_lens_state"] = "mapped" if self.state.flags.get("forge_lens_mapped") else "shattered_blind"
 
     def start_act2_scaffold(self) -> None:
         assert self.state is not None
@@ -456,6 +676,9 @@ class StoryAct2ScaffoldMixin:
         )
         for line in self.act2_campaign_snapshot_lines():
             self.output_fn(line)
+        late_route_recap = self.act2_late_route_hub_recap()
+        if late_route_recap is not None:
+            self.say(late_route_recap)
         while True:
             options: list[tuple[str, str]] = []
             if not self.state.flags.get("agatha_truth_secured"):
@@ -533,9 +756,13 @@ class StoryAct2ScaffoldMixin:
                 self.state.current_scene = "act2_midpoint_convergence"
                 return
             if selection_key == "broken_prospect":
+                if not self.confirm_act2_late_route_priority("broken_prospect"):
+                    continue
                 self.state.current_scene = "broken_prospect"
                 return
             if selection_key == "south_adit":
+                if not self.confirm_act2_late_route_priority("south_adit"):
+                    continue
                 self.state.current_scene = "south_adit"
                 return
             if selection_key == "outer":
@@ -1686,10 +1913,12 @@ class StoryAct2ScaffoldMixin:
 
     def scene_act2_scaffold_complete(self) -> None:
         assert self.state is not None
+        self.act2_record_epilogue_flags()
         self.banner("Act II Complete")
         town_state = self.state.flags.get("act3_phandalin_state", "holding")
         claims_state = self.state.flags.get("act3_claims_balance", "contested")
         whisper_state = self.state.flags.get("act3_whisper_state", "lingering")
+        forge_state = str(self.state.flags.get("act3_forge_route_state", "direct"))
         sponsor = self.ACT2_SPONSOR_LABELS.get(str(self.state.flags.get("act2_sponsor", "council")), "a loose council")
         captive_outcome = str(self.state.flags.get("act2_captive_outcome", "uncertain"))
         if town_state == "united":
@@ -1716,6 +1945,16 @@ class StoryAct2ScaffoldMixin:
             captive_line = "The rescue still matters, but too many missing names follow the company back out of the adit."
         else:
             captive_line = "The prisoners were never the only stakes, but they proved who the party believed the cave was for."
+        forge_line = self.act2_forge_route_summary_line()
+        if forge_line is None:
+            if forge_state == "mastered":
+                forge_line = "You broke the Forge so thoroughly that even its side routes end the act sounding more like ruined craft than living doctrine."
+            elif forge_state == "broken":
+                forge_line = "You broke enough of the Forge's side routes that Act 3 inherits a damaged instrument instead of a clean weapon."
+            elif forge_state == "partial":
+                forge_line = "You hurt the Forge badly, but one surviving side route still shapes how dangerous its aftermath will be."
+            else:
+                forge_line = "You reached Caldra directly, which saved the act but left the Forge's side wounds less thoroughly explored."
         self.say(
             town_line,
             typed=True,
@@ -1723,6 +1962,7 @@ class StoryAct2ScaffoldMixin:
         self.say(claims_line)
         self.say(whisper_line)
         self.say(captive_line)
+        self.say(forge_line)
         if 2 not in self.state.completed_acts:
             self.state.completed_acts.append(2)
         self.state.current_act = 2

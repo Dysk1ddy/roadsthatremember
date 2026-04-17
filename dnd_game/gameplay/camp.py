@@ -8,8 +8,15 @@ from ..ui.rich_render import Columns, Group, Panel, Table, box
 
 
 class CampMixin:
+    def camp_digest_lines(self) -> list[str]:
+        getter = getattr(self, "act2_camp_digest_lines", None)
+        if not callable(getter):
+            return []
+        return list(getter())
+
     def render_camp_overview(self) -> None:
         assert self.state is not None
+        digest_lines = self.camp_digest_lines()
         if not (
             callable(getattr(self, "should_use_rich_ui", None))
             and self.should_use_rich_ui()
@@ -19,6 +26,10 @@ class CampMixin:
             and Table is not None
             and box is not None
         ):
+            if digest_lines:
+                self.say("Act II Digest:")
+                for line in digest_lines:
+                    self.output_fn(f"- {line}")
             return
         status = Table.grid(expand=True, padding=(0, 1))
         status.add_column(style=f"bold {rich_style_name('light_yellow')}", width=12)
@@ -55,43 +66,57 @@ class CampMixin:
             self.rich_text("6. Speak to the magic mirror", "light_green"),
             self.rich_text("7. Break camp", "light_green"),
         )
-        self.emit_rich(
-            Group(
+        panels: list[object] = [
+            Panel(
+                status,
+                title=self.rich_text("Camp Ledger", "light_yellow", bold=True),
+                border_style=rich_style_name("light_yellow"),
+                box=box.ROUNDED,
+                padding=(0, 1),
+            )
+        ]
+        if digest_lines:
+            digest_content = Group(*(self.rich_from_ansi(line) for line in digest_lines))
+            panels.append(
                 Panel(
-                    status,
-                    title=self.rich_text("Camp Ledger", "light_yellow", bold=True),
-                    border_style=rich_style_name("light_yellow"),
+                    digest_content,
+                    title=self.rich_text("Act II Digest", "light_aqua", bold=True),
+                    border_style=rich_style_name("light_aqua"),
                     box=box.ROUNDED,
                     padding=(0, 1),
-                ),
-                Columns(
-                    [
-                        Panel(
-                            active_party,
-                            title=self.rich_text("Around The Fire", "light_green", bold=True),
-                            border_style=rich_style_name("light_green"),
-                            box=box.ROUNDED,
-                            padding=(0, 1),
-                        ),
-                        Panel(
-                            camp_roster,
-                            title=self.rich_text("Camp Roster", "light_aqua", bold=True),
-                            border_style=rich_style_name("light_aqua"),
-                            box=box.ROUNDED,
-                            padding=(0, 1),
-                        ),
-                        Panel(
-                            options,
-                            title=self.rich_text("Camp Actions", "light_red", bold=True),
-                            border_style=rich_style_name("light_red"),
-                            box=box.ROUNDED,
-                            padding=(0, 1),
-                        ),
-                    ],
-                    expand=True,
-                    equal=True,
-                ),
-            ),
+                )
+            )
+        panels.append(
+            Columns(
+                [
+                    Panel(
+                        active_party,
+                        title=self.rich_text("Around The Fire", "light_green", bold=True),
+                        border_style=rich_style_name("light_green"),
+                        box=box.ROUNDED,
+                        padding=(0, 1),
+                    ),
+                    Panel(
+                        camp_roster,
+                        title=self.rich_text("Camp Roster", "light_aqua", bold=True),
+                        border_style=rich_style_name("light_aqua"),
+                        box=box.ROUNDED,
+                        padding=(0, 1),
+                    ),
+                    Panel(
+                        options,
+                        title=self.rich_text("Camp Actions", "light_red", bold=True),
+                        border_style=rich_style_name("light_red"),
+                        box=box.ROUNDED,
+                        padding=(0, 1),
+                    ),
+                ],
+                expand=True,
+                equal=True,
+            )
+        )
+        self.emit_rich(
+            Group(*panels),
             width=max(108, self.rich_console_width()),
         )
 

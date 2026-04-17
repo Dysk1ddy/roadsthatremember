@@ -1220,7 +1220,7 @@ class CombatFlowMixin:
             options.append("Use Action Surge")
         if turn_state.actions_remaining > 0:
             options.append(f"Attack with {actor.weapon.name}")
-            if actor.class_name == "Paladin" and has_spell_slots(actor):
+            if actor.class_name == "Paladin" and "divine_smite" in actor.features:
                 options.append("Attack with Divine Smite")
             if actor.class_name == "Paladin" and actor.resources.get("lay_on_hands", 0) > 0:
                 options.append("Use Lay on Hands")

@@ -2,12 +2,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..content import create_enemy
-from ..drafts.map_system import ACT1_HYBRID_MAP
+from ..content import create_enemy, create_irielle_ashwake, create_nim_ardentglass
+from ..drafts.map_system import ACT1_HYBRID_MAP, ACT2_ENEMY_DRIVEN_MAP
 from ..drafts.map_system.runtime import (
     DraftMapState,
     DungeonMap,
     DungeonRoom,
+    build_act2_pressure_panel,
+    build_act2_pressure_panel_text,
     build_dungeon_panel,
     build_dungeon_panel_text,
     build_overworld_panel,
@@ -16,28 +18,35 @@ from ..drafts.map_system.runtime import (
     requirement_met,
     room_direction,
 )
-from ..ui.rich_render import RICH_AVAILABLE
+from ..ui.rich_render import Group, RICH_AVAILABLE
 from .encounter import Encounter
 
 
 def _requirement_flag_names(*, requirement) -> set[str]:
-    return {
+    names = {
         *requirement.all_flags,
         *requirement.any_flags,
         *requirement.blocked_flags,
     }
+    for flag_count in requirement.flag_count_requirements:
+        names.update(flag_count.flags)
+    for flag_value in requirement.flag_value_requirements:
+        names.add(flag_value.flag_name)
+    for numeric_flag in requirement.numeric_flag_requirements:
+        names.add(numeric_flag.flag_name)
+    return names
 
 
-def _collect_act1_flag_names() -> set[str]:
+def _collect_blueprint_flag_names(blueprint) -> set[str]:
     flag_names: set[str] = set()
-    for node in ACT1_HYBRID_MAP.nodes.values():
+    for node in blueprint.nodes.values():
         flag_names.update(_requirement_flag_names(requirement=node.requirement))
-    for edge in ACT1_HYBRID_MAP.edges:
+    for edge in blueprint.edges:
         flag_names.update(_requirement_flag_names(requirement=edge.requirement))
-    for beat in ACT1_HYBRID_MAP.story_beats:
+    for beat in blueprint.story_beats:
         flag_names.update(_requirement_flag_names(requirement=beat.requirement))
         flag_names.update(beat.grants_flags)
-    for dungeon in ACT1_HYBRID_MAP.dungeons.values():
+    for dungeon in blueprint.dungeons.values():
         flag_names.update(dungeon.completion_flags)
         for room in dungeon.rooms.values():
             flag_names.update(_requirement_flag_names(requirement=room.requirement))
@@ -45,12 +54,15 @@ def _collect_act1_flag_names() -> set[str]:
     return flag_names
 
 
-ACT1_MAP_FLAG_NAMES = _collect_act1_flag_names()
+ACT1_MAP_FLAG_NAMES = _collect_blueprint_flag_names(ACT1_HYBRID_MAP)
+ACT2_MAP_FLAG_NAMES = _collect_blueprint_flag_names(ACT2_ENEMY_DRIVEN_MAP)
 ACT1_SCENE_TO_NODE_ID = {node.scene_key: node_id for node_id, node in ACT1_HYBRID_MAP.nodes.items()}
+ACT2_SCENE_TO_NODE_ID = {node.scene_key: node_id for node_id, node in ACT2_ENEMY_DRIVEN_MAP.nodes.items()}
 
 
 class MapSystemMixin:
     MAP_STATE_KEY = "map_state"
+    ACT2_MAP_STATE_KEY = "act2_map_state"
 
     def ensure_state_integrity(self) -> None:
         super().ensure_state_integrity()
@@ -123,6 +135,29 @@ class MapSystemMixin:
         assert isinstance(payload, dict)
         return payload
 
+    def _ensure_act2_map_state_payload(self) -> None:
+        assert self.state is not None
+        raw = self.state.flags.get(self.ACT2_MAP_STATE_KEY)
+        if not isinstance(raw, dict):
+            raw = {}
+        payload = {
+            "current_node_id": str(raw.get("current_node_id") or ACT2_ENEMY_DRIVEN_MAP.start_node_id),
+            "current_dungeon_id": raw.get("current_dungeon_id"),
+            "current_room_id": raw.get("current_room_id"),
+            "visited_nodes": self._string_list(raw.get("visited_nodes")),
+            "cleared_rooms": self._string_list(raw.get("cleared_rooms")),
+            "seen_story_beats": self._string_list(raw.get("seen_story_beats")),
+            "room_history": self._string_list(raw.get("room_history")),
+        }
+        self.state.flags[self.ACT2_MAP_STATE_KEY] = payload
+
+    def _act2_map_state_payload(self) -> dict[str, Any]:
+        assert self.state is not None
+        self._ensure_act2_map_state_payload()
+        payload = self.state.flags[self.ACT2_MAP_STATE_KEY]
+        assert isinstance(payload, dict)
+        return payload
+
     def _string_list(self, raw: Any) -> list[str]:
         if isinstance(raw, list):
             values = raw
@@ -155,6 +190,7 @@ class MapSystemMixin:
             tuple(sorted(state.flags)),
             tuple(sorted(state.active_quests)),
             tuple(sorted(state.completed_quests)),
+            tuple(sorted((key, repr(value)) for key, value in state.flag_values.items())),
             tuple(sorted(state.visited_nodes)),
             tuple(sorted(state.cleared_rooms)),
             tuple(sorted(state.seen_story_beats)),
@@ -162,7 +198,7 @@ class MapSystemMixin:
 
     def _clear_map_view_cache(self, *views: str) -> None:
         cache = self._map_view_cache()
-        targets = views or ("overworld", "dungeon")
+        targets = views or ("overworld", "dungeon", "act2_overworld", "act2_dungeon")
         for view in targets:
             cache[view] = None
 
@@ -205,20 +241,30 @@ class MapSystemMixin:
         self._compact_hud_last_scene_key = None
         self._sync_story_beats_from_flags()
 
+    def _sync_act2_map_state_with_scene(self, *, force_node_id: str | None = None) -> None:
+        assert self.state is not None
+        payload = self._act2_map_state_payload()
+        node_id = force_node_id or self._act2_current_node_id()
+        node = ACT2_ENEMY_DRIVEN_MAP.nodes[node_id]
+        payload["current_node_id"] = node_id
+        if node_id not in payload["visited_nodes"]:
+            payload["visited_nodes"].append(node_id)
+        if node.enters_dungeon_id is None or self.state.current_scene != node.scene_key:
+            payload["current_dungeon_id"] = None
+            payload["current_room_id"] = None
+            payload["room_history"] = []
+            return
+        dungeon = ACT2_ENEMY_DRIVEN_MAP.dungeons[node.enters_dungeon_id]
+        payload["current_dungeon_id"] = dungeon.dungeon_id
+        if payload.get("current_room_id") not in dungeon.rooms:
+            payload["current_room_id"] = dungeon.entrance_room_id
+        payload["room_history"] = [room_id for room_id in payload["room_history"] if room_id in dungeon.rooms]
+
     def act1_map_state(self) -> DraftMapState:
         assert self.state is not None
         self._sync_map_state_with_scene()
         payload = self._map_state_payload()
-        active_quests = {
-            quest_id
-            for quest_id, entry in self.state.quests.items()
-            if getattr(entry, "status", "") in {"active", "ready_to_turn_in"}
-        }
-        completed_quests = {
-            quest_id
-            for quest_id, entry in self.state.quests.items()
-            if getattr(entry, "status", "") == "completed"
-        }
+        active_quests, completed_quests = self._map_quest_sets()
         flags = {
             flag_name
             for flag_name in ACT1_MAP_FLAG_NAMES
@@ -234,6 +280,97 @@ class MapSystemMixin:
             cleared_rooms=set(payload["cleared_rooms"]),
             seen_story_beats=set(payload["seen_story_beats"]),
         )
+
+    def _map_quest_sets(self) -> tuple[set[str], set[str]]:
+        assert self.state is not None
+        active_quests = {
+            quest_id
+            for quest_id, entry in self.state.quests.items()
+            if getattr(entry, "status", "") in {"active", "ready_to_turn_in"}
+        }
+        completed_quests = {
+            quest_id
+            for quest_id, entry in self.state.quests.items()
+            if getattr(entry, "status", "") == "completed"
+        }
+        return active_quests, completed_quests
+
+    def _primitive_flag_values(self) -> dict[str, Any]:
+        assert self.state is not None
+        return {
+            key: value
+            for key, value in self.state.flags.items()
+            if isinstance(value, str | int | float | bool)
+        }
+
+    def _act2_boolean_flags(self) -> set[str]:
+        assert self.state is not None
+        flags = {
+            flag_name
+            for flag_name in ACT2_MAP_FLAG_NAMES
+            if self.state.flags.get(flag_name) is True
+        }
+        if self.state.current_act >= 2 or self.state.current_scene in ACT2_SCENE_TO_NODE_ID:
+            flags.add("act2_started")
+        return flags
+
+    def _act2_cleared_room_ids(self) -> set[str]:
+        assert self.state is not None
+        cleared: set[str] = set()
+        for dungeon in ACT2_ENEMY_DRIVEN_MAP.dungeons.values():
+            for room in dungeon.rooms.values():
+                if any(self.state.flags.get(flag_name) is True for flag_name in room.clear_grants_flags):
+                    cleared.add(room.room_id)
+        return cleared
+
+    def _act2_seen_story_beats(self) -> set[str]:
+        assert self.state is not None
+        seen: set[str] = set()
+        for beat in ACT2_ENEMY_DRIVEN_MAP.story_beats:
+            if any(self.state.flags.get(flag_name) is True for flag_name in beat.grants_flags):
+                seen.add(beat.beat_id)
+        return seen
+
+    def _act2_current_node_id(self) -> str:
+        assert self.state is not None
+        node_id = ACT2_SCENE_TO_NODE_ID.get(self.state.current_scene)
+        if node_id is not None:
+            return node_id
+        if self.state.flags.get("act2_started") or self.state.current_act >= 2:
+            return "act2_expedition_hub"
+        return ACT2_ENEMY_DRIVEN_MAP.start_node_id
+
+    def act2_map_state(self) -> DraftMapState:
+        assert self.state is not None
+        self._sync_act2_map_state_with_scene()
+        payload = self._act2_map_state_payload()
+        active_quests, completed_quests = self._map_quest_sets()
+        current_node_id = str(payload["current_node_id"])
+        node = ACT2_ENEMY_DRIVEN_MAP.nodes[current_node_id]
+        current_room_id = str(payload["current_room_id"]) if payload.get("current_room_id") else None
+        derived_cleared_rooms = self._act2_cleared_room_ids()
+
+        state = DraftMapState(
+            current_node_id=current_node_id,
+            current_room_id=current_room_id,
+            flags=self._act2_boolean_flags(),
+            active_quests=active_quests,
+            completed_quests=completed_quests,
+            flag_values=self._primitive_flag_values(),
+            visited_nodes=set(payload["visited_nodes"]),
+            cleared_rooms=set(payload["cleared_rooms"]) | derived_cleared_rooms,
+            seen_story_beats=set(payload["seen_story_beats"]) | self._act2_seen_story_beats(),
+        )
+
+        known_nodes = {
+            node_id
+            for node_id, candidate in ACT2_ENEMY_DRIVEN_MAP.nodes.items()
+            if requirement_met(state, candidate.requirement)
+        }
+        known_nodes.add(ACT2_ENEMY_DRIVEN_MAP.start_node_id)
+        known_nodes.add(current_node_id)
+        state.visited_nodes.update(known_nodes)
+        return state
 
     def current_act1_dungeon(self) -> DungeonMap | None:
         if self.state is None:
@@ -342,6 +479,15 @@ class MapSystemMixin:
             return False
         return self.state.current_scene in ACT1_SCENE_TO_NODE_ID or self.state.current_scene == "act1_complete"
 
+    def act2_hybrid_map_available(self) -> bool:
+        if self.state is None:
+            return False
+        return (
+            self.state.current_scene in ACT2_SCENE_TO_NODE_ID
+            or self.state.current_act >= 2
+            or bool(self.state.flags.get("act2_started"))
+        )
+
     def render_act1_overworld_map(self, *, force: bool = False) -> None:
         if not self.act1_hybrid_map_available():
             return
@@ -378,6 +524,149 @@ class MapSystemMixin:
         cache["dungeon"] = cache_key
         self.output_fn("")
 
+    def current_act2_dungeon(self) -> DungeonMap | None:
+        if self.state is None or not self.act2_hybrid_map_available():
+            return None
+        self._sync_act2_map_state_with_scene()
+        node = ACT2_ENEMY_DRIVEN_MAP.nodes[self._act2_current_node_id()]
+        if node.enters_dungeon_id is None or self.state.current_scene != node.scene_key:
+            return None
+        return ACT2_ENEMY_DRIVEN_MAP.dungeons.get(node.enters_dungeon_id)
+
+    def current_act2_room(self, dungeon: DungeonMap) -> DungeonRoom:
+        payload = self._act2_map_state_payload()
+        room_id = payload.get("current_room_id")
+        if not isinstance(room_id, str) or room_id not in dungeon.rooms:
+            room_id = dungeon.entrance_room_id
+        return dungeon.rooms[room_id]
+
+    def act2_room_is_cleared(self, room_id: str) -> bool:
+        payload = self._act2_map_state_payload()
+        if room_id in set(payload["cleared_rooms"]):
+            return True
+        return room_id in self._act2_cleared_room_ids()
+
+    def complete_act2_map_room(self, dungeon: DungeonMap, room_id: str) -> None:
+        assert self.state is not None
+        payload = self._act2_map_state_payload()
+        if room_id not in payload["cleared_rooms"]:
+            payload["cleared_rooms"].append(room_id)
+        room = dungeon.rooms[room_id]
+        for flag_name in room.clear_grants_flags:
+            self.state.flags[flag_name] = True
+        self._clear_map_view_cache("act2_overworld", "act2_dungeon")
+        self._compact_hud_last_scene_key = None
+
+    def set_current_act2_map_room(self, room_id: str, *, announce: bool = False, movement_text: str = "") -> None:
+        payload = self._act2_map_state_payload()
+        current_room_id = payload.get("current_room_id")
+        if current_room_id == room_id:
+            return
+        if isinstance(current_room_id, str) and current_room_id:
+            payload["room_history"].append(current_room_id)
+        payload["current_room_id"] = room_id
+        self._clear_map_view_cache("act2_dungeon")
+        self._compact_hud_last_scene_key = None
+        if announce:
+            self.say(movement_text or f"You move toward {room_id.replace('_', ' ')}.")
+        dungeon = self.current_act2_dungeon()
+        if dungeon is not None:
+            self.render_act2_dungeon_map(dungeon, force=True)
+
+    def peek_act2_backtrack_room(self, dungeon: DungeonMap) -> DungeonRoom | None:
+        payload = self._act2_map_state_payload()
+        for room_id in reversed(payload["room_history"]):
+            if room_id in dungeon.rooms:
+                return dungeon.rooms[room_id]
+        return None
+
+    def _act2_movement_option_label(self, room: DungeonRoom, candidate: DungeonRoom) -> str:
+        dungeon = self.current_act2_dungeon()
+        direction = room_direction(room, candidate, dungeon)
+        verb = "Advance to" if not self.act2_room_is_cleared(candidate.room_id) else "Return to"
+        return self.skill_tag(f"MOVE {direction}", self.action_option(f"{verb} {candidate.title}"))
+
+    def act2_room_navigation_options(self, dungeon: DungeonMap) -> list[tuple[str, str, str]]:
+        room = self.current_act2_room(dungeon)
+        options: list[tuple[str, str, str]] = []
+        seen_targets: set[str] = set()
+        exits = current_room_exits(dungeon, self.act2_map_state())
+        ordered_exits = sorted(
+            exits,
+            key=lambda candidate: (
+                self.act2_room_is_cleared(candidate.room_id),
+                {"UP": 0, "RIGHT": 1, "DOWN": 2, "LEFT": 3, "HERE": 4}[room_direction(room, candidate, dungeon)],
+                candidate.title,
+            ),
+        )
+        for candidate in ordered_exits:
+            options.append(("move", candidate.room_id, self._act2_movement_option_label(room, candidate)))
+            seen_targets.add(candidate.room_id)
+        previous_room = self.peek_act2_backtrack_room(dungeon)
+        if previous_room is not None and previous_room.room_id not in seen_targets:
+            options.append(("move", previous_room.room_id, self._act2_movement_option_label(room, previous_room)))
+        options.append(("withdraw", "act2_expedition_hub", self.action_option("Withdraw to the expedition hub")))
+        return options
+
+    def return_to_act2_hub(self, text: str) -> None:
+        assert self.state is not None
+        payload = self._act2_map_state_payload()
+        payload["current_node_id"] = "act2_expedition_hub"
+        if "act2_expedition_hub" not in payload["visited_nodes"]:
+            payload["visited_nodes"].append("act2_expedition_hub")
+        payload["current_dungeon_id"] = None
+        payload["current_room_id"] = None
+        payload["room_history"] = []
+        self.state.current_scene = "act2_expedition_hub"
+        self._clear_map_view_cache("act2_overworld", "act2_dungeon")
+        self._compact_hud_last_scene_key = None
+        self.say(text)
+
+    def render_act2_overworld_map(self, *, force: bool = False) -> None:
+        if not self.act2_hybrid_map_available():
+            return
+        state = self.act2_map_state()
+        cache = self._map_view_cache()
+        cache_key = self._map_state_signature(state)
+        if not force and cache.get("act2_overworld") == cache_key:
+            return
+        panel = build_overworld_panel(ACT2_ENEMY_DRIVEN_MAP, state)
+        if self.should_use_rich_ui() and RICH_AVAILABLE:
+            rich_panel = Group(build_act2_pressure_panel(state.flag_values), panel) if Group is not None else panel
+            if self.emit_rich(rich_panel, width=max(108, self.rich_console_width())):
+                cache["act2_overworld"] = cache_key
+                self.output_fn("")
+                return
+        for line in build_act2_pressure_panel_text(state.flag_values).splitlines():
+            self.output_fn(line)
+        for line in build_overworld_panel_text(ACT2_ENEMY_DRIVEN_MAP, state).splitlines():
+            self.output_fn(line)
+        cache["act2_overworld"] = cache_key
+        self.output_fn("")
+
+    def render_act2_dungeon_map(self, dungeon: DungeonMap, *, force: bool = False) -> None:
+        state = self.act2_map_state()
+        cache = self._map_view_cache()
+        cache_key = (dungeon.dungeon_id, self._map_state_signature(state))
+        if not force and cache.get("act2_dungeon") == cache_key:
+            return
+        dungeon_panel = build_dungeon_panel(dungeon, state)
+        if self.should_use_rich_ui() and RICH_AVAILABLE:
+            rich_panel = Group(build_act2_pressure_panel(state.flag_values), dungeon_panel) if Group is not None else dungeon_panel
+            if self.emit_rich(
+                rich_panel,
+                width=max(108, self.rich_console_width()),
+            ):
+                cache["act2_dungeon"] = cache_key
+                self.output_fn("")
+                return
+        for line in build_act2_pressure_panel_text(state.flag_values).splitlines():
+            self.output_fn(line)
+        for line in build_dungeon_panel_text(dungeon, state).splitlines():
+            self.output_fn(line)
+        cache["act2_dungeon"] = cache_key
+        self.output_fn("")
+
     def _movement_option_label(self, room: DungeonRoom, candidate: DungeonRoom) -> str:
         dungeon = self.current_act1_dungeon()
         direction = room_direction(room, candidate, dungeon)
@@ -407,6 +696,15 @@ class MapSystemMixin:
         return options
 
     def open_map_menu(self) -> None:
+        if self.act1_hybrid_map_available():
+            self.open_act1_map_menu()
+            return
+        if self.act2_hybrid_map_available():
+            self.open_act2_map_menu()
+            return
+        self.say("There is no active hybrid map at this point in the adventure.")
+
+    def open_act1_map_menu(self) -> None:
         if not self.act1_hybrid_map_available():
             self.say("There is no active hybrid map at this point in the adventure.")
             return
@@ -432,6 +730,39 @@ class MapSystemMixin:
                     continue
                 self.banner(dungeon.title)
                 self.render_act1_dungeon_map(dungeon, force=True)
+                continue
+            return
+
+    def open_act2_map_menu(self) -> None:
+        if not self.act2_hybrid_map_available():
+            self.say("There is no active Act II map yet.")
+            return
+        dungeon = self.current_act2_dungeon()
+        site_label = "Current Site (not available here)"
+        if dungeon is not None:
+            playable_sites = {"stonehollow_dig", "broken_prospect", "south_adit", "wave_echo_outer_galleries", "black_lake_causeway", "forge_of_spells"}
+            site_label = dungeon.title if dungeon.entry_node_id in playable_sites else f"{dungeon.title} (draft, read-only)"
+        while True:
+            choice = self.choose(
+                "Map menu",
+                [
+                    "Act II Route Map",
+                    site_label,
+                    "Back",
+                ],
+                allow_meta=False,
+                show_hud=False,
+            )
+            if choice == 1:
+                self.banner("Act II Route Map")
+                self.render_act2_overworld_map(force=True)
+                continue
+            if choice == 2:
+                if dungeon is None:
+                    self.say("There is no Act II site map to show from this location.")
+                    continue
+                self.banner(dungeon.title)
+                self.render_act2_dungeon_map(dungeon, force=True)
                 continue
             return
 
@@ -612,6 +943,36 @@ class MapSystemMixin:
     def scene_emberhall_cellars(self) -> None:
         self.run_act1_dungeon("emberhall_cellars")
 
+    def scene_stonehollow_dig(self) -> None:
+        if self.state is not None:
+            self.state.current_scene = "stonehollow_dig"
+        self.run_act2_dungeon("stonehollow_dig")
+
+    def scene_broken_prospect(self) -> None:
+        if self.state is not None:
+            self.state.current_scene = "broken_prospect"
+        self.run_act2_dungeon("broken_prospect")
+
+    def scene_south_adit(self) -> None:
+        if self.state is not None:
+            self.state.current_scene = "south_adit"
+        self.run_act2_dungeon("south_adit")
+
+    def scene_wave_echo_outer_galleries(self) -> None:
+        if self.state is not None:
+            self.state.current_scene = "wave_echo_outer_galleries"
+        self.run_act2_dungeon("wave_echo_outer_galleries")
+
+    def scene_black_lake_causeway(self) -> None:
+        if self.state is not None:
+            self.state.current_scene = "black_lake_causeway"
+        self.run_act2_dungeon("black_lake_causeway")
+
+    def scene_forge_of_spells(self) -> None:
+        if self.state is not None:
+            self.state.current_scene = "forge_of_spells"
+        self.run_act2_dungeon("forge_of_spells")
+
     def run_act1_dungeon(self, node_id: str) -> None:
         assert self.state is not None
         self._sync_map_state_with_scene(force_node_id=node_id)
@@ -686,6 +1047,1959 @@ class MapSystemMixin:
         }
         handler = handlers[(node_id, room.room_id)]
         handler(dungeon, room)
+
+    def run_act2_dungeon(self, node_id: str) -> None:
+        assert self.state is not None
+        self._sync_act2_map_state_with_scene(force_node_id=node_id)
+        node = ACT2_ENEMY_DRIVEN_MAP.nodes[node_id]
+        dungeon = ACT2_ENEMY_DRIVEN_MAP.dungeons[str(node.enters_dungeon_id)]
+
+        while self.state is not None and self.state.current_scene == node.scene_key:
+            room = self.current_act2_room(dungeon)
+            self.banner(node.title)
+            self.render_act2_dungeon_map(dungeon)
+            if not self.act2_room_is_cleared(room.room_id):
+                self._run_act2_room(node_id, dungeon, room)
+                if self.state.current_scene != node.scene_key:
+                    return
+                continue
+
+            options = self.act2_room_navigation_options(dungeon)
+            choice = self.scenario_choice(
+                f"What do you do from {room.title}?",
+                [text for _, _, text in options],
+                allow_meta=False,
+            )
+            action, destination, _ = options[choice - 1]
+            if action == "move":
+                next_room = dungeon.rooms[destination]
+                self.set_current_act2_map_room(
+                    destination,
+                    announce=True,
+                    movement_text=f"You move {room_direction(room, next_room, dungeon).lower()} toward {next_room.title}.",
+                )
+                continue
+            self.return_to_act2_hub(f"You withdraw from {node.title} and return to Phandalin's expedition table.")
+            return
+
+    def _run_act2_room(self, node_id: str, dungeon: DungeonMap, room: DungeonRoom) -> None:
+        handlers = {
+            ("stonehollow_dig", "survey_mouth"): self._stonehollow_survey_mouth,
+            ("stonehollow_dig", "slime_cut"): self._stonehollow_slime_cut,
+            ("stonehollow_dig", "warded_side_run"): self._stonehollow_warded_side_run,
+            ("stonehollow_dig", "scholar_pocket"): self._stonehollow_scholar_pocket,
+            ("stonehollow_dig", "collapse_lift"): self._stonehollow_collapse_lift,
+            ("stonehollow_dig", "lower_breakout"): self._stonehollow_lower_breakout,
+            ("broken_prospect", "broken_shelf"): self._broken_prospect_broken_shelf,
+            ("broken_prospect", "pact_markers"): self._broken_prospect_pact_markers,
+            ("broken_prospect", "rival_survey_shelf"): self._broken_prospect_rival_survey_shelf,
+            ("broken_prospect", "sentinel_span"): self._broken_prospect_sentinel_span,
+            ("broken_prospect", "sealed_approach"): self._broken_prospect_sealed_approach,
+            ("broken_prospect", "foreman_shift"): self._broken_prospect_foreman_shift,
+            ("south_adit", "adit_mouth"): self._south_adit_adit_mouth,
+            ("south_adit", "silent_cells"): self._south_adit_silent_cells,
+            ("south_adit", "drainage_exit"): self._south_adit_drainage_exit,
+            ("south_adit", "infirmary_cut"): self._south_adit_infirmary_cut,
+            ("south_adit", "augur_cell"): self._south_adit_augur_cell,
+            ("south_adit", "warden_nave"): self._south_adit_warden_nave,
+            ("wave_echo_outer_galleries", "rail_junction"): self._wave_echo_rail_junction,
+            ("wave_echo_outer_galleries", "slime_sluice"): self._wave_echo_slime_sluice,
+            ("wave_echo_outer_galleries", "grimlock_side_run"): self._wave_echo_grimlock_side_run,
+            ("wave_echo_outer_galleries", "collapsed_crane"): self._wave_echo_collapsed_crane,
+            ("wave_echo_outer_galleries", "false_echo_loop"): self._wave_echo_false_echo_loop,
+            ("wave_echo_outer_galleries", "deep_haul_gate"): self._wave_echo_deep_haul_gate,
+            ("black_lake_causeway", "causeway_lip"): self._black_lake_causeway_lip,
+            ("black_lake_causeway", "drowned_shrine"): self._black_lake_drowned_shrine,
+            ("black_lake_causeway", "choir_barracks"): self._black_lake_choir_barracks,
+            ("black_lake_causeway", "anchor_chains"): self._black_lake_anchor_chains,
+            ("black_lake_causeway", "blackwater_edge"): self._black_lake_blackwater_edge,
+            ("black_lake_causeway", "far_landing"): self._black_lake_far_landing,
+            ("forge_of_spells", "forge_threshold"): self._forge_threshold,
+            ("forge_of_spells", "choir_pit"): self._forge_choir_pit,
+            ("forge_of_spells", "pact_anvil"): self._forge_pact_anvil,
+            ("forge_of_spells", "shard_channels"): self._forge_shard_channels,
+            ("forge_of_spells", "resonance_lens"): self._forge_resonance_lens,
+            ("forge_of_spells", "caldra_dais"): self._forge_caldra_dais,
+        }
+        handler = handlers[(node_id, room.room_id)]
+        handler(dungeon, room)
+
+    def _stonehollow_delayed(self) -> bool:
+        assert self.state is not None
+        return self.state.flags.get("act2_neglected_lead") == "stonehollow_dig_cleared"
+
+    def _stonehollow_survey_mouth(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
+        assert self.state is not None
+        if not self.has_quest("rescue_stonehollow_scholars"):
+            self.grant_quest("rescue_stonehollow_scholars")
+        if not self.state.flags.get("stonehollow_seen"):
+            self.say(
+                "Stonehollow is a half-legitimate dig site turned excavation wound. Survey strings hang through damp air, "
+                "collapsed supports choke the lower lane, and someone has been using the trapped scholars as unwilling map readers.",
+                typed=True,
+            )
+            if self._stonehollow_delayed():
+                self.say(
+                    "Coming here late means the place has had longer to collapse inward on both bodies and evidence. The lower notes are not all going to be recoverable now."
+                )
+            self.state.flags["stonehollow_seen"] = True
+        choice = self.scenario_choice(
+            "How do you take the first measure of the dig?",
+            [
+                self.skill_tag("INVESTIGATION", self.action_option("Read the support lines and mark the one section that can still hold.")),
+                self.skill_tag("ATHLETICS", self.action_option("Brace the lowest beam before the entry throat folds inward.")),
+                self.skill_tag("ARCANA", self.action_option("Listen for the old Pact warding under the fresh collapse noise.")),
+            ],
+            allow_meta=False,
+        )
+        if choice == 1:
+            self.player_action("Read the support lines and mark the one section that can still hold.")
+            if self.skill_check(self.state.player, "Investigation", 13, context="to read the dig braces under pressure"):
+                self.state.flags["stonehollow_supports_stabilized"] = True
+                self.reward_party(xp=10, reason="stabilizing Stonehollow's entry braces")
+                self.say("You mark the honest braces and the whole entry stops feeling like a mouth about to close.")
+            else:
+                self.say("The support pattern is bad in too many places at once. You get through, but not cleanly.")
+        elif choice == 2:
+            self.player_action("Brace the lowest beam before the entry throat folds inward.")
+            if self.skill_check(self.state.player, "Athletics", 13, context="to brace the collapsing entry"):
+                self.state.flags["stonehollow_entry_braced"] = True
+                self.apply_status(self.state.player, "emboldened", 1, source="holding Stonehollow's entry open")
+                self.say("The beam groans, but you force it into usefulness long enough for the party to pass.")
+            else:
+                self.apply_status(self.state.player, "reeling", 1, source="Stonehollow's unstable entry")
+                self.say("You keep the beam from killing anyone, but it takes a brutal shoulder and a shower of stone.")
+        else:
+            self.player_action("Listen for the old Pact warding under the fresh collapse noise.")
+            if self.skill_check(self.state.player, "Arcana", 13, context="to hear the warded side-run beneath the collapse noise"):
+                self.state.flags["stonehollow_ward_path_hint"] = True
+                self.say("Beneath the bad echoes, one old ward still answers in a steady pattern. There is a cleaner side-run somewhere below.")
+            else:
+                self.say("The echoes answer, but not in any pattern you can trust yet.")
+        self.complete_act2_map_room(dungeon, room.room_id)
+
+    def _stonehollow_slime_cut(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
+        assert self.state is not None
+        self.say(
+            "The main cut narrows around spilled lantern oil, acid-eaten timber, and an ochre mass dragging itself through the dig like a slow argument against boots."
+        )
+        party_size = len(self.state.party_members())
+        enemies = [create_enemy("ochre_slime")]
+        if party_size >= 4:
+            enemies.append(self.act2_pick_enemy(("stirge_swarm", "acidmaw_burrower", "carrion_lash_crawler")))
+        hero_bonus = self.apply_scene_companion_support("stonehollow_dig")
+        if self.state.flags.get("stonehollow_supports_stabilized"):
+            hero_bonus += 1
+            self.apply_status(enemies[0], "reeling", 1, source="your marked support collapse")
+        choice = self.scenario_choice(
+            "How do you cross the slime cut?",
+            [
+                self.skill_tag("INVESTIGATION", self.action_option("Drop the marked brace and pin the ooze under its own ceiling.")),
+                self.skill_tag("ATHLETICS", self.action_option("Force the crossing before the acid eats the last plank.")),
+                self.skill_tag("SURVIVAL", self.action_option("Use the dry stone ribs and keep everyone out of the wet center.")),
+            ],
+            allow_meta=False,
+        )
+        if choice == 1:
+            self.player_action("Drop the marked brace and pin the ooze under its own ceiling.")
+            if self.skill_check(self.state.player, "Investigation", 13, context="to turn the support lines into a trap"):
+                enemies[0].current_hp = max(1, enemies[0].current_hp - 5)
+                self.apply_status(enemies[0], "prone", 1, source="the dropped brace")
+                hero_bonus += 2
+        elif choice == 2:
+            self.player_action("Force the crossing before the acid eats the last plank.")
+            if self.skill_check(self.state.player, "Athletics", 13, context="to force the slime cut crossing"):
+                self.apply_status(self.state.player, "emboldened", 2, source="forcing the slime cut")
+                hero_bonus += 1
+        else:
+            self.player_action("Use the dry stone ribs and keep everyone out of the wet center.")
+            if self.skill_check(self.state.player, "Survival", 13, context="to read the safe stone through the slime cut"):
+                hero_bonus += 2
+                self.say("You find the narrow ribs that the ooze has not softened yet, and the party gets angles instead of panic.")
+        outcome = self.run_encounter(
+            Encounter(
+                title="Stonehollow Slime Cut",
+                description="An acid-slick chokepoint blocks the main survey route through the dig.",
+                enemies=enemies,
+                allow_flee=True,
+                allow_parley=False,
+                hero_initiative_bonus=hero_bonus,
+                allow_post_combat_random_encounter=False,
+            )
+        )
+        if outcome == "defeat":
+            self.handle_defeat("Stonehollow seals over the party and the missing scholars stay lost below.")
+            return
+        if outcome == "fled":
+            self.return_to_act2_hub("You retreat from the slime cut before the collapse can trap everyone together.")
+            return
+        self.complete_act2_map_room(dungeon, room.room_id)
+
+    def _stonehollow_warded_side_run(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
+        assert self.state is not None
+        self.say(
+            "The side-run is narrower and older than the main dig, lined with Pact scratches that have survived better than the new timber."
+        )
+        dc = 13 if self.state.flags.get("stonehollow_ward_path_hint") else 14
+        choice = self.scenario_choice(
+            "How do you work the warded side-run?",
+            [
+                self.skill_tag("ARCANA", self.action_option("Follow the living parts of the ward and ignore the dead echoes.")),
+                self.skill_tag("HISTORY", self.action_option("Read the old survey discipline instead of the new dig marks.")),
+                self.skill_tag("RELIGION", self.action_option("Treat the old oath marks as warnings, not decorations.")),
+            ],
+            allow_meta=False,
+        )
+        skill = "Arcana" if choice == 1 else "History" if choice == 2 else "Religion"
+        if self.skill_check(self.state.player, skill, dc, context="to read Stonehollow's warded side-run"):
+            self.state.flags["stonehollow_ward_path_read"] = True
+            self.reward_party(xp=10, reason="reading Stonehollow's Pact warding")
+            self.say("The side-run resolves into a real path, and the old warding shows where the scholars would have tried to hide.")
+        else:
+            self.say("The side-run gives you enough path to keep moving, but the deeper pattern stays stubbornly incomplete.")
+        self.complete_act2_map_room(dungeon, room.room_id)
+
+    def _stonehollow_scholar_pocket(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
+        assert self.state is not None
+        self.say(
+            "A cramped pocket of salvage boards and chalk maps holds the last useful survey notes, a few shaking survivors, and one gnome who is trying to look less terrified than he is."
+        )
+        delayed = self._stonehollow_delayed()
+        choice = self.scenario_choice(
+            "What do you secure first?",
+            [
+                self.skill_tag("MEDICINE", self.action_option("Stabilize the injured scholars before the pocket has to move.")),
+                self.skill_tag("INVESTIGATION", self.action_option("Gather the survey notes before another collapse eats the route truth.")),
+                self.skill_tag("PERSUASION", self.action_option("Get the survivors moving as a group before panic chooses for them.")),
+            ],
+            allow_meta=False,
+        )
+        skill = "Medicine" if choice == 1 else "Investigation" if choice == 2 else "Persuasion"
+        if self.skill_check(self.state.player, skill, 13, context="to secure Stonehollow's trapped survey pocket"):
+            self.reward_party(xp=15, reason="saving Stonehollow's survey pocket")
+            if choice == 2:
+                self.state.flags["stonehollow_notes_preserved"] = True
+            self.say("You turn the pocket from a trapped room into an evacuation point before the next tremor decides the matter.")
+        else:
+            self.say("You get the survivors moving, but the pocket sheds notes, tools, and certainty as it goes.")
+        if not self.find_companion("Nim Ardentglass"):
+            self.speaker(
+                "Nim Ardentglass",
+                "If you're the reason I'm not dying under my own survey notes, I should probably stop pretending I can solve Wave Echo by myself.",
+            )
+            recruit = self.scenario_choice(
+                "Nim gathers his satchel and looks between you and the ruined lane.",
+                [
+                    self.quoted_option("RECRUIT", "Then walk with us and keep the maps honest."),
+                    self.quoted_option("SAFE", "Get back to Phandalin and recover. We can talk there."),
+                ],
+                allow_meta=False,
+            )
+            self.recruit_companion(create_nim_ardentglass())
+            nim = self.find_companion("Nim Ardentglass")
+            if delayed and nim is not None:
+                self.adjust_companion_disposition(
+                    nim,
+                    -1,
+                    "you came for Stonehollow late, after some of the cleanest notes were already gone",
+                )
+            if recruit == 2 and nim is not None and nim in self.state.companions:
+                self.move_companion_to_camp(nim)
+                self.say("Nim agrees to return to camp and organize whatever survey truth can still be salvaged.")
+        self.complete_act2_map_room(dungeon, room.room_id)
+
+    def _stonehollow_collapse_lift(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
+        assert self.state is not None
+        self.say("The lift shaft is half ladder, half hanging mistake, with something blind and hungry moving through the dark below.")
+        party_size = len(self.state.party_members())
+        enemies = [create_enemy("grimlock_tunneler")]
+        if party_size >= 4:
+            enemies.append(self.act2_pick_enemy(("acidmaw_burrower", "carrion_lash_crawler", "grimlock_tunneler")))
+        hero_bonus = self.apply_scene_companion_support("stonehollow_dig")
+        choice = self.scenario_choice(
+            "How do you force the lower lane open?",
+            [
+                self.skill_tag("ATHLETICS", self.action_option("Drop fast, catch the chain, and make the shaft your angle.")),
+                self.skill_tag("SURVIVAL", self.action_option("Move like the tunnelers do and reach their blind side first.")),
+                self.skill_tag("STEALTH", self.action_option("Let the lift creak without you on it and strike from the side ladder.")),
+            ],
+            allow_meta=False,
+        )
+        if choice == 1:
+            self.player_action("Drop fast, catch the chain, and make the shaft your angle.")
+            if self.skill_check(self.state.player, "Athletics", 13, context="to force the collapse lift"):
+                hero_bonus += 2
+                self.apply_status(self.state.player, "emboldened", 2, source="taking the shaft by force")
+        elif choice == 2:
+            self.player_action("Move like the tunnelers do and reach their blind side first.")
+            if self.skill_check(self.state.player, "Survival", 13, context="to read the tunnelers' lower-lane path"):
+                hero_bonus += 2
+                self.apply_status(enemies[0], "surprised", 1, source="you reached the blind side first")
+        else:
+            self.player_action("Let the lift creak without you on it and strike from the side ladder.")
+            if self.skill_check(self.state.player, "Stealth", 13, context="to misdirect the lift ambush"):
+                enemies[0].current_hp = max(1, enemies[0].current_hp - 4)
+                hero_bonus += 1
+        outcome = self.run_encounter(
+            Encounter(
+                title="Stonehollow Collapse Lift",
+                description="Tunnel predators try to keep the lower lane sealed around the trapped survey route.",
+                enemies=enemies,
+                allow_flee=True,
+                allow_parley=False,
+                hero_initiative_bonus=hero_bonus,
+                allow_post_combat_random_encounter=False,
+            )
+        )
+        if outcome == "defeat":
+            self.handle_defeat("Stonehollow seals over the party and the missing scholars stay lost below.")
+            return
+        if outcome == "fled":
+            self.return_to_act2_hub("You pull back from the collapse lift before the lower lane takes the whole company.")
+            return
+        self.complete_act2_map_room(dungeon, room.room_id)
+
+    def _stonehollow_lower_breakout(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
+        assert self.state is not None
+        delayed = self._stonehollow_delayed()
+        party_size = len(self.state.party_members())
+        enemies = [create_enemy("grimlock_tunneler")]
+        if delayed:
+            enemies.append(self.act2_pick_enemy(("spectral_foreman", "hookclaw_burrower")))
+        elif not self.state.flags.get("stonehollow_scholars_found"):
+            enemies.append(create_enemy("ochre_slime"))
+        if party_size >= 4:
+            enemies.append(self.act2_pick_enemy(("grimlock_tunneler", "acidmaw_burrower", "carrion_lash_crawler")))
+        hero_bonus = self.apply_scene_companion_support("stonehollow_dig")
+        if self.state.flags.get("stonehollow_lane_forced"):
+            hero_bonus += 1
+        if self.state.flags.get("stonehollow_ward_path_read"):
+            hero_bonus += 1
+        if self.state.flags.get("stonehollow_notes_preserved"):
+            hero_bonus += 1
+        choice = self.scenario_choice(
+            "How do you turn the lower breakout into an exit instead of a grave?",
+            [
+                self.skill_tag("INVESTIGATION", self.action_option("Use the preserved route notes to call the safest extraction line.")),
+                self.skill_tag("ATHLETICS", self.action_option("Hold the lower lane open while the scholars run.")),
+                self.skill_tag("ARCANA", self.action_option("Wake the remaining ward just long enough to break the monsters' rhythm.")),
+            ],
+            allow_meta=False,
+        )
+        if choice == 1:
+            self.player_action("Use the preserved route notes to call the safest extraction line.")
+            if self.skill_check(self.state.player, "Investigation", 14, context="to call the clean extraction line"):
+                hero_bonus += 2
+                if enemies:
+                    enemies[0].current_hp = max(1, enemies[0].current_hp - 4)
+        elif choice == 2:
+            self.player_action("Hold the lower lane open while the scholars run.")
+            if self.skill_check(self.state.player, "Athletics", 14, context="to hold Stonehollow's lower lane open"):
+                hero_bonus += 2
+                self.apply_status(self.state.player, "emboldened", 2, source="holding the lower lane")
+        else:
+            self.player_action("Wake the remaining ward just long enough to break the monsters' rhythm.")
+            if self.skill_check(self.state.player, "Arcana", 14, context="to wake Stonehollow's remaining ward"):
+                hero_bonus += 2
+                for enemy in enemies:
+                    self.apply_status(enemy, "reeling", 1, source="the old ward flaring")
+        outcome = self.run_encounter(
+            Encounter(
+                title="Stonehollow Breakout",
+                description="The trapped dig is full of things that want the scholars silenced before they can finish reading the cave.",
+                enemies=enemies,
+                allow_flee=True,
+                allow_parley=False,
+                hero_initiative_bonus=hero_bonus,
+                allow_post_combat_random_encounter=False,
+            )
+        )
+        if outcome == "defeat":
+            self.handle_defeat("Stonehollow seals over the party and the missing scholars stay lost below.")
+            return
+        if outcome == "fled":
+            self.return_to_act2_hub("You retreat from the lower breakout before Stonehollow can turn the rescue into a burial.")
+            return
+        self.complete_act2_map_room(dungeon, room.room_id)
+        self.reward_party(xp=45, gold=10, reason="clearing Stonehollow Dig")
+        if delayed:
+            self.act2_shift_metric(
+                "act2_route_control",
+                1,
+                "you salvage enough of Stonehollow's survey work to stop the route picture from staying crippled",
+            )
+        else:
+            self.act2_shift_metric(
+                "act2_route_control",
+                2,
+                "the Stonehollow survey line finally belongs to people who plan to bring it back out alive",
+            )
+            if self.state.flags.get("stonehollow_ward_path_read"):
+                self.act2_shift_metric(
+                    "act2_whisper_pressure",
+                    -1,
+                    "reading the Pact warding correctly keeps one more part of the cave from teaching through panic",
+                )
+        self.return_to_act2_hub("Stonehollow exhales stone dust behind you, and the rescued survey truth finally reaches the expedition table.")
+
+    def _broken_prospect_delayed(self) -> bool:
+        assert self.state is not None
+        return self.state.flags.get("act2_first_late_route") == "south_adit"
+
+    def _broken_prospect_broken_shelf(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
+        assert self.state is not None
+        if not self.state.flags.get("act2_first_late_route"):
+            self.act2_mark_late_route_choice("broken_prospect")
+        if not self.has_quest("free_wave_echo_captives"):
+            self.grant_quest("free_wave_echo_captives")
+        if not self.has_quest("sever_quiet_choir"):
+            self.grant_quest("sever_quiet_choir")
+        if not self.state.flags.get("broken_prospect_seen"):
+            self.say(
+                "Broken Prospect is a jagged approach above Wave Echo Cave: half collapsed survey cut, half old dwarfwork scar, "
+                "and now one more place where history is trying to decide which footsteps matter.",
+                typed=True,
+            )
+            if self._broken_prospect_delayed():
+                self.say(
+                    "Because you chose the prison line first, rival crews and cult sentries have had longer to root themselves into the prospect shelves."
+                )
+            self.state.flags["broken_prospect_seen"] = True
+        choice = self.scenario_choice(
+            "How do you make first contact with the cave approach?",
+            [
+                self.skill_tag("HISTORY", self.action_option("Call the old survey marks before the echoes lie about distance.")),
+                self.skill_tag("STEALTH", self.action_option("Use the broken prospect ledge and slip past the first sentries.")),
+                self.skill_tag("RELIGION", self.action_option("Steady the line before the dead memory of this place gets teeth.")),
+            ],
+            allow_meta=False,
+        )
+        if choice == 1:
+            self.player_action("Call the old survey marks before the echoes lie about distance.")
+            if self.skill_check(self.state.player, "History", 14, context="to use the Pact survey marks correctly"):
+                self.state.flags["prospect_shelf_marks_read"] = True
+                self.reward_party(xp=10, reason="reading the Broken Prospect shelf marks")
+                self.say("The old marks stop being decoration and become a usable way to judge distance.")
+        elif choice == 2:
+            self.player_action("Use the broken prospect ledge and slip past the first sentries.")
+            if self.skill_check(self.state.player, "Stealth", 14, context="to slip into Broken Prospect cleanly"):
+                self.state.flags["prospect_ledge_approach"] = True
+                self.say("The ledge is ugly, but it gives you the first angle before the threshold realizes you have one.")
+        else:
+            self.player_action("Steady the line before the dead memory of this place gets teeth.")
+            if self.skill_check(self.state.player, "Religion", 14, context="to keep the haunted threshold from owning the pace"):
+                self.state.flags["prospect_threshold_steadied"] = True
+                self.apply_status(self.state.player, "blessed", 2, source="meeting the cave with deliberate faith")
+        self.complete_act2_map_room(dungeon, room.room_id)
+
+    def _broken_prospect_pact_markers(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
+        assert self.state is not None
+        self.say("The Pact markers cut across stone, timber, and old claim stakes, half survey language and half warning prayer.")
+        dc = 13 if self.state.flags.get("prospect_shelf_marks_read") or self.state.flags.get("nim_countermeasure_notes") else 14
+        choice = self.scenario_choice(
+            "How do you make the markers useful?",
+            [
+                self.skill_tag("HISTORY", self.action_option("Read the dwarfwork survey order and call the true span.")),
+                self.skill_tag("INVESTIGATION", self.action_option("Compare new claim scratches against the older route logic.")),
+                self.skill_tag("ARCANA", self.action_option("Find the parts of the marking that still answer old Pact law.")),
+            ],
+            allow_meta=False,
+        )
+        skill = "History" if choice == 1 else "Investigation" if choice == 2 else "Arcana"
+        if self.skill_check(self.state.player, skill, dc, context="to decode Broken Prospect's Pact markers"):
+            self.state.flags["prospect_markers_decoded"] = True
+            self.reward_party(xp=10, reason="decoding the Broken Prospect markers")
+            self.say("The threshold resolves into spans, turns, and a warning about the foreman's dead shift below.")
+        else:
+            self.say("You get enough of the pattern to move, but the dead-shift warning stays more feeling than fact.")
+        self.complete_act2_map_room(dungeon, room.room_id)
+
+    def _broken_prospect_rival_survey_shelf(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
+        assert self.state is not None
+        self.say("The delayed survey shelf is no longer empty. Rival claim stakes share space with Choir scratch marks and a lookout who knows exactly why this route mattered.")
+        enemies = [create_enemy("cult_lookout")]
+        if self.act2_metric_value("act2_route_control") <= 2:
+            enemies.append(self.act2_pick_enemy(("expedition_reaver", "cult_lookout", "starblighted_miner")))
+        else:
+            enemies.append(self.act2_pick_enemy(("expedition_reaver", "cult_lookout")))
+        if len(self.state.party_members()) >= 4:
+            enemies.append(self.act2_pick_enemy(("grimlock_tunneler", "starblighted_miner", "cult_lookout")))
+        hero_bonus = self.apply_scene_companion_support("broken_prospect")
+        if self.state.flags.get("prospect_ledge_approach"):
+            hero_bonus += 1
+            self.apply_status(enemies[0], "surprised", 1, source="your ledge approach")
+        choice = self.scenario_choice(
+            "How do you break the rival shelf?",
+            [
+                self.skill_tag("STEALTH", self.action_option("Slip behind the claim stakes and cut off the lookout's escape.")),
+                self.skill_tag("INTIMIDATION", self.action_option("Make it clear that this claim is not surviving contact with you.")),
+                self.skill_tag("INVESTIGATION", self.action_option("Spot the false survey line and turn their prepared angle against them.")),
+            ],
+            allow_meta=False,
+        )
+        if choice == 1:
+            self.player_action("Slip behind the claim stakes and cut off the lookout's escape.")
+            if self.skill_check(self.state.player, "Stealth", 14, context="to flank the rival survey shelf"):
+                hero_bonus += 2
+                self.apply_status(enemies[0], "surprised", 1, source="you reached the shelf from behind")
+        elif choice == 2:
+            self.player_action("Make it clear that this claim is not surviving contact with you.")
+            if self.skill_check(self.state.player, "Intimidation", 14, context="to crack the rival survey crew's nerve"):
+                hero_bonus += 1
+                enemies[-1].current_hp = max(1, enemies[-1].current_hp - 3)
+        else:
+            self.player_action("Spot the false survey line and turn their prepared angle against them.")
+            if self.skill_check(self.state.player, "Investigation", 14, context="to read the rival shelf's false survey line"):
+                hero_bonus += 2
+                self.state.flags["prospect_false_claim_exposed"] = True
+        outcome = self.run_encounter(
+            Encounter(
+                title="Broken Prospect Rival Shelf",
+                description="Delayed claimants and Choir scouts try to keep the cleaner Wave Echo approach from returning to your map.",
+                enemies=enemies,
+                allow_flee=True,
+                allow_parley=True,
+                parley_dc=14,
+                hero_initiative_bonus=hero_bonus,
+                allow_post_combat_random_encounter=False,
+            )
+        )
+        if outcome == "defeat":
+            self.handle_defeat("The rival shelf throws the company back before the prospect route can be reclaimed.")
+            return
+        if outcome == "fled":
+            self.return_to_act2_hub("You withdraw from the rival shelf before the claimants can pin the whole company there.")
+            return
+        self.complete_act2_map_room(dungeon, room.room_id)
+
+    def _broken_prospect_sentinel_span(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
+        assert self.state is not None
+        self.say("The sentinel span crosses old dwarfwork where a suit of armor still remembers a duty nobody living gave it.")
+        enemies = [create_enemy("animated_armor")]
+        if self.act2_metric_value("act2_whisper_pressure") >= 4:
+            enemies.append(self.act2_pick_enemy(("obelisk_eye", "iron_prayer_horror")))
+        elif len(self.state.party_members()) >= 4:
+            enemies.append(self.act2_pick_enemy(("cult_lookout", "grimlock_tunneler", "starblighted_miner")))
+        hero_bonus = self.apply_scene_companion_support("broken_prospect")
+        if self.state.flags.get("prospect_markers_decoded"):
+            hero_bonus += 1
+        choice = self.scenario_choice(
+            "How do you cross the sentinel span?",
+            [
+                self.skill_tag("HISTORY", self.action_option("Call the old pass-mark and make the armor hesitate.")),
+                self.skill_tag("ATHLETICS", self.action_option("Take the span fast and turn the narrow footing into your pressure.")),
+                self.skill_tag("RELIGION", self.action_option("Treat the armor like a dead oath instead of a machine.")),
+            ],
+            allow_meta=False,
+        )
+        if choice == 1:
+            self.player_action("Call the old pass-mark and make the armor hesitate.")
+            if self.skill_check(self.state.player, "History", 14, context="to call the Broken Prospect sentinel mark"):
+                hero_bonus += 2
+                self.apply_status(enemies[0], "reeling", 1, source="the old pass-mark")
+        elif choice == 2:
+            self.player_action("Take the span fast and turn the narrow footing into your pressure.")
+            if self.skill_check(self.state.player, "Athletics", 14, context="to force the sentinel span"):
+                hero_bonus += 1
+                self.apply_status(self.state.player, "emboldened", 2, source="forcing the sentinel span")
+        else:
+            self.player_action("Treat the armor like a dead oath instead of a machine.")
+            if self.skill_check(self.state.player, "Religion", 14, context="to answer the sentinel oath"):
+                hero_bonus += 1
+                self.state.flags["prospect_dead_oath_answered"] = True
+        outcome = self.run_encounter(
+            Encounter(
+                title="Broken Prospect Sentinel Span",
+                description="Old Pact armor tests the party before the cave approach can become a true route.",
+                enemies=enemies,
+                allow_flee=True,
+                allow_parley=False,
+                hero_initiative_bonus=hero_bonus,
+                allow_post_combat_random_encounter=False,
+            )
+        )
+        if outcome == "defeat":
+            self.handle_defeat("The sentinel span holds and Wave Echo's threshold throws the company back.")
+            return
+        if outcome == "fled":
+            self.return_to_act2_hub("You retreat from the sentinel span before the old armor can turn the ledge into a drop.")
+            return
+        self.complete_act2_map_room(dungeon, room.room_id)
+
+    def _broken_prospect_sealed_approach(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
+        assert self.state is not None
+        self.say("Behind the rival shelf, a sealed approach holds route nails, old tally slates, and a claim cache nobody had time to strip clean.")
+        choice = self.scenario_choice(
+            "What do you take from the sealed approach?",
+            [
+                self.skill_tag("INVESTIGATION", self.action_option("Recover the route cache and prove which survey marks were real.")),
+                self.skill_tag("SLEIGHT OF HAND", self.action_option("Open the sealed coffer without breaking the old slates inside.")),
+                self.skill_tag("HISTORY", self.action_option("Record the dead labor tally so the foreman's pattern makes sense.")),
+            ],
+            allow_meta=False,
+        )
+        if choice == 1:
+            self.player_action("Recover the route cache and prove which survey marks were real.")
+            if self.skill_check(self.state.player, "Investigation", 14, context="to recover the Broken Prospect route cache"):
+                self.state.flags["prospect_route_cache_read"] = True
+                self.reward_party(xp=10, reason="recovering the Broken Prospect route cache")
+                self.say("The cache turns the shelf from rumor into route control.")
+        elif choice == 2:
+            self.player_action("Open the sealed coffer without breaking the old slates inside.")
+            if self.skill_check(self.state.player, "Sleight of Hand", 14, context="to open the Broken Prospect coffer"):
+                self.add_inventory_item("scroll_arcane_refresh", source="the Broken Prospect sealed approach")
+                self.say("The coffer opens without snapping the slate bundle inside.")
+            else:
+                self.say("The coffer fights you, but the route slates survive with only one ugly crack.")
+        else:
+            self.player_action("Record the dead labor tally so the foreman's pattern makes sense.")
+            if self.skill_check(self.state.player, "History", 14, context="to read the dead labor tally"):
+                self.state.flags["prospect_foreman_tally_read"] = True
+                self.say("The tally gives the foreman's dead shift a pattern you can interrupt later.")
+        self.complete_act2_map_room(dungeon, room.room_id)
+
+    def _broken_prospect_foreman_shift(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
+        assert self.state is not None
+        delayed = self._broken_prospect_delayed()
+        enemies = [create_enemy("spectral_foreman")]
+        if not self.state.flags.get("prospect_sentinel_span_cleared"):
+            enemies.insert(0, create_enemy("animated_armor"))
+        if delayed or self.act2_metric_value("act2_route_control") <= 2:
+            enemies.append(self.act2_pick_enemy(("cult_lookout", "iron_prayer_horror", "obelisk_eye")))
+        if len(self.state.party_members()) >= 4:
+            enemies.append(self.act2_pick_enemy(("cult_lookout", "grimlock_tunneler", "starblighted_miner")))
+        hero_bonus = 0
+        if self.state.flags.get("nim_countermeasure_notes"):
+            hero_bonus += 1
+            self.say("Nim's preserved theorem notes let you predict which part of the prospect's echo is honest and which part is bait.")
+        if self.state.flags.get("prospect_markers_decoded"):
+            hero_bonus += 1
+        if self.state.flags.get("prospect_route_cache_read") or self.state.flags.get("prospect_cache_secured"):
+            hero_bonus += 1
+        if self.state.flags.get("prospect_foreman_tally_read"):
+            hero_bonus += 1
+        if self.state.flags.get("prospect_threshold_steadied"):
+            hero_bonus += 1
+        choice = self.scenario_choice(
+            "How do you break the dead foreman's shift?",
+            [
+                self.skill_tag("HISTORY", self.action_option("Call the old survey marks before the echoes lie about distance.")),
+                self.skill_tag("STEALTH", self.action_option("Use the broken prospect ledge and hit the foreman from the blind side.")),
+                self.skill_tag("RELIGION", self.action_option("Steady the line before the dead memory of this place gets teeth.")),
+            ],
+            allow_meta=False,
+        )
+        if choice == 1:
+            self.player_action("Call the old survey marks before the echoes lie about distance.")
+            if self.skill_check(self.state.player, "History", 14, context="to use the Pact survey marks correctly"):
+                hero_bonus += 2
+        elif choice == 2:
+            self.player_action("Use the broken prospect ledge and hit the foreman from the blind side.")
+            if self.skill_check(self.state.player, "Stealth", 14, context="to slip into Wave Echo cleanly"):
+                hero_bonus += 2
+                self.apply_status(enemies[0], "surprised", 1, source="your ledge approach")
+        else:
+            self.player_action("Steady the line before the dead memory of this place gets teeth.")
+            if self.skill_check(self.state.player, "Religion", 14, context="to keep the haunted threshold from owning the pace"):
+                hero_bonus += 1
+                self.apply_status(self.state.player, "blessed", 2, source="meeting the cave with deliberate faith")
+        outcome = self.run_encounter(
+            Encounter(
+                title="Broken Prospect",
+                description="The first Wave Echo guardians still answer old duties, even now that new masters are twisting them.",
+                enemies=enemies,
+                allow_flee=True,
+                allow_parley=False,
+                hero_initiative_bonus=hero_bonus,
+                allow_post_combat_random_encounter=False,
+            )
+        )
+        if outcome == "defeat":
+            self.handle_defeat("Wave Echo's threshold throws the company back into the dark above.")
+            return
+        if outcome == "fled":
+            self.return_to_act2_hub("You withdraw from the cave mouth before the threshold can swallow the approach.")
+            return
+        self.complete_act2_map_room(dungeon, room.room_id)
+        self.act2_shift_metric(
+            "act2_route_control",
+            1,
+            "the prospect approach now belongs to your side instead of whoever would have claimed it with confidence and bad intent",
+        )
+        if self.state.flags.get("act2_captive_outcome") == "captives_endangered":
+            self.say(
+                "The route is cleaner now, but nobody in camp mistakes that clean line for a moral victory while the South Adit still holds prisoners."
+            )
+        self.return_to_act2_hub("Broken Prospect finally resolves into a real route, and Wave Echo has one less way to lie about where it begins.")
+
+    def _south_adit_delayed(self) -> bool:
+        assert self.state is not None
+        return self.state.flags.get("act2_first_late_route") == "broken_prospect"
+
+    def _south_adit_adit_mouth(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
+        assert self.state is not None
+        if not self.state.flags.get("act2_first_late_route"):
+            self.act2_mark_late_route_choice("south_adit")
+        if not self.has_quest("free_wave_echo_captives"):
+            self.grant_quest("free_wave_echo_captives")
+        if not self.has_quest("sever_quiet_choir"):
+            self.grant_quest("sever_quiet_choir")
+        if not self.state.flags.get("south_adit_seen"):
+            self.say(
+                "The southern workings smell like old iron, cold water, and fear kept quiet too long. Cells have been built into the support chambers. "
+                "The Quiet Choir has not just occupied Wave Echo. It has been sorting people here.",
+                typed=True,
+            )
+            if self._south_adit_delayed():
+                self.say(
+                    "Broken Prospect going first bought your side a cleaner route, but the adit has had longer to become a place of missing names and emptied cells."
+                )
+            self.state.flags["south_adit_seen"] = True
+        choice = self.scenario_choice(
+            "How do you read the prison mouth before the wardens know you are inside?",
+            [
+                self.skill_tag("PERCEPTION", self.action_option("Count the patrol bells and learn when the cell block breathes.")),
+                self.skill_tag("SLEIGHT OF HAND", self.action_option("Mute the first alarm chain before it can carry sound down the line.")),
+                self.skill_tag("MEDICINE", self.action_option("Mark the weakest voices first so the rescue starts with the living.")),
+            ],
+            allow_meta=False,
+        )
+        if choice == 1:
+            self.player_action("Count the patrol bells and learn when the cell block breathes.")
+            if self.skill_check(self.state.player, "Perception", 13, context="to read the South Adit prison rhythm"):
+                self.state.flags["south_adit_patrol_rhythm_read"] = True
+                self.say("The wardens are disciplined, but not imaginative. You can hear the gap they trust too much.")
+        elif choice == 2:
+            self.player_action("Mute the first alarm chain before it can carry sound down the line.")
+            if self.skill_check(self.state.player, "Sleight of Hand", 13, context="to mute the adit's first alarm chain"):
+                self.state.flags["south_adit_alarm_muted"] = True
+                self.say("The chain still moves, but it no longer sings for help.")
+        else:
+            self.player_action("Mark the weakest voices first so the rescue starts with the living.")
+            if self.skill_check(self.state.player, "Medicine", 13, context="to triage the adit prisoners from the first signs"):
+                self.state.flags["south_adit_triage_started"] = True
+                self.say("You catch the signs that matter: shallow breath, bad silence, and who must leave first.")
+        self.complete_act2_map_room(dungeon, room.room_id)
+
+    def _south_adit_silent_cells(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
+        assert self.state is not None
+        self.say("The first cell row holds people too tired to shout and wardens confident enough to mistake that for control.")
+        choice = self.scenario_choice(
+            "How do you open the silent cells?",
+            [
+                self.skill_tag("SLEIGHT OF HAND", self.action_option("Open the locks quietly and pass tools through before anyone runs.")),
+                self.skill_tag("PERSUASION", self.action_option("Keep the prisoners silent, steady, and moving together.")),
+                self.skill_tag("INTIMIDATION", self.action_option("Let the nearest warden see the cells opening and understand what comes next.")),
+            ],
+            allow_meta=False,
+        )
+        if choice == 1:
+            self.player_action("Open the locks quietly and pass tools through before anyone runs.")
+            if self.skill_check(self.state.player, "Sleight of Hand", 14, context="to open the South Adit cells quietly"):
+                self.state.flags["south_adit_cells_quietly_opened"] = True
+                self.reward_party(xp=10, reason="opening the South Adit cells quietly")
+                self.say("Locks give one after another, quiet enough that hope has to be whispered down the row.")
+        elif choice == 2:
+            self.player_speaker("No running blind. Breathe, pass it down, and move when I move.")
+            if self.skill_check(self.state.player, "Persuasion", 13, context="to keep the captives steady"):
+                self.state.flags["south_adit_prisoners_steadied"] = True
+                self.say("The row becomes a line instead of a panic.")
+        else:
+            self.player_action("Let the nearest warden see the cells opening and understand what comes next.")
+            if self.skill_check(self.state.player, "Intimidation", 14, context="to break the first warden's nerve"):
+                self.state.flags["south_adit_warden_nerve_cracked"] = True
+                self.say("The nearest guard backs away from the cell row before the fight has technically started.")
+        self.complete_act2_map_room(dungeon, room.room_id)
+
+    def _south_adit_drainage_exit(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
+        assert self.state is not None
+        self.say("The drainage exit is a wet side cut full of dropped manacles, old boot prints, and things that learned to hunt by listening upward.")
+        enemies = [create_enemy("grimlock_tunneler")]
+        if len(self.state.party_members()) >= 4:
+            enemies.append(self.act2_pick_enemy(("cult_lookout", "starblighted_miner", "grimlock_tunneler")))
+        hero_bonus = self.apply_scene_companion_support("south_adit")
+        if self.state.flags.get("south_adit_patrol_rhythm_read"):
+            hero_bonus += 1
+        choice = self.scenario_choice(
+            "How do you secure the drainage exit?",
+            [
+                self.skill_tag("SURVIVAL", self.action_option("Move with the water noise and reach the hunters' blind angle.")),
+                self.skill_tag("STEALTH", self.action_option("Let the drainage chain rattle without you under it.")),
+                self.skill_tag("ATHLETICS", self.action_option("Force the grate open and turn the side cut into an exit lane.")),
+            ],
+            allow_meta=False,
+        )
+        if choice == 1:
+            self.player_action("Move with the water noise and reach the hunters' blind angle.")
+            if self.skill_check(self.state.player, "Survival", 14, context="to secure the South Adit drainage route"):
+                hero_bonus += 2
+                self.apply_status(enemies[0], "surprised", 1, source="you moved inside the drainage noise")
+        elif choice == 2:
+            self.player_action("Let the drainage chain rattle without you under it.")
+            if self.skill_check(self.state.player, "Stealth", 14, context="to misdirect the drainage ambush"):
+                enemies[0].current_hp = max(1, enemies[0].current_hp - 4)
+                hero_bonus += 1
+        else:
+            self.player_action("Force the grate open and turn the side cut into an exit lane.")
+            if self.skill_check(self.state.player, "Athletics", 14, context="to wrench the drainage grate open"):
+                hero_bonus += 2
+                self.apply_status(self.state.player, "emboldened", 2, source="forcing the drainage exit")
+        outcome = self.run_encounter(
+            Encounter(
+                title="South Adit Drainage Exit",
+                description="A side-cut ambush tries to keep the delayed prison rescue from gaining a second exit.",
+                enemies=enemies,
+                allow_flee=True,
+                allow_parley=False,
+                hero_initiative_bonus=hero_bonus,
+                allow_post_combat_random_encounter=False,
+            )
+        )
+        if outcome == "defeat":
+            self.handle_defeat("The drainage route swallows the rescue and the prison line stays closed.")
+            return
+        if outcome == "fled":
+            self.return_to_act2_hub("You pull back from the drainage exit before it turns the whole rescue into a drowned rush.")
+            return
+        self.complete_act2_map_room(dungeon, room.room_id)
+
+    def _south_adit_infirmary_cut(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
+        assert self.state is not None
+        self.say("The infirmary cut is not mercy. It is sorting: the weak on blankets, the useful on chains, and the dead already written off.")
+        choice = self.scenario_choice(
+            "What do you save from the infirmary cut?",
+            [
+                self.skill_tag("MEDICINE", self.action_option("Stabilize the captives who will not survive a running rescue.")),
+                self.skill_tag("INSIGHT", self.action_option("Find the prisoner the wardens kept alive because they knew something.")),
+                self.skill_tag("RELIGION", self.action_option("Break the Choir's hush-prayers before they follow the wounded out.")),
+            ],
+            allow_meta=False,
+        )
+        if choice == 1:
+            self.player_action("Stabilize the captives who will not survive a running rescue.")
+            if self.skill_check(self.state.player, "Medicine", 14, context="to stabilize the weakest South Adit captives"):
+                self.state.flags["south_adit_weakest_saved"] = True
+                self.apply_status(self.state.player, "blessed", 1, source="saving the vulnerable first")
+                self.reward_party(xp=10, reason="stabilizing the weakest South Adit captives")
+        elif choice == 2:
+            self.player_action("Find the prisoner the wardens kept alive because they knew something.")
+            if self.skill_check(self.state.player, "Insight", 14, context="to spot the informed captive"):
+                self.state.flags["south_adit_witness_found"] = True
+                self.add_clue("A South Adit captive names the Quiet Choir's prisoner-sorting cadence and points toward the deeper nave.")
+                self.say("One captive is less broken than hidden. They give you the rhythm the wardens use to move witnesses below.")
+        else:
+            self.player_action("Break the Choir's hush-prayers before they follow the wounded out.")
+            if self.skill_check(self.state.player, "Religion", 14, context="to break the Choir's hush-prayers"):
+                self.state.flags["south_adit_hush_prayers_broken"] = True
+                self.act2_shift_metric(
+                    "act2_whisper_pressure",
+                    -1,
+                    "the infirmary prayers stop carrying the Choir's cadence into the captives' breathing",
+                )
+        self.complete_act2_map_room(dungeon, room.room_id)
+
+    def _south_adit_recruit_irielle(self, *, delayed: bool) -> None:
+        assert self.state is not None
+        if self.has_companion("Irielle Ashwake"):
+            return
+        self.speaker(
+            "Irielle Ashwake",
+            "If you were trying to prove there was still a side worth escaping to, this was a convincing way to do it.",
+        )
+        recruit = self.scenario_choice(
+            "A shaken tiefling augur stands among the freed captives, eyes fixed on the deeper dark.",
+            [
+                self.quoted_option("RECRUIT", "Then come with us and help end the Choir properly."),
+                self.quoted_option("SAFE", "Get topside and breathe real air first. We will speak in camp."),
+            ],
+            allow_meta=False,
+        )
+        self.recruit_companion(create_irielle_ashwake())
+        irielle = self.find_companion("Irielle Ashwake")
+        if irielle is not None and delayed:
+            self.adjust_companion_disposition(
+                irielle,
+                -1,
+                "too many captives were left below long enough to vanish before you reached the adit",
+            )
+        elif irielle is not None:
+            self.adjust_companion_disposition(
+                irielle,
+                1,
+                "you chose the prison line before the cleaner route race",
+            )
+        if recruit == 2 and irielle is not None and irielle in self.state.companions:
+            self.move_companion_to_camp(irielle)
+            self.say("Irielle agrees to reach camp first and share what she knows once she can think without whispering walls around her.")
+
+    def _south_adit_augur_cell(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
+        assert self.state is not None
+        delayed = self._south_adit_delayed()
+        self.say(
+            "The augur cell has no proper lock left, only copper wire, blood-dulled chalk, and a tiefling prisoner tracing counter-rhythms into the stone."
+        )
+        choice = self.scenario_choice(
+            "How do you reach the augur without letting the Choir hear the contact?",
+            [
+                self.skill_tag("ARCANA", self.action_option("Complete her counter-cadence before the wall answers wrong.")),
+                self.skill_tag("PERSUASION", self.action_option("Tell her exactly who sent you and why this rescue is real.")),
+                self.skill_tag("RELIGION", self.action_option("Name the Choir's prayer as a prison trick, not a revelation.")),
+            ],
+            allow_meta=False,
+        )
+        skill = "Arcana" if choice == 1 else "Persuasion" if choice == 2 else "Religion"
+        if self.skill_check(self.state.player, skill, 14, context="to make clean contact with Irielle Ashwake"):
+            self.state.flags["south_adit_counter_cadence_learned"] = True
+            self.reward_party(xp=15, reason="making contact with Irielle in the South Adit")
+            self.say("The counter-cadence catches. For the first time in the adit, the wall sounds like stone instead of a mouth.")
+        else:
+            self.say("Irielle still understands enough to move, but the cadence keeps some of its teeth.")
+        self._south_adit_recruit_irielle(delayed=delayed)
+        self.complete_act2_map_room(dungeon, room.room_id)
+
+    def _south_adit_warden_nave(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
+        assert self.state is not None
+        delayed = self._south_adit_delayed()
+        enemies = [create_enemy("starblighted_miner"), create_enemy("choir_adept")]
+        if delayed:
+            enemies.append(self.act2_pick_enemy(("cult_lookout", "oathbroken_revenant")))
+        elif len(self.state.party_members()) >= 4:
+            enemies.append(self.act2_pick_enemy(("cult_lookout", "choir_executioner")))
+        if len(self.state.party_members()) >= 4:
+            enemies.append(self.act2_pick_enemy(("cult_lookout", "grimlock_tunneler", "starblighted_miner")))
+
+        hero_bonus = self.apply_scene_companion_support("south_adit")
+        if self.state.flags.get("elira_field_lantern"):
+            hero_bonus += 1
+            self.say("Elira's field lantern turns the adit's worst silence from sacred to merely ugly.")
+        if self.state.flags.get("south_adit_cells_quietly_opened"):
+            hero_bonus += 1
+            self.apply_status(enemies[1], "surprised", 1, source="the cells opening behind them")
+        if self.state.flags.get("south_adit_prisoners_steadied"):
+            hero_bonus += 1
+        if self.state.flags.get("south_adit_drainage_secured"):
+            hero_bonus += 1
+        if self.state.flags.get("south_adit_weakest_saved"):
+            hero_bonus += 1
+        if self.state.flags.get("south_adit_counter_cadence_learned"):
+            hero_bonus += 1
+
+        choice = self.scenario_choice(
+            "How do you crack the prison line?",
+            [
+                self.skill_tag("SLEIGHT OF HAND", self.action_option("Open the last cells quietly and arm the captives before the wardens know.")),
+                self.skill_tag("INTIMIDATION", self.action_option("Hit the wardens hard enough that the prisoners remember your side instead.")),
+                self.skill_tag("MEDICINE", self.action_option("Go for the weakest captives first and keep the line from becoming a slaughter.")),
+            ],
+            allow_meta=False,
+        )
+        if choice == 1:
+            self.player_action("Open the last cells quietly and arm the captives before the wardens know.")
+            if self.skill_check(self.state.player, "Sleight of Hand", 14, context="to free the first prisoners without raising the line"):
+                hero_bonus += 2
+                self.apply_status(enemies[1], "surprised", 1, source="the cells opening behind them")
+        elif choice == 2:
+            self.player_action("Hit the wardens hard enough that the prisoners remember your side instead.")
+            if self.skill_check(self.state.player, "Intimidation", 14, context="to crack the adit's prison discipline"):
+                hero_bonus += 1
+        else:
+            self.player_action("Go for the weakest captives first and keep the line from becoming a slaughter.")
+            if self.skill_check(self.state.player, "Medicine", 14, context="to keep the rescue from turning into a panic crush"):
+                hero_bonus += 1
+                self.apply_status(self.state.player, "blessed", 1, source="saving the vulnerable first")
+
+        outcome = self.run_encounter(
+            Encounter(
+                title="South Adit Wardens",
+                description="The prison line beneath Wave Echo tries to bury witnesses before the truth can get out.",
+                enemies=enemies,
+                allow_flee=True,
+                allow_parley=False,
+                hero_initiative_bonus=hero_bonus,
+                allow_post_combat_random_encounter=False,
+            )
+        )
+        if outcome == "defeat":
+            self.handle_defeat("The South Adit stays a prison and the captives disappear back into the dark.")
+            return
+        if outcome == "fled":
+            self.return_to_act2_hub("You fall back from the adit before the rescue turns fatal.")
+            return
+
+        self.complete_act2_map_room(dungeon, room.room_id)
+        if delayed:
+            self.state.flags["act2_captive_outcome"] = "few_saved"
+            self.say("You still free people, but too many cells are already empty for the party to pretend this delay was clean.")
+        else:
+            self.state.flags["act2_captive_outcome"] = "many_saved"
+            self.act2_shift_metric(
+                "act2_town_stability",
+                1,
+                "the rescue reaches town as proof that this expedition still remembers the people trapped under it",
+            )
+        self._south_adit_recruit_irielle(delayed=delayed)
+        self.reward_party(xp=60, gold=18, reason="freeing the South Adit prisoners")
+        self.return_to_act2_hub("The South Adit prison line breaks open behind you, and its survivors carry the first hard proof of the Choir back toward Phandalin.")
+
+    def _wave_echo_rail_junction(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
+        assert self.state is not None
+        if not self.state.flags.get("wave_echo_outer_seen"):
+            self.say(
+                "The outer galleries keep the mine's old grandeur and none of its safety. Echoing rails, broken cranes, and ancient runoffs "
+                "turn every line of advance into a place where one mistake could still matter more than courage.",
+                typed=True,
+            )
+            self.state.flags["wave_echo_outer_seen"] = True
+        choice = self.scenario_choice(
+            "How do you read the rail junction?",
+            [
+                self.skill_tag("INVESTIGATION", self.action_option("Follow the survey marks and keep the old mine from lying about its own shape.")),
+                self.skill_tag("SURVIVAL", self.action_option("Find the side-runs the grimlocks trust before they find you.")),
+                self.skill_tag("ATHLETICS", self.action_option("Test the haul rail and find where force can still reopen the route.")),
+            ],
+            allow_meta=False,
+        )
+        if choice == 1:
+            self.player_action("Follow the survey marks and keep the old mine from lying about its own shape.")
+            if self.skill_check(self.state.player, "Investigation", 14, context="to read Wave Echo's outer rail junction"):
+                self.state.flags["outer_survey_marks_read"] = True
+                self.say("The false marks fall away from the real route, at least for this first junction.")
+        elif choice == 2:
+            self.player_action("Find the side-runs the grimlocks trust before they find you.")
+            if self.skill_check(self.state.player, "Survival", 14, context="to read the grimlock side-runs"):
+                self.state.flags["outer_side_run_read"] = True
+                self.say("The side-runs have a rhythm: not safe, exactly, but honest about where the ambush wants to stand.")
+        else:
+            self.player_action("Test the haul rail and find where force can still reopen the route.")
+            if self.skill_check(self.state.player, "Athletics", 14, context="to test the collapsed haul rail"):
+                self.state.flags["outer_haul_rail_plan"] = True
+                self.apply_status(self.state.player, "emboldened", 1, source="finding the rail's remaining strength")
+        self.complete_act2_map_room(dungeon, room.room_id)
+
+    def _wave_echo_slime_sluice(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
+        assert self.state is not None
+        self.say("The slime sluice is a slick runoff channel where old alchemical waste has learned to move like an argument with gravity.")
+        enemies = [create_enemy("ochre_slime")]
+        if len(self.state.party_members()) >= 4 or self.act2_metric_value("act2_route_control") <= 2:
+            enemies.append(self.act2_pick_enemy(("stirge_swarm", "hookclaw_burrower", "carrion_lash_crawler")))
+        hero_bonus = self.apply_scene_companion_support("wave_echo_outer_galleries")
+        if self.state.flags.get("outer_survey_marks_read"):
+            hero_bonus += 1
+        choice = self.scenario_choice(
+            "How do you carry the company through the slime sluice?",
+            [
+                self.skill_tag("INVESTIGATION", self.action_option("Use the survey marks to find where the old runoff can be dropped safely.")),
+                self.skill_tag("ATHLETICS", self.action_option("Force the crossing before the acid eats the last stable edge.")),
+                self.skill_tag("SURVIVAL", self.action_option("Read the dry stone ribs and keep everyone out of the hungry center.")),
+            ],
+            allow_meta=False,
+        )
+        if choice == 1:
+            self.player_action("Use the survey marks to find where the old runoff can be dropped safely.")
+            if self.skill_check(self.state.player, "Investigation", 14, context="to turn the sluice marks into an opening"):
+                enemies[0].current_hp = max(1, enemies[0].current_hp - 5)
+                self.apply_status(enemies[0], "reeling", 1, source="the old runoff gate dropping")
+                hero_bonus += 2
+        elif choice == 2:
+            self.player_action("Force the crossing before the acid eats the last stable edge.")
+            if self.skill_check(self.state.player, "Athletics", 14, context="to force the slime sluice crossing"):
+                hero_bonus += 1
+                self.apply_status(self.state.player, "emboldened", 2, source="forcing the slime sluice")
+        else:
+            self.player_action("Read the dry stone ribs and keep everyone out of the hungry center.")
+            if self.skill_check(self.state.player, "Survival", 14, context="to read safe stone through the slime sluice"):
+                hero_bonus += 2
+        outcome = self.run_encounter(
+            Encounter(
+                title="Wave Echo Slime Sluice",
+                description="Acidic runoff and cave predators try to turn the outer gallery into a dead end.",
+                enemies=enemies,
+                allow_flee=True,
+                allow_parley=False,
+                hero_initiative_bonus=hero_bonus,
+                allow_post_combat_random_encounter=False,
+            )
+        )
+        if outcome == "defeat":
+            self.handle_defeat("The outer galleries close around the party before the deeper route can be stabilized.")
+            return
+        if outcome == "fled":
+            self.return_to_act2_hub("You retreat from the slime sluice to reset the approach.")
+            return
+        self.complete_act2_map_room(dungeon, room.room_id)
+
+    def _wave_echo_grimlock_side_run(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
+        assert self.state is not None
+        self.say("The grimlock side-run is less a passage than a hunting habit worn into stone.")
+        enemies = [create_enemy("grimlock_tunneler")]
+        if len(self.state.party_members()) >= 4 or self.act2_metric_value("act2_route_control") <= 2:
+            enemies.append(self.act2_pick_enemy(("grimlock_tunneler", "hookclaw_burrower", "starblighted_miner")))
+        hero_bonus = self.apply_scene_companion_support("wave_echo_outer_galleries")
+        if self.state.flags.get("outer_side_run_read"):
+            hero_bonus += 1
+        choice = self.scenario_choice(
+            "How do you beat the side-run ambush?",
+            [
+                self.skill_tag("SURVIVAL", self.action_option("Take the side-runs the grimlocks trust and beat them to the angle.")),
+                self.skill_tag("STEALTH", self.action_option("Let the hunters hear a false company while you move around them.")),
+                self.skill_tag("PERCEPTION", self.action_option("Count the echoes until the real breathing separates from the false.")),
+            ],
+            allow_meta=False,
+        )
+        if choice == 1:
+            self.player_action("Take the side-runs the grimlocks trust and beat them to the angle.")
+            if self.skill_check(self.state.player, "Survival", 14, context="to move like something that actually belongs underground"):
+                hero_bonus += 2
+                self.apply_status(enemies[0], "surprised", 1, source="you reached their angle first")
+        elif choice == 2:
+            self.player_action("Let the hunters hear a false company while you move around them.")
+            if self.skill_check(self.state.player, "Stealth", 14, context="to misdirect the grimlock side-run"):
+                enemies[0].current_hp = max(1, enemies[0].current_hp - 4)
+                hero_bonus += 1
+        else:
+            self.player_action("Count the echoes until the real breathing separates from the false.")
+            if self.skill_check(self.state.player, "Perception", 14, context="to hear the real side-run ambush"):
+                hero_bonus += 2
+        outcome = self.run_encounter(
+            Encounter(
+                title="Wave Echo Grimlock Side-Run",
+                description="Tunnel hunters try to make the outer galleries turn against the party's map sense.",
+                enemies=enemies,
+                allow_flee=True,
+                allow_parley=False,
+                hero_initiative_bonus=hero_bonus,
+                allow_post_combat_random_encounter=False,
+            )
+        )
+        if outcome == "defeat":
+            self.handle_defeat("The outer galleries close around the party before the deeper route can be stabilized.")
+            return
+        if outcome == "fled":
+            self.return_to_act2_hub("You retreat from the grimlock side-run before the ambush can close the route behind you.")
+            return
+        self.complete_act2_map_room(dungeon, room.room_id)
+
+    def _wave_echo_collapsed_crane(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
+        assert self.state is not None
+        self.say("The collapsed crane blocks a direct haul line, all snapped chain, wedged beam, and one bad choice away from becoming an avalanche.")
+        dc = 13 if self.state.flags.get("outer_haul_rail_plan") else 14
+        choice = self.scenario_choice(
+            "How do you reopen the crane route?",
+            [
+                self.skill_tag("ATHLETICS", self.action_option("Reopen the haul rail and force the cave to answer a direct advance.")),
+                self.skill_tag("INVESTIGATION", self.action_option("Find the pin that lets the crane drop without taking the ceiling too.")),
+                self.skill_tag("SURVIVAL", self.action_option("Use the old haul scars to choose where the collapse can safely fall.")),
+            ],
+            allow_meta=False,
+        )
+        skill = "Athletics" if choice == 1 else "Investigation" if choice == 2 else "Survival"
+        if self.skill_check(self.state.player, skill, dc, context="to reopen the collapsed crane route"):
+            self.state.flags["outer_crane_stabilized"] = True
+            self.reward_party(xp=10, reason="reopening Wave Echo's collapsed crane route")
+            self.say("The crane drops with a sound like a verdict, and the direct haul line becomes ugly but usable.")
+        else:
+            self.say("The crane shifts badly. You get the route open, but every echo behind you sounds less forgiving.")
+            self.act2_shift_metric(
+                "act2_route_control",
+                -1,
+                "the crane route opens messily enough to make the outer gallery map less trustworthy",
+            )
+        self.complete_act2_map_room(dungeon, room.room_id)
+
+    def _wave_echo_false_echo_loop(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
+        assert self.state is not None
+        self.say("The false echo loop repeats footsteps that are not yours and distances that change when you trust them.")
+        high_whisper = self.act2_metric_value("act2_whisper_pressure") >= 4
+        hero_bonus = self.apply_scene_companion_support("wave_echo_outer_galleries")
+        choice = self.scenario_choice(
+            "How do you map the false echo loop?",
+            [
+                self.skill_tag("INVESTIGATION", self.action_option("Mark every repeated echo until the real path is the only one left.")),
+                self.skill_tag("ARCANA", self.action_option("Treat the false echoes as resonance and break their timing.")),
+                self.skill_tag("SURVIVAL", self.action_option("Trust the air and stone instead of the sounds trying to guide you.")),
+            ],
+            allow_meta=False,
+        )
+        skill = "Investigation" if choice == 1 else "Arcana" if choice == 2 else "Survival"
+        if self.skill_check(self.state.player, skill, 14, context="to map the false echo loop"):
+            self.state.flags["outer_false_echo_named"] = True
+            hero_bonus += 1
+            self.say("The loop is still wrong, but it is now wrong in a shape you can use.")
+        else:
+            self.say("The loop gives you the path, but takes enough certainty that the next gate feels closer than it should.")
+        if high_whisper:
+            enemies = [self.act2_pick_enemy(("starblighted_miner", "whispermaw_blob", "hookclaw_burrower"))]
+            if len(self.state.party_members()) >= 4:
+                enemies.append(self.act2_pick_enemy(("starblighted_miner", "obelisk_eye", "grimlock_tunneler")))
+            if self.state.flags.get("outer_false_echo_named"):
+                self.apply_status(enemies[0], "reeling", 1, source="the loop's timing breaking")
+            outcome = self.run_encounter(
+                Encounter(
+                    title="Wave Echo False Echo Loop",
+                    description="The outer galleries answer high whisper pressure with starblighted shapes in the wrong echoes.",
+                    enemies=enemies,
+                    allow_flee=True,
+                    allow_parley=False,
+                    hero_initiative_bonus=hero_bonus,
+                    allow_post_combat_random_encounter=False,
+                )
+            )
+            if outcome == "defeat":
+                self.handle_defeat("The false echo loop closes over the party before the deeper route can be named.")
+                return
+            if outcome == "fled":
+                self.return_to_act2_hub("You retreat from the false echo loop before the mine can make a second set of footsteps permanent.")
+                return
+        self.complete_act2_map_room(dungeon, room.room_id)
+
+    def _wave_echo_deep_haul_gate(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
+        assert self.state is not None
+        enemies = [create_enemy("grimlock_tunneler"), create_enemy("ochre_slime")]
+        if self.act2_metric_value("act2_whisper_pressure") >= 4:
+            enemies.append(self.act2_pick_enemy(("starblighted_miner", "whispermaw_blob", "hookclaw_burrower")))
+        elif self.act2_metric_value("act2_route_control") <= 2 or len(self.state.party_members()) >= 4:
+            enemies.append(self.act2_pick_enemy(("stirge_swarm", "hookclaw_burrower", "carrion_lash_crawler")))
+        if len(self.state.party_members()) >= 4:
+            enemies.append(self.act2_pick_enemy(("grimlock_tunneler", "starblighted_miner", "hookclaw_burrower")))
+        hero_bonus = self.apply_scene_companion_support("wave_echo_outer_galleries")
+        if self.state.flags.get("outer_survey_marks_read"):
+            hero_bonus += 1
+        if self.state.flags.get("outer_grimlock_run_cleared"):
+            hero_bonus += 1
+        if self.state.flags.get("outer_crane_reopened"):
+            hero_bonus += 1
+        if self.state.flags.get("outer_false_echo_named"):
+            hero_bonus += 1
+        choice = self.scenario_choice(
+            "How do you force the deep haul gate?",
+            [
+                self.skill_tag("INVESTIGATION", self.action_option("Follow the survey marks and keep the old mine from lying about its own shape.")),
+                self.skill_tag("SURVIVAL", self.action_option("Take the side-runs the grimlocks trust and beat them to the angle.")),
+                self.skill_tag("ATHLETICS", self.action_option("Reopen the haul rail and force the cave to answer a direct advance.")),
+            ],
+            allow_meta=False,
+        )
+        if choice == 1:
+            self.player_action("Follow the survey marks and keep the old mine from lying about its own shape.")
+            if self.skill_check(self.state.player, "Investigation", 14, context="to keep the party on the real line through false echoes"):
+                hero_bonus += 2
+        elif choice == 2:
+            self.player_action("Take the side-runs the grimlocks trust and beat them to the angle.")
+            if self.skill_check(self.state.player, "Survival", 14, context="to move like something that actually belongs underground"):
+                hero_bonus += 2
+                self.apply_status(enemies[0], "surprised", 1, source="you reached their angle first")
+        else:
+            self.player_action("Reopen the haul rail and force the cave to answer a direct advance.")
+            if self.skill_check(self.state.player, "Athletics", 14, context="to turn the broken rail into a fighting line instead of a hazard"):
+                hero_bonus += 1
+                self.apply_status(self.state.player, "emboldened", 2, source="forcing the galleries to take your pace")
+        outcome = self.run_encounter(
+            Encounter(
+                title="Outer Gallery Pressure",
+                description="Wave Echo's outer defenses are now a mix of scavengers, predators, and bad old engineering.",
+                enemies=enemies,
+                allow_flee=True,
+                allow_parley=False,
+                hero_initiative_bonus=hero_bonus,
+                allow_post_combat_random_encounter=False,
+            )
+        )
+        if outcome == "defeat":
+            self.handle_defeat("The outer galleries close around the party before the deeper route can be stabilized.")
+            return
+        if outcome == "fled":
+            self.return_to_act2_hub("You retreat from the outer galleries to reset the approach.")
+            return
+        self.complete_act2_map_room(dungeon, room.room_id)
+        self.reward_party(xp=50, gold=12, reason="forcing the outer galleries open")
+        self.act2_shift_metric(
+            "act2_route_control",
+            1,
+            "the company now owns a real line through Wave Echo's outer galleries",
+        )
+        self.return_to_act2_hub("Wave Echo's outer galleries settle behind you into a route the expedition can actually hold.")
+
+    def _black_lake_causeway_lip(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
+        assert self.state is not None
+        if not self.has_quest("sever_quiet_choir"):
+            self.grant_quest("sever_quiet_choir")
+        if not self.state.flags.get("black_lake_seen"):
+            self.say(
+                "The old black water cuts the cave in half beneath a narrow causeway of stone and broken dwarfwork. A drowned shrine leans off one side. "
+                "A cult barracks squats on the other. This is the last clean threshold before the Forge of Spells, and the Quiet Choir knows it.",
+                typed=True,
+            )
+            self.state.flags["black_lake_seen"] = True
+        choice = self.scenario_choice(
+            "What do you read first on the crossing?",
+            [
+                self.skill_tag("RELIGION", self.action_option("Mark the drowned shrine before the lake swallows its last clean prayer.")),
+                self.skill_tag("STEALTH", self.action_option("Count the barracks watches and messenger lanes before you start crossing openly.")),
+                self.skill_tag("ATHLETICS", self.action_option("Test the anchor pull and learn where the causeway can be made to lurch.")),
+            ],
+            allow_meta=False,
+        )
+        if choice == 1:
+            self.player_action("Mark the drowned shrine before the lake swallows its last clean prayer.")
+            if self.skill_check(self.state.player, "Religion", 14, context="to hear what sanctity still survives over the black water"):
+                self.state.flags["black_lake_shrine_route_marked"] = True
+                self.add_clue("A thin thread of older sanctity still answers at Black Lake's drowned shrine, which means the crossing is not fully the Choir's yet.")
+                self.reward_party(xp=10, reason="reading the drowned shrine before the crossing")
+        elif choice == 2:
+            self.player_action("Count the barracks watches and messenger lanes before you start crossing openly.")
+            if self.skill_check(self.state.player, "Stealth", 14, context="to read the barracks watches without becoming part of the report"):
+                self.state.flags["black_lake_barracks_watch_read"] = True
+                self.reward_party(xp=10, reason="mapping the Black Lake barracks watches")
+        else:
+            self.player_action("Test the anchor pull and learn where the causeway can be made to lurch.")
+            if self.skill_check(self.state.player, "Athletics", 14, context="to feel where the old line will break before it throws you with it"):
+                self.state.flags["black_lake_anchor_stress_read"] = True
+                self.reward_party(xp=10, reason="reading the causeway's anchor strain")
+        self.complete_act2_map_room(dungeon, room.room_id)
+
+    def _black_lake_drowned_shrine(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
+        assert self.state is not None
+        self.say(
+            "Stone saints lean half-submerged in black water while old lamp niches hold only cold mineral sheen. The shrine is not dead, but it is listening for who claims it next."
+        )
+        dc = 13 if self.state.flags.get("black_lake_shrine_route_marked") or self.state.flags.get("agatha_truth_clear") else 14
+        choice = self.scenario_choice(
+            "How do you reclaim the drowned shrine?",
+            [
+                self.skill_tag("RELIGION", self.action_option("Wake the old rite cleanly and force the crossing to remember its first purpose.")),
+                self.skill_tag("INSIGHT", self.action_option("Read which prayer the lake is still willing to answer without taking a life for it.")),
+                self.skill_tag("ARCANA", self.action_option("Thread the shrine's old resonance through the Forge's newer wrong song.")),
+            ],
+            allow_meta=False,
+        )
+        shrine_bonus = False
+        if choice == 1:
+            self.player_action("Wake the old rite cleanly and force the crossing to remember its first purpose.")
+            shrine_bonus = self.skill_check(self.state.player, "Religion", dc, context="to reclaim the drowned shrine before the Choir notices")
+        elif choice == 2:
+            self.player_action("Read which prayer the lake is still willing to answer without taking a life for it.")
+            shrine_bonus = self.skill_check(self.state.player, "Insight", dc, context="to find the one safe rite left in the shrine")
+        else:
+            self.player_action("Thread the shrine's old resonance through the Forge's newer wrong song.")
+            shrine_bonus = self.skill_check(self.state.player, "Arcana", dc, context="to braid the shrine's older resonance against the forge-hum")
+        self.complete_act2_map_room(dungeon, room.room_id)
+        self.act2_shift_metric(
+            "act2_whisper_pressure",
+            -1,
+            "the drowned shrine answers before the forge can drown it entirely in the Choir's rhythm",
+        )
+        if shrine_bonus:
+            self.state.flags["black_lake_shrine_sanctity_named"] = True
+            self.apply_status(self.state.player, "blessed", 2, source="the reclaimed Black Lake shrine")
+            self.add_clue("The drowned shrine still answers an older sanctity, which means the Forge route has not been fully rewritten by the Quiet Choir.")
+            self.reward_party(xp=15, reason="reclaiming the drowned shrine cleanly")
+        else:
+            self.say("The shrine answers, but only after taking a little more of the lake's cold into your bones than you wanted.")
+
+    def _black_lake_choir_barracks(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
+        assert self.state is not None
+        enemies = [create_enemy("cult_lookout"), create_enemy("choir_adept")]
+        if self.act2_metric_value("act2_whisper_pressure") >= 4:
+            enemies.append(self.act2_pick_enemy(("starblighted_miner", "obelisk_eye", "blacklake_pincerling")))
+        elif len(self.state.party_members()) >= 4 or self.act2_metric_value("act2_route_control") <= 2:
+            enemies.append(self.act2_pick_enemy(("starblighted_miner", "blacklake_pincerling", "cult_lookout")))
+        hero_bonus = self.apply_scene_companion_support("black_lake_causeway")
+        if self.state.flags.get("black_lake_barracks_watch_read"):
+            hero_bonus += 1
+            self.apply_status(enemies[0], "surprised", 1, source="you entered on the barracks blind side")
+        choice = self.scenario_choice(
+            "How do you strip the barracks?",
+            [
+                self.skill_tag("STEALTH", self.action_option("Cut the messengers first and keep the barracks from warning the far side.")),
+                self.skill_tag("INVESTIGATION", self.action_option("Take the rota boards and reserve orders before the fighting scatters them.")),
+                self.skill_tag("ATHLETICS", self.action_option("Turn the weapon racks and bunks into a collapsing choke point.")),
+            ],
+            allow_meta=False,
+        )
+        if choice == 1:
+            self.player_action("Cut the messengers first and keep the barracks from warning the far side.")
+            if self.skill_check(self.state.player, "Stealth", 14, context="to kill the Black Lake message chain before it runs"):
+                hero_bonus += 2
+                self.apply_status(enemies[1], "surprised", 1, source="their messengers dropped first")
+        elif choice == 2:
+            self.player_action("Take the rota boards and reserve orders before the fighting scatters them.")
+            if self.skill_check(self.state.player, "Investigation", 14, context="to seize the barracks orders intact"):
+                hero_bonus += 1
+                self.state.flags["black_lake_barracks_orders_taken"] = True
+                self.add_clue("Black Lake barracks orders confirm the Quiet Choir keeps its last reserve line on the Forge side of the crossing.")
+        else:
+            self.player_action("Turn the weapon racks and bunks into a collapsing choke point.")
+            if self.skill_check(self.state.player, "Athletics", 14, context="to make the barracks collapse inward on its own defenders"):
+                hero_bonus += 1
+                self.apply_status(enemies[0], "prone", 1, source="the barracks caving around them")
+        outcome = self.run_encounter(
+            Encounter(
+                title="Black Lake Barracks",
+                description="The Quiet Choir's last organized staging room before the Forge has to be broken or stripped.",
+                enemies=enemies,
+                allow_flee=True,
+                allow_parley=False,
+                hero_initiative_bonus=hero_bonus,
+                allow_post_combat_random_encounter=False,
+            )
+        )
+        if outcome == "defeat":
+            self.handle_defeat("The barracks holds, and the far side of Black Lake stays reinforced.")
+            return
+        if outcome == "fled":
+            self.return_to_act2_hub("You fall back from the Black Lake barracks before the whole crossing turns against you.")
+            return
+        self.complete_act2_map_room(dungeon, room.room_id)
+
+    def _black_lake_anchor_chains(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
+        assert self.state is not None
+        self.say(
+            "Old anchor chains descend into the black water beside split dwarfwork posts. The whole crossing can still be made to shudder if you know where to strike."
+        )
+        dc = 13 if self.state.flags.get("black_lake_anchor_stress_read") else 14
+        choice = self.scenario_choice(
+            "How do you sabotage the causeway anchors?",
+            [
+                self.skill_tag("ATHLETICS", self.action_option("Rip the right chain free and make the far landing fight on a trembling line.")),
+                self.skill_tag("INVESTIGATION", self.action_option("Read the rivets and pick the exact weak point instead of guessing.")),
+                self.skill_tag("SURVIVAL", self.action_option("Mark the safe footing first so your own people can move when the stone lurches.")),
+            ],
+            allow_meta=False,
+        )
+        clean_sabotage = False
+        if choice == 1:
+            self.player_action("Rip the right chain free and make the far landing fight on a trembling line.")
+            clean_sabotage = self.skill_check(self.state.player, "Athletics", dc, context="to tear the anchor free without losing the crossing")
+        elif choice == 2:
+            self.player_action("Read the rivets and pick the exact weak point instead of guessing.")
+            clean_sabotage = self.skill_check(self.state.player, "Investigation", dc, context="to pick the causeway's clean failure point")
+            if clean_sabotage:
+                self.state.flags["black_lake_anchor_weak_point_found"] = True
+        else:
+            self.player_action("Mark the safe footing first so your own people can move when the stone lurches.")
+            clean_sabotage = self.skill_check(self.state.player, "Survival", dc, context="to mark a usable line across a shaking causeway")
+            if clean_sabotage:
+                self.state.flags["black_lake_causeway_footing_marked"] = True
+        self.complete_act2_map_room(dungeon, room.room_id)
+        if clean_sabotage:
+            self.apply_status(self.state.player, "emboldened", 1, source="learning exactly how the causeway will jump")
+            self.reward_party(xp=15, reason="sabotaging the Black Lake anchors cleanly")
+        else:
+            self.act2_shift_metric(
+                "act2_route_control",
+                -1,
+                "the anchor sabotage had to be done messy and loud while the crossing fought back",
+            )
+
+    def _black_lake_blackwater_edge(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
+        assert self.state is not None
+        enemies = [create_enemy("blacklake_pincerling"), create_enemy("animated_armor")]
+        if self.act2_metric_value("act2_whisper_pressure") >= 4:
+            enemies.append(self.act2_pick_enemy(("duskmire_matriarch", "obelisk_eye", "starblighted_miner")))
+        elif len(self.state.party_members()) >= 4:
+            enemies.append(self.act2_pick_enemy(("starblighted_miner", "blacklake_pincerling", "cult_lookout")))
+        hero_bonus = self.apply_scene_companion_support("black_lake_causeway")
+        if self.state.flags.get("black_lake_shrine_purified"):
+            hero_bonus += 1
+            self.apply_status(self.state.player, "blessed", 1, source="the Black Lake shrine")
+        if self.state.flags.get("black_lake_barracks_raided"):
+            hero_bonus += 1
+        if self.state.flags.get("black_lake_causeway_shaken"):
+            hero_bonus += 1
+            self.apply_status(enemies[0], "prone", 1, source="the waterline lurching under the broken anchors")
+        choice = self.scenario_choice(
+            "How do you keep the black water from swallowing the route?",
+            [
+                self.skill_tag("SURVIVAL", self.action_option("Keep the party on the one line of stone that still behaves like ground.")),
+                self.skill_tag("INVESTIGATION", self.action_option("Read the runoff and force the predators toward the shallows.")),
+                self.skill_tag("ATHLETICS", self.action_option("Drag the line forward before the undertow can close around it.")),
+            ],
+            allow_meta=False,
+        )
+        if choice == 1:
+            self.player_action("Keep the party on the one line of stone that still behaves like ground.")
+            if self.skill_check(self.state.player, "Survival", 14, context="to guide the party across the safe blackwater footing"):
+                hero_bonus += 2
+                self.state.flags["black_lake_waterline_read"] = True
+        elif choice == 2:
+            self.player_action("Read the runoff and force the predators toward the shallows.")
+            if self.skill_check(self.state.player, "Investigation", 14, context="to turn the black water's flow against what lives in it"):
+                hero_bonus += 1
+                enemies[0].current_hp = max(1, enemies[0].current_hp - 4)
+        else:
+            self.player_action("Drag the line forward before the undertow can close around it.")
+            if self.skill_check(self.state.player, "Athletics", 14, context="to beat the waterline's undertow by force"):
+                hero_bonus += 1
+                self.apply_status(self.state.player, "emboldened", 2, source="forcing the Black Lake edge")
+        outcome = self.run_encounter(
+            Encounter(
+                title="Black Lake Waterline",
+                description="Blackwater predators and old guardians make the last open stretch feel narrower than it is.",
+                enemies=enemies,
+                allow_flee=True,
+                allow_parley=False,
+                hero_initiative_bonus=hero_bonus,
+                allow_post_combat_random_encounter=False,
+            )
+        )
+        if outcome == "defeat":
+            self.handle_defeat("The black water swallows the approach before the far landing can be taken.")
+            return
+        if outcome == "fled":
+            self.return_to_act2_hub("You fall back from the waterline before the lake can trap the whole company.")
+            return
+        self.complete_act2_map_room(dungeon, room.room_id)
+
+    def _black_lake_far_landing(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
+        assert self.state is not None
+        enemies = [create_enemy("animated_armor"), create_enemy("starblighted_miner")]
+        if len(self.state.party_members()) >= 4 or self.act2_metric_value("act2_whisper_pressure") >= 4:
+            enemies.append(self.act2_pick_enemy(("spectral_foreman", "blacklake_pincerling", "duskmire_matriarch", "obelisk_eye")))
+        if len(self.state.party_members()) >= 4:
+            enemies.append(self.act2_pick_enemy(("cult_lookout", "starblighted_miner", "blacklake_pincerling")))
+        elif not self.state.flags.get("black_lake_barracks_raided"):
+            enemies.append(self.act2_pick_enemy(("cult_lookout", "choir_adept", "starblighted_miner")))
+        hero_bonus = self.apply_scene_companion_support("black_lake_causeway")
+        if self.state.flags.get("black_lake_shrine_purified"):
+            hero_bonus += 1
+            self.apply_status(self.state.player, "blessed", 2, source="the reclaimed Black Lake shrine")
+        if self.state.flags.get("black_lake_barracks_raided"):
+            hero_bonus += 1
+        if self.state.flags.get("black_lake_causeway_shaken"):
+            hero_bonus += 1
+            self.apply_status(enemies[0], "prone", 1, source="the causeway lurching under your sabotage")
+        if self.state.flags.get("black_lake_barracks_orders_taken"):
+            hero_bonus += 1
+            enemies[1].current_hp = max(1, enemies[1].current_hp - 4)
+        if self.state.flags.get("black_lake_causeway_footing_marked") or self.state.flags.get("black_lake_waterline_read"):
+            hero_bonus += 1
+        choice = self.scenario_choice(
+            "How do you force the far landing?",
+            [
+                self.skill_tag("RELIGION", self.action_option("Carry the shrine's answered light into the last clean stretch before the Forge.")),
+                self.skill_tag("STEALTH", self.action_option("Cut the last runners and reserves out from under the far side before it can brace.")),
+                self.skill_tag("ATHLETICS", self.action_option("Fight while the whole causeway trembles and make the landing answer your pace.")),
+            ],
+            allow_meta=False,
+        )
+        if choice == 1:
+            self.player_action("Carry the shrine's answered light into the last clean stretch before the Forge.")
+            if self.skill_check(self.state.player, "Religion", 14, context="to make the reclaimed shrine matter on the far landing"):
+                hero_bonus += 1
+                self.apply_status(enemies[1], "frightened", 1, source="older sanctity cutting through the lake-hum")
+        elif choice == 2:
+            self.player_action("Cut the last runners and reserves out from under the far side before it can brace.")
+            if self.skill_check(self.state.player, "Stealth", 14, context="to gut the far landing's messenger chain before it settles"):
+                hero_bonus += 2
+                self.apply_status(enemies[0], "surprised", 1, source="the far side losing its runners")
+        else:
+            self.player_action("Fight while the whole causeway trembles and make the landing answer your pace.")
+            if self.skill_check(self.state.player, "Athletics", 14, context="to turn the shaking causeway into your advantage"):
+                hero_bonus += 2
+                self.apply_status(self.state.player, "emboldened", 2, source="forcing the far landing")
+        outcome = self.run_encounter(
+            Encounter(
+                title="Black Lake Causeway",
+                description="Constructs, corrupted miners, and old command echoes try to stop the final approach.",
+                enemies=enemies,
+                allow_flee=True,
+                allow_parley=False,
+                hero_initiative_bonus=hero_bonus,
+                allow_post_combat_random_encounter=False,
+            )
+        )
+        if outcome == "defeat":
+            self.handle_defeat("The causeway becomes a kill lane and the Forge remains out of reach.")
+            return
+        if outcome == "fled":
+            self.return_to_act2_hub("You withdraw from the causeway before the line fully collapses around you.")
+            return
+        self.complete_act2_map_room(dungeon, room.room_id)
+        self.reward_party(xp=55, gold=15, reason="crossing the Black Lake causeway")
+        self.add_journal("You crossed the Black Lake causeway and opened the last clean approach to the Forge of Spells.")
+        self.return_to_act2_hub("The Black Lake causeway is finally yours, and the Forge lies open on the far side.")
+
+    def _forge_threshold(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
+        assert self.state is not None
+        if not self.state.flags.get("forge_seen"):
+            self.say(
+                "The Forge of Spells is no longer just a lost wonder. The Quiet Choir has turned it into an instrument. "
+                "Shards hum inside old channels, the air sounds wrong when it moves, and the whole chamber feels like it is listening for the next hand bold enough to strike it.",
+                typed=True,
+            )
+            if self.state.flags.get("black_lake_shrine_purified"):
+                self.say("The answered sanctity from Black Lake keeps one line through the chamber sounding like craft instead of hunger.")
+            if self.state.flags.get("black_lake_barracks_orders_taken"):
+                self.say("The stolen barracks orders mark which choir lanes were supposed to reinforce the forge and which ones were only meant to witness.")
+            elif self.state.flags.get("black_lake_barracks_raided"):
+                self.say("Because you stripped the barracks on the crossing, the forge's outer support rhythm is thinner than Caldra expected.")
+            if self.state.flags.get("black_lake_causeway_shaken"):
+                self.say("The force you fed into the causeway still travels through the old foundations. The shard channels are venting on a rhythm instead of a mystery.")
+            self.state.flags["forge_seen"] = True
+        if (
+            self.act2_metric_value("act2_whisper_pressure") >= 4
+            or self.state.flags.get("black_lake_causeway_shaken")
+            or self.state.flags.get("black_lake_anchor_weak_point_found")
+        ):
+            self.state.flags["forge_shard_route_exposed"] = True
+        choice = self.scenario_choice(
+            "What do you read first in the forge chamber?",
+            [
+                self.skill_tag("INVESTIGATION", self.action_option("Lay the stolen support routes over the chamber and find the choir's real traffic line.")),
+                self.skill_tag("RELIGION", self.action_option("Carry the shrine's answered sanctity forward before the forge swallows the last of it.")),
+                self.skill_tag("ARCANA", self.action_option("Time the shard surges and learn which pulse the chamber cannot hide.")),
+            ],
+            allow_meta=False,
+        )
+        if choice == 1:
+            dc = 13 if self.state.flags.get("black_lake_barracks_orders_taken") else 14
+            self.player_action("Lay the stolen support routes over the chamber and find the choir's real traffic line.")
+            if self.skill_check(self.state.player, "Investigation", dc, context="to read the forge's real support traffic"):
+                self.state.flags["forge_threshold_orders_read"] = True
+                self.add_clue("The Forge's real reinforcement traffic still runs through the choir pit, which means Caldra's dais is not the only thing holding her ritual up.")
+                self.add_journal("You used the Black Lake orders to read the Forge threshold and find the chamber's real support traffic.")
+                self.reward_party(xp=10, reason="reading the forge support routes")
+        elif choice == 2:
+            dc = 13 if self.state.flags.get("black_lake_shrine_purified") else 14
+            self.player_action("Carry the shrine's answered sanctity forward before the forge swallows the last of it.")
+            if self.skill_check(self.state.player, "Religion", dc, context="to carry clean sanctity into the forge threshold"):
+                self.state.flags["forge_threshold_sanctified"] = True
+                self.apply_status(self.state.player, "blessed", 1, source="the Black Lake shrine carried into the Forge")
+                self.add_journal("You carried Black Lake's answered sanctity across the Forge threshold and kept one lane of the chamber honest.")
+                self.reward_party(xp=10, reason="sanctifying the forge threshold")
+        else:
+            dc = 13 if self.state.flags.get("black_lake_causeway_shaken") or self.state.flags.get("black_lake_anchor_weak_point_found") else 14
+            self.player_action("Time the shard surges and learn which pulse the chamber cannot hide.")
+            if self.skill_check(self.state.player, "Arcana", dc, context="to read the shard surges before they settle"):
+                self.state.flags["forge_threshold_shard_timing"] = True
+                self.state.flags["forge_shard_route_exposed"] = True
+                self.add_clue("The force you fed into the Black Lake foundations has exposed a shard vent that Caldra was relying on the chamber to keep hidden.")
+                self.add_journal("You timed the Forge's shard surges and exposed a side route the chamber was trying to keep buried.")
+                self.reward_party(xp=10, reason="timing the forge shard surges")
+        self.complete_act2_map_room(dungeon, room.room_id)
+
+    def _forge_choir_pit(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
+        assert self.state is not None
+        enemies = [create_enemy("choir_adept"), create_enemy("cult_lookout")]
+        if not self.state.flags.get("black_lake_barracks_raided"):
+            enemies.append(self.act2_pick_enemy(("cult_lookout", "choir_executioner", "starblighted_miner")))
+        if len(self.state.party_members()) >= 4:
+            enemies.append(self.act2_pick_enemy(("cult_lookout", "choir_executioner", "starblighted_miner")))
+        elif self.act2_metric_value("act2_whisper_pressure") >= 4:
+            enemies.append(self.act2_pick_enemy(("obelisk_eye", "starblighted_miner", "iron_prayer_horror")))
+        hero_bonus = self.apply_scene_companion_support("forge_of_spells")
+        if self.state.flags.get("black_lake_barracks_raided"):
+            hero_bonus += 1
+        if self.state.flags.get("black_lake_barracks_orders_taken") or self.state.flags.get("forge_threshold_orders_read"):
+            hero_bonus += 1
+            self.apply_status(enemies[0], "surprised", 1, source="their reserve line already being read against them")
+        choice = self.scenario_choice(
+            "How do you break the choir pit?",
+            [
+                self.skill_tag("STEALTH", self.action_option("Kill the last signal line before the adepts can fold it back into the forge.")),
+                self.skill_tag("ARCANA", self.action_option("Shatter their chant tempo and make the pit answer the forge instead of the Choir.")),
+                self.skill_tag("INTIMIDATION", self.action_option("Hit the witnesses so hard the whole pit remembers fear before faith.")),
+            ],
+            allow_meta=False,
+        )
+        if choice == 1:
+            self.player_action("Kill the last signal line before the adepts can fold it back into the forge.")
+            if self.skill_check(self.state.player, "Stealth", 14, context="to cut the choir pit's signal line cleanly"):
+                hero_bonus += 2
+                self.apply_status(enemies[1], "surprised", 1, source="the signal line dying first")
+        elif choice == 2:
+            self.player_action("Shatter their chant tempo and make the pit answer the forge instead of the Choir.")
+            if self.skill_check(self.state.player, "Arcana", 14, context="to break the choir pit's chant tempo"):
+                hero_bonus += 1
+                enemies[0].current_hp = max(1, enemies[0].current_hp - 4)
+        else:
+            self.player_action("Hit the witnesses so hard the whole pit remembers fear before faith.")
+            if self.skill_check(self.state.player, "Intimidation", 14, context="to crack the forge witnesses' nerve"):
+                hero_bonus += 1
+                self.apply_status(enemies[0], "frightened", 1, source="the pit losing its nerve")
+        outcome = self.run_encounter(
+            Encounter(
+                title="Forge Choir Pit",
+                description="The last organized choir support line still tries to keep Caldra's ritual supplied and witnessed.",
+                enemies=enemies,
+                allow_flee=True,
+                allow_parley=False,
+                hero_initiative_bonus=hero_bonus,
+                allow_post_combat_random_encounter=False,
+            )
+        )
+        if outcome == "defeat":
+            self.handle_defeat("The choir pit keeps feeding the Forge and the chamber never stops answering it.")
+            return
+        if outcome == "fled":
+            self.return_to_act2_hub("You fall back from the choir pit before the Forge can seal the route behind you.")
+            return
+        self.complete_act2_map_room(dungeon, room.room_id)
+        self.add_journal("You silenced the forge choir pit and cut one of Caldra's last organized support lines.")
+
+    def _forge_pact_anvil(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
+        assert self.state is not None
+        self.say(
+            "An old Pact anvil sits inside the Forge's newer desecration like a discipline the chamber still cannot quite kill. Heat moves through it in patient lines instead of hungry bursts."
+        )
+        dc = 15
+        if self.state.flags.get("agatha_truth_clear"):
+            dc -= 1
+        if self.state.flags.get("nim_countermeasure_notes"):
+            dc -= 1
+        if self.state.flags.get("black_lake_shrine_purified") or self.state.flags.get("forge_threshold_sanctified"):
+            dc -= 1
+        choice = self.scenario_choice(
+            "How do you work the Pact anvil?",
+            [
+                self.skill_tag("ARCANA", self.action_option("Break the forge-channel tempo before Caldra can finish tuning it.")),
+                self.skill_tag("INVESTIGATION", self.action_option("Read the old craft rhythm and find the one line the Choir still has to fake.")),
+                self.skill_tag("RELIGION", self.action_option("Ask the older vow to remember what this chamber was built to serve.")),
+            ],
+            allow_meta=False,
+        )
+        tuned = False
+        if choice == 1:
+            self.player_action("Break the forge-channel tempo before Caldra can finish tuning it.")
+            tuned = self.skill_check(self.state.player, "Arcana", dc, context="to disrupt the forge-channel harmony at the anvil")
+        elif choice == 2:
+            self.player_action("Read the old craft rhythm and find the one line the Choir still has to fake.")
+            tuned = self.skill_check(self.state.player, "Investigation", dc, context="to read the Forge's surviving craft rhythm")
+        else:
+            self.player_action("Ask the older vow to remember what this chamber was built to serve.")
+            tuned = self.skill_check(self.state.player, "Religion", dc, context="to wake the older Pact discipline in the anvil")
+        self.complete_act2_map_room(dungeon, room.room_id)
+        if tuned:
+            self.state.flags["forge_anvil_tuned"] = True
+            if self.state.flags.get("south_adit_counter_cadence_learned") and self.find_companion("Irielle Ashwake") is not None:
+                self.state.flags["irielle_counter_cadence"] = True
+            self.add_clue("The Pact anvil still carries a discipline that can crack the Choir's forge-tempo if you hit it cleanly.")
+            self.add_journal("You woke the Pact anvil's older discipline and proved the Forge still remembers craft beneath the Choir's ritual.")
+            self.reward_party(xp=15, reason="recovering the Forge's older rhythm")
+        else:
+            self.say("The anvil answers, but not cleanly enough to become certainty on its own.")
+
+    def _forge_shard_channels(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
+        assert self.state is not None
+        enemies = [create_enemy("obelisk_eye"), create_enemy("starblighted_miner")]
+        if self.act2_metric_value("act2_whisper_pressure") >= 4:
+            enemies.append(self.act2_pick_enemy(("iron_prayer_horror", "obelisk_eye", "starblighted_miner")))
+        elif len(self.state.party_members()) >= 4:
+            enemies.append(self.act2_pick_enemy(("cult_lookout", "starblighted_miner", "obelisk_eye")))
+        hero_bonus = self.apply_scene_companion_support("forge_of_spells")
+        if self.state.flags.get("black_lake_causeway_shaken"):
+            hero_bonus += 1
+            self.apply_status(enemies[0], "reeling", 1, source="the causeway shock still running through the foundations")
+        if self.state.flags.get("black_lake_anchor_weak_point_found") or self.state.flags.get("forge_threshold_shard_timing"):
+            hero_bonus += 1
+        if self.state.flags.get("black_lake_causeway_footing_marked"):
+            hero_bonus += 1
+        choice = self.scenario_choice(
+            "How do you break the shard channels?",
+            [
+                self.skill_tag("ARCANA", self.action_option("Turn the channel pulse against itself before the eye can refocus it.")),
+                self.skill_tag("ATHLETICS", self.action_option("Force the braces wide enough that the shard surge tears its own lane apart.")),
+                self.skill_tag("SURVIVAL", self.action_option("Move on the marked footing and make the channel chase empty space.")),
+            ],
+            allow_meta=False,
+        )
+        if choice == 1:
+            self.player_action("Turn the channel pulse against itself before the eye can refocus it.")
+            if self.skill_check(self.state.player, "Arcana", 14, context="to invert the shard-channel pulse"):
+                hero_bonus += 2
+                enemies[0].current_hp = max(1, enemies[0].current_hp - 5)
+        elif choice == 2:
+            self.player_action("Force the braces wide enough that the shard surge tears its own lane apart.")
+            if self.skill_check(self.state.player, "Athletics", 14, context="to break the shard braces under pressure"):
+                hero_bonus += 1
+                self.apply_status(self.state.player, "emboldened", 2, source="breaking the shard braces")
+        else:
+            self.player_action("Move on the marked footing and make the channel chase empty space.")
+            if self.skill_check(self.state.player, "Survival", 14, context="to move through the shard channel on the only safe line"):
+                hero_bonus += 1
+                self.apply_status(enemies[1], "surprised", 1, source="the channel losing your trail")
+        outcome = self.run_encounter(
+            Encounter(
+                title="Forge Shard Channels",
+                description="The Forge's worst shard pressure is no longer ambient. It is pointed at you on purpose.",
+                enemies=enemies,
+                allow_flee=True,
+                allow_parley=False,
+                hero_initiative_bonus=hero_bonus,
+                allow_post_combat_random_encounter=False,
+            )
+        )
+        if outcome == "defeat":
+            self.handle_defeat("The shard channels tear the party apart before the lens can be reached.")
+            return
+        if outcome == "fled":
+            self.return_to_act2_hub("You retreat from the shard channels before the Forge can pin the whole company in them.")
+            return
+        self.complete_act2_map_room(dungeon, room.room_id)
+        self.add_clue("The shard channels were feeding the Forge from a deeper pressure seam, not just from Caldra's platform.")
+        self.add_journal("You broke the shard channels and turned the Forge's hidden pressure seam into a wound instead of a weapon.")
+
+    def _forge_resonance_lens(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
+        assert self.state is not None
+        self.say(
+            "A lattice of humming shard-light hangs over the Forge's heart. This is where Caldra turns every side route into certainty and every witness into part of the instrument."
+        )
+        dc = 15
+        if self.state.flags.get("black_lake_shrine_purified"):
+            dc -= 1
+        if self.state.flags.get("black_lake_barracks_orders_taken"):
+            dc -= 1
+        if self.state.flags.get("black_lake_causeway_shaken") or self.state.flags.get("black_lake_anchor_weak_point_found"):
+            dc -= 1
+        if self.state.flags.get("forge_anvil_tuned"):
+            dc -= 1
+        choice = self.scenario_choice(
+            "How do you map the resonance lens before facing Caldra?",
+            [
+                self.skill_tag("INVESTIGATION", self.action_option("Lay every side objective over the lens and find the one support line she still needs.")),
+                self.skill_tag("ARCANA", self.action_option("Break the lens tempo now, while it is still pretending to be stable.")),
+                self.skill_tag("PERSUASION", self.action_option("Name the lie the Choir is telling itself and make the lens carry doubt instead of certainty.")),
+            ],
+            allow_meta=False,
+        )
+        if choice == 1:
+            self.player_action("Lay every side objective over the lens and find the one support line she still needs.")
+            success = self.skill_check(self.state.player, "Investigation", dc, context="to map the Forge lens from the inside")
+            if success:
+                self.state.flags["forge_lens_support_line_named"] = True
+        elif choice == 2:
+            self.player_action("Break the lens tempo now, while it is still pretending to be stable.")
+            success = self.skill_check(self.state.player, "Arcana", dc, context="to break the resonance lens tempo before the boss fight")
+            if success:
+                self.state.flags["forge_lens_tempo_broken"] = True
+        else:
+            persuasion_dc = dc
+            if self.state.flags.get("act2_captive_outcome") == "many_saved":
+                persuasion_dc -= 1
+            if self.find_companion("Irielle Ashwake") is not None:
+                persuasion_dc -= 1
+            self.player_action("Name the lie the Choir is telling itself and make the lens carry doubt instead of certainty.")
+            success = self.skill_check(self.state.player, "Persuasion", persuasion_dc, context="to name the lie the lens is built around")
+            if success:
+                self.state.flags["forge_lens_truth_named"] = True
+        self.complete_act2_map_room(dungeon, room.room_id)
+        if success:
+            if self.state.flags.get("forge_choir_pit_silenced"):
+                self.state.flags["forge_support_line_broken"] = True
+            if self.state.flags.get("forge_pact_rhythm_found"):
+                self.state.flags["forge_ritual_line_broken"] = True
+            if self.state.flags.get("forge_shard_channels_disrupted"):
+                self.state.flags["forge_shard_line_broken"] = True
+            self.add_clue("The resonance lens only held because Caldra was braiding witness, ritual, and shard pressure into one engineered lie.")
+            self.add_journal("You mapped the resonance lens from inside and learned exactly which lines were keeping Caldra's certainty standing.")
+            self.reward_party(xp=15, reason="mapping the resonance lens before the final confrontation")
+        else:
+            self.say("You map enough of the lens to reach Caldra, but not enough to pretend the chamber is done with surprises.")
+
+    def _forge_caldra_dais(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
+        assert self.state is not None
+        enemies = [create_enemy("caldra_voss"), create_enemy("choir_adept")]
+        if len(self.state.party_members()) >= 4:
+            enemies.append(self.act2_pick_enemy(("cult_lookout", "starblighted_miner", "choir_executioner")))
+        if self.state.flags.get("black_lake_barracks_raided") and len(self.state.party_members()) >= 4:
+            enemies.append(self.act2_pick_enemy(("cult_lookout", "starblighted_miner")))
+        elif not self.state.flags.get("black_lake_barracks_raided"):
+            enemies.append(self.act2_pick_enemy(("cult_lookout", "choir_executioner", "starblighted_miner")))
+        if self.act2_metric_value("act2_whisper_pressure") >= 4:
+            enemies.append(self.act2_pick_enemy(("starblighted_miner", "obelisk_eye", "iron_prayer_horror")))
+
+        hero_bonus = self.apply_scene_companion_support("forge_of_spells")
+        parley_dc = 15
+        if self.state.flags.get("black_lake_shrine_purified") or self.state.flags.get("forge_threshold_sanctified"):
+            self.apply_status(self.state.player, "blessed", 2, source="the reclaimed Black Lake shrine")
+            hero_bonus += 1
+            parley_dc -= 1
+        if self.state.flags.get("black_lake_barracks_orders_taken") or self.state.flags.get("forge_lens_support_line_named"):
+            hero_bonus += 1
+            if len(enemies) > 1:
+                enemies[1].current_hp = max(1, enemies[1].current_hp - 4)
+        if self.state.flags.get("black_lake_causeway_shaken") or self.state.flags.get("forge_shard_channels_disrupted"):
+            hero_bonus += 1
+            if len(enemies) > 1:
+                self.apply_status(enemies[1], "reeling", 1, source="the forge foundations never fully settled")
+        if self.state.flags.get("forge_anvil_tuned") or self.state.flags.get("forge_ritual_line_broken"):
+            hero_bonus += 1
+            enemies[0].current_hp = max(1, enemies[0].current_hp - 6)
+        if self.state.flags.get("south_adit_counter_cadence_learned") and self.find_companion("Irielle Ashwake") is not None:
+            self.state.flags["irielle_counter_cadence"] = True
+        if self.state.flags.get("irielle_counter_cadence"):
+            hero_bonus += 1
+            enemies[0].current_hp = max(1, enemies[0].current_hp - 4)
+            self.say("Irielle's counter-cadence lands first and steals part of the forge's certainty before steel ever crosses it.")
+            parley_dc -= 1
+
+        choice = self.scenario_choice(
+            "How do you open the final confrontation?",
+            [
+                self.quoted_option("ARCANA", "Break her ritual tempo before she finishes tuning the forge."),
+                self.quoted_option("PERSUASION", "You have seen enough of what the Choir calls revelation. Step away from the forge."),
+                self.action_option("Hit the chamber hard and trust momentum before the whispers settle in."),
+            ],
+            allow_meta=False,
+        )
+        if choice == 1:
+            dc = 15
+            if self.state.flags.get("agatha_truth_clear"):
+                dc -= 1
+            if self.state.flags.get("nim_countermeasure_notes"):
+                dc -= 1
+            if self.state.flags.get("forge_anvil_tuned"):
+                dc -= 1
+            self.player_speaker("Break her ritual tempo before she finishes tuning the forge.")
+            if self.skill_check(self.state.player, "Arcana", dc, context="to disrupt the forge-channel harmony"):
+                hero_bonus += 2
+                enemies[0].current_hp = max(1, enemies[0].current_hp - 6)
+        elif choice == 2:
+            dc = 15
+            if self.state.flags.get("act2_captive_outcome") == "many_saved":
+                dc -= 1
+            if self.find_companion("Irielle Ashwake") is not None:
+                dc -= 1
+            if self.state.flags.get("forge_lens_truth_named"):
+                dc -= 1
+            self.player_speaker("You have seen enough of what the Choir calls revelation. Step away from the forge.")
+            if self.skill_check(self.state.player, "Persuasion", dc, context="to force even a moment of doubt into Caldra's certainty"):
+                hero_bonus += 1
+                self.apply_status(enemies[1], "frightened", 1, source="hearing the certainty crack")
+        else:
+            self.player_action("Hit the chamber hard and trust momentum before the whispers settle in.")
+            hero_bonus += 2
+            self.apply_status(self.state.player, "emboldened", 2, source="storming the Forge of Spells")
+            if self.state.flags.get("act2_sponsor") == "lionshield":
+                hero_bonus += 1
+        outcome = self.run_encounter(
+            Encounter(
+                title="Boss: Sister Caldra Voss",
+                description="The Quiet Choir's cult agent makes the final stand at the Forge of Spells.",
+                enemies=enemies,
+                allow_flee=True,
+                allow_parley=True,
+                parley_dc=max(12, parley_dc),
+                hero_initiative_bonus=hero_bonus,
+                allow_post_combat_random_encounter=False,
+            )
+        )
+        if outcome == "defeat":
+            self.handle_defeat("Caldra holds the Forge and the mine's song bends further away from anything mortal should trust.")
+            return
+        if outcome == "fled":
+            self.return_to_act2_hub("You tear yourself out of the forge chamber before the whole room can close around the party.")
+            return
+        self.complete_act2_map_room(dungeon, room.room_id)
+        self.add_clue("Caldra's notes describe the Forge as only a lens. Whatever the Quiet Choir truly serves is deeper, older, and not confined to the mine.")
+        if self.act2_metric_value("act2_whisper_pressure") >= 4:
+            self.add_clue(
+                "Even broken, the Forge keeps trying to answer a call from farther down. The party is not leaving Wave Echo with clean silence."
+            )
+        self.add_journal("You broke Sister Caldra Voss and tore the Forge of Spells out of the Quiet Choir's grip.")
+        self.reward_party(xp=120, gold=40, reason="breaking the Quiet Choir's Wave Echo cell")
+        self.act2_record_epilogue_flags()
+        self.return_to_act2_hub("The Forge's wrong song breaks apart behind you, and Wave Echo finally sounds like a place instead of an instrument.")
 
     def _old_owl_well_ring(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
         assert self.state is not None

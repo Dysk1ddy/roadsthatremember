@@ -35,6 +35,31 @@ ROLE_SYMBOLS = {
     "exit": "X",
 }
 
+ACT2_METRIC_LABELS = {
+    "act2_town_stability": ("Fractured", "Shaken", "Strained", "Holding", "Steady", "United"),
+    "act2_route_control": ("Lost", "Thin", "Contested", "Firm", "Dominant", "Commanding"),
+    "act2_whisper_pressure": ("Quieted", "Faint", "Present", "Growing", "Severe", "Overwhelming"),
+}
+
+ACT2_SPONSOR_LABELS = {
+    "exchange": "Halia's Exchange bloc",
+    "lionshield": "Linene's supply line",
+    "wardens": "Elira and Daran's wardens",
+    "council": "a divided council",
+}
+
+ACT2_LATE_ROUTE_LABELS = {
+    "broken_prospect": "Broken Prospect first",
+    "south_adit": "South Adit first",
+}
+
+ACT2_CAPTIVE_LABELS = {
+    "captives_endangered": "Endangered",
+    "few_saved": "Few saved",
+    "many_saved": "Many saved",
+    "uncertain": "Uncertain",
+}
+
 
 def _box_panel(title: str, lines: list[str], width: int = 62) -> str:
     inner_width = max(width - 4, len(title) + 2, *(len(line) for line in lines or [""]))
@@ -42,6 +67,80 @@ def _box_panel(title: str, lines: list[str], width: int = 62) -> str:
     body = [f"| {line.ljust(inner_width)} |" for line in lines] or [f"| {' ' * inner_width} |"]
     bottom = f"+{'-' * (inner_width + 2)}+"
     return "\n".join([top, *body, bottom])
+
+
+def _int_flag(flag_values: dict[str, Any], key: str, default: int = 0) -> int:
+    value = flag_values.get(key, default)
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int | float):
+        return int(value)
+    return default
+
+
+def _act2_metric_line(flag_values: dict[str, Any], key: str, label: str) -> str:
+    value = max(0, min(5, _int_flag(flag_values, key, 0)))
+    return f"{label}: {ACT2_METRIC_LABELS[key][value]} ({value}/5)"
+
+
+def _act2_pressure_lines(flag_values: dict[str, Any]) -> list[str]:
+    sponsor_key = str(flag_values.get("act2_sponsor", "council"))
+    route_key = str(flag_values.get("act2_first_late_route", ""))
+    captive_key = str(flag_values.get("act2_captive_outcome", "uncertain"))
+    neglected = str(flag_values.get("act2_neglected_lead", "")).strip()
+    lines = [
+        _act2_metric_line(flag_values, "act2_town_stability", "Town Stability"),
+        _act2_metric_line(flag_values, "act2_route_control", "Route Control"),
+        _act2_metric_line(flag_values, "act2_whisper_pressure", "Whisper Pressure"),
+        f"Sponsor: {ACT2_SPONSOR_LABELS.get(sponsor_key, sponsor_key or 'Uncommitted')}",
+        f"Late-route priority: {ACT2_LATE_ROUTE_LABELS.get(route_key, 'Unchosen')}",
+        f"Captives: {ACT2_CAPTIVE_LABELS.get(captive_key, captive_key.replace('_', ' ').title() or 'Uncertain')}",
+    ]
+    if neglected and neglected != "none":
+        resolved = bool(flag_values.get(neglected))
+        label = neglected.replace("_", " ").title()
+        lines.append(f"Delayed lead: {label} ({'recovered' if resolved else 'unresolved'})")
+    return lines
+
+
+def build_act2_pressure_panel_text(flag_values: dict[str, Any]) -> str:
+    return _box_panel("Act II Pressures", _act2_pressure_lines(flag_values), width=78)
+
+
+def build_act2_pressure_panel(flag_values: dict[str, Any]) -> Panel:
+    table = Table.grid(expand=True, padding=(0, 1))
+    table.add_column(ratio=2)
+    table.add_column(ratio=2)
+
+    metrics = Table.grid(expand=True)
+    metrics.add_column(ratio=2)
+    metrics.add_column(ratio=1, justify="right")
+    for key, label in (
+        ("act2_town_stability", "Town Stability"),
+        ("act2_route_control", "Route Control"),
+        ("act2_whisper_pressure", "Whisper Pressure"),
+    ):
+        value = max(0, min(5, _int_flag(flag_values, key, 0)))
+        metrics.add_row(Text(label, style="cyan"), Text(f"{ACT2_METRIC_LABELS[key][value]} {value}/5", style="white"))
+
+    sponsor_key = str(flag_values.get("act2_sponsor", "council"))
+    route_key = str(flag_values.get("act2_first_late_route", ""))
+    captive_key = str(flag_values.get("act2_captive_outcome", "uncertain"))
+    statuses = Table.grid(expand=True)
+    statuses.add_column(ratio=2)
+    statuses.add_column(ratio=2)
+    statuses.add_row(Text("Sponsor", style="cyan"), Text(ACT2_SPONSOR_LABELS.get(sponsor_key, sponsor_key or "Uncommitted"), style="white"))
+    statuses.add_row(Text("Late Route", style="cyan"), Text(ACT2_LATE_ROUTE_LABELS.get(route_key, "Unchosen"), style="white"))
+    statuses.add_row(
+        Text("Captives", style="cyan"),
+        Text(ACT2_CAPTIVE_LABELS.get(captive_key, captive_key.replace("_", " ").title() or "Uncertain"), style="white"),
+    )
+
+    table.add_row(
+        Panel(metrics, title="Pressure", border_style="yellow", box=box.SIMPLE),
+        Panel(statuses, title="Status", border_style="cyan", box=box.SIMPLE),
+    )
+    return Panel(table, title="Act II Pressures", border_style="yellow", box=box.ROUNDED, padding=(0, 1))
 
 
 def _node_is_known(node: TravelNode, state: DraftMapState) -> bool:
@@ -233,6 +332,7 @@ def build_hud_panel(
     hp_text: str = "34/40",
     gold: int = 27,
     quest_text: str = "Stop the Watchtower Raids",
+    act_text: str = "Act 1",
 ) -> Panel:
     table = Table.grid(expand=True)
     table.add_column(ratio=3)
@@ -246,7 +346,7 @@ def build_hud_panel(
     table.add_row(
         Text(f"Quest: {quest_text}", style="cyan"),
         Text("Mode: Hybrid Draft", style="magenta"),
-        Text("Act 1", style="green"),
+        Text(act_text, style="green"),
     )
     return Panel(table, title="HUD", border_style="cyan", box=box.ROUNDED, padding=(0, 1))
 
@@ -561,6 +661,7 @@ def render_screen_with_rich(
     hp_text: str = "34/40",
     gold: int = 27,
     quest_text: str = "Stop the Watchtower Raids",
+    act_text: str = "Act 1",
     scene_text: str = "A draft presentation pass using a rich-guided panel layout.",
     console: Console | None = None,
 ) -> str:
@@ -583,6 +684,7 @@ def render_screen_with_rich(
         hp_text=hp_text,
         gold=gold,
         quest_text=quest_text,
+        act_text=act_text,
     )
 
     if dungeon is None:

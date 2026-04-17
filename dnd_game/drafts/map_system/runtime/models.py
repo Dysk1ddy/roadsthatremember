@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import Any, Literal
 
 
 NodeKind = Literal["story", "hub", "site", "dungeon_entry"]
@@ -9,10 +9,56 @@ RoomRole = Literal["entrance", "combat", "event", "treasure", "boss", "exit"]
 
 
 @dataclass(slots=True)
+class FlagCountRequirement:
+    flags: tuple[str, ...]
+    minimum: int
+    maximum: int | None = None
+    notes: str = ""
+
+    def describe(self) -> str:
+        count_text = f"at least {self.minimum}"
+        if self.maximum is not None:
+            count_text = f"{self.minimum}-{self.maximum}"
+        suffix = f" ({self.notes})" if self.notes else ""
+        return f"{count_text} of: {', '.join(self.flags)}{suffix}"
+
+
+@dataclass(slots=True)
+class FlagValueRequirement:
+    flag_name: str
+    expected_value: Any
+    notes: str = ""
+
+    def describe(self) -> str:
+        suffix = f" ({self.notes})" if self.notes else ""
+        return f"{self.flag_name} == {self.expected_value!r}{suffix}"
+
+
+@dataclass(slots=True)
+class NumericFlagRequirement:
+    flag_name: str
+    minimum: int | float | None = None
+    maximum: int | float | None = None
+    notes: str = ""
+
+    def describe(self) -> str:
+        parts: list[str] = []
+        if self.minimum is not None:
+            parts.append(f">= {self.minimum}")
+        if self.maximum is not None:
+            parts.append(f"<= {self.maximum}")
+        suffix = f" ({self.notes})" if self.notes else ""
+        return f"{self.flag_name} {' and '.join(parts) or 'numeric'}{suffix}"
+
+
+@dataclass(slots=True)
 class Requirement:
     all_flags: tuple[str, ...] = ()
     any_flags: tuple[str, ...] = ()
     blocked_flags: tuple[str, ...] = ()
+    flag_count_requirements: tuple[FlagCountRequirement, ...] = ()
+    flag_value_requirements: tuple[FlagValueRequirement, ...] = ()
+    numeric_flag_requirements: tuple[NumericFlagRequirement, ...] = ()
     active_quests: tuple[str, ...] = ()
     completed_quests: tuple[str, ...] = ()
     notes: str = ""
@@ -25,6 +71,12 @@ class Requirement:
             parts.append(f"any flag: {', '.join(self.any_flags)}")
         if self.blocked_flags:
             parts.append(f"blocked by: {', '.join(self.blocked_flags)}")
+        for flag_count in self.flag_count_requirements:
+            parts.append(f"flag count: {flag_count.describe()}")
+        for flag_value in self.flag_value_requirements:
+            parts.append(f"flag value: {flag_value.describe()}")
+        for numeric_flag in self.numeric_flag_requirements:
+            parts.append(f"numeric flag: {numeric_flag.describe()}")
         if self.active_quests:
             parts.append(f"active quest: {', '.join(self.active_quests)}")
         if self.completed_quests:
@@ -119,6 +171,7 @@ class DraftMapState:
     flags: set[str] = field(default_factory=set)
     active_quests: set[str] = field(default_factory=set)
     completed_quests: set[str] = field(default_factory=set)
+    flag_values: dict[str, Any] = field(default_factory=dict)
     visited_nodes: set[str] = field(default_factory=set)
     cleared_rooms: set[str] = field(default_factory=set)
     seen_story_beats: set[str] = field(default_factory=set)

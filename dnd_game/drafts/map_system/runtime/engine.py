@@ -5,17 +5,53 @@ from collections import deque
 from .models import DraftMapState, DungeonMap, DungeonRoom, HybridMapBlueprint, Requirement, StoryBeat, TravelEdge, TravelNode
 
 
+def _flag_is_present(state: DraftMapState, flag_name: str) -> bool:
+    if flag_name in state.flags:
+        return True
+    value = state.flag_values.get(flag_name)
+    return bool(value)
+
+
+def _numeric_flag_value(state: DraftMapState, flag_name: str) -> float | None:
+    value = state.flag_values.get(flag_name)
+    if isinstance(value, bool):
+        return 1.0 if value else 0.0
+    if isinstance(value, int | float):
+        return float(value)
+    return None
+
+
 def requirement_met(state: DraftMapState, requirement: Requirement) -> bool:
-    if requirement.all_flags and not set(requirement.all_flags).issubset(state.flags):
+    if requirement.all_flags and not all(_flag_is_present(state, flag_name) for flag_name in requirement.all_flags):
         return False
     if requirement.any_flags or requirement.active_quests:
-        has_any_unlock = bool(set(requirement.any_flags).intersection(state.flags)) or bool(
+        has_any_unlock = any(_flag_is_present(state, flag_name) for flag_name in requirement.any_flags) or bool(
             set(requirement.active_quests).intersection(state.active_quests)
         )
         if not has_any_unlock:
             return False
-    if requirement.blocked_flags and set(requirement.blocked_flags).intersection(state.flags):
+    if requirement.blocked_flags and any(_flag_is_present(state, flag_name) for flag_name in requirement.blocked_flags):
         return False
+    for flag_count in requirement.flag_count_requirements:
+        count = sum(1 for flag_name in flag_count.flags if _flag_is_present(state, flag_name))
+        if count < flag_count.minimum:
+            return False
+        if flag_count.maximum is not None and count > flag_count.maximum:
+            return False
+    for flag_value in requirement.flag_value_requirements:
+        actual_value = state.flag_values.get(flag_value.flag_name)
+        if actual_value is None and flag_value.flag_name in state.flags:
+            actual_value = True
+        if actual_value != flag_value.expected_value:
+            return False
+    for numeric_flag in requirement.numeric_flag_requirements:
+        actual_value = _numeric_flag_value(state, numeric_flag.flag_name)
+        if actual_value is None:
+            return False
+        if numeric_flag.minimum is not None and actual_value < numeric_flag.minimum:
+            return False
+        if numeric_flag.maximum is not None and actual_value > numeric_flag.maximum:
+            return False
     if requirement.completed_quests and not set(requirement.completed_quests).issubset(state.completed_quests):
         return False
     return True

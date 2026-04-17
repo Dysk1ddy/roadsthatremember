@@ -73,6 +73,8 @@ class JournalMixin:
         if not self.rich_ledger_enabled():
             return False
 
+        extra_snapshot_lines_getter = getattr(self, "journal_snapshot_lines", None)
+        extra_snapshot_lines = extra_snapshot_lines_getter() if callable(extra_snapshot_lines_getter) else []
         snapshot = Table.grid(expand=True, padding=(0, 1))
         snapshot.add_column(style=f"bold {rich_style_name('light_yellow')}", width=12)
         snapshot.add_column(ratio=1)
@@ -83,6 +85,8 @@ class JournalMixin:
             f"{len(active_quests)} active | {len(ready_quests)} ready | {len(completed_quests)} completed",
         )
         snapshot.add_row("Leads", f"{len(self.state.clues)} clues | {len(story_notes)} journal notes")
+        for index, line in enumerate(extra_snapshot_lines):
+            snapshot.add_row("Act II" if index == 0 else "", line)
 
         def quest_panel(title: str, entries, color: str, *, include_summary: bool) :
             table = Table.grid(expand=True, padding=(0, 1))
@@ -194,7 +198,9 @@ class JournalMixin:
         active_quests = getattr(self, "quest_entries_by_status", lambda status: [])("active")
         completed_quests = getattr(self, "quest_entries_by_status", lambda status: [])("completed")
         story_notes = self.story_journal_entries()
-        if not ready_quests and not active_quests and not completed_quests and not self.state.clues and not story_notes:
+        extra_snapshot_lines_getter = getattr(self, "journal_snapshot_lines", None)
+        extra_snapshot_lines = extra_snapshot_lines_getter() if callable(extra_snapshot_lines_getter) else []
+        if not ready_quests and not active_quests and not completed_quests and not self.state.clues and not story_notes and not extra_snapshot_lines:
             self.say("Your journal is empty.")
             return
         if self.render_rich_journal_view(
@@ -211,6 +217,8 @@ class JournalMixin:
             f"- Quest load: {len(active_quests)} active, {len(ready_quests)} ready to turn in, {len(completed_quests)} completed"
         )
         self.output_fn(f"- Leads tracked: {len(self.state.clues)} clues, {len(story_notes)} journal notes")
+        for line in extra_snapshot_lines:
+            self.output_fn(f"- {line}")
         if ready_quests:
             self.say("Ready to Turn In:")
             for definition, entry in ready_quests:
