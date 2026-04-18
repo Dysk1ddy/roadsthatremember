@@ -7,13 +7,35 @@ class StoryTownServicesMixin:
     def visit_shrine(self) -> None:
         assert self.state is not None
         self.banner("Shrine of Tymora")
+        if self.has_companion("Elira Dawnmantle") and self.state.flags.get("elira_neverwinter_recruited"):
+            if not self.state.flags.get("shrine_seen"):
+                self.say(
+                    "Phandalin's little luck shrine is open, but Elira's field kit is not waiting beside the altar. "
+                    "The acolytes are working from the triage notes she sent ahead from Neverwinter, and the wounded keep "
+                    "pointing south toward the same ash-bitter blades.",
+                    typed=True,
+                )
+                self.state.flags["shrine_seen"] = True
+                if not self.state.flags.get("shrine_raiders_asked"):
+                    self.state.flags["shrine_raiders_asked"] = True
+                    self.add_clue("Elira's notes confirm the Ashen Brand poison reached Phandalin from the Neverwinter road.")
+            else:
+                self.say("The shrine bells move in the wind while Elira stays with the company, where the next wound is likeliest to happen.")
+            return
         if not self.state.flags.get("shrine_seen"):
-            self.say(
-                "A modest shrine stands open to the road, all wind bells, votive flame, and hurried footsteps. "
-                "Sister Elira Dawnmantle is kneeling beside a miner whose wound has darkened with ash-stained poison, "
-                "working with the calm intensity of someone refusing to let panic set the pace.",
-                typed=True,
-            )
+            if self.state.flags.get("neverwinter_elira_met"):
+                self.say(
+                    "A modest shrine stands open to the road, all wind bells, votive flame, and hurried footsteps. "
+                    "Elira looks up from a miner's ash-dark wound and recognizes you from Neverwinter without letting her hands slow.",
+                    typed=True,
+                )
+            else:
+                self.say(
+                    "A modest shrine stands open to the road, all wind bells, votive flame, and hurried footsteps. "
+                    "Sister Elira Dawnmantle is kneeling beside a miner whose wound has darkened with ash-stained poison, "
+                    "working with the calm intensity of someone refusing to let panic set the pace.",
+                    typed=True,
+                )
             self.state.flags["shrine_seen"] = True
         while True:
             options: list[tuple[str, str]] = []

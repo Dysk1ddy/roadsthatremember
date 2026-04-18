@@ -1,7 +1,13 @@
 from __future__ import annotations
 
 from ..data.story.background_openings import BACKGROUND_STARTS
-from ..content import create_enemy, create_kaelis_starling, create_rhogar_valeguard, create_tolan_ironshield
+from ..content import (
+    create_elira_dawnmantle,
+    create_enemy,
+    create_kaelis_starling,
+    create_rhogar_valeguard,
+    create_tolan_ironshield,
+)
 from .encounter import Encounter
 
 
@@ -561,6 +567,7 @@ class StoryIntroMixin:
             options.extend(self.scene_identity_options("neverwinter_briefing"))
             if not self.state.flags.get("neverwinter_preparation_done"):
                 options.append(("prep", self.action_option("Make one more stop in Neverwinter before riding out.")))
+            options.append(("inn", self.action_option("Rest at a Neverwinter inn (5 gp per active party member).")))
             options.append(("leave", self.action_option("Take the writ and head for the High Road.")))
             choice = self.scenario_choice("Choose your response to Mira.", [text for _, text in options])
             selection_key, selection = options[choice - 1]
@@ -588,6 +595,8 @@ class StoryIntroMixin:
                 )
             elif selection_key == "prep":
                 self.handle_neverwinter_prep()
+            elif selection_key == "inn":
+                self.paid_inn_long_rest("a Neverwinter inn")
             else:
                 self.handle_neverwinter_departure_fork()
                 return
@@ -634,10 +643,266 @@ class StoryIntroMixin:
             self.say("You keep your focus on the road ahead.")
         self.state.flags["neverwinter_preparation_done"] = True
 
+    def handle_neverwinter_tymora_shrine(self) -> None:
+        assert self.state is not None
+        if self.state.flags.get("neverwinter_tymora_shrine_seen"):
+            return
+        self.state.flags["neverwinter_tymora_shrine_seen"] = True
+        self.state.flags["neverwinter_elira_met"] = True
+        self.banner("South Gate Shrine of Tymora")
+        self.say(
+            "Mira's writ takes you through Neverwinter's southern gate, where a temporary Tymoran shrine has been lashed "
+            "to a rebuilt watch alcove. A priestess is treating a drover whose arm has gone gray around an ash-bitter cut, "
+            "while Helm's Hold pilgrims and Phandalin teamsters wait in a nervous half-circle.",
+            typed=True,
+        )
+        self.speaker(
+            "Elira Dawnmantle",
+            "If the road is teaching its wounds this close to the city, then Phandalin will be seeing worse by nightfall.",
+        )
+        choice = self.scenario_choice(
+            "How do you help at the shrine before the road takes you south?",
+            [
+                self.skill_tag("MEDICINE", self.action_option("Stabilize the poisoned drover with Elira.")),
+                self.skill_tag("RELIGION", self.action_option("Lead Tymora's road-prayer for the waiting caravan.")),
+                self.skill_tag("INVESTIGATION", self.action_option("Study the ash toxin and the false road marks on the harness.")),
+                self.action_option("Keep the shrine moving and save your strength for the road."),
+            ],
+            allow_meta=False,
+        )
+        helped_elira = False
+        if choice == 1:
+            self.player_action("Stabilize the poisoned drover with Elira.")
+            helped_elira = self.skill_check(self.state.player, "Medicine", 12, context="to slow the ash-bitter poison")
+            if helped_elira:
+                self.state.flags["elira_helped"] = True
+                self.state.flags["neverwinter_elira_helped"] = True
+                self.state.flags["road_poison_pattern_known"] = True
+                self.add_clue("Elira identifies an ash-bitter poison reaching victims before Phandalin.")
+                self.reward_party(xp=10, reason="helping Elira stabilize a poisoned drover")
+                self.say("The gray edge of the wound stops spreading, and Elira gives you a small, approving nod.")
+            else:
+                self.say("The poison keeps moving, but your pressure and clean bandage buy Elira enough time to save the drover.")
+        elif choice == 2:
+            self.player_action("Lead Tymora's road-prayer for the waiting caravan.")
+            helped_elira = self.skill_check(self.state.player, "Religion", 12, context="to steady the shrine and caravan")
+            self.add_inventory_item("blessed_salve", source="Elira's shrine satchel")
+            if helped_elira:
+                self.state.flags["elira_helped"] = True
+                self.state.flags["neverwinter_elira_blessing"] = True
+                self.reward_party(xp=10, reason="steadying the South Gate shrine")
+                self.say("The prayer quiets the panic without softening the danger, which may be Tymora's cleanest kind of luck.")
+            else:
+                self.say("The words land unevenly, but the caravan still leaves with steadier hands and one less argument.")
+        elif choice == 3:
+            self.player_action("Study the ash toxin and the false road marks on the harness.")
+            helped_elira = self.skill_check(self.state.player, "Investigation", 12, context="to connect poison, harness marks, and forged authority")
+            if helped_elira:
+                self.state.flags["elira_helped"] = True
+                self.state.flags["neverwinter_false_road_marks_found"] = True
+                self.state.flags["blackwake_millers_ford_lead"] = True
+                self.add_clue("Harness marks at Neverwinter's gate match false roadwarden inspections near Miller's Ford.")
+                self.reward_party(xp=10, reason="reading the poisoned road evidence")
+                self.say("The harness cuts are too neat for panic. Someone with copied authority pulled this wagon out of line.")
+            else:
+                self.say("You catch the pattern too late to name it cleanly, but the false inspection cuts stay in your mind.")
+        else:
+            self.player_action("Keep the shrine moving and save your strength for the road.")
+            self.add_inventory_item("potion_healing", source="Elira's road charity basket")
+            self.say("Elira presses a healing draught into your hands anyway. Luck, apparently, dislikes going unused.")
+
+        if self.has_companion("Elira Dawnmantle"):
+            return
+        options = [
+            self.quoted_option("RECRUIT", "Walk with us. The road needs a field priest more than a waiting shrine."),
+            self.quoted_option("SAFE", "Finish your work here. If Phandalin still needs you, we will find you there."),
+        ]
+        recruit_choice = self.scenario_choice("Elira looks from the shrine to the south road.", options, allow_meta=False)
+        self.player_choice_output(options[recruit_choice - 1])
+        if recruit_choice == 1:
+            if self.state.flags.get("elira_helped") or self.skill_check(
+                self.state.player,
+                "Persuasion",
+                12,
+                context="to convince Elira the field needs her now",
+            ):
+                self.recruit_companion(create_elira_dawnmantle())
+                self.state.flags["elira_neverwinter_recruited"] = True
+                self.state.flags["shrine_recruit_attempted"] = True
+                self.speaker("Elira Dawnmantle", "Then I walk now. Tymora can keep a shrine; people need hands.")
+            else:
+                self.state.flags["neverwinter_elira_recruit_failed"] = True
+                self.speaker("Elira Dawnmantle", "Not yet. Earn the road's trust, and ask me again in Phandalin.")
+        else:
+            self.state.flags["elira_neverwinter_available_in_phandalin"] = True
+            self.speaker("Elira Dawnmantle", "Then I will finish here and follow the wounded south. We may meet again before the day is done.")
+
+    def handle_neverwinter_high_road_milehouse(self) -> None:
+        assert self.state is not None
+        if self.state.flags.get("neverwinter_high_road_milehouse_seen"):
+            return
+        self.state.flags["neverwinter_high_road_milehouse_seen"] = True
+        self.banner("High Road Milehouse")
+        self.say(
+            "Past the last Neverwinter stones, the High Road narrows around a shuttered milehouse used by Helm's Hold pilgrims, "
+            "Lord Neverember's roadwardens, and Phandalin-bound wagons. Fresh ash has been rubbed into the milemark, trying to "
+            "turn a lawful stop into a frightened detour.",
+            typed=True,
+        )
+        enemies = [create_enemy("brand_saboteur")]
+        if self.act1_party_size() >= 3:
+            enemies.append(create_enemy("bandit"))
+        else:
+            enemies[0].current_hp = enemies[0].max_hp = 7
+        hero_bonus = 0
+        choice = self.scenario_choice(
+            "Which path do you secure from the milehouse?",
+            [
+                self.skill_tag("INVESTIGATION", self.action_option("Inspect the false roadwarden writs before anyone moves on.")),
+                self.skill_tag("SURVIVAL", self.action_option("Scout the Neverwinter Wood verge for the ambush line.")),
+                self.skill_tag("PERSUASION", self.action_option("Organize the Helm's Hold pilgrims and refugee wagons into one guarded column.")),
+            ],
+            allow_meta=False,
+        )
+        if choice == 1:
+            self.player_action("Inspect the false roadwarden writs before anyone moves on.")
+            if self.skill_check(self.state.player, "Investigation", 12, context="to expose forged roadwarden authority"):
+                self.state.flags["neverwinter_false_writs_spotted"] = True
+                self.state.flags["blackwake_millers_ford_lead"] = True
+                self.state.flags["road_patrol_writ"] = True
+                enemies[0].current_hp = max(1, enemies[0].current_hp - 3)
+                hero_bonus += 1
+                self.add_clue("False roadwarden writs near Neverwinter point toward forged authority before Phandalin.")
+                self.say("The writ seal copies Lord Neverember's road mark closely enough to fool scared teamsters, but not a calm look.")
+        elif choice == 2:
+            self.player_action("Scout the Neverwinter Wood verge for the ambush line.")
+            if self.skill_check(self.state.player, "Survival", 12, context="to read the woodline before the Brand springs it"):
+                self.state.flags["neverwinter_woodline_path"] = True
+                self.state.flags["road_ambush_scouted"] = True
+                self.apply_status(enemies[0], "surprised", 1, source="your woodline scout")
+                hero_bonus += 1
+                self.say("The ash line hides badly under pine needles. You find the waiting knife before it finds the wagon.")
+        else:
+            self.player_action("Organize the Helm's Hold pilgrims and refugee wagons into one guarded column.")
+            if self.skill_check(self.state.player, "Persuasion", 12, context="to turn frightened travelers into an orderly column"):
+                self.state.flags["neverwinter_pilgrims_guarded"] = True
+                self.state.flags["blackwake_gallows_copse_lead"] = True
+                hero_bonus += 1
+                elira = self.find_companion("Elira Dawnmantle")
+                if elira is not None:
+                    self.adjust_companion_disposition(elira, 1, "you protected pilgrims before chasing the faster lead")
+                self.say("The column tightens around the weakest carts, and a pilgrim points out where two wagons were taken south alive.")
+
+        outcome = self.run_encounter(
+            Encounter(
+                title="High Road Milehouse Intercept",
+                description="Ashen Brand cutters try to turn forged authority and pilgrim fear into another missing wagon.",
+                enemies=enemies,
+                allow_flee=True,
+                allow_parley=True,
+                parley_dc=12,
+                hero_initiative_bonus=hero_bonus,
+                allow_post_combat_random_encounter=False,
+            )
+        )
+        if outcome == "defeat":
+            self.handle_defeat("The milehouse falls quiet, and the road south learns fear before your name.")
+            return
+        if outcome == "fled":
+            self.state.flags["neverwinter_milehouse_bypassed"] = True
+            self.say("You break away from the milehouse before the false roadwardens can pin the company in place.")
+            return
+        self.state.flags["neverwinter_milehouse_secured"] = True
+        self.reward_party(xp=20, gold=5, reason="securing the High Road milehouse")
+        self.add_journal("You secured a Neverwinter-side milehouse and chose how the road south would open.")
+
+    def handle_neverwinter_signal_cairn(self) -> None:
+        assert self.state is not None
+        if self.state.flags.get("neverwinter_signal_cairn_seen"):
+            return
+        self.state.flags["neverwinter_signal_cairn_seen"] = True
+        self.banner("Neverwinter Wood Signal Cairn")
+        self.say(
+            "A little farther south, the road bends past an old signal cairn on the Neverwinter Wood side of the ditch. "
+            "Its stones are older than the new roadwarden paint, and someone has packed the top with green pine, lamp oil, "
+            "and a strip of ash-black cloth waiting for a match.",
+            typed=True,
+        )
+        enemies = [self.intro_pick_enemy(("goblin_skirmisher", "cinder_kobold"))]
+        if self.act1_party_size() >= 3:
+            enemies.append(create_enemy("bandit_archer"))
+        else:
+            enemies[0].current_hp = enemies[0].max_hp = 6
+        hero_bonus = 0
+        choice = self.scenario_choice(
+            "How do you handle the signal cairn?",
+            [
+                self.skill_tag("STEALTH", self.action_option("Take the firekeeper quietly before the signal rises.")),
+                self.skill_tag("SURVIVAL", self.action_option("Spoil the fuel and read where the watchers came from.")),
+                self.skill_tag("ARCANA", self.action_option("Check the ash-cloth for a magical or alchemical trigger.")),
+            ],
+            allow_meta=False,
+        )
+        if choice == 1:
+            self.player_action("Take the firekeeper quietly before the signal rises.")
+            if self.skill_check(self.state.player, "Stealth", 12, context="to silence the signal watcher"):
+                self.state.flags["road_reinforcement_signal_cut"] = True
+                self.apply_status(enemies[0], "surprised", 1, source="your quiet approach")
+                hero_bonus += 1
+                self.say("The watcher turns too late, flint still in hand, and the signal never becomes more than intent.")
+        elif choice == 2:
+            self.player_action("Spoil the fuel and read where the watchers came from.")
+            if self.skill_check(self.state.player, "Survival", 12, context="to spoil the cairn and follow the sign-cut trail"):
+                self.state.flags["road_reinforcement_signal_cut"] = True
+                self.state.flags["road_second_wave_trail_read"] = True
+                hero_bonus += 1
+                self.add_clue("A signal cairn south of Neverwinter was meant to call a harder Ashen Brand wave onto the High Road.")
+                self.say("The fuel goes wet and useless, and the footprints point toward a second ambush pocket farther south.")
+        else:
+            self.player_action("Check the ash-cloth for a magical or alchemical trigger.")
+            if self.skill_check(self.state.player, "Arcana", 12, context="to disarm the ash-cloth flash trigger"):
+                self.state.flags["road_reinforcement_signal_cut"] = True
+                self.state.flags["road_ash_signal_understood"] = True
+                enemies[0].current_hp = max(1, enemies[0].current_hp - 2)
+                hero_bonus += 1
+                self.say("The cloth is treated to flare high and dirty. You pinch the trigger out before the Brand can paint the sky.")
+
+        outcome = self.run_encounter(
+            Encounter(
+                title="Neverwinter Wood Signal Cairn",
+                description="A hidden firekeeper tries to warn the High Road ambush before you can stop the signal.",
+                enemies=enemies,
+                allow_flee=True,
+                allow_parley=True,
+                parley_dc=12,
+                hero_initiative_bonus=hero_bonus,
+                allow_post_combat_random_encounter=False,
+            )
+        )
+        if outcome == "defeat":
+            self.handle_defeat("The signal fire climbs over the trees, and the High Road closes around you before Phandalin ever sees your face.")
+            return
+        if outcome == "fled":
+            self.state.flags["neverwinter_signal_cairn_bypassed"] = True
+            self.say("You leave the cairn burning low behind you, knowing someone farther south may have seen enough.")
+            return
+        self.state.flags["neverwinter_signal_cairn_cleared"] = True
+        self.reward_party(xp=15, gold=4, reason="silencing the Neverwinter Wood signal cairn")
+        self.add_journal("You found and broke a signal cairn meant to harden the High Road ambush.")
+
     def handle_neverwinter_departure_fork(self) -> None:
         assert self.state is not None
         if not self.state.flags.get("early_companion_recruited"):
             self.offer_early_companion()
+        self.handle_neverwinter_tymora_shrine()
+        if self.state is None or self.state.current_scene != "neverwinter_briefing":
+            return
+        self.handle_neverwinter_high_road_milehouse()
+        if self.state is None or self.state.current_scene != "neverwinter_briefing":
+            return
+        self.handle_neverwinter_signal_cairn()
+        if self.state is None or self.state.current_scene != "neverwinter_briefing":
+            return
         self.add_journal("Mira Thann sent you south with a writ for Phandalin's steward.")
 
         while True:
@@ -652,7 +917,7 @@ class StoryIntroMixin:
                 [
                     self.action_option("Take the direct south road toward Phandalin."),
                     self.action_option("Investigate the smoke and caravan panic near the river cut."),
-                    self.action_option("Circle back long enough to gather one more rumor in Neverwinter."),
+                    self.skill_tag("BACKTRACK", self.action_option("Circle back long enough to gather one more rumor in Neverwinter.")),
                 ],
                 allow_meta=False,
             )
@@ -683,6 +948,8 @@ class StoryIntroMixin:
                 )
             else:
                 self.say("The rumor loop has gone thin. The smoke east of the road is still the only fresh lead.")
+            self.state.current_scene = "neverwinter_briefing"
+            return
 
     def offer_early_companion(self) -> None:
         assert self.state is not None
@@ -756,124 +1023,214 @@ class StoryIntroMixin:
             )
             self.add_clue("A High Road note suggests Sereth Vane survived Blackwake and is still moving useful cargo south.")
             self.add_journal("Sereth Vane's initials surfaced on a High Road note after Blackwake.")
-        party_size = len(self.state.party_members())
-        if party_size == 1:
-            enemies = [
-                self.intro_pick_enemy(("goblin_skirmisher", "cinder_kobold")),
-                self.intro_pick_enemy(("wolf", "mireweb_spider")),
-            ]
-            enemies[0].current_hp = enemies[0].max_hp = 5
-            enemies[1].current_hp = enemies[1].max_hp = 5
-            hero_bonus = 2
-            self.state.player.temp_hp = max(self.state.player.temp_hp, 6)
-            self.apply_status(self.state.player, "blessed", 1, source="the guard's desperate cover")
-            self.say(
-                "The wounded guard has already bloodied both threats and buys you a cleaner lane to enter the fight. "
-                "You begin with 6 temporary hit points and a brief surge of confidence."
-            )
-        elif party_size == 2:
-            enemies = [
-                self.intro_pick_enemy(("goblin_skirmisher", "cinder_kobold")),
-                self.intro_pick_enemy(("wolf", "mireweb_spider")),
-            ]
-            enemies[1].current_hp = enemies[1].max_hp = 7
-            hero_bonus = 1
-            self.say("The wounded guard buys your smaller company a narrow opening before the ambush can fully close.")
-        else:
-            enemies = [
-                self.intro_pick_enemy(("goblin_skirmisher", "cinder_kobold")),
-                self.intro_pick_enemy(("goblin_skirmisher", "cinder_kobold", "briar_twig")),
-                self.intro_pick_enemy(("wolf", "mireweb_spider")),
-            ]
-            hero_bonus = 0
-        hero_bonus += self.apply_scene_companion_support("road_ambush")
-        if not self.state.flags.get("road_approach_chosen"):
-            choice = self.scenario_choice(
-                "How do you approach the ambush?",
-                [
-                    self.skill_tag("ATHLETICS", self.action_option("Charge in before the guard falls.")),
-                    self.skill_tag("STEALTH", self.action_option("Flank through the brush.")),
-                    self.skill_tag("INTIMIDATION", self.action_option("Break their nerve with a warning shout.")),
-                ],
-                allow_meta=False,
-            )
-            self.state.flags["road_approach_chosen"] = True
-            if choice == 1:
-                self.player_action("Charge in before the guard falls.")
-                success = self.skill_check(self.state.player, "Athletics", 12, context="to hit the ambush line like a battering ram")
-                if success:
-                    self.apply_status(self.state.player, "emboldened", 2, source="a crashing opening charge")
-                    if enemies:
-                        self.apply_status(enemies[0], "prone", 1, source="your shoulder-first impact")
-                    self.say("You smash into the raiders hard enough to break their shape before the melee is even set.")
-                    hero_bonus += 2
-                else:
-                    self.apply_status(self.state.player, "reeling", 1, source="an overextended charge")
-                    self.say("You still hit the fight fast, but the first impact jars you off balance instead of breaking the line.")
-            elif choice == 2:
-                self.player_action("Flank through the brush.")
-                success = self.skill_check(self.state.player, "Stealth", 12, context="to slip through the brush")
-                if success:
-                    enemies[0].current_hp = max(1, enemies[0].current_hp - 4)
-                    self.apply_status(enemies[0], "surprised", 1, source="your hidden approach")
-                    hero_bonus += 2
-                    self.say("You strike from cover before the goblins fully understand what hit them.")
-                else:
-                    self.apply_status(self.state.player, "reeling", 1, source="getting caught in the open")
-                    self.say("A snapped branch gives you away, and the goblins whirl toward you.")
+        if not self.state.flags.get("road_ambush_wave_one_cleared"):
+            party_size = len(self.state.party_members())
+            if party_size == 1:
+                enemies = [
+                    self.intro_pick_enemy(("goblin_skirmisher", "cinder_kobold")),
+                    self.intro_pick_enemy(("wolf", "mireweb_spider")),
+                ]
+                enemies[0].current_hp = enemies[0].max_hp = 5
+                enemies[1].current_hp = enemies[1].max_hp = 5
+                hero_bonus = 2
+                self.state.player.temp_hp = max(self.state.player.temp_hp, 6)
+                self.apply_status(self.state.player, "blessed", 1, source="the guard's desperate cover")
+                self.say(
+                    "The wounded guard has already bloodied both threats and buys you a cleaner lane to enter the fight. "
+                    "You begin with 6 temporary hit points and a brief surge of confidence."
+                )
+            elif party_size == 2:
+                enemies = [
+                    self.intro_pick_enemy(("goblin_skirmisher", "cinder_kobold")),
+                    self.intro_pick_enemy(("wolf", "mireweb_spider")),
+                ]
+                enemies[1].current_hp = enemies[1].max_hp = 7
+                hero_bonus = 1
+                self.say("The wounded guard buys your smaller company a narrow opening before the ambush can fully close.")
             else:
-                self.player_action("Break their nerve with a warning shout.")
-                success = self.skill_check(self.state.player, "Intimidation", 12, context="to rattle the raiders")
-                if success:
-                    enemies[-1].current_hp = max(1, enemies[-1].current_hp - 3)
-                    self.apply_status(enemies[-1], "frightened", 2, source="your warning roar")
-                    self.say("The wolf hesitates just long enough for the guard to pull free and draw breath.")
+                enemies = [
+                    self.intro_pick_enemy(("goblin_skirmisher", "cinder_kobold")),
+                    self.intro_pick_enemy(("goblin_skirmisher", "cinder_kobold", "briar_twig")),
+                    self.intro_pick_enemy(("wolf", "mireweb_spider")),
+                ]
+                hero_bonus = 0
+            hero_bonus += self.apply_scene_companion_support("road_ambush")
+            parley_dc = 12 if party_size <= 2 else 13
+            if self.state.flags.get("road_ambush_scouted") and enemies:
+                hero_bonus += 1
+                self.apply_status(enemies[0], "surprised", 1, source="the milehouse woodline scout")
+                self.say("Because you read the woodline at the milehouse, the ambush starts with one raider looking the wrong way.")
+            if self.state.flags.get("road_patrol_writ") and enemies:
+                enemies[-1].current_hp = max(1, enemies[-1].current_hp - 2)
+                parley_dc = max(10, parley_dc - 1)
+                self.say("The exposed roadwarden writ makes the raiders hesitate before committing to another false seizure.")
+            if self.state.flags.get("neverwinter_pilgrims_guarded"):
+                hero_bonus += 1
+                self.say("The Helm's Hold column keeps its nerve behind you, leaving fewer panicked bodies for the raiders to exploit.")
+            if not self.state.flags.get("road_approach_chosen"):
+                approach_options = [
+                    ("athletics", self.skill_tag("ATHLETICS", self.action_option("Charge in before the guard falls."))),
+                    ("stealth", self.skill_tag("STEALTH", self.action_option("Flank through the brush."))),
+                    ("intimidation", self.skill_tag("INTIMIDATION", self.action_option("Break their nerve with a warning shout."))),
+                ]
+                backtrack_node = self.peek_act1_overworld_backtrack_node()
+                if backtrack_node is not None:
+                    approach_options.append(
+                        (
+                            "backtrack",
+                            self.skill_tag(
+                                "BACKTRACK",
+                                self.action_option("Backtrack toward Neverwinter and reconsider the river smoke."),
+                            ),
+                        )
+                    )
+                choice = self.scenario_choice(
+                    "How do you approach the ambush?",
+                    [text for _, text in approach_options],
+                    allow_meta=False,
+                )
+                selection_key, _ = approach_options[choice - 1]
+                if selection_key == "backtrack":
+                    if not self.backtrack_act1_overworld_node():
+                        self.say("There is no familiar road behind you to backtrack right now.")
+                    return
+                self.state.flags["road_approach_chosen"] = True
+                if selection_key == "athletics":
+                    self.player_action("Charge in before the guard falls.")
+                    success = self.skill_check(self.state.player, "Athletics", 12, context="to hit the ambush line like a battering ram")
+                    if success:
+                        self.apply_status(self.state.player, "emboldened", 2, source="a crashing opening charge")
+                        if enemies:
+                            self.apply_status(enemies[0], "prone", 1, source="your shoulder-first impact")
+                        self.say("You smash into the raiders hard enough to break their shape before the melee is even set.")
+                        hero_bonus += 2
+                    else:
+                        self.apply_status(self.state.player, "reeling", 1, source="an overextended charge")
+                        self.say("You still hit the fight fast, but the first impact jars you off balance instead of breaking the line.")
+                elif selection_key == "stealth":
+                    self.player_action("Flank through the brush.")
+                    success = self.skill_check(self.state.player, "Stealth", 12, context="to slip through the brush")
+                    if success:
+                        enemies[0].current_hp = max(1, enemies[0].current_hp - 4)
+                        self.apply_status(enemies[0], "surprised", 1, source="your hidden approach")
+                        hero_bonus += 2
+                        self.say("You strike from cover before the goblins fully understand what hit them.")
+                    else:
+                        self.apply_status(self.state.player, "reeling", 1, source="getting caught in the open")
+                        self.say("A snapped branch gives you away, and the goblins whirl toward you.")
                 else:
-                    for enemy in enemies:
-                        if enemy.is_conscious():
-                            self.apply_status(enemy, "emboldened", 1, source="seeing the bluff fail")
-                    self.say("The goblins only cackle harder and close in.")
+                    self.player_action("Break their nerve with a warning shout.")
+                    success = self.skill_check(self.state.player, "Intimidation", 12, context="to rattle the raiders")
+                    if success:
+                        enemies[-1].current_hp = max(1, enemies[-1].current_hp - 3)
+                        self.apply_status(enemies[-1], "frightened", 2, source="your warning roar")
+                        self.say("The wolf hesitates just long enough for the guard to pull free and draw breath.")
+                    else:
+                        for enemy in enemies:
+                            if enemy.is_conscious():
+                                self.apply_status(enemy, "emboldened", 1, source="seeing the bluff fail")
+                        self.say("The goblins only cackle harder and close in.")
 
-        encounter = Encounter(
-            title="Roadside Ambush",
-            description="Roadside raiders and a hunting beast rush the ruined wagon.",
-            enemies=enemies,
-            allow_flee=True,
-            allow_parley=True,
-            parley_dc=12 if party_size <= 2 else 13,
-            hero_initiative_bonus=hero_bonus,
-            allow_post_combat_random_encounter=False,
-        )
-        outcome = self.run_encounter(encounter)
-        if outcome == "defeat":
-            self.handle_defeat("The High Road falls silent around the wreckage.")
-            return
-        if outcome == "fled":
-            self.say("You circle wide, catch your breath, and try the road again.")
-            return
-
-        self.add_clue("A scorched badge on the goblins marks the Ashen Brand.")
-        self.add_clue("The raiders were working with a hobgoblin sergeant tied to Ashfall Watch.")
-        self.reward_party(xp=25, gold=15, reason="saving the caravan guard on the High Road")
-        self.say(
-            "Once the smoke settles, the wounded guard introduces himself as Tolan Ironshield, a caravan veteran "
-            "who was escorting ore and temple supplies to Phandalin."
-        )
-        self.speaker("Tolan Ironshield", "I can still stand. Say the word and I walk with you, or I make for the inn.")
-        options = [
-            self.quoted_option("RECRUIT", "If you can stand, stand with us."),
-            self.quoted_option("SAFE", "Get to the inn and recover. We'll talk there."),
-        ]
-        choice = self.scenario_choice("Tolan tightens the straps on his shield.", options, allow_meta=False)
-        self.player_choice_output(options[choice - 1])
-        if choice == 1:
-            self.recruit_companion(create_tolan_ironshield())
-            self.speaker(
-                "Tolan Ironshield",
-                "Good. Give me a minute to cinch the shield and I'll see you all the way to Phandalin.",
+            outcome = self.run_encounter(
+                Encounter(
+                    title="Roadside Ambush: First Wave",
+                    description="Roadside raiders and a hunting beast rush the ruined wagon.",
+                    enemies=enemies,
+                    allow_flee=True,
+                    allow_parley=True,
+                    parley_dc=parley_dc,
+                    hero_initiative_bonus=hero_bonus,
+                    allow_post_combat_random_encounter=False,
+                )
             )
+            if outcome == "defeat":
+                self.handle_defeat("The High Road falls silent around the wreckage.")
+                return
+            if outcome == "fled":
+                self.say("You circle wide, catch your breath, and try the road again.")
+                return
+
+            self.state.flags["road_ambush_wave_one_cleared"] = True
+            self.add_clue("A scorched badge on the first High Road raiders marks the Ashen Brand.")
+            self.reward_party(xp=15, gold=8, reason="breaking the first High Road wave")
+            self.say(
+                "Once the first rush breaks, the wounded guard introduces himself as Tolan Ironshield, a caravan veteran "
+                "who was escorting ore and temple supplies to Phandalin."
+            )
+            self.speaker("Tolan Ironshield", "That was only the hook. I can still stand for the hammer blow if you'll have me.")
+            options = [
+                self.quoted_option("RECRUIT", "If you can stand, stand with us."),
+                self.quoted_option("SAFE", "Get to the inn and recover. We'll talk there."),
+            ]
+            choice = self.scenario_choice("Tolan tightens the straps on his shield.", options, allow_meta=False)
+            self.player_choice_output(options[choice - 1])
+            if choice == 1:
+                self.recruit_companion(create_tolan_ironshield())
+                self.speaker(
+                    "Tolan Ironshield",
+                    "Good. Give me a minute to cinch the shield and I'll see you all the way to Phandalin.",
+                )
+            else:
+                self.state.flags["tolan_waiting_at_inn"] = True
+                self.add_journal("Tolan Ironshield is waiting at the Stonehill Inn if you need another shield arm.")
         else:
-            self.state.flags["tolan_waiting_at_inn"] = True
-            self.add_journal("Tolan Ironshield is waiting at the Stonehill Inn if you need another shield arm.")
+            self.say("The first ambush wave is already broken, but the road ahead still carries signal calls and running feet.")
+
+        if self.state is None:
+            return
+        if not self.state.flags.get("road_ambush_wave_two_cleared"):
+            self.say(
+                "A horn coughs from the pines before the wagon dust can settle. The second wave comes in tighter: "
+                "not scavengers this time, but the crew meant to punish anyone who survived the first rush.",
+                typed=True,
+            )
+            party_size = len(self.state.party_members())
+            if party_size <= 2:
+                enemies = [create_enemy("bandit"), self.intro_pick_enemy(("goblin_skirmisher", "cinder_kobold"))]
+                enemies[0].current_hp = min(enemies[0].current_hp, 9)
+                enemies[0].max_hp = min(enemies[0].max_hp, 9)
+                hero_bonus = 1
+            elif party_size == 3:
+                enemies = [create_enemy("ash_brand_enforcer"), self.intro_pick_enemy(("goblin_skirmisher", "cinder_kobold"))]
+                hero_bonus = 0
+            else:
+                enemies = [
+                    create_enemy("ash_brand_enforcer"),
+                    create_enemy("bandit_archer"),
+                    self.intro_pick_enemy(("cinder_kobold", "goblin_skirmisher", "wolf")),
+                ]
+                hero_bonus = 0
+            if self.state.flags.get("road_reinforcement_signal_cut"):
+                hero_bonus += 1
+                if enemies:
+                    self.apply_status(enemies[0], "reeling", 1, source="the broken signal cairn")
+                self.say("Because the signal cairn went dark, the second wave arrives angry instead of coordinated.")
+            if self.state.flags.get("road_second_wave_trail_read") and enemies:
+                self.apply_status(enemies[-1], "surprised", 1, source="your read on the second-wave trail")
+                self.say("You already read this approach at the cairn; the trailing raider walks straight into your angle.")
+
+            outcome = self.run_encounter(
+                Encounter(
+                    title="High Road Second Wave",
+                    description="A harder Ashen Brand reserve crew hits the wagon wreck after Tolan has a chance to join the line.",
+                    enemies=enemies,
+                    allow_flee=True,
+                    allow_parley=True,
+                    parley_dc=13 if party_size <= 2 else 14,
+                    hero_initiative_bonus=hero_bonus,
+                    allow_post_combat_random_encounter=False,
+                )
+            )
+            if outcome == "defeat":
+                self.handle_defeat("The second High Road wave breaks the caravan line before Phandalin can be warned.")
+                return
+            if outcome == "fled":
+                self.say("You fall back from the second wave and will need to retake the road before Phandalin is safe.")
+                return
+
+            self.state.flags["road_ambush_wave_two_cleared"] = True
+            self.add_clue("The harder High Road reserve was working under a hobgoblin sergeant tied to Ashfall Watch.")
+            self.reward_party(xp=20, gold=7, reason="breaking the High Road reserve wave")
+
         self.state.flags["road_ambush_cleared"] = True
         self.travel_to_act1_node("phandalin_hub")

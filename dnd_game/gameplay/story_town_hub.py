@@ -280,6 +280,7 @@ class StoryTownHubMixin:
                     )
                 if self.state.flags.get("tolan_waiting_at_inn") and not self.has_companion("Tolan Ironshield"):
                     options.append(("recruit_tolan", self.action_option("Wave Tolan over and ask him to gear up.")))
+                options.append(("paid_rest", self.action_option("Rent beds for a long rest (5 gp per active party member).")))
                 options.append(("leave", self.action_option("Leave the common room for now.")))
                 choice = self.scenario_choice("The common room quiets for a moment as you enter.", [text for _, text in options])
                 selection_key, _ = options[choice - 1]
@@ -357,6 +358,9 @@ class StoryTownHubMixin:
                     self.state.flags.pop("tolan_waiting_at_inn", None)
                     self.recruit_companion(create_tolan_ironshield())
                     self.speaker("Tolan Ironshield", "About time. I was getting tired of waiting on soup.")
+                elif selection_key == "paid_rest":
+                    self.player_action("Rent beds at the Stonehill Inn for the company.")
+                    self.paid_inn_long_rest("Stonehill Inn")
                 else:
                     self.player_action("You leave the common room for now.")
                     return

@@ -62,6 +62,7 @@ from dnd_game.drafts.map_system import ACT2_ENEMY_DRIVEN_MAP
 from dnd_game.drafts.map_system.data.act1_hybrid_map import ACT1_HYBRID_MAP
 from dnd_game.data.story.lore import APPENDIX_LORE
 from dnd_game.data.quests import QuestLogEntry
+from dnd_game.data.items.catalog import LOOT_TABLES
 from dnd_game.items import ITEMS, format_inventory_line
 from dnd_game.models import GameState
 from dnd_game.gameplay.status_effects import STATUS_DEFINITIONS
@@ -732,6 +733,115 @@ class CoreTests(unittest.TestCase):
         with patch("dnd_game.gameplay.inventory_core.roll_loot_for_enemy", return_value={"bread_round": 1, "potion_healing": 1}):
             game.collect_loot([create_enemy("bandit")], source="Roadside Ambush")
         self.assertEqual(pauses, ["pause", "pause"])
+
+    def test_encounter_scaling_adds_minimum_enemies_for_three_member_party(self) -> None:
+        player = build_character(
+            name="Velkor",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        companions = [create_kaelis_starling(), create_elira_dawnmantle()]
+        for member in [player, *companions]:
+            member.level = 3
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(90094))
+        game.state = GameState(player=player, companions=companions, current_scene="road_ambush")
+        encounter = Encounter(
+            title="Scaling Probe",
+            description="A small fight should grow for a three-member party.",
+            enemies=[create_enemy("goblin_skirmisher")],
+            allow_post_combat_random_encounter=False,
+        )
+
+        game.prepare_encounter_for_party(encounter)
+
+        self.assertEqual(len(encounter.enemies), 3)
+        self.assertEqual(encounter.enemies[0].level, 3)
+        self.assertGreater(encounter.enemies[0].max_hp, 6)
+        self.assertGreater(encounter.enemies[0].xp_value, 50)
+        self.assertTrue(any("Added by party-size encounter scaling." in note for enemy in encounter.enemies[1:] for note in enemy.notes))
+
+    def test_encounter_scaling_raises_two_enemies_when_four_or_more_are_present(self) -> None:
+        player = build_character(
+            name="Velkor",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        companions = [create_kaelis_starling(), create_elira_dawnmantle()]
+        for member in [player, *companions]:
+            member.level = 4
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(90095))
+        game.state = GameState(player=player, companions=companions, current_scene="road_ambush")
+        encounter = Encounter(
+            title="Large Scaling Probe",
+            description="A larger fight should scale two enemies.",
+            enemies=[
+                create_enemy("bandit"),
+                create_enemy("goblin_skirmisher"),
+                create_enemy("wolf"),
+                create_enemy("brand_saboteur"),
+            ],
+            allow_post_combat_random_encounter=False,
+        )
+
+        game.prepare_encounter_for_party(encounter)
+
+        scaled = [enemy for enemy in encounter.enemies if any(note.startswith("Pseudo-scaled") for note in enemy.notes)]
+        self.assertEqual(len(scaled), 2)
+        self.assertTrue(all(enemy.level == 4 for enemy in scaled))
+
+    def test_scaled_enemy_rewards_are_paid_from_encounter_victory(self) -> None:
+        player = build_character(
+            name="Velkor",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        companions = [create_kaelis_starling(), create_elira_dawnmantle()]
+        for member in [player, *companions]:
+            member.level = 3
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(90096))
+        game.state = GameState(player=player, companions=companions, current_scene="road_ambush", inventory={})
+        encounter = Encounter(
+            title="Scaled Reward Probe",
+            description="Scaled enemies should pay scaled rewards.",
+            enemies=[create_enemy("bandit")],
+            allow_post_combat_random_encounter=False,
+        )
+        game.prepare_encounter_for_party(encounter)
+        expected_xp = sum(enemy.xp_value for enemy in encounter.enemies)
+        expected_gold = sum(enemy.gold_value for enemy in encounter.enemies)
+        for enemy in encounter.enemies:
+            enemy.current_hp = 0
+
+        game.resolve_encounter_victory(encounter, encounter.enemies)
+
+        self.assertEqual(game.state.xp, expected_xp)
+        self.assertEqual(game.state.gold, expected_gold)
+
+    def test_act2_enemy_archetypes_have_loot_tables(self) -> None:
+        required_tables = {
+            "cult_lookout",
+            "choir_adept",
+            "expedition_reaver",
+            "grimlock_tunneler",
+            "starblighted_miner",
+            "animated_armor",
+            "spectral_foreman",
+            "blacklake_pincerling",
+            "caldra_voss",
+        }
+        self.assertLessEqual(required_tables, set(LOOT_TABLES))
+        for archetype in required_tables:
+            self.assertTrue(LOOT_TABLES[archetype])
+            self.assertTrue(any(ITEMS[entry.item_id].is_equippable() for entry in LOOT_TABLES[archetype]))
 
     def test_speaker_introduces_new_named_npc_once(self) -> None:
         player = build_character(
@@ -1767,16 +1877,55 @@ class CoreTests(unittest.TestCase):
         )
         act2_game.run_encounter = lambda encounter: encounters.append(encounter) or "victory"  # type: ignore[method-assign]
         act2_game.scene_black_lake_causeway()
+        assert act2_game.state is not None
+        act2_game.state.inventory["sigil_anchor_ring_rare"] = 1
         act2_game.scene_forge_of_spells()
         self.assertEqual(encounters[3].title, "Black Lake Waterline")
         self.assertEqual(len(encounters[3].enemies), 3)
         self.assertEqual(encounters[4].title, "Black Lake Causeway")
-        self.assertEqual(len(encounters[4].enemies), 4)
+        self.assertEqual(len(encounters[4].enemies), 3)
         self.assertEqual(encounters[5].title, "Forge Choir Pit")
         self.assertEqual(len(encounters[5].enemies), 3)
         self.assertEqual(encounters[6].title, "Boss: Sister Caldra Voss")
         self.assertEqual(len(encounters[6].enemies), 4)
         self.assertGreater(encounters[6].enemies[0].max_hp, 42)
+
+    def test_black_lake_barracks_raid_removes_forge_reserve_without_strong_gear(self) -> None:
+        player = build_character(
+            name="Vale",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        game = TextDnDGame(input_fn=lambda _: "3", output_fn=lambda _: None, rng=random.Random(900837))
+        game.state = GameState(
+            player=player,
+            companions=[create_rhogar_valeguard(), create_elira_dawnmantle(), create_nim_ardentglass()],
+            current_act=2,
+            current_scene="forge_of_spells",
+            flags={
+                "act2_started": True,
+                "black_lake_crossed": True,
+                "black_lake_barracks_raided": True,
+                "act2_town_stability": 3,
+                "act2_route_control": 3,
+                "act2_whisper_pressure": 2,
+            },
+            inventory={},
+        )
+        encounters: list[Encounter] = []
+        game.ensure_state_integrity()
+        game.travel_to_act2_node("forge_of_spells")
+        dungeon = game.current_act2_dungeon()
+        assert dungeon is not None
+        game.scenario_choice = lambda prompt, options, **kwargs: 3  # type: ignore[method-assign]
+        game.run_encounter = lambda encounter: encounters.append(encounter) or "victory"  # type: ignore[method-assign]
+        game._forge_caldra_dais(dungeon, dungeon.rooms["caldra_dais"])
+
+        self.assertEqual(encounters[0].title, "Boss: Sister Caldra Voss")
+        self.assertEqual(len(encounters[0].enemies), 3)
 
     def test_act1_room_navigation_options_show_direction_tags(self) -> None:
         player = build_character(
@@ -2651,6 +2800,10 @@ class CoreTests(unittest.TestCase):
             game.state.flags["act2_map_state"]["cleared_rooms"],
             ["survey_mouth", "slime_cut", "scholar_pocket", "lower_breakout"],
         )
+        self.assertTrue(
+            game.state.inventory.get("delver_lantern_hood_uncommon", 0)
+            or game.state.inventory.get("forgehand_gauntlets_uncommon", 0)
+        )
         self.assertEqual([encounter.title for encounter in encounters], ["Stonehollow Slime Cut", "Stonehollow Breakout"])
 
     def test_south_adit_uses_playable_act2_room_map_and_recruits_irielle(self) -> None:
@@ -2712,6 +2865,7 @@ class CoreTests(unittest.TestCase):
             game.state.flags["act2_map_state"]["cleared_rooms"],
             ["adit_mouth", "silent_cells", "augur_cell", "warden_nave"],
         )
+        self.assertEqual(game.state.inventory.get("choirward_amulet_uncommon"), 1)
         self.assertEqual([encounter.title for encounter in encounters], ["South Adit Wardens"])
 
     def test_act2_hub_warns_before_first_late_route_choice(self) -> None:
@@ -2930,6 +3084,7 @@ class CoreTests(unittest.TestCase):
             game.state.flags["act2_map_state"]["cleared_rooms"],
             ["causeway_lip", "choir_barracks", "blackwater_edge", "far_landing"],
         )
+        self.assertEqual(game.state.inventory.get("fireward_elixir"), 1)
         self.assertEqual(
             [encounter.title for encounter in encounters],
             ["Black Lake Barracks", "Black Lake Waterline", "Black Lake Causeway"],
@@ -3793,8 +3948,12 @@ class CoreTests(unittest.TestCase):
                 "1", "1",  # fighter skills
                 "1",  # confirm character
                 "1",  # soldier prologue choice
-                "6",  # take the writ
+                "7",  # take the writ
                 "1",  # recruit Kaelis on departure
+                "4",  # keep the Tymora shrine moving
+                "2",  # let Elira finish her work and meet later
+                "1",  # inspect the milehouse writs
+                "1",  # silence the signal cairn
                 "1",  # take the direct road at the route fork
             ]
         )
@@ -3822,8 +3981,12 @@ class CoreTests(unittest.TestCase):
                 "1", "1",
                 "1",
                 "1",  # soldier prologue choice
-                "6",  # take the writ
+                "7",  # take the writ
                 "1",  # recruit Kaelis on departure
+                "4",  # keep the Tymora shrine moving
+                "2",  # let Elira finish her work and meet later
+                "1",  # inspect the milehouse writs
+                "1",  # silence the signal cairn
                 "1",  # take the direct road at the route fork
             ]
         )
@@ -3850,7 +4013,13 @@ class CoreTests(unittest.TestCase):
         game.state = GameState(
             player=player,
             current_scene="neverwinter_briefing",
-            flags={"act1_started": True, "early_companion_recruited": "Kaelis Starling"},
+            flags={
+                "act1_started": True,
+                "early_companion_recruited": "Kaelis Starling",
+                "neverwinter_tymora_shrine_seen": True,
+                "neverwinter_high_road_milehouse_seen": True,
+                "neverwinter_signal_cairn_seen": True,
+            },
         )
         game.handle_neverwinter_departure_fork()
         self.assertEqual(game.state.current_scene, "blackwake_crossing")
@@ -3859,6 +4028,59 @@ class CoreTests(unittest.TestCase):
         rendered = self.plain_output(log)
         self.assertIn("Overworld Route Map", rendered)
         self.assertIn("Blackwake Crossing", rendered)
+
+    def test_departure_fork_rumor_backtracks_to_neverwinter(self) -> None:
+        player = build_character(
+            name="Vale",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        answers = iter(["3"])
+        log: list[str] = []
+        game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=log.append, rng=random.Random(8043))
+        game.state = GameState(
+            player=player,
+            current_scene="neverwinter_briefing",
+            flags={
+                "act1_started": True,
+                "early_companion_recruited": "Kaelis Starling",
+                "neverwinter_tymora_shrine_seen": True,
+                "neverwinter_high_road_milehouse_seen": True,
+                "neverwinter_signal_cairn_seen": True,
+            },
+        )
+        game.handle_neverwinter_departure_fork()
+        self.assertEqual(game.state.current_scene, "neverwinter_briefing")
+        self.assertTrue(game.state.flags["blackwake_neverwinter_rumor"])
+        self.assertTrue(any("forged river-cut inspections" in clue for clue in game.state.clues))
+        rendered = self.plain_output(log)
+        self.assertIn("[BACKTRACK]", rendered)
+        self.assertIn("good-looking papers and bad patience", rendered)
+
+    def test_road_ambush_approach_can_backtrack_to_neverwinter(self) -> None:
+        player = build_character(
+            name="Vale",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        log: list[str] = []
+        game = TextDnDGame(input_fn=lambda _: "4", output_fn=log.append, rng=random.Random(8044))
+        game.state = GameState(player=player, current_scene="road_ambush", flags={"act1_started": True})
+        encounters: list[Encounter] = []
+        game.run_encounter = lambda encounter: encounters.append(encounter) or "victory"
+        game.scene_road_ambush()
+        self.assertEqual(game.state.current_scene, "neverwinter_briefing")
+        self.assertFalse(game.state.flags.get("road_approach_chosen", False))
+        self.assertEqual(encounters, [])
+        rendered = self.plain_output(log)
+        self.assertIn("Backtrack toward Neverwinter and reconsider the river smoke", rendered)
+        self.assertIn("Mira is waiting", rendered)
 
     def test_road_ambush_flow_recruits_tolan(self) -> None:
         player = build_character(
@@ -3872,10 +4094,12 @@ class CoreTests(unittest.TestCase):
         log: list[str] = []
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(4))
         game.state = GameState(player=player, current_scene="road_ambush", clues=[], journal=[])
-        game.run_encounter = lambda encounter: "victory"
+        encounters: list[Encounter] = []
+        game.run_encounter = lambda encounter: encounters.append(encounter) or "victory"
         game.scene_road_ambush()
         self.assertEqual(game.state.current_scene, "phandalin_hub")
         self.assertTrue(any(companion.name == "Tolan Ironshield" for companion in game.state.companions))
+        self.assertEqual([encounter.title for encounter in encounters], ["Roadside Ambush: First Wave", "High Road Second Wave"])
         rendered = self.plain_output(log)
         self.assertIn("Tolan Ironshield: \"Good. Give me a minute to cinch the shield", rendered)
 
@@ -4069,9 +4293,18 @@ class CoreTests(unittest.TestCase):
             class_skill_choices=["Insight", "Performance", "Persuasion"],
         )
         log: list[str] = []
-        answers = iter(["1", "3", "4", "1", "1"])
+        answers = iter(["1", "3", "5", "1"])
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=log.append, rng=random.Random(3010))
-        game.state = GameState(player=player, current_scene="neverwinter_briefing")
+        game.state = GameState(
+            player=player,
+            current_scene="neverwinter_briefing",
+            flags={
+                "early_companion_recruited": "Kaelis Starling",
+                "neverwinter_tymora_shrine_seen": True,
+                "neverwinter_high_road_milehouse_seen": True,
+                "neverwinter_signal_cairn_seen": True,
+            },
+        )
         game.scene_neverwinter_briefing()
         rendered = self.plain_output(log)
         self.assertIn("better story and a sharper tongue", rendered)
@@ -4391,21 +4624,28 @@ class CoreTests(unittest.TestCase):
             base_ability_scores={"STR": 8, "DEX": 14, "CON": 12, "INT": 15, "WIS": 13, "CHA": 10},
             class_skill_choices=["Arcana", "Investigation"],
         )
-        captured: dict[str, object] = {}
+        captures: list[dict[str, object]] = []
 
         def fake_run(encounter):
-            captured["enemy_count"] = len(encounter.enemies)
-            captured["parley_dc"] = encounter.parley_dc
-            captured["temp_hp"] = game.state.player.temp_hp
+            captures.append(
+                {
+                    "enemy_count": len(encounter.enemies),
+                    "parley_dc": encounter.parley_dc,
+                    "temp_hp": game.state.player.temp_hp,
+                    "title": encounter.title,
+                }
+            )
             return "victory"
 
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(5))
         game.state = GameState(player=player, current_scene="road_ambush", clues=[], journal=[])
         game.run_encounter = fake_run
         game.scene_road_ambush()
-        self.assertEqual(captured["enemy_count"], 2)
-        self.assertEqual(captured["parley_dc"], 12)
-        self.assertGreaterEqual(captured["temp_hp"], 6)
+        self.assertEqual(captures[0]["title"], "Roadside Ambush: First Wave")
+        self.assertEqual(captures[0]["enemy_count"], 2)
+        self.assertEqual(captures[0]["parley_dc"], 12)
+        self.assertGreaterEqual(captures[0]["temp_hp"], 6)
+        self.assertEqual(captures[1]["title"], "High Road Second Wave")
 
     def test_road_ambush_scales_for_two_member_party(self) -> None:
         player = build_character(
@@ -4417,19 +4657,20 @@ class CoreTests(unittest.TestCase):
             class_skill_choices=["Arcana", "Investigation"],
         )
         companion = create_kaelis_starling()
-        captured: dict[str, object] = {}
+        captures: list[dict[str, object]] = []
 
         def fake_run(encounter):
-            captured["enemy_count"] = len(encounter.enemies)
-            captured["parley_dc"] = encounter.parley_dc
+            captures.append({"enemy_count": len(encounter.enemies), "parley_dc": encounter.parley_dc, "title": encounter.title})
             return "victory"
 
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(45))
         game.state = GameState(player=player, companions=[companion], current_scene="road_ambush", clues=[], journal=[])
         game.run_encounter = fake_run
         game.scene_road_ambush()
-        self.assertEqual(captured["enemy_count"], 2)
-        self.assertEqual(captured["parley_dc"], 12)
+        self.assertEqual(captures[0]["title"], "Roadside Ambush: First Wave")
+        self.assertEqual(captures[0]["enemy_count"], 2)
+        self.assertEqual(captures[0]["parley_dc"], 12)
+        self.assertEqual(captures[1]["title"], "High Road Second Wave")
 
     def test_road_ambush_intimidation_works_for_solo_party(self) -> None:
         player = build_character(
@@ -4457,10 +4698,10 @@ class CoreTests(unittest.TestCase):
             class_skill_choices=["Athletics", "Survival"],
         )
         answers = iter(["1", "1"])
-        captured: dict[str, object] = {}
+        captures: list[list[dict[str, int]]] = []
 
         def fake_run(encounter):
-            captured["enemy_conditions"] = [dict(enemy.conditions) for enemy in encounter.enemies]
+            captures.append([dict(enemy.conditions) for enemy in encounter.enemies])
             return "victory"
 
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=lambda _: None, rng=random.Random(111))
@@ -4469,7 +4710,7 @@ class CoreTests(unittest.TestCase):
         game.run_encounter = fake_run
         game.scene_road_ambush()
         self.assertEqual(player.conditions.get("emboldened"), 2)
-        self.assertEqual(captured["enemy_conditions"][0].get("prone"), 1)
+        self.assertEqual(captures[0][0].get("prone"), 1)
 
     def test_road_ambush_intimidation_failure_emboldens_enemies(self) -> None:
         player = build_character(
@@ -4481,10 +4722,10 @@ class CoreTests(unittest.TestCase):
             class_skill_choices=["Athletics", "Survival"],
         )
         answers = iter(["3", "1"])
-        captured: dict[str, object] = {}
+        captures: list[list[dict[str, int]]] = []
 
         def fake_run(encounter):
-            captured["enemy_conditions"] = [dict(enemy.conditions) for enemy in encounter.enemies]
+            captures.append([dict(enemy.conditions) for enemy in encounter.enemies])
             return "victory"
 
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=lambda _: None, rng=random.Random(112))
@@ -4492,7 +4733,7 @@ class CoreTests(unittest.TestCase):
         game.skill_check = lambda actor, skill, dc, context: False
         game.run_encounter = fake_run
         game.scene_road_ambush()
-        self.assertTrue(all("emboldened" in conditions for conditions in captured["enemy_conditions"]))
+        self.assertTrue(all("emboldened" in conditions for conditions in captures[0]))
 
     def test_road_ambush_intimidation_choice_renders_as_action(self) -> None:
         player = build_character(
@@ -4909,6 +5150,30 @@ class CoreTests(unittest.TestCase):
         self.assertTrue(all(member.level == 4 for member in game.state.party_members()))
         self.assertTrue(all(member.current_hp == member.max_hp for member in game.state.party_members()))
 
+    def test_dev_prompt_jump_to_act2_restarts_current_scene_loop(self) -> None:
+        player = build_character(
+            name="Velkor",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        answers = iter(["dev", "5", "1"])
+        game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=lambda _: None, rng=random.Random(165))
+        game.state = GameState(player=player, current_scene="phandalin_hub", gold=25)
+
+        with self.assertRaises(gameplay_base.ResumeLoadedGame):
+            game.choose("Where do you go next?", ["Stay in Phandalin", "Ride out"])
+
+        self.assertEqual(game.state.current_act, 2)
+        self.assertEqual(game.state.current_scene, "act2_claims_council")
+        self.assertEqual(
+            {companion.name for companion in game.state.companions},
+            {"Bryn Underbough", "Elira Dawnmantle", "Tolan Ironshield"},
+        )
+        self.assertTrue(all(member.level == 4 for member in game.state.party_members()))
+
     def test_spell_slots_start_with_bg3_style_class_tables(self) -> None:
         wizard = build_character(
             name="Nyra",
@@ -5004,6 +5269,54 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(game.state.player.current_hp, game.state.player.max_hp)
         self.assertEqual(game.state.short_rests_remaining, 2)
         self.assertLessEqual(game.current_supply_points(), 8)
+
+    def test_paid_inn_long_rest_charges_party_without_consuming_supplies(self) -> None:
+        player = build_character(
+            name="Velkor",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        companion = create_kaelis_starling()
+        player.current_hp = 2
+        companion.current_hp = 3
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(172))
+        game.state = GameState(
+            player=player,
+            companions=[companion],
+            current_scene="phandalin_hub",
+            gold=10,
+            inventory={"camp_stew_jar": 3, "bread_round": 4, "goat_cheese": 2},
+            short_rests_remaining=0,
+        )
+        supply_points = game.current_supply_points()
+        self.assertTrue(game.paid_inn_long_rest("Stonehill Inn"))
+        self.assertEqual(game.state.gold, 0)
+        self.assertEqual(game.current_supply_points(), supply_points)
+        self.assertEqual(player.current_hp, player.max_hp)
+        self.assertEqual(companion.current_hp, companion.max_hp)
+        self.assertEqual(game.state.short_rests_remaining, 2)
+
+    def test_paid_inn_long_rest_requires_enough_gold(self) -> None:
+        player = build_character(
+            name="Velkor",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        player.current_hp = 2
+        log: list[str] = []
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(173))
+        game.state = GameState(player=player, current_scene="phandalin_hub", gold=4, short_rests_remaining=0)
+        self.assertFalse(game.paid_inn_long_rest("Stonehill Inn"))
+        self.assertEqual(game.state.gold, 4)
+        self.assertEqual(player.current_hp, 2)
+        self.assertEqual(game.state.short_rests_remaining, 0)
+        self.assertIn("costs 5 gp", self.plain_output(log))
 
     def test_short_rest_heals_half_maximum_hp_rounded_up(self) -> None:
         player = build_character(
@@ -5708,7 +6021,7 @@ class CoreTests(unittest.TestCase):
             class_skill_choices=["Athletics", "Survival"],
         )
         log: list[str] = []
-        answers = iter(["1", "3"])
+        answers = iter(["1", "4"])
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=log.append, rng=random.Random(30))
         game.state = GameState(player=player, current_scene="phandalin_hub")
         game.visit_stonehill_inn()
@@ -5725,7 +6038,7 @@ class CoreTests(unittest.TestCase):
             class_skill_choices=["Athletics", "Survival"],
         )
         log: list[str] = []
-        answers = iter(["1", "1"])
+        answers = iter(["1", "2"])
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=log.append, rng=random.Random(9205))
         game.state = GameState(
             player=player,
@@ -5758,9 +6071,19 @@ class CoreTests(unittest.TestCase):
             class_skill_choices=["Athletics", "Survival"],
         )
         log: list[str] = []
-        answers = iter(["1", "1", "4", "1", "1"])
+        answers = iter(["1", "6", "1"])
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=log.append, rng=random.Random(27))
-        game.state = GameState(player=player, current_scene="neverwinter_briefing", flags={"briefing_seen": True})
+        game.state = GameState(
+            player=player,
+            current_scene="neverwinter_briefing",
+            flags={
+                "briefing_seen": True,
+                "early_companion_recruited": "Kaelis Starling",
+                "neverwinter_tymora_shrine_seen": True,
+                "neverwinter_high_road_milehouse_seen": True,
+                "neverwinter_signal_cairn_seen": True,
+            },
+        )
         game.scene_neverwinter_briefing()
         rendered = self.plain_output(log)
         self.assertEqual(rendered.count('1. "How is Neverwinter holding together these days?"'), 1)
@@ -5826,6 +6149,107 @@ class CoreTests(unittest.TestCase):
         self.assertIn("Kaelis Starling, a ranger scout", rendered)
         self.assertIn("Rhogar Valeguard, a paladin caravan-guard", rendered)
         self.assertNotIn("Handle the road alone for now.", rendered)
+
+    def test_neverwinter_tymora_shrine_can_recruit_elira_before_phandalin(self) -> None:
+        player = build_character(
+            name="Velkor",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        answers = iter(["1", "1"])
+        game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=lambda _: None, rng=random.Random(90090))
+        game.state = GameState(
+            player=player,
+            companions=[create_kaelis_starling()],
+            current_scene="neverwinter_briefing",
+        )
+        game.skill_check = lambda actor, skill, dc, context: True  # type: ignore[method-assign]
+
+        game.handle_neverwinter_tymora_shrine()
+
+        self.assertTrue(game.has_companion("Elira Dawnmantle"))
+        self.assertTrue(game.state.flags["elira_neverwinter_recruited"])
+        self.assertTrue(game.state.flags["elira_helped"])
+        self.assertEqual(len(game.state.party_members()), 3)
+
+    def test_neverwinter_high_road_milehouse_sets_route_effect_for_three_member_party(self) -> None:
+        player = build_character(
+            name="Velkor",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        encounters: list[Encounter] = []
+        game = TextDnDGame(input_fn=lambda _: "2", output_fn=lambda _: None, rng=random.Random(90091))
+        game.state = GameState(
+            player=player,
+            companions=[create_kaelis_starling(), create_elira_dawnmantle()],
+            current_scene="neverwinter_briefing",
+        )
+        game.skill_check = lambda actor, skill, dc, context: True  # type: ignore[method-assign]
+        game.run_encounter = lambda encounter: encounters.append(encounter) or "victory"  # type: ignore[method-assign]
+
+        game.handle_neverwinter_high_road_milehouse()
+
+        self.assertTrue(game.state.flags["neverwinter_woodline_path"])
+        self.assertTrue(game.state.flags["road_ambush_scouted"])
+        self.assertEqual([encounter.title for encounter in encounters], ["High Road Milehouse Intercept"])
+        self.assertEqual(len(encounters[0].enemies), 2)
+
+    def test_neverwinter_signal_cairn_sets_second_wave_edge(self) -> None:
+        player = build_character(
+            name="Velkor",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        encounters: list[Encounter] = []
+        game = TextDnDGame(input_fn=lambda _: "2", output_fn=lambda _: None, rng=random.Random(90093))
+        game.state = GameState(
+            player=player,
+            companions=[create_kaelis_starling(), create_elira_dawnmantle()],
+            current_scene="neverwinter_briefing",
+        )
+        game.skill_check = lambda actor, skill, dc, context: True  # type: ignore[method-assign]
+        game.run_encounter = lambda encounter: encounters.append(encounter) or "victory"  # type: ignore[method-assign]
+
+        game.handle_neverwinter_signal_cairn()
+
+        self.assertTrue(game.state.flags["road_reinforcement_signal_cut"])
+        self.assertTrue(game.state.flags["road_second_wave_trail_read"])
+        self.assertEqual([encounter.title for encounter in encounters], ["Neverwinter Wood Signal Cairn"])
+        self.assertEqual(len(encounters[0].enemies), 2)
+
+    def test_phandalin_shrine_defers_when_elira_joined_in_neverwinter(self) -> None:
+        player = build_character(
+            name="Velkor",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        log: list[str] = []
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(90092))
+        game.state = GameState(
+            player=player,
+            companions=[create_elira_dawnmantle()],
+            current_scene="phandalin_hub",
+            flags={"elira_neverwinter_recruited": True},
+        )
+
+        game.visit_shrine()
+
+        rendered = self.plain_output(log)
+        self.assertIn("Elira's field kit is not waiting", rendered)
+        self.assertNotIn("Choose what you say to Elira.", rendered)
 
     def test_help_command_lists_global_commands(self) -> None:
         player = build_character(
@@ -6259,6 +6683,32 @@ class CoreTests(unittest.TestCase):
         self.assertFalse(second_game.current_settings_payload()["pacing_pauses_enabled"])
         self.assertFalse(second_game.current_settings_payload()["staggered_reveals_enabled"])
         self.assertFalse(second_game.current_settings_payload()["animations_and_delays_enabled"])
+
+        settings_path.unlink(missing_ok=True)
+        save_dir.rmdir()
+
+    def test_missing_settings_default_to_music_and_presentation_on_sfx_off(self) -> None:
+        save_dir = Path.cwd() / "tests_output" / "settings_defaults"
+        save_dir.mkdir(parents=True, exist_ok=True)
+        settings_path = save_dir / "settings.json"
+        settings_path.unlink(missing_ok=True)
+
+        game = TextDnDGame(
+            input_fn=lambda _: "1",
+            output_fn=print,
+            save_dir=save_dir,
+            rng=random.Random(407),
+        )
+
+        self.assertFalse(game.current_settings_payload()["sound_effects_enabled"])
+        self.assertTrue(game.current_settings_payload()["music_enabled"])
+        self.assertTrue(game.current_settings_payload()["dice_animations_enabled"])
+        self.assertEqual(game.current_settings_payload()["dice_animation_mode"], "full")
+        self.assertTrue(game.current_settings_payload()["typed_dialogue_enabled"])
+        self.assertTrue(game.current_settings_payload()["pacing_pauses_enabled"])
+        self.assertTrue(game.current_settings_payload()["staggered_reveals_enabled"])
+        self.assertTrue(game.current_settings_payload()["animations_and_delays_enabled"])
+        self.assertEqual(gameplay_base.GameBase.default_settings_payload(), game.current_settings_payload())
 
         settings_path.unlink(missing_ok=True)
         save_dir.rmdir()

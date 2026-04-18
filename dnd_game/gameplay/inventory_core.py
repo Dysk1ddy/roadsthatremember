@@ -249,18 +249,8 @@ class InventoryCoreMixin:
             f"Short rests remaining before a long rest: {self.state.short_rests_remaining}."
         )
 
-    def long_rest(self) -> None:
+    def complete_long_rest_recovery(self) -> None:
         assert self.state is not None
-        required_points = 12
-        consumed, missing = choose_supply_items_to_consume(self.inventory_dict(), required_points)
-        if missing > 0:
-            self.say(
-                f"You need {required_points} supply points to long rest, but the party only has "
-                f"{required_points - missing} available."
-            )
-            return
-        for item_id, quantity in consumed.items():
-            self.remove_inventory_item(item_id, quantity)
         for member in [self.state.player, *self.state.all_companions()]:
             if member.dead:
                 member.temp_hp = 0
@@ -277,8 +267,43 @@ class InventoryCoreMixin:
                 if member.conditions["exhaustion"] <= 0:
                     member.conditions.pop("exhaustion", None)
         self.state.short_rests_remaining = 2
+
+    def long_rest(self) -> None:
+        assert self.state is not None
+        required_points = 12
+        consumed, missing = choose_supply_items_to_consume(self.inventory_dict(), required_points)
+        if missing > 0:
+            self.say(
+                f"You need {required_points} supply points to long rest, but the party only has "
+                f"{required_points - missing} available."
+            )
+            return
+        for item_id, quantity in consumed.items():
+            self.remove_inventory_item(item_id, quantity)
+        self.complete_long_rest_recovery()
         consumed_text = ", ".join(f"{get_item(item_id).name} x{quantity}" for item_id, quantity in consumed.items())
         self.say(f"The party completes a long rest after using {consumed_text}.")
+
+    def paid_inn_long_rest_cost(self) -> int:
+        assert self.state is not None
+        return 5 * max(1, len(self.state.party_members()))
+
+    def paid_inn_long_rest(self, inn_name: str) -> bool:
+        assert self.state is not None
+        party_size = max(1, len(self.state.party_members()))
+        cost = self.paid_inn_long_rest_cost()
+        member_text = "member" if party_size == 1 else "members"
+        if self.state.gold < cost:
+            self.say(
+                f"A long rest at {inn_name} costs {cost} gp for {party_size} active party {member_text}, "
+                f"but the party only has {self.state.gold} gp."
+            )
+            return False
+        self.state.gold -= cost
+        self.complete_long_rest_recovery()
+        self.say(f"The party pays {cost} gp for beds at {inn_name} and completes a long rest without using camp supplies.")
+        self.add_journal(f"Paid {cost} gp for a long rest at {inn_name}.")
+        return True
 
     def show_inventory(self, *, filter_key: str = "all") -> None:
         assert self.state is not None

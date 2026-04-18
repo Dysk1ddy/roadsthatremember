@@ -2810,6 +2810,12 @@ class MapSystemMixin:
             return
         self.complete_act2_map_room(dungeon, room.room_id)
         self.reward_party(xp=45, gold=10, reason="clearing Stonehollow Dig")
+        stonehollow_reward = self.act2_stonehollow_milestone_item()
+        self.act2_award_milestone_gear(
+            "act2_stonehollow_milestone_gear",
+            stonehollow_reward,
+            source="Stonehollow's recovered survey locker",
+        )
         if delayed:
             self.act2_shift_metric(
                 "act2_route_control",
@@ -3427,6 +3433,11 @@ class MapSystemMixin:
             )
         self._south_adit_recruit_irielle(delayed=delayed)
         self.reward_party(xp=60, gold=18, reason="freeing the South Adit prisoners")
+        self.act2_award_milestone_gear(
+            "act2_south_adit_milestone_gear",
+            "choirward_amulet_uncommon",
+            source="the South Adit prisoner cache",
+        )
         self.return_to_act2_hub("The South Adit prison line breaks open behind you, and its survivors carry the first hard proof of the Choir back toward Phandalin.")
 
     def _wave_echo_rail_junction(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
@@ -3940,10 +3951,14 @@ class MapSystemMixin:
 
     def _black_lake_far_landing(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
         assert self.state is not None
+        high_pressure = self.act2_metric_value("act2_whisper_pressure") >= 4
+        bad_route = self.act2_metric_value("act2_route_control") <= 2
+        strong_gear = self.act2_party_has_strong_route_gear()
+        full_party = len(self.state.party_members()) >= 4
         enemies = [create_enemy("animated_armor"), create_enemy("starblighted_miner")]
-        if len(self.state.party_members()) >= 4 or self.act2_metric_value("act2_whisper_pressure") >= 4:
+        if full_party or high_pressure:
             enemies.append(self.act2_pick_enemy(("spectral_foreman", "blacklake_pincerling", "duskmire_matriarch", "obelisk_eye")))
-        if len(self.state.party_members()) >= 4:
+        if full_party and (bad_route or high_pressure or strong_gear):
             enemies.append(self.act2_pick_enemy(("cult_lookout", "starblighted_miner", "blacklake_pincerling")))
         elif not self.state.flags.get("black_lake_barracks_raided"):
             enemies.append(self.act2_pick_enemy(("cult_lookout", "choir_adept", "starblighted_miner")))
@@ -4004,6 +4019,11 @@ class MapSystemMixin:
             return
         self.complete_act2_map_room(dungeon, room.room_id)
         self.reward_party(xp=55, gold=15, reason="crossing the Black Lake causeway")
+        self.act2_award_milestone_gear(
+            "act2_black_lake_milestone_gear",
+            self.act2_black_lake_milestone_item(),
+            source="the Black Lake reliquary",
+        )
         self.add_journal("You crossed the Black Lake causeway and opened the last clean approach to the Forge of Spells.")
         self.return_to_act2_hub("The Black Lake causeway is finally yours, and the Forge lies open on the far side.")
 
@@ -4080,12 +4100,15 @@ class MapSystemMixin:
 
     def _forge_choir_pit(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
         assert self.state is not None
+        high_pressure = self.act2_metric_value("act2_whisper_pressure") >= 4
+        hard_route = self.act2_metric_value("act2_route_control") <= 2 or self.act2_party_has_strong_route_gear()
+        full_party = len(self.state.party_members()) >= 4
         enemies = [create_enemy("choir_adept"), create_enemy("cult_lookout")]
         if not self.state.flags.get("black_lake_barracks_raided"):
             enemies.append(self.act2_pick_enemy(("cult_lookout", "choir_executioner", "starblighted_miner")))
-        if len(self.state.party_members()) >= 4:
+        if full_party and (hard_route or high_pressure):
             enemies.append(self.act2_pick_enemy(("cult_lookout", "choir_executioner", "starblighted_miner")))
-        elif self.act2_metric_value("act2_whisper_pressure") >= 4:
+        elif high_pressure:
             enemies.append(self.act2_pick_enemy(("obelisk_eye", "starblighted_miner", "iron_prayer_horror")))
         hero_bonus = self.apply_scene_companion_support("forge_of_spells")
         if self.state.flags.get("black_lake_barracks_raided"):
@@ -4312,14 +4335,17 @@ class MapSystemMixin:
 
     def _forge_caldra_dais(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
         assert self.state is not None
+        high_pressure = self.act2_metric_value("act2_whisper_pressure") >= 4
+        hard_route = self.act2_metric_value("act2_route_control") <= 2 or self.act2_party_has_strong_route_gear()
+        full_party = len(self.state.party_members()) >= 4
         enemies = [create_enemy("caldra_voss"), create_enemy("choir_adept")]
-        if len(self.state.party_members()) >= 4:
+        if full_party:
             enemies.append(self.act2_pick_enemy(("cult_lookout", "starblighted_miner", "choir_executioner")))
-        if self.state.flags.get("black_lake_barracks_raided") and len(self.state.party_members()) >= 4:
+        if self.state.flags.get("black_lake_barracks_raided") and full_party and (hard_route or high_pressure):
             enemies.append(self.act2_pick_enemy(("cult_lookout", "starblighted_miner")))
         elif not self.state.flags.get("black_lake_barracks_raided"):
             enemies.append(self.act2_pick_enemy(("cult_lookout", "choir_executioner", "starblighted_miner")))
-        if self.act2_metric_value("act2_whisper_pressure") >= 4:
+        if high_pressure:
             enemies.append(self.act2_pick_enemy(("starblighted_miner", "obelisk_eye", "iron_prayer_horror")))
 
         hero_bonus = self.apply_scene_companion_support("forge_of_spells")
@@ -5889,6 +5915,8 @@ class MapSystemMixin:
         assert self.state is not None
         party_size = self.act1_party_size()
         boss_enemies = [create_enemy("varyn"), create_enemy("ash_brand_enforcer"), create_enemy("ember_channeler")]
+        boss_enemies[0].max_hp += 8
+        boss_enemies[0].current_hp += 8
         if party_size >= 3:
             boss_enemies.append(self.act1_pick_enemy(("bandit", "cinderflame_skull", "whispermaw_blob")))
         if party_size >= 4:

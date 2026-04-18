@@ -41,9 +41,58 @@ class StoryAct2ScaffoldMixin:
         ("forge_pact_rhythm_found", "recovered the Pact anvil's rhythm"),
         ("forge_shard_channels_disrupted", "shattered the shard channels"),
     )
+    ACT2_MILESTONE_GEAR_IDS = (
+        "delver_lantern_hood_uncommon",
+        "forgehand_gauntlets_uncommon",
+        "choirward_amulet_uncommon",
+    )
+    ACT2_RARE_ROUTE_GEAR_IDS = (
+        "sigil_anchor_ring_rare",
+        "choirward_amulet_rare",
+        "delver_lantern_hood_rare",
+        "forgehand_gauntlets_rare",
+        "studded_leather_rare",
+        "breastplate_rare",
+        "chain_mail_rare",
+        "splint_armor_rare",
+        "shield_rare",
+    )
 
     def act2_pick_enemy(self, templates, *, name: str | None = None):
         return create_enemy(self.rng.choice(tuple(templates)), name=name)
+
+    def act2_award_milestone_gear(self, reward_flag: str, item_id: str, *, source: str) -> None:
+        assert self.state is not None
+        if self.state.flags.get(reward_flag):
+            return
+        if self.add_inventory_item(item_id, source=source):
+            self.state.flags[reward_flag] = item_id
+
+    def act2_stonehollow_milestone_item(self) -> str:
+        assert self.state is not None
+        if self.state.flags.get("stonehollow_ward_path_read") or self.state.flags.get("stonehollow_notes_preserved"):
+            return "delver_lantern_hood_uncommon"
+        return "forgehand_gauntlets_uncommon"
+
+    def act2_black_lake_milestone_item(self) -> str:
+        assert self.state is not None
+        if self.state.flags.get("black_lake_shrine_purified") or self.act2_metric_value("act2_whisper_pressure") >= 4:
+            return "sigil_anchor_ring_rare"
+        return "fireward_elixir"
+
+    def act2_party_has_strong_route_gear(self) -> bool:
+        assert self.state is not None
+        inventory = self.inventory_dict()
+        if any(inventory.get(item_id, 0) > 0 for item_id in self.ACT2_RARE_ROUTE_GEAR_IDS):
+            return True
+        milestone_count = sum(inventory.get(item_id, 0) for item_id in self.ACT2_MILESTONE_GEAR_IDS)
+        equipped_ids: list[str] = []
+        for member in self.state.party_members():
+            equipped_ids.extend(item_id for item_id in member.equipment_slots.values() if item_id is not None)
+        if any(item_id in self.ACT2_RARE_ROUTE_GEAR_IDS for item_id in equipped_ids):
+            return True
+        milestone_count += sum(1 for item_id in equipped_ids if item_id in self.ACT2_MILESTONE_GEAR_IDS)
+        return milestone_count >= 3
 
     def act2_branch_progress(self) -> int:
         assert self.state is not None
@@ -844,6 +893,7 @@ class StoryAct2ScaffoldMixin:
                     ("turn_in", self.action_option("Report at the council table and resolve ready quests.")),
                     ("camp", self.action_option("Return to camp and manage the wider company.")),
                     ("sidetrack", self.action_option("Follow a companion's Act 2 thread.")),
+                    ("inn", self.action_option("Rest at Stonehill Inn (5 gp per active party member).")),
                     ("rest", self.action_option("Take a short rest.")),
                     ("party", self.action_option("Review the current party.")),
                 ]
@@ -900,6 +950,9 @@ class StoryAct2ScaffoldMixin:
                 continue
             if selection_key == "sidetrack":
                 self.run_act2_companion_sidetrack()
+                continue
+            if selection_key == "inn":
+                self.paid_inn_long_rest("Stonehill Inn")
                 continue
             if selection_key == "rest":
                 self.short_rest()
@@ -1439,6 +1492,11 @@ class StoryAct2ScaffoldMixin:
                 self.say("Nim agrees to return to camp and organize whatever survey truth can still be salvaged.")
         self.state.flags["stonehollow_dig_cleared"] = True
         self.reward_party(xp=45, gold=10, reason="clearing Stonehollow Dig")
+        self.act2_award_milestone_gear(
+            "act2_stonehollow_milestone_gear",
+            self.act2_stonehollow_milestone_item(),
+            source="Stonehollow's recovered survey locker",
+        )
         if delayed:
             self.act2_shift_metric(
                 "act2_route_control",
@@ -1795,6 +1853,11 @@ class StoryAct2ScaffoldMixin:
                 self.move_companion_to_camp(irielle)
                 self.say("Irielle agrees to reach camp first and share what she knows once she can think without whispering walls around her.")
         self.reward_party(xp=60, gold=18, reason="freeing the South Adit prisoners")
+        self.act2_award_milestone_gear(
+            "act2_south_adit_milestone_gear",
+            "choirward_amulet_uncommon",
+            source="the South Adit prisoner cache",
+        )
         self.state.current_scene = "act2_expedition_hub"
 
     def scene_wave_echo_outer_galleries(self) -> None:
@@ -1871,10 +1934,14 @@ class StoryAct2ScaffoldMixin:
             "This is the last clean threshold before the Forge of Spells, and the Quiet Choir knows it.",
             typed=True,
         )
+        high_pressure = self.act2_metric_value("act2_whisper_pressure") >= 4
+        bad_route = self.act2_metric_value("act2_route_control") <= 2
+        strong_gear = self.act2_party_has_strong_route_gear()
+        full_party = len(self.state.party_members()) >= 4
         enemies = [create_enemy("animated_armor"), create_enemy("starblighted_miner")]
-        if len(self.state.party_members()) >= 4 or self.act2_metric_value("act2_whisper_pressure") >= 4:
+        if full_party or high_pressure:
             enemies.append(self.act2_pick_enemy(("spectral_foreman", "blacklake_pincerling", "duskmire_matriarch", "obelisk_eye")))
-        if len(self.state.party_members()) >= 4:
+        if full_party and (bad_route or high_pressure or strong_gear):
             enemies.append(self.act2_pick_enemy(("cult_lookout", "starblighted_miner", "blacklake_pincerling")))
         choice = self.scenario_choice(
             "What do you claim on the way across the lake?",
@@ -1933,6 +2000,11 @@ class StoryAct2ScaffoldMixin:
             return
         self.state.flags["black_lake_crossed"] = True
         self.reward_party(xp=55, gold=15, reason="crossing the Black Lake causeway")
+        self.act2_award_milestone_gear(
+            "act2_black_lake_milestone_gear",
+            self.act2_black_lake_milestone_item(),
+            source="the Black Lake reliquary",
+        )
         self.state.current_scene = "act2_expedition_hub"
 
     def scene_forge_of_spells(self) -> None:
@@ -1943,14 +2015,17 @@ class StoryAct2ScaffoldMixin:
             "Shards hum inside old channels, the air sounds wrong when it moves, and Sister Caldra Voss stands where ancient craft meets a much newer hunger.",
             typed=True,
         )
+        high_pressure = self.act2_metric_value("act2_whisper_pressure") >= 4
+        hard_route = self.act2_metric_value("act2_route_control") <= 2 or self.act2_party_has_strong_route_gear()
+        full_party = len(self.state.party_members()) >= 4
         enemies = [create_enemy("caldra_voss"), create_enemy("choir_adept")]
-        if len(self.state.party_members()) >= 4:
+        if full_party:
             enemies.append(self.act2_pick_enemy(("cult_lookout", "starblighted_miner", "choir_executioner")))
-        if self.state.flags.get("black_lake_barracks_raided") and len(self.state.party_members()) >= 4:
+        if self.state.flags.get("black_lake_barracks_raided") and full_party and (hard_route or high_pressure):
             enemies.append(self.act2_pick_enemy(("cult_lookout", "starblighted_miner")))
         elif not self.state.flags.get("black_lake_barracks_raided"):
             enemies.append(self.act2_pick_enemy(("cult_lookout", "choir_executioner", "starblighted_miner")))
-        if self.act2_metric_value("act2_whisper_pressure") >= 4:
+        if high_pressure:
             enemies.append(self.act2_pick_enemy(("starblighted_miner", "obelisk_eye", "iron_prayer_horror")))
         if self.state.flags.get("black_lake_shrine_purified"):
             self.apply_status(self.state.player, "blessed", 2, source="the reclaimed Black Lake shrine")

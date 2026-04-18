@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from ..content import create_enemy
 from ..items import get_item
 from ..models import Character
 from ..ui.colors import rich_style_name
@@ -29,13 +30,14 @@ class CombatFlowMixin:
         play_encounter_music = getattr(self, "play_encounter_music", None)
         refresh_scene_music = getattr(self, "refresh_scene_music", None)
         try:
+            heroes = [member for member in self.state.party_members() if not member.dead]
+            self.prepare_encounter_for_party(encounter, heroes=heroes)
+            enemies = encounter.enemies
             if callable(play_encounter_music):
                 play_encounter_music(encounter)
             self.banner(encounter.title)
             self.say(encounter.description, typed=True)
             self.pause_for_combat_transition()
-            heroes = [member for member in self.state.party_members() if not member.dead]
-            enemies = encounter.enemies
             self.introduce_encounter_characters(enemies)
             self.apply_companion_combat_openers(heroes, enemies, encounter)
             for enemy in enemies:
@@ -91,6 +93,115 @@ class CombatFlowMixin:
             self._in_combat = False
             if callable(refresh_scene_music):
                 refresh_scene_music()
+
+    def prepare_encounter_for_party(self, encounter: Encounter, *, heroes: list[Character] | None = None) -> None:
+        assert self.state is not None
+        party = heroes if heroes is not None else [member for member in self.state.party_members() if not member.dead]
+        if not party:
+            return
+        target_level = max(1, max(member.level for member in party))
+        original_living_enemies = [enemy for enemy in encounter.enemies if "enemy" in enemy.tags and not enemy.dead]
+        if not original_living_enemies:
+            return
+
+        scaling_slots = 2 if len(original_living_enemies) >= 4 else 1
+        self.scale_encounter_enemies_to_party_level(original_living_enemies, target_level, slots=scaling_slots)
+
+        if len(party) >= 3:
+            self.ensure_minimum_encounter_enemies(encounter, target_level=target_level, minimum=3)
+
+    def scale_encounter_enemies_to_party_level(
+        self,
+        enemies: list[Character],
+        target_level: int,
+        *,
+        slots: int,
+    ) -> None:
+        candidates = [enemy for enemy in enemies if enemy.is_conscious() and enemy.level < target_level]
+        candidates.sort(
+            key=lambda enemy: (
+                "leader" in enemy.tags,
+                enemy.xp_value,
+                enemy.max_hp,
+                enemy.level,
+            ),
+            reverse=True,
+        )
+        for enemy in candidates[: max(0, slots)]:
+            self.scale_enemy_to_party_level(enemy, target_level)
+
+    def scale_enemy_to_party_level(self, enemy: Character, target_level: int) -> None:
+        if target_level <= enemy.level:
+            return
+        original_level = enemy.level
+        level_gap = target_level - original_level
+        hp_deficit = max(0, enemy.max_hp - enemy.current_hp)
+        for _ in range(level_gap):
+            hp_gain = max(1, enemy.hit_die // 2 + 1 + enemy.ability_mod("CON"))
+            enemy.max_hp += hp_gain
+        enemy.level = target_level
+        if enemy.current_hp > 0:
+            enemy.current_hp = max(1, enemy.max_hp - hp_deficit)
+        if level_gap >= 2:
+            enemy.weapon.damage_bonus += level_gap // 2
+        enemy.xp_value = self.scaled_enemy_reward(enemy.xp_value, level_gap, xp=True)
+        enemy.gold_value = self.scaled_enemy_reward(enemy.gold_value, level_gap, xp=False)
+        enemy.notes.append(f"Pseudo-scaled from level {original_level} to {target_level}.")
+
+    def scaled_enemy_reward(self, base_value: int, level_gap: int, *, xp: bool) -> int:
+        if base_value <= 0 or level_gap <= 0:
+            return base_value
+        per_level = 0.5 if xp else 0.35
+        return max(base_value + 1, int(round(base_value * (1 + per_level * level_gap))))
+
+    def ensure_minimum_encounter_enemies(self, encounter: Encounter, *, target_level: int, minimum: int) -> None:
+        while len([enemy for enemy in encounter.enemies if "enemy" in enemy.tags and not enemy.dead]) < minimum:
+            template = self.support_enemy_template_for_encounter(encounter.enemies, target_level=target_level)
+            support = create_enemy(template)
+            support.notes.append("Added by party-size encounter scaling.")
+            encounter.enemies.append(support)
+
+    def support_enemy_template_for_encounter(self, enemies: list[Character], *, target_level: int) -> str:
+        living = [enemy for enemy in enemies if "enemy" in enemy.tags and not enemy.dead]
+        tags = {tag for enemy in living for tag in enemy.tags}
+        archetypes = {enemy.archetype for enemy in living}
+        races = {enemy.race for enemy in living}
+
+        if archetypes & {"caldra_voss", "choir_adept", "cult_lookout", "choir_executioner"}:
+            return "cult_lookout"
+        if "undead" in tags or "Undead" in races:
+            return "lantern_fen_wisp" if target_level >= 3 else "skeletal_sentry"
+        if "construct" in tags or "Construct" in races:
+            return "animated_armor"
+        if "plant" in tags or "Plant" in races:
+            return "briar_twig"
+        if "ooze" in tags or "Ooze" in races:
+            return "ochre_slime"
+        if "beast" in tags or "Beast" in races:
+            return "stirge_swarm" if target_level >= 3 else "wolf"
+        if "aberration" in tags or "Aberration" in races:
+            return "blacklake_pincerling" if target_level >= 4 else "nothic"
+        if "monstrosity" in tags or "Monstrosity" in races:
+            if target_level >= 4:
+                return "carrion_lash_crawler"
+            return "rust_shell_scuttler"
+        if "giant" in tags or "Giant" in races:
+            return "goblin_skirmisher"
+        if "Orc" in races:
+            return "orc_raider"
+        if "Bugbear" in races:
+            return "bugbear_reaver"
+        if "Kobold" in races:
+            return "cinder_kobold"
+        if "Goblin" in races:
+            return "goblin_skirmisher"
+        if "humanoid" in tags or races & {"Human", "Humanoid", "Hobgoblin"}:
+            if archetypes & {"gutter_zealot", "ember_channeler"}:
+                return "gutter_zealot"
+            if target_level >= 3 and archetypes & {"expedition_reaver", "starblighted_miner"}:
+                return "expedition_reaver"
+            return "bandit_archer"
+        return "bandit"
 
     def resolve_encounter_victory(self, encounter: Encounter, enemies: list[Character]) -> str:
         assert self.state is not None

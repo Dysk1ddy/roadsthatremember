@@ -1434,6 +1434,8 @@ class StoryAct1ExpandedMixin:
             self.say("Glass and reeking poison spread across the hall entrance, forcing the final fight to start amid chaos you chose.")
 
         boss_enemies = [create_enemy("varyn"), create_enemy("bandit", name="Ashen Brand Enforcer"), create_enemy("bandit_archer")]
+        boss_enemies[0].max_hp += 8
+        boss_enemies[0].current_hp += 8
         if party_size >= 4:
             boss_enemies.append(self.act1_pick_enemy(("bandit", "cinderflame_skull", "whispermaw_blob")))
         choice = self.scenario_choice(

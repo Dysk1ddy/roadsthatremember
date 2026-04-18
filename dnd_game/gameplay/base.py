@@ -71,6 +71,16 @@ class GameBase:
         "full": "Full",
     }
     SETTINGS_KEYS = (*BOOLEAN_SETTINGS_KEYS, "dice_animation_mode")
+    DEFAULT_SETTINGS_PAYLOAD = {
+        "sound_effects_enabled": False,
+        "music_enabled": True,
+        "dice_animations_enabled": True,
+        "dice_animation_mode": "full",
+        "typed_dialogue_enabled": True,
+        "pacing_pauses_enabled": True,
+        "staggered_reveals_enabled": True,
+        "animations_and_delays_enabled": True,
+    }
     ACT_LABELS = {
         1: "I",
         2: "II",
@@ -188,7 +198,11 @@ class GameBase:
         self.autosaves_enabled = self._interactive_output
         should_apply_persisted_settings = self._interactive_output or not self._uses_default_save_dir
         persisted_settings = self.load_persisted_settings() if should_apply_persisted_settings else {}
-        default_presentation = persisted_settings.get("animations_and_delays_enabled", self._interactive_output)
+        default_settings = self.default_settings_payload()
+        default_presentation = persisted_settings.get(
+            "animations_and_delays_enabled",
+            default_settings["animations_and_delays_enabled"] if should_apply_persisted_settings else self._interactive_output,
+        )
         stored_dice_mode = persisted_settings.get("dice_animation_mode")
         if animate_dice is None:
             if isinstance(stored_dice_mode, str) and stored_dice_mode in self.DICE_ANIMATION_MODES:
@@ -249,13 +263,23 @@ class GameBase:
         self._pending_act2_dungeon_map_refresh = False
         self._pending_act2_dungeon_movement_text = ""
         self._music_enabled_preference = bool(
-            persisted_settings.get("music_enabled", self._interactive_output) if play_music is None else play_music
+            persisted_settings.get(
+                "music_enabled",
+                default_settings["music_enabled"] if should_apply_persisted_settings else self._interactive_output,
+            )
+            if play_music is None
+            else play_music
         )
         initialize_music_system = getattr(self, "initialize_music_system", None)
         if callable(initialize_music_system):
             initialize_music_system(self._music_enabled_preference)
         self._sound_effects_enabled_preference = bool(
-            persisted_settings.get("sound_effects_enabled", self._interactive_output) if play_sfx is None else play_sfx
+            persisted_settings.get(
+                "sound_effects_enabled",
+                default_settings["sound_effects_enabled"] if should_apply_persisted_settings else self._interactive_output,
+            )
+            if play_sfx is None
+            else play_sfx
         )
         initialize_sound_effects_system = getattr(self, "initialize_sound_effects_system", None)
         if callable(initialize_sound_effects_system):
@@ -313,6 +337,10 @@ class GameBase:
         if isinstance(dice_mode, str) and dice_mode in self.DICE_ANIMATION_MODES:
             settings["dice_animation_mode"] = dice_mode
         return settings
+
+    @classmethod
+    def default_settings_payload(cls) -> dict[str, object]:
+        return dict(cls.DEFAULT_SETTINGS_PAYLOAD)
 
     def current_settings_payload(self) -> dict[str, object]:
         presentation_bundle = bool(
@@ -1700,7 +1728,9 @@ class GameBase:
             self.show_global_commands()
             return True
         if lowered == "dev":
-            self.open_developer_tools_menu()
+            if self.open_developer_tools_menu():
+                self._compact_hud_last_scene_key = None
+                raise ResumeLoadedGame()
             return True
         if lowered == "settings":
             self.open_settings_menu()
@@ -1882,10 +1912,10 @@ class GameBase:
         self.say("Developer snapshot loaded: Act II begins with Bryn, Elira, and Tolan at level 4.")
         return True
 
-    def open_developer_tools_menu(self) -> None:
+    def open_developer_tools_menu(self) -> bool:
         if self.state is None:
             self.say("Start or load an adventure before using developer tools.")
-            return
+            return False
         while True:
             self.banner("Developer Tools")
             self.say("These tools affect the current run immediately and any save made afterward will keep the changes.")
@@ -1908,9 +1938,9 @@ class GameBase:
                 self.level_up_party_instantly()
             elif choice == 5:
                 if self.jump_to_act2_developer_start():
-                    return
+                    return True
             else:
-                return
+                return False
 
     def show_global_commands(self) -> None:
         commands = [
