@@ -40,10 +40,15 @@ from dnd_game.gameplay.sound_effects import (
     closest_dice_roll_sound_effect,
 )
 from dnd_game.gameplay.music import (
+    MUSIC_BOSS_TRANSITION_SECONDS,
+    MUSIC_COMBAT_EXIT_TRANSITION_SECONDS,
+    MUSIC_COMBAT_TRANSITION_SECONDS,
     MUSIC_ASSET_EXTENSIONS,
     MUSIC_CONTEXT_FOLDERS,
+    MUSIC_TRANSITION_CURVE,
     SCENE_MUSIC_CONTEXTS,
     music_files_for_context,
+    music_transition_seconds,
 )
 from dnd_game.gameplay.spell_slots import spell_slot_counts
 from dnd_game.drafts.map_system.runtime import (
@@ -243,6 +248,61 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(messages, ["Music enabled."])
         self.assertTrue(any(command.startswith('open "') and "Main menu" in command for command in commands))
         self.assertIn("play dnd_game_music repeat", commands)
+
+    def test_music_transition_profiles_match_scene_energy(self) -> None:
+        self.assertEqual(music_transition_seconds("wilderness", "combat"), MUSIC_COMBAT_TRANSITION_SECONDS)
+        self.assertEqual(music_transition_seconds("dungeon", "boss_combat"), MUSIC_BOSS_TRANSITION_SECONDS)
+        self.assertEqual(music_transition_seconds("combat", "city"), MUSIC_COMBAT_EXIT_TRANSITION_SECONDS)
+        self.assertGreater(music_transition_seconds("city", "dungeon"), MUSIC_COMBAT_TRANSITION_SECONDS)
+
+    def test_play_music_for_context_passes_contextual_crossfade(self) -> None:
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(900315))
+        game.music_enabled = True
+        game._music_supported = True
+        game._music_context = "wilderness"
+        game._music_track_name = "old.mp3"
+        game._last_music_transition_at = 0.0
+        game.choose_music_file = lambda context: Path(f"{context}.mp3")
+
+        with patch.object(audio_backend, "play_music", return_value=True) as play_music:
+            game.play_music_for_context("combat", restart=True)
+
+        play_music.assert_called_once()
+        _, kwargs = play_music.call_args
+        self.assertEqual(kwargs["fade_ms"], int(MUSIC_COMBAT_TRANSITION_SECONDS * 1000))
+        self.assertEqual(kwargs["curve"], MUSIC_TRANSITION_CURVE)
+        self.assertEqual(game._music_context, "combat")
+        self.assertEqual(game._music_track_name, "combat.mp3")
+
+    def test_stop_music_fades_to_silence(self) -> None:
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(900316))
+        game._music_supported = True
+        game._music_context = "city"
+        game._music_track_name = "town.mp3"
+
+        with patch.object(audio_backend, "stop_music") as stop_music:
+            game.stop_music(fade_seconds=1.5)
+
+        stop_music.assert_called_once_with(fade_ms=1500, curve=MUSIC_TRANSITION_CURVE)
+        self.assertIsNone(game._music_context)
+        self.assertIsNone(game._music_track_name)
+
+    def test_restarting_same_music_context_obeys_switch_cooldown(self) -> None:
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(900317))
+        game.music_enabled = True
+        game._music_supported = True
+        game._music_context = "combat"
+        game._music_track_name = "combat.mp3"
+        game._last_music_transition_at = 4.8
+        game.choose_music_file = lambda context: Path(f"{context}.mp3")
+
+        with (
+            patch("dnd_game.gameplay.music.time.perf_counter", return_value=5.0),
+            patch.object(audio_backend, "play_music", return_value=True) as play_music,
+        ):
+            game.play_music_for_context("combat", restart=True)
+
+        play_music.assert_not_called()
 
     def test_sound_effect_library_contains_expected_files(self) -> None:
         self.assertEqual(set(SOUND_EFFECT_FILES), {effect.key for effect in DICE_ROLL_SOUND_EFFECTS})
@@ -669,6 +729,39 @@ class CoreTests(unittest.TestCase):
 
         self.assertEqual(outcome, "victory")
         self.assertEqual(calls, [("encounter", "boss_combat"), ("scene", False)])
+
+    def test_run_encounter_starts_combat_music_after_description(self) -> None:
+        player = build_character(
+            name="Velkor",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        enemy = create_enemy("goblin_skirmisher")
+        enemy.current_hp = 0
+        enemy.dead = True
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(900811))
+        game.state = GameState(player=player, current_scene="road_ambush")
+        events: list[tuple[str, str]] = []
+        game.banner = lambda title: events.append(("banner", title))
+        game.say = lambda text, **_: events.append(("say", text))
+        game.pause_for_combat_transition = lambda: events.append(("pause", "combat"))
+        game.play_encounter_music = lambda encounter: events.append(("music", game.encounter_music_context(encounter)))
+        game.refresh_scene_music = lambda default_to_menu=False: events.append(("scene", str(default_to_menu)))
+
+        game.run_encounter(
+            Encounter(
+                title="Road Ambush",
+                description="A shadow lunges at you from the ditch.",
+                enemies=[enemy],
+                allow_post_combat_random_encounter=False,
+            )
+        )
+
+        self.assertLess(events.index(("say", "A shadow lunges at you from the ditch.")), events.index(("music", "combat")))
+        self.assertLess(events.index(("music", "combat")), events.index(("pause", "combat")))
 
     def test_start_new_game_keeps_main_menu_music_context(self) -> None:
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(90082))

@@ -33,10 +33,10 @@ class CombatFlowMixin:
             heroes = [member for member in self.state.party_members() if not member.dead]
             self.prepare_encounter_for_party(encounter, heroes=heroes)
             enemies = encounter.enemies
-            if callable(play_encounter_music):
-                play_encounter_music(encounter)
             self.banner(encounter.title)
             self.say(encounter.description, typed=True)
+            if callable(play_encounter_music):
+                play_encounter_music(encounter)
             self.pause_for_combat_transition()
             self.introduce_encounter_characters(enemies)
             self.apply_companion_combat_openers(heroes, enemies, encounter)

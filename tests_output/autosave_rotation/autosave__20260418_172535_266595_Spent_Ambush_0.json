@@ -1,0 +1,133 @@
+{
+  "player": {
+    "name": "Vale",
+    "race": "Human",
+    "class_name": "Fighter",
+    "background": "Soldier",
+    "level": 1,
+    "ability_scores": {
+      "STR": 16,
+      "DEX": 15,
+      "CON": 14,
+      "INT": 9,
+      "WIS": 13,
+      "CHA": 11
+    },
+    "skill_proficiencies": [
+      "Athletics",
+      "Intimidation",
+      "Survival"
+    ],
+    "saving_throw_proficiencies": [
+      "STR",
+      "CON"
+    ],
+    "features": [
+      "second_wind"
+    ],
+    "weapon": {
+      "name": "Longsword",
+      "damage": "1d8",
+      "ability": "STR",
+      "weapon_type": "simple",
+      "to_hit_bonus": 0,
+      "damage_bonus": 0,
+      "finesse": false,
+      "ranged": false,
+      "hands_required": 1,
+      "properties": [
+        "versatile"
+      ]
+    },
+    "armor": {
+      "name": "Chain Mail",
+      "base_ac": 16,
+      "armor_type": "light",
+      "dex_cap": 0,
+      "heavy": true,
+      "stealth_disadvantage": false
+    },
+    "hit_die": 10,
+    "current_hp": 12,
+    "max_hp": 12,
+    "shield": true,
+    "spellcasting_ability": null,
+    "skill_expertise": [],
+    "bonus_proficiencies": [
+      "Land Vehicles",
+      "Gaming Set"
+    ],
+    "resources": {
+      "second_wind": 1
+    },
+    "max_resources": {
+      "second_wind": 1
+    },
+    "inventory": {
+      "Healing Potion": 1
+    },
+    "conditions": {},
+    "equipment_bonuses": {
+      "Athletics": 1,
+      "Intimidation": 1
+    },
+    "gear_bonuses": {},
+    "notes": [
+      "Veteran's kit: +1 to Athletics and Intimidation checks."
+    ],
+    "tags": [
+      "hero"
+    ],
+    "equipment_slots": {},
+    "archetype": "fighter",
+    "companion_id": "",
+    "disposition": 0,
+    "lore": [],
+    "bond_flags": {},
+    "relationship_bonuses": {},
+    "stable": false,
+    "dead": false,
+    "death_successes": 0,
+    "death_failures": 0,
+    "temp_hp": 0,
+    "xp_value": 0,
+    "gold_value": 0
+  },
+  "companions": [],
+  "camp_companions": [],
+  "current_act": 1,
+  "current_scene": "road_ambush",
+  "flags": {
+    "random_encounters_seen": [
+      "loose_flagstones"
+    ],
+    "map_state": {
+      "current_node_id": "neverwinter_briefing",
+      "current_dungeon_id": null,
+      "current_room_id": null,
+      "visited_nodes": [],
+      "cleared_rooms": [],
+      "seen_story_beats": [],
+      "node_history": [],
+      "room_history": []
+    }
+  },
+  "clues": [],
+  "journal": [
+    "Reward from Spent Ambush 0: 50 XP, 4 gp.",
+    "Looted Bread Round x1 from Spent Ambush 0.",
+    "Looted Roadworn Leather Armor x1 from Spent Ambush 0.",
+    "Looted Potion of Healing x1 from Spent Ambush 0."
+  ],
+  "quests": {},
+  "completed_acts": [],
+  "xp": 50,
+  "gold": 13,
+  "inventory": {
+    "bread_round": 1,
+    "leather_armor_common": 1,
+    "potion_healing": 1,
+    "scroll_mending_word": 1
+  },
+  "short_rests_remaining": 2
+}

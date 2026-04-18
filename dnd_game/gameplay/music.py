@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import random
+import time
 
 from . import audio_backend
 
@@ -52,6 +53,37 @@ SCENE_MUSIC_CONTEXTS: dict[str, str] = {
     "act2_scaffold_complete": "city",
 }
 
+MUSIC_TRANSITION_CURVE = "equal_power"
+MUSIC_CONTEXT_SWITCH_COOLDOWN_SECONDS = 0.45
+MUSIC_INITIAL_FADE_SECONDS = 1.25
+MUSIC_COMBAT_TRANSITION_SECONDS = 1.0
+MUSIC_BOSS_TRANSITION_SECONDS = 0.75
+MUSIC_RANDOM_ENCOUNTER_TRANSITION_SECONDS = 1.2
+MUSIC_COMBAT_EXIT_TRANSITION_SECONDS = 2.75
+MUSIC_LOCAL_TRANSITION_SECONDS = 2.25
+MUSIC_AREA_TRANSITION_SECONDS = 3.5
+MUSIC_MUTE_FADE_SECONDS = 0.8
+COMBAT_MUSIC_CONTEXTS = frozenset({"combat", "miniboss_combat", "boss_combat"})
+LOCAL_MUSIC_CONTEXTS = frozenset({"camp", "inn", "town", "city"})
+
+
+def music_transition_seconds(previous_context: str | None, next_context: str) -> float:
+    if previous_context is None:
+        return MUSIC_INITIAL_FADE_SECONDS
+    if previous_context == next_context:
+        return MUSIC_COMBAT_TRANSITION_SECONDS if next_context in COMBAT_MUSIC_CONTEXTS else MUSIC_LOCAL_TRANSITION_SECONDS
+    if next_context == "boss_combat":
+        return MUSIC_BOSS_TRANSITION_SECONDS
+    if next_context in {"combat", "miniboss_combat"}:
+        return MUSIC_COMBAT_TRANSITION_SECONDS
+    if next_context == "random_encounter":
+        return MUSIC_RANDOM_ENCOUNTER_TRANSITION_SECONDS
+    if previous_context in COMBAT_MUSIC_CONTEXTS:
+        return MUSIC_COMBAT_EXIT_TRANSITION_SECONDS
+    if previous_context in LOCAL_MUSIC_CONTEXTS or next_context in LOCAL_MUSIC_CONTEXTS:
+        return MUSIC_LOCAL_TRANSITION_SECONDS
+    return MUSIC_AREA_TRANSITION_SECONDS
+
 
 def music_files_for_context(context: str, asset_dir: Path = MUSIC_ASSET_DIR) -> list[Path]:
     tracks: list[Path] = []
@@ -79,6 +111,7 @@ class MusicMixin:
         self._music_context: str | None = None
         self._music_track_name: str | None = None
         self._last_music_track_by_context: dict[str, str] = {}
+        self._last_music_transition_at = 0.0
         self._music_asset_dir = MUSIC_ASSET_DIR
         self._music_supported = audio_backend.music_is_available()
         self._music_assets_ready = any(
@@ -108,24 +141,46 @@ class MusicMixin:
         chooser = getattr(self.rng, "choice", random.choice)
         return chooser(candidates)
 
-    def play_music_for_context(self, context: str, *, restart: bool = False) -> None:
+    def play_music_for_context(self, context: str, *, restart: bool = False, transition_seconds: float | None = None) -> None:
         if not self.music_enabled or not self._music_supported:
             return
         if not restart and self._music_context == context and self._music_track_name is not None:
             return
+        now = time.perf_counter()
+        if (
+            restart
+            and self._music_context == context
+            and self._music_track_name is not None
+            and now - self._last_music_transition_at < MUSIC_CONTEXT_SWITCH_COOLDOWN_SECONDS
+        ):
+            return
         track_path = self.choose_music_file(context)
         if track_path is None:
             return
-        if not audio_backend.play_music(track_path, loops=-1):
+        fade_seconds = (
+            music_transition_seconds(self._music_context, context)
+            if transition_seconds is None
+            else max(0.0, transition_seconds)
+        )
+        if not audio_backend.play_music(
+            track_path,
+            loops=-1,
+            fade_ms=int(fade_seconds * 1000),
+            curve=MUSIC_TRANSITION_CURVE,
+        ):
             return
         self._music_context = context
         self._music_track_name = track_path.name
         self._last_music_track_by_context[context] = track_path.name
+        self._last_music_transition_at = now
 
-    def stop_music(self) -> None:
+    def stop_music(self, *, fade_seconds: float = MUSIC_MUTE_FADE_SECONDS) -> None:
         if not self._music_supported:
             return
-        audio_backend.stop_music()
+        audio_backend.stop_music(
+            fade_ms=int(max(0.0, fade_seconds) * 1000),
+            curve=MUSIC_TRANSITION_CURVE,
+        )
         self._music_context = None
         self._music_track_name = None
 
