@@ -320,6 +320,25 @@ class StoryAct2ScaffoldMixin:
             route += 1
         if self.act2_company_has("Elira Dawnmantle"):
             whisper -= 1
+        if self.state.flags.get("quest_reward_blackwake_watch_backing"):
+            town += 1
+            route += 1
+        if self.state.flags.get("quest_reward_miners_road_open"):
+            town += 1
+            route += 1
+        if self.state.flags.get("quest_reward_barthen_resupply_credit"):
+            town += 1
+        if self.state.flags.get("quest_reward_lionshield_logistics"):
+            route += 1
+        if self.state.flags.get("quest_reward_gravequiet_contacts"):
+            whisper -= 1
+        if self.state.flags.get("quest_reward_edermath_scout_network"):
+            route += 1
+        if self.state.flags.get("quest_reward_bryn_underworld_favor"):
+            route += 1
+        if self.state.flags.get("quest_reward_elira_mercy_blessing"):
+            town += 1
+            whisper -= 1
         self.state.flags["act2_town_stability"] = max(0, min(5, town))
         self.state.flags["act2_route_control"] = max(0, min(5, route))
         self.state.flags["act2_whisper_pressure"] = max(0, min(5, whisper))
@@ -890,7 +909,7 @@ class StoryAct2ScaffoldMixin:
             options.extend(
                 [
                     ("status", self.action_option("Review the expedition pressures and current consequences.")),
-                    ("turn_in", self.action_option("Report at the council table and resolve ready quests.")),
+                    ("turn_in", self.action_option("Report completed quests to their original givers.")),
                     ("camp", self.action_option("Return to camp and manage the wider company.")),
                     ("sidetrack", self.action_option("Follow a companion's Act 2 thread.")),
                     ("inn", self.action_option("Rest at Stonehill Inn (5 gp per active party member).")),
@@ -959,10 +978,47 @@ class StoryAct2ScaffoldMixin:
                 continue
             self.show_party()
 
+    def act2_turn_in_dialogue(self, quest_id: str) -> None:
+        if quest_id == "recover_pact_waymap":
+            self.speaker(
+                "Halia Thornton",
+                "Now that is a route worth arguing over. Good. A claim with a real map behind it survives longer than a claim with only shouting.",
+            )
+        elif quest_id == "seek_agathas_truth":
+            self.speaker(
+                "Elira Dawnmantle",
+                "Then Conyberry's dead were not left speaking into the dark. Tell me the warning cleanly, and I will make sure it is carried gently.",
+            )
+        elif quest_id == "rescue_stonehollow_scholars":
+            self.speaker(
+                "Linene Graywind",
+                "Names first. Then injuries. Then what they brought back. I can replace tools, but I will not file people under losses before I have to.",
+            )
+        elif quest_id == "cut_woodland_saboteurs":
+            self.speaker(
+                "Daran Edermath",
+                "A broken sabotage line means scouts can breathe again. Not relax. Never relax. But breathe, and sometimes that is the difference.",
+            )
+        elif quest_id == "hold_the_claims_meet":
+            self.speaker(
+                "Linene Graywind",
+                "The meeting held because someone kept the room pointed at tomorrow instead of old grudges. I will take that kind of order wherever I can get it.",
+            )
+        elif quest_id == "free_wave_echo_captives":
+            self.speaker(
+                "Elira Dawnmantle",
+                "Give me every name you can remember. The rescued deserve more than being counted as proof that we did the correct thing.",
+            )
+        elif quest_id == "sever_quiet_choir":
+            self.speaker(
+                "Town Council",
+                "Then Wave Echo was never only a claim dispute. Put the truth on the table, all of it, and let the town decide with open eyes.",
+            )
+
     def run_act2_council_turnins(self) -> None:
         assert self.state is not None
         self.refresh_quest_statuses(announce=False)
-        ready_quests = [
+        ready_quest_ids = [
             "recover_pact_waymap",
             "seek_agathas_truth",
             "rescue_stonehollow_scholars",
@@ -971,12 +1027,27 @@ class StoryAct2ScaffoldMixin:
             "free_wave_echo_captives",
             "sever_quiet_choir",
         ]
-        turned_in_any = False
-        for quest_id in ready_quests:
-            if self.turn_in_quest(quest_id):
-                turned_in_any = True
-        if not turned_in_any:
+        ready_quests = [
+            self.get_quest_definition(quest_id)
+            for quest_id in ready_quest_ids
+            if self.quest_is_ready(quest_id)
+        ]
+        if not ready_quests:
             self.say("Nobody at the council table has a fresh report to close out just yet.")
+            return
+        options = [
+            self.action_option(f"Report to {definition.giver}: {definition.title}.")
+            for definition in ready_quests
+        ]
+        options.append(self.action_option("Hold the reports for now."))
+        choice = self.scenario_choice("Who do you report to?", options, allow_meta=False)
+        if choice == len(options):
+            self.player_action("Hold the reports for now.")
+            return
+        definition = ready_quests[choice - 1]
+        self.player_action(f"Report {definition.title} to {definition.giver}.")
+        self.act2_turn_in_dialogue(definition.quest_id)
+        self.turn_in_quest(definition.quest_id, giver=definition.giver)
 
     def run_act2_companion_sidetrack(self) -> None:
         assert self.state is not None

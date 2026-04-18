@@ -15,8 +15,8 @@ The final section also includes a design appendix with proposed future enemies w
   - `dnd_game/gameplay/combat_flow.py`
   - `dnd_game/gameplay/combat_resolution.py`
   - `dnd_game/data/items/catalog.py`
-  - `ACT1_CONTENT_REFERENCE.md`
-  - `ACT2_CONTENT_REFERENCE.md`
+  - `information/Story/ACT1_CONTENT_REFERENCE.md`
+  - `information/Story/ACT2_CONTENT_REFERENCE.md`
 - `android_port/` mirrors the same enemy factory roster and encounter structure; it does not add unique enemy archetypes.
 - The `Design Expansion: 25 New Enemy Concepts` appendix at the end of this file is proposal content added for future implementation. Its archetypes are not part of the current scanned runtime roster.
 - Gold below is the enemy's built-in `gold_value`, which is awarded on victory.

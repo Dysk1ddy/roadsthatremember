@@ -17,9 +17,9 @@ This file documents the non-player cast currently surfaced by the game, includin
   - `dnd_game/gameplay/random_encounters.py`
   - `dnd_game/data/quests/act1.py`
   - `dnd_game/data/quests/act2.py`
-  - `ACT1_CONTENT_REFERENCE.md`
-  - `ACT2_CONTENT_REFERENCE.md`
-  - `enemies.md`
+  - `information/Story/ACT1_CONTENT_REFERENCE.md`
+  - `information/Story/ACT2_CONTENT_REFERENCE.md`
+  - `information/catalogs/enemies.md`
 - Enemy stats use the runtime `Character.armor_class` value from the live factory, not just armor base AC.
 - A named enemy alias keeps the base template's mechanics unless it is listed as its own factory key.
 - `gravecaller` is still factory-defined, but the current map content uses `vaelith_marr` as the Old Owl Well boss implementation.
@@ -177,4 +177,4 @@ These entries are unique names or aliases used in scenes, intros, or reference m
 - Add new companions to `dnd_game/data/story/companions.py`, their factory function in `dnd_game/data/story/factories.py`, and the companion table above.
 - Add new enemy templates to the enemy roster once they are present in `create_enemy()`.
 - Add renamed scene enemies to the alias table when a scene passes `name=` to `create_enemy()`.
-- Keep this file in sync with `enemies.md` when enemy stats, loot, or encounter placement changes.
+- Keep this file in sync with `information/catalogs/enemies.md` when enemy stats, loot, or encounter placement changes.

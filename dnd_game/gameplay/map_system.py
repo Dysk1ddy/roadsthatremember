@@ -233,7 +233,7 @@ class MapSystemMixin:
         self.reward_party(xp=20, reason="resolving Bryn's loose ends")
         self.state.flags["bryn_loose_ends_resolved"] = True
         self.refresh_quest_statuses(announce=False)
-        self.turn_in_quest("bryn_loose_ends")
+        self.turn_in_quest("bryn_loose_ends", giver="Bryn Underbough")
 
     def maybe_run_act1_companion_conflict(self) -> None:
         assert self.state is not None
@@ -303,7 +303,7 @@ class MapSystemMixin:
         self.reward_party(xp=20, reason="deciding Elira's question under fire")
         self.state.flags["elira_faith_under_ash_resolved"] = True
         self.refresh_quest_statuses(announce=False)
-        self.turn_in_quest("elira_faith_under_ash")
+        self.turn_in_quest("elira_faith_under_ash", giver="Elira Dawnmantle")
 
     def act1_victory_tier(self) -> str:
         assert self.state is not None
@@ -1570,7 +1570,7 @@ class MapSystemMixin:
                 elif resolution == "sabotage":
                     self.add_inventory_item("antitoxin_vial", 1, source="a seized city-side medicine pouch")
                     self.say("Mira cannot prosecute ashes, but she can use the damage to tighten the next patrol net.")
-            self.turn_in_quest("trace_blackwake_cell")
+            self.turn_in_quest("trace_blackwake_cell", giver="Mira Thann")
             self.say("With the report made, the south road waits again. The Phandalin writ is still yours to carry.")
             self.travel_to_act1_node("high_road_ambush")
             return

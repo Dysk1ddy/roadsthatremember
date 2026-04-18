@@ -36,7 +36,7 @@ Act 2 is now playable as a scaffolded expedition campaign, and the project also 
 - Full equipment management for every party member, not just the player character
 - Equipment slots for `Head`, `Ring 1`, `Ring 2`, `Neck`, `Chest`, `Gloves`, `Boots`, `Main Hand`, `Off Hand`, and `Cape`
 - Character sheets for every party member, separate from the quick `party` combat-status view
-- A generated item reference in `ITEM_CATALOG.md` covering the full catalog, rarity, rules text, weight, and acquisition sources
+- A generated item reference in `information/catalogs/ITEM_CATALOG.md` covering the full catalog, rarity, rules text, weight, and acquisition sources
 
 ## Presentation and readability
 
@@ -152,10 +152,11 @@ That suite now includes coverage for:
 
 For reading, balancing, and debugging, the project now has a few source-facing markdown references:
 
-- `GAME_SYSTEMS_REFERENCE.md`: classes, races, backgrounds, leveling, combat formulas, spells, abilities, statuses, rest rules, and inventory systems
-- `ACT1_CONTENT_REFERENCE.md`: Act 1 route flow, major NPC hubs, expanded quest chain, enemy archetypes, rewards, recruitment points, and useful story flags
-- `ACT2_CONTENT_REFERENCE.md`: Act 2 route flow, new recruitable companions, companion side arcs, Wave Echo / cult structure, quests, enemies, and the planned Act 2 random encounter pool
-- `ITEM_CATALOG.md`: full generated item, equipment, consumable, and scroll catalog
+- `information/systems/GAME_SYSTEMS_REFERENCE.md`: classes, races, backgrounds, leveling, combat formulas, spells, abilities, statuses, rest rules, and inventory systems
+- `information/systems/QUEST_SYSTEM_REFERENCE.md`: quest data model, lifecycle, turn-in rules, rewards, story unlocks, and maintenance checklist
+- `information/Story/ACT1_CONTENT_REFERENCE.md`: Act 1 route flow, major NPC hubs, expanded quest chain, enemy archetypes, rewards, recruitment points, and useful story flags
+- `information/Story/ACT2_CONTENT_REFERENCE.md`: Act 2 route flow, new recruitable companions, companion side arcs, Wave Echo / cult structure, quests, enemies, and the planned Act 2 random encounter pool
+- `information/catalogs/ITEM_CATALOG.md`: full generated item, equipment, consumable, and scroll catalog
 
 ## Useful in-game commands
 
@@ -190,10 +191,11 @@ The settings menu currently includes:
 
 - `main.py`: entry point
 - `dnd_game/`: main game code
-- `GAME_SYSTEMS_REFERENCE.md`: mechanics and progression reference
-- `ACT1_CONTENT_REFERENCE.md`: Act 1 content and debugging reference
-- `ACT2_CONTENT_REFERENCE.md`: Act 2 design target and future implementation reference
-- `ITEM_CATALOG.md`: generated full item catalog
+- `information/systems/GAME_SYSTEMS_REFERENCE.md`: mechanics and progression reference
+- `information/systems/QUEST_SYSTEM_REFERENCE.md`: quest system and reward reference
+- `information/Story/ACT1_CONTENT_REFERENCE.md`: Act 1 content and debugging reference
+- `information/Story/ACT2_CONTENT_REFERENCE.md`: Act 2 design target and future implementation reference
+- `information/catalogs/ITEM_CATALOG.md`: generated full item catalog
 - `saves/`: JSON save files
 - `tests/test_core.py`: core regression coverage
 

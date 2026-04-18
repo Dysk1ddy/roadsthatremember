@@ -1,6 +1,6 @@
 # Sword Coast Story Content Summary
 
-This file is a repo-wide story pass for the current text-based Python DnD game. It is based on the root reference markdown files, the live game flow in `dnd_game/`, the current map system, companion and camp data, random encounter content, the Act 2 scaffold, and a quick scan of the Android and draft folders.
+This file is a repo-wide story pass for the current text-based Python DnD game. It is based on the `information/` reference markdown files, the live game flow in `dnd_game/`, the current map system, companion and camp data, random encounter content, the Act 2 scaffold, and a quick scan of the Android and draft folders.
 
 ## What Is Live, Planned, Or Legacy
 
@@ -13,11 +13,11 @@ This file is a repo-wide story pass for the current text-based Python DnD game. 
 
 ## Story Source Map
 
-- Root story references:
+- Story and systems references:
   - `README.md`
-  - `ACT1_CONTENT_REFERENCE.md`
-  - `ACT2_CONTENT_REFERENCE.md`
-  - `GAME_SYSTEMS_REFERENCE.md`
+  - `information/Story/ACT1_CONTENT_REFERENCE.md`
+  - `information/Story/ACT2_CONTENT_REFERENCE.md`
+  - `information/systems/GAME_SYSTEMS_REFERENCE.md`
 - Live story code:
   - `dnd_game/gameplay/story_intro.py`
   - `dnd_game/gameplay/story_town_hub.py`
@@ -1072,7 +1072,7 @@ There are two important Act 2 random-story layers in the repo.
 
 ### Documented Act 2-exclusive pool
 
-`ACT2_CONTENT_REFERENCE.md` proposes a suspense-heavy pool built around expedition dread, cult traces, and mine folklore:
+`information/Story/ACT2_CONTENT_REFERENCE.md` proposes a suspense-heavy pool built around expedition dread, cult traces, and mine folklore:
 
 - `Silent Mule Train`
 - `Lantern in the Wash`
@@ -1128,17 +1128,17 @@ These scenes quietly carry a lot of story texture:
 
 ## Legacy, Duplicate, And Draft Story Material Elsewhere In The Repo
 
-### Root markdown references
+### Information markdown references
 
 These files are useful canonical summaries or design targets:
 
 - `README.md`
   - big-picture game premise and feature promises,
-- `ACT1_CONTENT_REFERENCE.md`
+- `information/Story/ACT1_CONTENT_REFERENCE.md`
   - approved Act 1 story map and quest flow,
-- `ACT2_CONTENT_REFERENCE.md`
+- `information/Story/ACT2_CONTENT_REFERENCE.md`
   - Act 2 design target and branching plan,
-- `GAME_SYSTEMS_REFERENCE.md`
+- `information/systems/GAME_SYSTEMS_REFERENCE.md`
   - companion, camp, travel, and systems context that affects how story is delivered.
 
 ### Android port

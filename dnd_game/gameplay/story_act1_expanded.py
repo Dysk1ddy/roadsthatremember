@@ -386,7 +386,7 @@ class StoryAct1ExpandedMixin:
                     "Daran Edermath",
                     "Good. Some victories feel loud. The best kind just make a road safe enough that ordinary people stop talking about it.",
                 )
-                self.turn_in_quest("break_wyvern_tor_raiders")
+                self.turn_in_quest("break_wyvern_tor_raiders", giver="Daran Edermath")
             elif selection_key == "blight":
                 self.state.flags["edermath_orchard_blight_checked"] = True
                 self.player_speaker("Something is wrong with these trees. Let me see what the ash is doing.")
@@ -486,7 +486,7 @@ class StoryAct1ExpandedMixin:
                     "Halia Thornton",
                     "Excellent. Quiet roads make honest ore much easier to turn into coin.",
                 )
-                self.turn_in_quest("silence_old_owl_well")
+                self.turn_in_quest("silence_old_owl_well", giver="Halia Thornton")
             elif selection_key == "missing":
                 self.state.flags["miners_exchange_missing_crews_asked"] = True
                 self.state.flags["miners_exchange_lead"] = True

@@ -15,7 +15,12 @@ ACT_1_QUESTS: dict[str, QuestDefinition] = {
         objective="Investigate Blackwake Crossing, uncover the cache behind the forged papers, and decide what survives the floodgate chamber.",
         turn_in="Report the Blackwake outcome to Mira in Neverwinter or carry the proof south toward Phandalin.",
         completion_flags=("blackwake_completed",),
-        reward=QuestReward(),
+        reward=QuestReward(
+            xp=90,
+            gold=35,
+            items={"miras_blackwake_seal": 1, "scroll_ember_ward": 1},
+            flags={"quest_reward_blackwake_watch_backing": True},
+        ),
         accepted_text=(
             "The road to Phandalin can wait long enough to answer one ugly question: why are caravans vanishing before they even reach the wider High Road?"
         ),
@@ -36,7 +41,12 @@ ACT_1_QUESTS: dict[str, QuestDefinition] = {
         objective="Break the Ashen Brand's hold on Ashfall Watch, then return to Tessa Harrow.",
         turn_in="Return to Tessa Harrow in Steward's Hall.",
         completion_flags=("ashfall_watch_cleared",),
-        reward=QuestReward(xp=45, gold=25),
+        reward=QuestReward(
+            xp=100,
+            gold=50,
+            items={"roadwarden_cloak": 1, "travel_biscuits": 4},
+            flags={"quest_reward_miners_road_open": True},
+        ),
         accepted_text=(
             "Tessa does not dress it up as heroics. She needs the watchtower raiders stopped before a frightened "
             "town begins starving by caution alone."
@@ -56,7 +66,13 @@ ACT_1_QUESTS: dict[str, QuestDefinition] = {
         objective="Clear Ashfall Watch and report back to Barthen once the road is safer.",
         turn_in="Return to Barthen's Provisions.",
         completion_flags=("ashfall_watch_cleared",),
-        reward=QuestReward(xp=30, gold=12, items={"bread_round": 2, "camp_stew_jar": 1}),
+        reward=QuestReward(
+            xp=75,
+            gold=35,
+            items={"barthen_resupply_token": 1, "bread_round": 4, "camp_stew_jar": 2},
+            flags={"quest_reward_barthen_resupply_credit": True},
+            merchant_attitudes={"barthen_provisions": 20},
+        ),
         accepted_text=(
             "Barthen's request is practical to the point of pain: make the road safe enough that flour, bandages, "
             "and lamp oil stop feeling rarer than courage."
@@ -79,7 +95,13 @@ ACT_1_QUESTS: dict[str, QuestDefinition] = {
         objective="Break Ashfall Watch and return to Linene Graywind with the news.",
         turn_in="Return to Linene Graywind at the Lionshield trading post.",
         completion_flags=("ashfall_watch_cleared",),
-        reward=QuestReward(xp=35, gold=18, items={"potion_healing": 1, "antitoxin_vial": 1}),
+        reward=QuestReward(
+            xp=85,
+            gold=45,
+            items={"lionshield_quartermaster_badge": 1, "potion_healing": 2, "antitoxin_vial": 2},
+            flags={"quest_reward_lionshield_logistics": True},
+            merchant_attitudes={"linene_graywind": 20},
+        ),
         accepted_text=(
             "Linene frames it in ledgers and steel, but the meaning is simple enough: if the watchtower stands, "
             "every honest caravan keeps bleeding coin to men with ash on their badges."
@@ -101,7 +123,12 @@ ACT_1_QUESTS: dict[str, QuestDefinition] = {
         objective="Break the operation at Old Owl Well and return to Halia Thornton.",
         turn_in="Return to Halia Thornton at the Miner's Exchange.",
         completion_flags=("old_owl_well_cleared",),
-        reward=QuestReward(xp=50, gold=24, items={"scroll_clarity": 1}),
+        reward=QuestReward(
+            xp=100,
+            gold=45,
+            items={"gravequiet_amulet": 1, "scroll_clarity": 1, "blessed_salve": 1},
+            flags={"quest_reward_gravequiet_contacts": True},
+        ),
         accepted_text=(
             "Halia phrases it like a ledger problem, but the meaning is simple enough: Old Owl Well is swallowing people, and every day it stays active makes the town smaller."
         ),
@@ -121,7 +148,12 @@ ACT_1_QUESTS: dict[str, QuestDefinition] = {
         objective="Clear Wyvern Tor and report back to Daran Edermath.",
         turn_in="Return to Daran Edermath at the orchard.",
         completion_flags=("wyvern_tor_cleared",),
-        reward=QuestReward(xp=50, gold=20, items={"greater_healing_draught": 1}),
+        reward=QuestReward(
+            xp=100,
+            gold=40,
+            items={"edermath_scout_buckle": 1, "greater_healing_draught": 1},
+            flags={"quest_reward_edermath_scout_network": True},
+        ),
         accepted_text=(
             "Daran does not romanticize the work. Wyvern Tor is a practical threat on practical roads, and he would prefer the town's scouts stop dying to prove it."
         ),
@@ -141,7 +173,12 @@ ACT_1_QUESTS: dict[str, QuestDefinition] = {
         objective="Track down Bryn's old cache trail and decide what to do with the ledger inside it.",
         turn_in="Resolve the ledger question with Bryn once the cache is found.",
         completion_flags=("bryn_loose_ends_resolved",),
-        reward=QuestReward(),
+        reward=QuestReward(
+            xp=80,
+            gold=25,
+            items={"bryns_cache_keyring": 1, "dust_of_disappearance": 1},
+            flags={"quest_reward_bryn_underworld_favor": True},
+        ),
         accepted_text=(
             "Bryn admits this one quietly: there is an old cache she never meant anyone worth saving to find. If the Brand reached it first, she wants your help ending the story cleanly."
         ),
@@ -161,7 +198,12 @@ ACT_1_QUESTS: dict[str, QuestDefinition] = {
         objective="Face a captive servant of the Ashen Brand and decide whether mercy or fear carries the day.",
         turn_in="Make the call when Elira asks for it in the field.",
         completion_flags=("elira_faith_under_ash_resolved",),
-        reward=QuestReward(),
+        reward=QuestReward(
+            xp=80,
+            gold=20,
+            items={"dawnmantle_mercy_charm": 1, "blessed_salve": 1},
+            flags={"quest_reward_elira_mercy_blessing": True},
+        ),
         accepted_text=(
             "Elira says it gently, which somehow makes it harder: anyone can sound righteous before the blood is close. What matters is the answer you choose after."
         ),

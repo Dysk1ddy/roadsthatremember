@@ -66,7 +66,7 @@ from dnd_game.drafts.map_system.runtime import (
 from dnd_game.drafts.map_system import ACT2_ENEMY_DRIVEN_MAP
 from dnd_game.drafts.map_system.data.act1_hybrid_map import ACT1_HYBRID_MAP
 from dnd_game.data.story.lore import APPENDIX_LORE
-from dnd_game.data.quests import QuestLogEntry
+from dnd_game.data.quests import QUESTS, QuestLogEntry
 from dnd_game.data.items.catalog import LOOT_TABLES
 from dnd_game.items import ITEMS, format_inventory_line
 from dnd_game.models import GameState
@@ -3941,12 +3941,128 @@ class CoreTests(unittest.TestCase):
         game.state = GameState(player=player, current_scene="phandalin_hub", flags={"ashfall_watch_cleared": True})
         game.grant_quest("restore_barthen_supplies")
         game.refresh_quest_statuses(announce=False)
+        self.assertEqual(game.state.quests["restore_barthen_supplies"].status, "ready_to_turn_in")
+        self.assertEqual(game.state.gold, 0)
+        self.assertEqual(game.state.xp, 0)
+        self.assertNotIn("bread_round", game.state.inventory)
         game.visit_barthen_provisions()
         self.assertEqual(game.state.quests["restore_barthen_supplies"].status, "completed")
-        self.assertEqual(game.state.gold, 12)
-        self.assertEqual(game.state.xp, 30)
-        self.assertEqual(game.state.inventory["bread_round"], 2)
-        self.assertEqual(game.state.inventory["camp_stew_jar"], 1)
+        self.assertEqual(game.state.gold, 35)
+        self.assertEqual(game.state.xp, 75)
+        self.assertEqual(game.state.inventory["barthen_resupply_token"], 1)
+        self.assertEqual(game.state.inventory["bread_round"], 4)
+        self.assertEqual(game.state.inventory["camp_stew_jar"], 2)
+        self.assertTrue(game.state.flags["quest_reward_barthen_resupply_credit"])
+        self.assertEqual(game.get_merchant_attitude("barthen_provisions"), 40)
+
+    def test_quest_rewards_require_original_giver(self) -> None:
+        player = build_character(
+            name="Vale",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        output: list[str] = []
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=output.append, rng=random.Random(303))
+        game.state = GameState(player=player, current_scene="phandalin_hub", flags={"ashfall_watch_cleared": True})
+        game.grant_quest("restore_barthen_supplies")
+        game.refresh_quest_statuses(announce=False)
+
+        self.assertFalse(game.turn_in_quest("restore_barthen_supplies", giver="Linene Graywind"))
+        self.assertEqual(game.state.quests["restore_barthen_supplies"].status, "ready_to_turn_in")
+        self.assertEqual(game.state.gold, 0)
+        self.assertEqual(game.state.xp, 0)
+        self.assertNotIn("bread_round", game.state.inventory)
+        self.assertNotIn("barthen_resupply_token", game.state.inventory)
+        self.assertNotIn("quest_reward_barthen_resupply_credit", game.state.flags)
+        self.assertTrue(any("has to be turned in to Barthen" in line for line in output))
+
+    def test_act2_turnins_are_selected_by_original_giver(self) -> None:
+        player = build_character(
+            name="Vale",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        answers = iter(["1"])
+        game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=lambda _: None, rng=random.Random(303))
+        game.state = GameState(
+            player=player,
+            current_act=2,
+            current_scene="act2_expedition_hub",
+            flags={"agatha_truth_secured": True, "wave_echo_reached": True},
+        )
+        game.grant_quest("recover_pact_waymap")
+        game.grant_quest("seek_agathas_truth")
+        game.refresh_quest_statuses(announce=False)
+
+        game.run_act2_council_turnins()
+
+        self.assertEqual(game.state.quests["recover_pact_waymap"].status, "completed")
+        self.assertEqual(game.state.quests["seek_agathas_truth"].status, "ready_to_turn_in")
+        self.assertEqual(game.state.gold, 75)
+        self.assertEqual(game.state.xp, 140)
+        self.assertEqual(game.state.inventory["pact_waymap_case"], 1)
+        self.assertEqual(game.state.inventory["resonance_tonic"], 2)
+        self.assertTrue(game.state.flags["quest_reward_pact_routes_mastered"])
+        self.assertEqual(game.state.flags["act2_route_control"], 3)
+        self.assertNotIn("scroll_quell_the_deep", game.state.inventory)
+
+    def test_quest_reward_items_are_cataloged(self) -> None:
+        for definition in QUESTS.values():
+            for item_id in definition.reward.items:
+                self.assertIn(item_id, ITEMS, f"{definition.quest_id} rewards unknown item {item_id}")
+
+        unique_reward_ids = {
+            "miras_blackwake_seal",
+            "roadwarden_cloak",
+            "barthen_resupply_token",
+            "lionshield_quartermaster_badge",
+            "gravequiet_amulet",
+            "edermath_scout_buckle",
+            "bryns_cache_keyring",
+            "dawnmantle_mercy_charm",
+            "pact_waymap_case",
+            "agathas_truth_lantern",
+            "stonehollow_survey_lantern",
+            "woodland_wayfinder_boots",
+            "claims_accord_brooch",
+            "freed_captive_prayer_beads",
+            "forgeheart_cinder",
+        }
+        for item_id in unique_reward_ids:
+            self.assertIn(item_id, ITEMS)
+            self.assertTrue(ITEMS[item_id].is_equippable(), item_id)
+
+    def test_act1_reward_unlocks_improve_act2_starting_position(self) -> None:
+        player = build_character(
+            name="Vale",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(304))
+        game.state = GameState(
+            player=player,
+            current_act=2,
+            flags={
+                "quest_reward_miners_road_open": True,
+                "quest_reward_lionshield_logistics": True,
+                "quest_reward_elira_mercy_blessing": True,
+            },
+        )
+
+        game.act2_initialize_metrics(force=True)
+
+        self.assertEqual(game.state.flags["act2_town_stability"], 4)
+        self.assertEqual(game.state.flags["act2_route_control"], 4)
+        self.assertEqual(game.state.flags["act2_whisper_pressure"], 1)
 
     def test_enemy_template_smoke(self) -> None:
         enemy = create_enemy("rukhar")

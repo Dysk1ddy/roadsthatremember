@@ -8,12 +8,18 @@ class QuestReward:
     xp: int = 0
     gold: int = 0
     items: dict[str, int] = field(default_factory=dict)
+    flags: dict[str, object] = field(default_factory=dict)
+    merchant_attitudes: dict[str, int] = field(default_factory=dict)
+    act2_metrics: dict[str, int] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, object]:
         return {
             "xp": self.xp,
             "gold": self.gold,
             "items": dict(self.items),
+            "flags": dict(self.flags),
+            "merchant_attitudes": dict(self.merchant_attitudes),
+            "act2_metrics": dict(self.act2_metrics),
         }
 
     @classmethod
@@ -22,6 +28,9 @@ class QuestReward:
             xp=int(data.get("xp", 0)),
             gold=int(data.get("gold", 0)),
             items={str(key): int(value) for key, value in dict(data.get("items", {})).items()},
+            flags=dict(data.get("flags", {})),
+            merchant_attitudes={str(key): int(value) for key, value in dict(data.get("merchant_attitudes", {})).items()},
+            act2_metrics={str(key): int(value) for key, value in dict(data.get("act2_metrics", {})).items()},
         )
 
 

@@ -16,7 +16,13 @@ ACT_2_QUESTS: dict[str, QuestDefinition] = {
         objective="Secure the pact waymap fragments and bring the findings back to the Miner's Exchange.",
         turn_in="Return to Halia Thornton at the Miner's Exchange.",
         completion_flags=("agatha_truth_secured", "wave_echo_reached"),
-        reward=QuestReward(xp=60, gold=28, items={"resonance_tonic": 1}),
+        reward=QuestReward(
+            xp=140,
+            gold=75,
+            items={"pact_waymap_case": 1, "resonance_tonic": 2},
+            flags={"quest_reward_pact_routes_mastered": True},
+            act2_metrics={"act2_route_control": 1},
+        ),
         accepted_text=(
             "Halia speaks of maps the way soldiers speak of walls: whoever controls the route controls the argument "
             "that follows."
@@ -38,7 +44,13 @@ ACT_2_QUESTS: dict[str, QuestDefinition] = {
         objective="Reach Agatha's old circuit, learn what was buried, and return with a cleaner truth.",
         turn_in="Return to Elira Dawnmantle once the Conyberry lead is settled.",
         completion_flags=("agatha_truth_secured",),
-        reward=QuestReward(xp=55, items={"scroll_quell_the_deep": 1}),
+        reward=QuestReward(
+            xp=130,
+            gold=40,
+            items={"agathas_truth_lantern": 1, "scroll_quell_the_deep": 1},
+            flags={"quest_reward_agathas_clear_truth": True},
+            act2_metrics={"act2_whisper_pressure": -1},
+        ),
         accepted_text=(
             "Elira does not call it safe. She only says that grief often keeps straighter records than the living do."
         ),
@@ -60,7 +72,14 @@ ACT_2_QUESTS: dict[str, QuestDefinition] = {
         objective="Find the missing Stonehollow survey team and bring back whoever still lives.",
         turn_in="Return to Linene Graywind after Stonehollow is resolved.",
         completion_flags=("stonehollow_dig_cleared",),
-        reward=QuestReward(xp=60, gold=22, items={"miners_ration_tin": 2}),
+        reward=QuestReward(
+            xp=140,
+            gold=70,
+            items={"stonehollow_survey_lantern": 1, "miners_ration_tin": 4},
+            flags={"quest_reward_stonehollow_scholars_saved": True},
+            merchant_attitudes={"linene_graywind": 10},
+            act2_metrics={"act2_town_stability": 1, "act2_route_control": 1},
+        ),
         accepted_text=(
             "Linene's request sounds like logistics, but the steel under it is plain enough: she wants her people home."
         ),
@@ -82,7 +101,13 @@ ACT_2_QUESTS: dict[str, QuestDefinition] = {
         objective="Track the woodland saboteurs, break their line, and return with proof the route is breathing again.",
         turn_in="Return to Daran Edermath once the survey camp route is secured.",
         completion_flags=("woodland_survey_cleared",),
-        reward=QuestReward(xp=60, gold=25, items={"delvers_amber": 1}),
+        reward=QuestReward(
+            xp=140,
+            gold=65,
+            items={"woodland_wayfinder_boots": 1, "delvers_amber": 2},
+            flags={"quest_reward_woodland_route_charts": True},
+            act2_metrics={"act2_route_control": 1},
+        ),
         accepted_text=(
             "Daran frames it as fieldcraft, not heroics. A route only exists if scouts can live long enough to chart it."
         ),
@@ -102,7 +127,14 @@ ACT_2_QUESTS: dict[str, QuestDefinition] = {
         objective="See the claims meeting through the sabotage night and keep the expedition from splintering.",
         turn_in="Report back to Linene Graywind once the town stops shaking itself apart.",
         completion_flags=("claims_meet_held", "phandalin_sabotage_resolved"),
-        reward=QuestReward(xp=50, gold=18),
+        reward=QuestReward(
+            xp=120,
+            gold=75,
+            items={"claims_accord_brooch": 1},
+            flags={"quest_reward_claims_accord": True},
+            merchant_attitudes={"linene_graywind": 10},
+            act2_metrics={"act2_town_stability": 2},
+        ),
         accepted_text=(
             "Linene is blunt: if the town tears itself apart over claims before the mine is even reached, everyone loses."
         ),
@@ -122,7 +154,13 @@ ACT_2_QUESTS: dict[str, QuestDefinition] = {
         objective="Open the South Adit cells, free the prisoners, and get the survivors back aboveground.",
         turn_in="Return to Elira Dawnmantle after the captives are clear of the adit.",
         completion_flags=("south_adit_cleared",),
-        reward=QuestReward(xp=70, gold=30, items={"scroll_echo_step": 1}),
+        reward=QuestReward(
+            xp=160,
+            gold=80,
+            items={"freed_captive_prayer_beads": 1, "scroll_echo_step": 1, "scroll_lesser_restoration": 1},
+            flags={"quest_reward_south_adit_survivor_network": True},
+            act2_metrics={"act2_town_stability": 1, "act2_whisper_pressure": -1},
+        ),
         accepted_text=(
             "Elira's voice goes colder than usual when she realizes the mine has turned into a prison."
         ),
@@ -143,7 +181,13 @@ ACT_2_QUESTS: dict[str, QuestDefinition] = {
         objective="Identify the Quiet Choir's leader, break the cult cell, and cut their hold on the mine.",
         turn_in="There is no formal turn-in beyond surviving and bringing the truth back out.",
         completion_flags=("caldra_defeated",),
-        reward=QuestReward(xp=100, gold=40, items={"forge_blessing_elixir": 1}),
+        reward=QuestReward(
+            xp=250,
+            gold=150,
+            items={"forgeheart_cinder": 1, "forge_blessing_elixir": 2, "scroll_forge_shelter": 1},
+            flags={"quest_reward_quiet_choir_broken": True},
+            act2_metrics={"act2_town_stability": 1, "act2_route_control": 1, "act2_whisper_pressure": -2},
+        ),
         accepted_text=(
             "By the time the Quiet Choir has a name, nobody in Phandalin mistakes this for an ordinary mining dispute anymore."
         ),
@@ -153,4 +197,3 @@ ACT_2_QUESTS: dict[str, QuestDefinition] = {
         ),
     ),
 }
-

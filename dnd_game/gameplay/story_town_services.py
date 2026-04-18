@@ -138,8 +138,7 @@ class StoryTownServicesMixin:
                     "Barthen",
                     "Then I can stop deciding which family hears 'maybe tomorrow' when the bread runs thin. That's worth more than a strongbox to me.",
                 )
-                self.turn_in_quest("restore_barthen_supplies")
-                self.adjust_merchant_attitude("barthen_provisions", 20, reason="Barthen's relief at seeing the road open")
+                self.turn_in_quest("restore_barthen_supplies", giver="Barthen")
             elif selection_key == "shortage":
                 self.state.flags["barthen_shortage_asked"] = True
                 self.player_speaker("What does Phandalin run short on first when the road turns bad?")
@@ -189,8 +188,7 @@ class StoryTownServicesMixin:
                     "Linene Graywind",
                     "Good. Fear is expensive, and I've had enough customers paying in it.",
                 )
-                self.turn_in_quest("reopen_lionshield_trade")
-                self.adjust_merchant_attitude("linene_graywind", 20, reason="Linene's respect for proven results")
+                self.turn_in_quest("reopen_lionshield_trade", giver="Linene Graywind")
             elif selection_key == "trade":
                 self.state.flags["trading_post_trade_asked"] = True
                 self.player_speaker("How badly are the raiders strangling trade?")

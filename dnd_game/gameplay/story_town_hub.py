@@ -176,7 +176,7 @@ class StoryTownHubMixin:
                     "Tessa Harrow",
                     "Then the town gets one honest stretch of hope before the next problem starts knocking. That's more than we've had in months.",
                 )
-                self.turn_in_quest("secure_miners_road")
+                self.turn_in_quest("secure_miners_road", giver="Steward Tessa Harrow")
             elif selection_key == "pressure":
                 self.state.flags["steward_pressure_asked"] = True
                 self.player_speaker("Where is the Ashen Brand hurting you the most?")

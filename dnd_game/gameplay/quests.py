@@ -105,7 +105,45 @@ class QuestMixin:
             parts.append(f"{definition.reward.gold} gp")
         for item_id, quantity in definition.reward.items.items():
             parts.append(f"{get_item(item_id).name} x{quantity}")
+        if definition.reward.flags:
+            parts.append("story unlocks")
+        if definition.reward.merchant_attitudes:
+            parts.append("better trade terms")
+        if definition.reward.act2_metrics:
+            parts.append("campaign momentum")
         return ", ".join(parts) if parts else "No listed reward."
+
+    def quest_reward_flag_label(self, flag: str) -> str:
+        cleaned = flag
+        for prefix in ("quest_reward_", "act2_", "act3_"):
+            if cleaned.startswith(prefix):
+                cleaned = cleaned[len(prefix) :]
+                break
+        return cleaned.replace("_", " ").title()
+
+    def apply_quest_unlock_rewards(self, definition: QuestDefinition) -> None:
+        assert self.state is not None
+        reward = definition.reward
+        unlock_labels: list[str] = []
+        for flag, value in reward.flags.items():
+            self.state.flags[flag] = value
+            unlock_labels.append(self.quest_reward_flag_label(flag))
+        if unlock_labels:
+            unlock_line = ", ".join(unlock_labels)
+            self.say(f"Story reward unlocked: {unlock_line}.")
+            self.add_journal(f"Story reward from {definition.title}: {unlock_line}.")
+
+        for merchant_id, amount in reward.merchant_attitudes.items():
+            self.adjust_merchant_attitude(merchant_id, amount, reason=f"{definition.giver}'s gratitude")
+
+        shift_metric = getattr(self, "act2_shift_metric", None)
+        metric_names = getattr(self, "ACT2_METRIC_NAMES", {})
+        for metric_key, delta in reward.act2_metrics.items():
+            if callable(shift_metric) and metric_key in metric_names:
+                shift_metric(metric_key, delta, f"{definition.title} turned in")
+                continue
+            current = int(self.state.flags.get(metric_key, 0) or 0)
+            self.state.flags[metric_key] = current + delta
 
     def quest_entries_by_status(self, status: str) -> list[tuple[QuestDefinition, QuestLogEntry]]:
         assert self.state is not None
@@ -136,13 +174,16 @@ class QuestMixin:
         self.refresh_quest_statuses(announce=False)
         return True
 
-    def turn_in_quest(self, quest_id: str) -> bool:
+    def turn_in_quest(self, quest_id: str, *, giver: str) -> bool:
         assert self.state is not None
         self.refresh_quest_statuses(announce=False)
         entry = self.state.quests.get(quest_id)
         if entry is None or entry.status != "ready_to_turn_in":
             return False
         definition = self.get_quest_definition(quest_id)
+        if giver != definition.giver:
+            self.say(f"{definition.title} has to be turned in to {definition.giver}.")
+            return False
         entry.status = "completed"
         self.append_quest_note(quest_id, definition.turn_in_text)
         self.add_journal(f"Quest completed: {definition.title}.")
@@ -159,4 +200,5 @@ class QuestMixin:
                 reward_line = ", ".join(received_parts)
                 self.say(f"Additional quest reward: {reward_line}.")
                 self.add_journal(f"Quest reward from {definition.title}: {reward_line}.")
+        self.apply_quest_unlock_rewards(definition)
         return True

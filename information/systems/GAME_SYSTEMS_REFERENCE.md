@@ -26,7 +26,8 @@ This file is a source-oriented reference for reading and debugging the current g
 - `dnd_game/gameplay/random_encounters.py`: post-combat event pool, follow-up chains, and Act-specific encounter tables
 - `dnd_game/data/story/factories.py`: hero and enemy factory data
 - `dnd_game/data/quests/act1.py`: quest definitions
-- `ITEM_CATALOG.md`: generated item and equipment catalog
+- `information/systems/QUEST_SYSTEM_REFERENCE.md`: detailed quest lifecycle, rewards, turn-in, and maintenance reference
+- `information/catalogs/ITEM_CATALOG.md`: generated item and equipment catalog
 
 ## Campaign State Layers
 
@@ -424,7 +425,7 @@ Present as tags and lore, but not given dedicated runtime logic yet:
 
 ### Item catalog
 
-- The full generated item reference already lives in `ITEM_CATALOG.md`
+- The full generated item reference already lives in `information/catalogs/ITEM_CATALOG.md`
 - Use that file for concrete weights, rarities, acquisition sources, weapon properties, armor entries, consumables, and scroll effects
 
 ## Notes For Debugging

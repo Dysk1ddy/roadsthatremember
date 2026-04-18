@@ -1,6 +1,6 @@
 # Sword Coast Act 2 Content Reference
 
-This file collects the approved design target for Act 2. Unlike `ACT1_CONTENT_REFERENCE.md`, this is currently a planning and scaffolding document rather than a summary of already playable scenes, so it should be treated as the source of truth for future implementation work unless later story revisions replace it.
+This file collects the approved design target for Act 2. Unlike `information/Story/ACT1_CONTENT_REFERENCE.md`, this is currently a planning and scaffolding document rather than a summary of already playable scenes, so it should be treated as the source of truth for future implementation work unless later story revisions replace it.
 
 The tone and structure stay anchored to official Phandalin / Wave Echo Cave material from the Forgotten Realms, while the cult thread, companion arcs, and several frontier locations are game-original adaptations built to set up a stranger Act 3.
 
