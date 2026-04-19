@@ -82,6 +82,13 @@ class CoreTests(unittest.TestCase):
     def plain_output(self, lines: list[str]) -> str:
         return strip_ansi("\n".join(lines))
 
+    def option_index_containing(self, options: list[str], needle: str) -> int:
+        plain_options = [strip_ansi(option) for option in options]
+        for index, option in enumerate(plain_options, start=1):
+            if needle in option:
+                return index
+        raise AssertionError(f"Could not find option containing {needle!r} in {plain_options!r}")
+
     def assert_dungeon_map_header_is_balanced(self, rendered: str) -> None:
         self.assertNotIn("Compass", rendered)
         rendered_lines = rendered.splitlines()
@@ -331,6 +338,7 @@ class CoreTests(unittest.TestCase):
             game = TextDnDGame(input_fn=lambda _: "1", output_fn=print, rng=random.Random(900313), play_sfx=False)
             messages: list[str] = []
             game.say = messages.append
+            game.persist_settings = lambda: None
             game.set_sound_effects_enabled(True)
         self.assertTrue(game._sfx_supported)
         self.assertTrue(game._sfx_assets_ready)
@@ -1287,6 +1295,89 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(game.state.flags["blackwake_sereth_fate"], "escaped")
         self.assertNotIn("blackwake_resolution", game.state.flags)
         self.assertEqual(game.state.quests["trace_blackwake_cell"].status, "ready_to_turn_in")
+
+    def test_blackwake_contract_house_intel_corners_sereth_without_skill_check(self) -> None:
+        player = build_character(
+            name="Velkor",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(9220))
+        game.state = GameState(
+            player=player,
+            current_scene="blackwake_crossing",
+            flags={
+                "act1_started": True,
+                "blackwake_started": True,
+                "neverwinter_private_room_intel": True,
+            },
+        )
+        game.grant_quest("trace_blackwake_cell")
+
+        def fail_skill_check(actor, skill, dc, context):
+            raise AssertionError("Contract-house Blackwake option should not require a skill check")
+
+        def choose_contract_house(prompt: str, options: list[str], **kwargs) -> int:
+            if prompt == "Sereth waits to see whether this becomes bargain, threat, or blood.":
+                return self.option_index_containing(options, "CONTRACT HOUSE INTEL")
+            if prompt == "The chamber is collapsing into smoke, shouting, and floodwater. What matters most now?":
+                return self.option_index_containing(options, "Secure the ledgers")
+            raise AssertionError(prompt)
+
+        captured: list[Encounter] = []
+        game.skill_check = fail_skill_check
+        game.scenario_choice = choose_contract_house  # type: ignore[method-assign]
+        game.run_encounter = lambda encounter: captured.append(encounter) or "victory"  # type: ignore[method-assign]
+        game.resolve_level_ups = lambda: None  # type: ignore[method-assign]
+        dungeon = ACT1_HYBRID_MAP.dungeons["blackwake_crossing_branch"]
+
+        game._blackwake_floodgate_chamber(dungeon, dungeon.rooms["floodgate_chamber"])
+
+        self.assertTrue(game.state.flags["blackwake_sereth_cornered_by_contract_house"])
+        self.assertEqual(game.state.flags["blackwake_sereth_fate"], "captured")
+        self.assertEqual(captured[0].enemies[0].conditions.get("reeling"), 2)
+        self.assertTrue(any("Sereth Vane's Blackwake command line" in clue for clue in game.state.clues))
+
+    def test_mira_report_mobilizes_contract_house_witnesses(self) -> None:
+        player = build_character(
+            name="Velkor",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        log: list[str] = []
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(9221))
+        game.state = GameState(
+            player=player,
+            current_scene="road_decision_post_blackwake",
+            flags={
+                "act1_started": True,
+                "blackwake_started": True,
+                "blackwake_completed": True,
+                "blackwake_resolution": "evidence",
+                "blackwake_sereth_fate": "captured",
+                "neverwinter_private_room_intel": True,
+            },
+        )
+        game.resolve_level_ups = lambda: None  # type: ignore[method-assign]
+        game.grant_quest("trace_blackwake_cell")
+
+        game.scene_road_decision_post_blackwake()
+
+        self.assertTrue(game.state.flags["neverwinter_contract_house_blackwake_reported"])
+        self.assertTrue(game.state.flags["neverwinter_contract_house_political_callback"])
+        self.assertEqual(game.state.quests["trace_blackwake_cell"].status, "completed")
+        rendered = self.plain_output(log)
+        self.assertIn("Sabra Kestrel", rendered)
+        self.assertIn("Oren Vale", rendered)
+        self.assertIn("Vessa Marr", rendered)
+        self.assertIn("Garren Flint", rendered)
+        self.assertIn("Neverwinter political pressure", " ".join(game.state.journal))
 
     def blackwake_navigation_game(
         self,
@@ -3344,6 +3435,34 @@ class CoreTests(unittest.TestCase):
         self.assertIn("Blackwake callback: Sereth Vane escaped the crossing", rendered)
         self.assertIn("Blackwake consequence: Sereth Vane escaped into Act 2's route war", rendered)
 
+    def test_act2_start_records_neverwinter_contract_house_political_callback(self) -> None:
+        player = build_character(
+            name="Vale",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        log: list[str] = []
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(9222))
+        game.state = GameState(
+            player=player,
+            current_scene="act1_complete",
+            flags={"neverwinter_contract_house_political_callback": True},
+        )
+
+        game.start_act2_scaffold()
+        game.show_act2_campaign_status()
+        game.show_journal()
+
+        rendered = self.plain_output(log)
+        self.assertEqual(game.state.flags["act2_route_control"], 3)
+        self.assertTrue(game.state.flags["act2_neverwinter_witness_pressure_active"])
+        self.assertTrue(game.state.flags["act2_neverwinter_witness_callback_recorded"])
+        self.assertIn("Neverwinter politics: Oren, Sabra, Vessa, and Garren", rendered)
+        self.assertIn("Neverwinter callback: Oren, Sabra, Vessa, and Garren kept pressure", rendered)
+
     def test_act2_scaffold_complete_mentions_forge_subroutes_in_handoff(self) -> None:
         player = build_character(
             name="Vale",
@@ -4022,6 +4141,11 @@ class CoreTests(unittest.TestCase):
             "roadwarden_cloak",
             "barthen_resupply_token",
             "lionshield_quartermaster_badge",
+            "innkeeper_credit_token",
+            "sella_ballad_token",
+            "blackseal_taster_pin",
+            "harl_road_knot",
+            "kestrel_ledger_clasp",
             "gravequiet_amulet",
             "edermath_scout_buckle",
             "bryns_cache_keyring",
@@ -5702,12 +5826,13 @@ class CoreTests(unittest.TestCase):
         companion = create_kaelis_starling()
         player.current_hp = 2
         companion.current_hp = 3
-        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(172))
+        log: list[str] = []
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(172))
         game.state = GameState(
             player=player,
             companions=[companion],
             current_scene="phandalin_hub",
-            gold=10,
+            gold=20,
             inventory={"camp_stew_jar": 3, "bread_round": 4, "goat_cheese": 2},
             short_rests_remaining=0,
         )
@@ -5718,6 +5843,42 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(player.current_hp, player.max_hp)
         self.assertEqual(companion.current_hp, companion.max_hp)
         self.assertEqual(game.state.short_rests_remaining, 2)
+        rendered = self.plain_output(log)
+        self.assertIn("will cost 20 gp total", rendered)
+        self.assertIn("Will long rest: Velkor, Kaelis Starling.", rendered)
+        self.assertIn("Spend 20 gp at Stonehill Inn and long rest this company?", rendered)
+
+    def test_paid_inn_long_rest_can_be_declined_after_cost_confirmation(self) -> None:
+        player = build_character(
+            name="Velkor",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        companion = create_tolan_ironshield()
+        companion.dead = True
+        companion.current_hp = 0
+        player.current_hp = 2
+        log: list[str] = []
+        game = TextDnDGame(input_fn=lambda _: "2", output_fn=log.append, rng=random.Random(1721))
+        game.state = GameState(
+            player=player,
+            companions=[companion],
+            current_scene="phandalin_hub",
+            gold=20,
+            short_rests_remaining=0,
+        )
+        self.assertFalse(game.paid_inn_long_rest("Stonehill Inn"))
+        self.assertEqual(game.state.gold, 20)
+        self.assertEqual(player.current_hp, 2)
+        self.assertTrue(companion.dead)
+        self.assertEqual(game.state.short_rests_remaining, 0)
+        rendered = self.plain_output(log)
+        self.assertIn("Will long rest: Velkor.", rendered)
+        self.assertIn("Will not be restored by resting: Tolan Ironshield (dead).", rendered)
+        self.assertIn("You keep your gold and do not rent beds.", rendered)
 
     def test_paid_inn_long_rest_requires_enough_gold(self) -> None:
         player = build_character(
@@ -5736,7 +5897,7 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(game.state.gold, 4)
         self.assertEqual(player.current_hp, 2)
         self.assertEqual(game.state.short_rests_remaining, 0)
-        self.assertIn("costs 5 gp", self.plain_output(log))
+        self.assertIn("costs 10 gp", self.plain_output(log))
 
     def test_short_rest_heals_half_maximum_hp_rounded_up(self) -> None:
         player = build_character(
@@ -6441,7 +6602,7 @@ class CoreTests(unittest.TestCase):
             class_skill_choices=["Athletics", "Survival"],
         )
         log: list[str] = []
-        answers = iter(["1", "4"])
+        answers = iter(["1", "9"])
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=log.append, rng=random.Random(30))
         game.state = GameState(player=player, current_scene="phandalin_hub")
         game.visit_stonehill_inn()
@@ -6458,7 +6619,7 @@ class CoreTests(unittest.TestCase):
             class_skill_choices=["Athletics", "Survival"],
         )
         log: list[str] = []
-        answers = iter(["1", "2"])
+        answers = iter(["1", "7"])
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=log.append, rng=random.Random(9205))
         game.state = GameState(
             player=player,
@@ -6480,6 +6641,566 @@ class CoreTests(unittest.TestCase):
         self.assertIn("someone taught the Brand what a supply loss feels like", rendered)
         self.assertIn("Sereth Vane", rendered)
         self.assertTrue(game.state.flags["inn_blackwake_rumor_asked"])
+
+    def test_stonehill_marked_keg_quest_can_be_resolved_and_turned_in(self) -> None:
+        player = build_character(
+            name="Velkor",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        log: list[str] = []
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(411))
+        game.state = GameState(player=player, current_scene="phandalin_hub")
+        game.skill_check = lambda actor, skill, dc, context: True  # type: ignore[method-assign]
+
+        def fake_scenario_choice(prompt: str, options: list[str], **kwargs) -> int:
+            if prompt == "Choose what you say to Mara Stonehill.":
+                if game.quest_is_completed("marked_keg_investigation"):
+                    return self.option_index_containing(options, "Leave Mara to the floor")
+                if game.quest_is_ready("marked_keg_investigation"):
+                    return self.option_index_containing(options, "Tell Mara who marked the keg")
+                if not game.has_quest("marked_keg_investigation"):
+                    return self.option_index_containing(options, "watching the kegs instead of the door")
+                return self.option_index_containing(options, "Read the room around Mara's marked keg.")
+            if prompt == "How do you handle Mara's marked keg?":
+                return self.option_index_containing(options, "Examine the keg chalk")
+            raise AssertionError(prompt)
+
+        game.scenario_choice = fake_scenario_choice  # type: ignore[method-assign]
+        game.stonehill_talk_mara()
+
+        self.assertEqual(game.state.quests["marked_keg_investigation"].status, "completed")
+        self.assertTrue(game.state.flags["marked_keg_resolved"])
+        self.assertTrue(game.state.flags["quest_reward_stonehill_common_room_welcome"])
+        self.assertEqual(game.state.inventory["innkeeper_credit_token"], 1)
+        self.assertEqual(game.state.gold, 24)
+        self.assertEqual(game.state.xp, 70)
+        rendered = self.plain_output(log)
+        self.assertIn("fresh chalk no cellar hand will claim", rendered)
+        self.assertIn("Additional quest reward: Innkeeper Credit Token x1.", rendered)
+
+    def test_stonehill_marked_keg_blessing_path_skips_skill_check(self) -> None:
+        player = build_character(
+            name="Velkor",
+            race="Human",
+            class_name="Fighter",
+            background="Charlatan",
+            base_ability_scores={"STR": 10, "DEX": 15, "CON": 13, "INT": 10, "WIS": 12, "CHA": 14},
+            class_skill_choices=["Deception", "Insight", "Stealth"],
+        )
+        log: list[str] = []
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(412))
+        game.state = GameState(player=player, current_scene="phandalin_hub")
+        game.apply_liars_blessing()
+
+        def fail_skill_check(actor, skill, dc, context):
+            raise AssertionError("Liar's Blessing path should not require a skill check")
+
+        game.skill_check = fail_skill_check
+        game.scenario_choice = lambda prompt, options, **kwargs: self.option_index_containing(options, "LIAR'S BLESSING")  # type: ignore[method-assign]
+        game.stonehill_investigate_marked_keg()
+
+        self.assertTrue(game.state.flags["marked_keg_resolved"])
+
+    def test_stonehill_songs_for_the_missing_can_be_completed(self) -> None:
+        player = build_character(
+            name="Velkor",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        log: list[str] = []
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(413))
+        game.state = GameState(player=player, current_scene="phandalin_hub")
+        game.skill_check = lambda actor, skill, dc, context: True  # type: ignore[method-assign]
+
+        def first_sella_choice(prompt: str, options: list[str], **kwargs) -> int:
+            if "Sella Quill" in prompt:
+                if not game.has_quest("songs_for_the_missing"):
+                    return self.option_index_containing(options, "Can a song do anything for the missing?")
+                return self.option_index_containing(options, "Leave Sella Quill")
+            raise AssertionError(prompt)
+
+        game.scenario_choice = first_sella_choice  # type: ignore[method-assign]
+        game.stonehill_talk_sella()
+
+        def jerek_choice(prompt: str, options: list[str], **kwargs) -> int:
+            if "Jerek Harl" in prompt:
+                if not game.state.flags.get("songs_for_missing_jerek_detail"):
+                    return self.option_index_containing(options, "Tell me the missing man's name")
+                return self.option_index_containing(options, "Leave Jerek")
+            raise AssertionError(prompt)
+
+        game.scenario_choice = jerek_choice  # type: ignore[method-assign]
+        game.stonehill_talk_jerek()
+
+        def tam_choice(prompt: str, options: list[str], **kwargs) -> int:
+            if "Old Tam Veller" in prompt:
+                if not game.state.flags.get("songs_for_missing_tam_detail"):
+                    return self.option_index_containing(options, "Stay with the part")
+                return self.option_index_containing(options, "Leave Old Tam")
+            raise AssertionError(prompt)
+
+        game.scenario_choice = tam_choice  # type: ignore[method-assign]
+        game.stonehill_talk_old_tam()
+
+        def nera_song_choice(prompt: str, options: list[str], **kwargs) -> int:
+            if "Nera Doss" in prompt:
+                if not game.state.flags.get("stonehill_nera_treated"):
+                    return self.option_index_containing(options, "Let me look at that split lip")
+                return self.option_index_containing(options, "Leave Nera Doss")
+            raise AssertionError(prompt)
+
+        game.scenario_choice = nera_song_choice  # type: ignore[method-assign]
+        game.stonehill_talk_nera()
+
+        def final_sella_choice(prompt: str, options: list[str], **kwargs) -> int:
+            if "Sella Quill" in prompt:
+                if game.quest_is_ready("songs_for_the_missing"):
+                    return self.option_index_containing(options, "Bring Sella the three true details")
+                return self.option_index_containing(options, "Leave Sella Quill")
+            raise AssertionError(prompt)
+
+        game.scenario_choice = final_sella_choice  # type: ignore[method-assign]
+        game.stonehill_talk_sella()
+
+        self.assertEqual(game.state.quests["songs_for_the_missing"].status, "completed")
+        self.assertEqual(game.state.inventory["sella_ballad_token"], 1)
+        self.assertTrue(game.state.flags["quest_reward_sella_names_carried"])
+        self.assertTrue(game.state.flags["songs_for_missing_jerek_detail"])
+        self.assertTrue(game.state.flags["songs_for_missing_tam_detail"])
+        self.assertTrue(game.state.flags["songs_for_missing_nera_detail"])
+        rendered = self.plain_output(log)
+        self.assertIn("three true details", rendered)
+        self.assertIn("Additional quest reward: Sella's Ballad Token x1.", rendered)
+
+    def test_stonehill_quiet_table_failure_can_roll_into_barfight_and_turn_in(self) -> None:
+        player = build_character(
+            name="Velkor",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        log: list[str] = []
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(414))
+        game.state = GameState(player=player, current_scene="phandalin_hub")
+
+        def selective_skill_check(actor, skill, dc, context):
+            if skill == "Stealth":
+                return False
+            return True
+
+        game.skill_check = selective_skill_check  # type: ignore[method-assign]
+
+        def nera_first_choice(prompt: str, options: list[str], **kwargs) -> int:
+            if "Nera Doss" in prompt:
+                if not game.has_quest("quiet_table_sharp_knives"):
+                    return self.option_index_containing(options, "Who wanted your message changed?")
+                if game.state.flags.get("stonehill_barfight_ready"):
+                    return self.option_index_containing(options, "Leave Nera Doss")
+                return self.option_index_containing(options, "Shadow the quiet table")
+            if prompt == "How do you work the quiet table?":
+                return self.option_index_containing(options, "Move around the beams")
+            raise AssertionError(prompt)
+
+        game.scenario_choice = nera_first_choice  # type: ignore[method-assign]
+        game.stonehill_talk_nera()
+
+        self.assertTrue(game.state.flags["stonehill_barfight_ready"])
+
+        game.scenario_choice = lambda prompt, options, **kwargs: self.option_index_containing(options, "Name the real instigator")  # type: ignore[method-assign]
+        game.stonehill_resolve_barfight()
+
+        self.assertTrue(game.state.flags["quiet_table_knives_resolved"])
+        self.assertFalse(game.state.flags["stonehill_barfight_ready"])
+
+        def nera_turnin_choice(prompt: str, options: list[str], **kwargs) -> int:
+            if "Nera Doss" in prompt:
+                if game.quest_is_ready("quiet_table_sharp_knives"):
+                    return self.option_index_containing(options, "Tell Nera what the quiet table was really doing")
+                return self.option_index_containing(options, "Leave Nera Doss")
+            raise AssertionError(prompt)
+
+        game.scenario_choice = nera_turnin_choice  # type: ignore[method-assign]
+        game.stonehill_talk_nera()
+
+        self.assertEqual(game.state.quests["quiet_table_sharp_knives"].status, "completed")
+        self.assertEqual(game.state.inventory["blackseal_taster_pin"], 1)
+        self.assertTrue(game.state.flags["quest_reward_stonehill_quiet_room_access"])
+        rendered = self.plain_output(log)
+        self.assertIn("folded payment note", rendered)
+        self.assertIn("Additional quest reward: Blackseal Taster Pin x1.", rendered)
+
+    def test_jerek_missing_brother_quest_can_be_found_at_ashfall_and_turned_in(self) -> None:
+        player = build_character(
+            name="Velkor",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        log: list[str] = []
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(415))
+        game.state = GameState(player=player, current_scene="phandalin_hub", flags={"act1_town_fear": 2})
+
+        def jerek_accept_choice(prompt: str, options: list[str], **kwargs) -> int:
+            if "Jerek Harl" in prompt:
+                if not game.has_quest("find_dain_harl"):
+                    return self.option_index_containing(options, "what truth do you want carried back")
+                return self.option_index_containing(options, "Leave Jerek")
+            raise AssertionError(prompt)
+
+        game.scenario_choice = jerek_accept_choice  # type: ignore[method-assign]
+        game.stonehill_talk_jerek()
+
+        self.assertTrue(game.has_quest("find_dain_harl"))
+        self.assertEqual(game.state.quests["find_dain_harl"].status, "active")
+
+        dungeon = ACT1_HYBRID_MAP.dungeons["ashfall_watch_fort"]
+        room = dungeon.rooms["prisoner_yard"]
+        game.state.current_scene = "ashfall_watch"
+        game.scenario_choice = lambda prompt, options, **kwargs: self.option_index_containing(options, "Cut the locks")  # type: ignore[method-assign]
+        game._ashfall_prisoner_yard(dungeon, room)
+
+        self.assertTrue(game.state.flags["ashfall_blue_scarf_truth_found"])
+        self.assertTrue(game.state.flags["dain_harl_truth_found"])
+        self.assertEqual(game.state.quests["find_dain_harl"].status, "ready_to_turn_in")
+
+        game.state.current_scene = "phandalin_hub"
+
+        def jerek_turnin_choice(prompt: str, options: list[str], **kwargs) -> int:
+            if "Jerek Harl" in prompt:
+                if game.quest_is_ready("find_dain_harl"):
+                    return self.option_index_containing(options, "Tell Jerek what you found of Dain Harl")
+                return self.option_index_containing(options, "Leave Jerek")
+            raise AssertionError(prompt)
+
+        game.scenario_choice = jerek_turnin_choice  # type: ignore[method-assign]
+        game.stonehill_talk_jerek()
+
+        self.assertEqual(game.state.quests["find_dain_harl"].status, "completed")
+        self.assertEqual(game.state.inventory["harl_road_knot"], 1)
+        self.assertTrue(game.state.flags["quest_reward_jerek_road_knot"])
+        self.assertEqual(game.state.flags["act1_town_fear"], 1)
+        rendered = self.plain_output(log)
+        self.assertIn("blue scarf", rendered)
+        self.assertIn("Additional quest reward: Harl Road-Knot x1.", rendered)
+
+    def test_stonehill_quiet_room_scene_unlocks_packet_intel(self) -> None:
+        player = build_character(
+            name="Velkor",
+            race="Human",
+            class_name="Rogue",
+            background="Charlatan",
+            base_ability_scores={"STR": 10, "DEX": 15, "CON": 12, "INT": 14, "WIS": 13, "CHA": 12},
+            class_skill_choices=["Investigation", "Insight", "Stealth"],
+        )
+        log: list[str] = []
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(416))
+        game.state = GameState(
+            player=player,
+            current_scene="phandalin_hub",
+            flags={
+                "inn_seen": True,
+                "inn_buy_drink_asked": True,
+                "inn_road_rumors_asked": True,
+                "inn_recruit_bryn_attempted": True,
+                "inn_recruit_bryn_second_attempted": True,
+                "quest_reward_stonehill_quiet_room_access": True,
+            },
+        )
+        game.skill_check = lambda actor, skill, dc, context: True  # type: ignore[method-assign]
+
+        def quiet_room_choice(prompt: str, options: list[str], **kwargs) -> int:
+            if prompt == "The common room quiets for a moment as you enter.":
+                if game.state.flags.get("stonehill_quiet_room_scene_done"):
+                    return self.option_index_containing(options, "Leave the common room")
+                return self.option_index_containing(options, "upstairs quiet room")
+            if prompt == "How do you work the quiet-room packet?":
+                return self.option_index_containing(options, "payment note beside the courier strip")
+            raise AssertionError(prompt)
+
+        game.scenario_choice = quiet_room_choice  # type: ignore[method-assign]
+        game.visit_stonehill_inn()
+
+        self.assertTrue(game.state.flags["stonehill_quiet_room_scene_done"])
+        self.assertTrue(game.state.flags["stonehill_quiet_room_intel_decoded"])
+        self.assertEqual(game.state.xp, 15)
+        rendered = self.plain_output(log)
+        self.assertIn("what your reward really buys", rendered)
+        self.assertIn("quiet-room packet", rendered)
+
+    def test_ashfall_quiet_room_intel_option_weakens_rukhar(self) -> None:
+        player = build_character(
+            name="Velkor",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(417))
+        game.state = GameState(
+            player=player,
+            current_scene="ashfall_watch",
+            flags={
+                "stonehill_quiet_room_intel_decoded": True,
+                "ashfall_lower_barracks_cleared": True,
+                "ashfall_signal_basin_silenced": True,
+            },
+        )
+        dungeon = ACT1_HYBRID_MAP.dungeons["ashfall_watch_fort"]
+        room = dungeon.rooms["rukhar_command"]
+        captured: list[Encounter] = []
+        game.scenario_choice = lambda prompt, options, **kwargs: self.option_index_containing(options, "QUIET ROOM INTEL")  # type: ignore[method-assign]
+        game.run_encounter = lambda encounter: captured.append(encounter) or "victory"  # type: ignore[method-assign]
+        game.return_to_phandalin = lambda text: None  # type: ignore[method-assign]
+
+        game._ashfall_rukhar_command(dungeon, room)
+
+        self.assertEqual(len(captured), 1)
+        self.assertEqual(captured[0].enemies[0].current_hp, 23)
+
+    def test_emberhall_quiet_room_intel_option_reads_ledgers_without_check(self) -> None:
+        player = build_character(
+            name="Velkor",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(418))
+        game.state = GameState(player=player, current_scene="emberhall_cellars", flags={"stonehill_quiet_room_intel_decoded": True})
+        dungeon = ACT1_HYBRID_MAP.dungeons["emberhall_depths"]
+        room = dungeon.rooms["ledger_chain"]
+
+        def fail_skill_check(actor, skill, dc, context):
+            raise AssertionError("Quiet-room ledger option should not require a skill check")
+
+        game.skill_check = fail_skill_check
+        game.scenario_choice = lambda prompt, options, **kwargs: self.option_index_containing(options, "QUIET ROOM INTEL")  # type: ignore[method-assign]
+
+        game._emberhall_ledger_chain(dungeon, room)
+
+        self.assertTrue(game.state.flags["emberhall_ledger_read"])
+
+    def test_neverwinter_contract_house_quest_can_unlock_private_room(self) -> None:
+        player = build_character(
+            name="Velkor",
+            race="Human",
+            class_name="Rogue",
+            background="Charlatan",
+            base_ability_scores={"STR": 10, "DEX": 15, "CON": 12, "INT": 14, "WIS": 13, "CHA": 14},
+            class_skill_choices=["Insight", "Investigation", "Sleight of Hand"],
+        )
+        log: list[str] = []
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(419))
+        game.state = GameState(player=player, current_scene="neverwinter_briefing")
+        game.skill_check = lambda actor, skill, dc, context: True  # type: ignore[method-assign]
+
+        def contract_house_choice(prompt: str, options: list[str], **kwargs) -> int:
+            if prompt == "The contract house room keeps three conversations going at once.":
+                if not game.has_quest("false_manifest_circuit"):
+                    return self.option_index_containing(options, "Sabra Kestrel")
+                if not game.state.flags.get("false_manifest_oren_detail"):
+                    return self.option_index_containing(options, "Oren Vale")
+                if not game.state.flags.get("false_manifest_vessa_detail"):
+                    return self.option_index_containing(options, "Vessa Marr")
+                if not game.state.flags.get("false_manifest_garren_detail"):
+                    return self.option_index_containing(options, "Garren Flint")
+                if game.quest_is_ready("false_manifest_circuit") and not game.quest_is_completed("false_manifest_circuit"):
+                    return self.option_index_containing(options, "Sabra Kestrel")
+                if game.state.flags.get("quest_reward_neverwinter_private_room_access") and not game.state.flags.get("neverwinter_private_room_scene_done"):
+                    return self.option_index_containing(options, "upstairs private room")
+                return self.option_index_containing(options, "Leave the contract house")
+            if "Sabra Kestrel" in prompt:
+                if not game.has_quest("false_manifest_circuit"):
+                    return self.option_index_containing(options, "Which ledger line")
+                if game.quest_is_ready("false_manifest_circuit") and not game.quest_is_completed("false_manifest_circuit"):
+                    return self.option_index_containing(options, "Bring Sabra")
+                return self.option_index_containing(options, "Leave Sabra")
+            if "Oren Vale" in prompt:
+                if not game.state.flags.get("false_manifest_oren_detail"):
+                    return self.option_index_containing(options, "written by someone expecting never to be checked")
+                return self.option_index_containing(options, "Leave Oren")
+            if "Vessa Marr" in prompt:
+                if not game.state.flags.get("false_manifest_vessa_detail"):
+                    return self.option_index_containing(options, "seal-color")
+                return self.option_index_containing(options, "Leave Vessa")
+            if "Garren Flint" in prompt:
+                if not game.state.flags.get("false_manifest_garren_detail"):
+                    return self.option_index_containing(options, "real roadwarden would never write")
+                return self.option_index_containing(options, "Leave Garren")
+            if prompt == "How do you read the upstairs contract room?":
+                return self.option_index_containing(options, "corrected manifests over the room register")
+            raise AssertionError(prompt)
+
+        game.scenario_choice = contract_house_choice  # type: ignore[method-assign]
+        game.visit_neverwinter_contract_house()
+
+        self.assertEqual(game.state.quests["false_manifest_circuit"].status, "completed")
+        self.assertEqual(game.state.inventory["kestrel_ledger_clasp"], 1)
+        self.assertTrue(game.state.flags["quest_reward_neverwinter_private_room_access"])
+        self.assertTrue(game.state.flags["neverwinter_private_room_scene_done"])
+        self.assertTrue(game.state.flags["neverwinter_private_room_intel"])
+        rendered = self.plain_output(log)
+        self.assertIn("Additional quest reward: Kestrel Ledger Clasp x1.", rendered)
+        self.assertIn("Upstairs Contract Room", rendered)
+
+    def test_act2_claims_council_mentions_harl_knot_and_quiet_room_intel(self) -> None:
+        player = build_character(
+            name="Velkor",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        log: list[str] = []
+        answers = iter(["1", "1"])
+        game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=log.append, rng=random.Random(420))
+        game.state = GameState(
+            player=player,
+            current_act=2,
+            current_scene="act2_claims_council",
+            flags={
+                "act2_started": True,
+                "act2_town_stability": 3,
+                "act2_route_control": 3,
+                "act2_whisper_pressure": 2,
+                "quest_reward_jerek_road_knot": True,
+                "stonehill_quiet_room_intel_decoded": True,
+                "act2_neverwinter_witness_pressure_active": True,
+            },
+        )
+        game.skill_check = lambda actor, skill, dc, context: False  # type: ignore[method-assign]
+
+        game.scene_act2_claims_council()
+
+        rendered = self.plain_output(log)
+        self.assertIn("blue road-knot", rendered)
+        self.assertIn("courier packet", rendered)
+        self.assertIn("Neverwinter sent a witness packet", rendered)
+
+    def test_stonehollow_harl_road_knot_option_marks_supports_without_skill_check(self) -> None:
+        player = build_character(
+            name="Velkor",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(421))
+        game.state = GameState(
+            player=player,
+            current_act=2,
+            current_scene="stonehollow_dig",
+            flags={
+                "act2_started": True,
+                "act2_town_stability": 3,
+                "act2_route_control": 3,
+                "act2_whisper_pressure": 2,
+                "quest_reward_jerek_road_knot": True,
+            },
+        )
+        dungeon = ACT2_ENEMY_DRIVEN_MAP.dungeons["stonehollow_dig_site"]
+        room = dungeon.rooms["survey_mouth"]
+
+        def fail_skill_check(actor, skill, dc, context):
+            raise AssertionError("Harl Road-Knot route option should not require a skill check")
+
+        game.skill_check = fail_skill_check
+        game.scenario_choice = lambda prompt, options, **kwargs: self.option_index_containing(options, "HARL ROAD-KNOT")  # type: ignore[method-assign]
+
+        game._stonehollow_survey_mouth(dungeon, room)
+
+        self.assertTrue(game.state.flags["stonehollow_supports_stabilized"])
+        self.assertEqual(game.state.xp, 10)
+
+    def test_black_lake_quiet_room_intel_option_takes_orders_without_skill_check(self) -> None:
+        player = build_character(
+            name="Velkor",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(422))
+        game.state = GameState(
+            player=player,
+            current_act=2,
+            current_scene="black_lake_causeway",
+            flags={
+                "act2_started": True,
+                "act2_town_stability": 3,
+                "act2_route_control": 3,
+                "act2_whisper_pressure": 2,
+                "stonehill_quiet_room_intel_decoded": True,
+            },
+        )
+        dungeon = ACT2_ENEMY_DRIVEN_MAP.dungeons["black_lake_crossing"]
+        room = dungeon.rooms["choir_barracks"]
+        captured: list[Encounter] = []
+
+        def fail_skill_check(actor, skill, dc, context):
+            raise AssertionError("Quiet-room Act II barracks option should not require a skill check")
+
+        game.skill_check = fail_skill_check
+        game.scenario_choice = lambda prompt, options, **kwargs: self.option_index_containing(options, "QUIET ROOM INTEL")  # type: ignore[method-assign]
+        game.run_encounter = lambda encounter: captured.append(encounter) or "victory"  # type: ignore[method-assign]
+
+        game._black_lake_choir_barracks(dungeon, room)
+
+        self.assertTrue(game.state.flags["black_lake_barracks_orders_taken"])
+        self.assertEqual(len(captured), 1)
+        self.assertEqual(captured[0].enemies[1].conditions.get("surprised"), 1)
+
+    def test_sella_song_changes_after_dain_truth_returns(self) -> None:
+        player = build_character(
+            name="Velkor",
+            race="Human",
+            class_name="Bard",
+            background="Charlatan",
+            base_ability_scores={"STR": 8, "DEX": 14, "CON": 13, "INT": 10, "WIS": 12, "CHA": 16},
+            class_skill_choices=["Insight", "Performance", "Persuasion"],
+        )
+        log: list[str] = []
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(423))
+        game.state = GameState(
+            player=player,
+            current_scene="phandalin_hub",
+            flags={"quest_reward_jerek_road_knot": True},
+            quests={
+                "songs_for_the_missing": QuestLogEntry(quest_id="songs_for_the_missing", status="completed", notes=[]),
+                "find_dain_harl": QuestLogEntry(quest_id="find_dain_harl", status="completed", notes=[]),
+            },
+        )
+
+        def sella_memorial_choice(prompt: str, options: list[str], **kwargs) -> int:
+            if "Sella Quill" in prompt:
+                if not game.state.flags.get("stonehill_sella_dain_memorial_done"):
+                    return self.option_index_containing(options, "Dain Harl's true ending")
+                return self.option_index_containing(options, "Leave Sella")
+            raise AssertionError(prompt)
+
+        game.scenario_choice = sella_memorial_choice  # type: ignore[method-assign]
+        game.stonehill_talk_sella()
+
+        self.assertTrue(game.state.flags["stonehill_sella_dain_memorial_done"])
+        rendered = self.plain_output(log)
+        self.assertIn("Dain Harl", rendered)
+        self.assertIn("second chorus changes", rendered)
 
     def test_briefing_question_cannot_be_repeated(self) -> None:
         player = build_character(
@@ -7038,6 +7759,7 @@ class CoreTests(unittest.TestCase):
         game._staggered_reveals_preference = True
         game.apply_staggered_reveal_preference()
         game.refresh_presentation_bundle_preference()
+        game.persist_settings = lambda: None
         with patch("sys.stdout", io.StringIO()):
             game.open_settings_menu()
         self.assertFalse(game.animate_dice)

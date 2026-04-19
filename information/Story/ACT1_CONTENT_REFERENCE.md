@@ -13,13 +13,13 @@ The summary sections at the top reflect the expanded Act 1 route and should be t
 - Named minibosses: `Vaelith Marr`, `Brughor Skullcleaver`, and `Rukhar Cinderfang`
 - Final boss: `Varyn Sable`
 - Total potential Act 1 combats now comfortably exceeds 10 before counting random encounters
-- New non-combat support hubs: `Edermath Orchard`, `Miner's Exchange`, Stonehill war-room, and the post-Ashfall lantern vigil
-- Quest set currently defined in data: 7 Act 1 quests, including 5 town quests and 2 companion personal quests
+- New non-combat support hubs: Neverwinter's contract house, `Edermath Orchard`, `Miner's Exchange`, Stonehill war-room, and the post-Ashfall lantern vigil
+- Quest set currently defined in data: 13 Act 1 quests, including 5 inn quests across Neverwinter and Stonehill, 6 wider town or road quests, and 2 companion personal quests
 - Reactivity layer now tracks `Town Fear`, `Ashen Strength`, and `Survivors Saved`, then resolves Act 1 as `clean_victory`, `costly_victory`, or `fractured_victory`
 
 ## Expanded Act 1 Route
 
-1. Neverwinter setup and one background-specific opening encounter or shortcut
+1. Neverwinter setup, briefing, contract-house social hub, and one background-specific opening encounter or shortcut
 2. High Road ambush and Tolan recruitment point
 3. Phandalin arrival, inn / shrine / shop / steward loops, orchard / exchange hubs, and a possible early `Cinderfall` reveal on a strong `Insight` read
 4. Old Owl Well route:
@@ -178,6 +178,11 @@ The summary sections at the top reflect the expanded Act 1 route and should be t
 | `secure_miners_road` | Stop the Watchtower Raids | Tessa Harrow | Steward's Hall | `ashfall_watch_cleared` | `45 XP`, `25 gp` |
 | `restore_barthen_supplies` | Keep the Shelves Full | Barthen | Barthen's Provisions | `ashfall_watch_cleared` | `30 XP`, `12 gp`, `bread_round x2`, `camp_stew_jar x1` |
 | `reopen_lionshield_trade` | Reopen the Trade Lane | Linene Graywind | Lionshield Coster | `ashfall_watch_cleared` | `35 XP`, `18 gp`, `potion_healing x1`, `antitoxin_vial x1` |
+| `marked_keg_investigation` | The Marked Keg | Mara Stonehill | Stonehill Inn | `marked_keg_resolved` | `70 XP`, `24 gp`, `innkeeper_credit_token x1` |
+| `songs_for_the_missing` | Songs for the Missing | Sella Quill | Stonehill Inn | `songs_for_missing_jerek_detail`, `songs_for_missing_tam_detail`, `songs_for_missing_nera_detail` | `65 XP`, `18 gp`, `sella_ballad_token x1` |
+| `quiet_table_sharp_knives` | Quiet Table, Sharp Knives | Nera Doss | Stonehill Inn | `quiet_table_knives_resolved` | `80 XP`, `28 gp`, `blackseal_taster_pin x1` |
+| `find_dain_harl` | Bring Back Dain's Name | Jerek Harl | Stonehill Inn | `dain_harl_truth_found` | `85 XP`, `26 gp`, `harl_road_knot x1` |
+| `false_manifest_circuit` | False Manifest Circuit | Sabra Kestrel | Oren Vale's Contract House | `false_manifest_oren_detail`, `false_manifest_vessa_detail`, `false_manifest_garren_detail` | `75 XP`, `24 gp`, `kestrel_ledger_clasp x1` |
 | `silence_old_owl_well` | Silence Old Owl Well | Halia Thornton | Miner's Exchange | `old_owl_well_cleared` | `50 XP`, `24 gp`, `scroll_clarity x1` |
 | `break_wyvern_tor_raiders` | Break the Wyvern Tor Raiders | Daran Edermath | Edermath Orchard | `wyvern_tor_cleared` | `50 XP`, `20 gp`, `greater_healing_draught x1` |
 | `bryn_loose_ends` | Loose Ends | Bryn Underbough | personal / road chain | `bryn_loose_ends_resolved` | no listed item reward; resolves by ledger choice |
@@ -213,6 +218,8 @@ The summary sections at the top reflect the expanded Act 1 route and should be t
 ### Ashfall consequences
 
 - Destroying the `Cinderfall` ember relay removes one lower-barracks reinforcement and prevents `Rukhar` from opening with his `4` temp HP reserve edge
+- Jerek Harl's `Bring Back Dain's Name` now resolves in the Ashfall prisoner-yard line, with a command-post paperwork fallback if the player reaches `Rukhar` first
+- Decoding Nera's upstairs quiet-room packet adds a special Ashfall command option that spends stolen countersign intel against `Rukhar`
 - Elira's `Faith Under Ash` resolution also feeds into Ashfall's boss setup:
   - mercy grants a later `Blessed` opener
   - hard judgment increases pressure and hardens the finale tone
@@ -232,6 +239,15 @@ The summary sections at the top reflect the expanded Act 1 route and should be t
   - Kaelis Starling
   - Rhogar Valeguard
   - no early companion
+- Oren Vale's contract house now acts as the city-side inn and social pressure valve before departure:
+  - Oren Vale keeps the room, the witnesses, and the upstairs private arrangements
+  - Sabra Kestrel grants `False Manifest Circuit`
+  - Vessa Marr runs the card table and smoke-side rumor line
+  - Garren Flint exposes how copied roadwarden cadence keeps getting obeyed
+- `False Manifest Circuit` is a Neverwinter inn quest built from Oren, Vessa, and Garren's separate details, then turned back in to Sabra
+- Completing Sabra's quest unlocks an upstairs private-room scene that turns contract-house politics into Blackwake and High Road intelligence
+- That private-room intel can be spent at Blackwake to corner Sereth Vane directly, then echoed through Mira's Neverwinter report if Oren, Sabra, Vessa, and Garren become public witnesses
+- `Ash In The Ale` can break out in the room if the player mishandles Vessa's table or pushes Garren too hard
 
 ### Roadside Ambush
 
@@ -252,6 +268,23 @@ The summary sections at the top reflect the expanded Act 1 route and should be t
 
 - Bryn can be recruited with Persuasion DC `12`
 - If Tolan was sent to recover instead of recruited on the road, he can be picked up here
+- New regulars now anchor the inn scene:
+  - Mara Stonehill, who runs the common room and grants `The Marked Keg`
+  - Jerek Harl, whose grief and anger now anchor `Bring Back Dain's Name`
+  - Sella Quill, a singer who grants `Songs for the Missing`
+  - Old Tam Veller, a ruin-minded prospector who still remembers honest route details
+  - Nera Doss, a courier whose split lip leads into `Quiet Table, Sharp Knives`
+- The Stonehill inn now supports:
+  - an inn sabotage investigation around a chalk-marked keg
+  - Jerek's missing-brother route quest, which ties Stonehill grief directly to Ashfall Watch
+  - a memory-ballad quest built from Jerek, Tam, and Nera's true details
+  - a quiet-table whisper scheme that can roll into a skill-resolved barfight
+  - an upstairs quiet-room reward scene that decodes stolen courier intel for later Ashfall and Emberhall use
+  - a memorial follow-up where Sella's song changes once Dain Harl's fate is brought home
+  - `Liar's Blessing` options in the keg, quiet-table, and quiet-room scenes
+- Stonehill's inn rewards now echo into Act 2:
+  - `Harl Road-Knot` opens a special route-reading option at Stonehollow Dig
+  - the quiet-room courier intel opens a special order-seizure option at Black Lake and is named during the claims council
 
 ### Shrine
 

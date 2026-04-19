@@ -339,6 +339,8 @@ class StoryAct2ScaffoldMixin:
         if self.state.flags.get("quest_reward_elira_mercy_blessing"):
             town += 1
             whisper -= 1
+        if self.state.flags.get("neverwinter_contract_house_political_callback"):
+            route += 1
         self.state.flags["act2_town_stability"] = max(0, min(5, town))
         self.state.flags["act2_route_control"] = max(0, min(5, route))
         self.state.flags["act2_whisper_pressure"] = max(0, min(5, whisper))
@@ -348,6 +350,13 @@ class StoryAct2ScaffoldMixin:
 
     def act2_initialize_blackwake_callbacks(self) -> None:
         assert self.state is not None
+        if self.state.flags.get("neverwinter_contract_house_political_callback"):
+            self.state.flags["act2_neverwinter_witness_pressure_active"] = True
+            if not self.state.flags.get("act2_neverwinter_witness_callback_recorded"):
+                self.state.flags["act2_neverwinter_witness_callback_recorded"] = True
+                self.add_journal(
+                    "Neverwinter callback: Oren, Sabra, Vessa, and Garren kept pressure on the false-manifest circuit, giving Act 2's route claims a stronger city-side witness line."
+                )
         if self.state.flags.get("blackwake_sereth_fate") != "escaped":
             return
         self.state.flags["act2_sereth_shadow_active"] = True
@@ -438,6 +447,10 @@ class StoryAct2ScaffoldMixin:
         if self.state.flags.get("act2_sereth_shadow_active"):
             lines.append(
                 "Blackwake callback: Sereth Vane escaped the crossing and remains a live route-corruption thread around Wave Echo supply claims."
+            )
+        if self.state.flags.get("act2_neverwinter_witness_pressure_active"):
+            lines.append(
+                "Neverwinter politics: Oren, Sabra, Vessa, and Garren are backing a city-side witness line against false manifests and copied road authority."
             )
         forge_route_line = self.act2_forge_route_summary_line()
         if forge_route_line is not None:
@@ -726,6 +739,21 @@ class StoryAct2ScaffoldMixin:
                 "Bryn Underbough",
                 "Every room with ledgers and lanterns ends up being about exits eventually. Best decide whose you trust."
             )
+        if self.state.flags.get("quest_reward_jerek_road_knot"):
+            self.speaker(
+                "Linene Graywind",
+                "Jerek's been showing people that blue road-knot. Folk remember who brought one hard truth home instead of letting the road swallow it. Use that while this room is still listening.",
+            )
+        if self.state.flags.get("stonehill_quiet_room_intel_decoded"):
+            self.speaker(
+                "Halia Thornton",
+                "Nera's courier packet was real enough to matter. If clerkwork and message chains were shaping Ashfall and Emberhall, assume the mine's routes are being edited the same way.",
+            )
+        if self.state.flags.get("act2_neverwinter_witness_pressure_active"):
+            self.speaker(
+                "Linene Graywind",
+                "Neverwinter sent a witness packet from Oren Vale's house. Sabra's manifests, Vessa's buyer phrase, and Garren's roadwarden line all agree: any claim built on copied authority gets read twice.",
+            )
         if not self.has_quest("recover_pact_waymap"):
             self.grant_quest("recover_pact_waymap")
         if not self.has_quest("seek_agathas_truth"):
@@ -912,7 +940,7 @@ class StoryAct2ScaffoldMixin:
                     ("turn_in", self.action_option("Report completed quests to their original givers.")),
                     ("camp", self.action_option("Return to camp and manage the wider company.")),
                     ("sidetrack", self.action_option("Follow a companion's Act 2 thread.")),
-                    ("inn", self.action_option("Rest at Stonehill Inn (5 gp per active party member).")),
+                    ("inn", self.action_option("Rest at Stonehill Inn (10 gp per active party member).")),
                     ("rest", self.action_option("Take a short rest.")),
                     ("party", self.action_option("Review the current party.")),
                 ]

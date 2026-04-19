@@ -1570,6 +1570,33 @@ class MapSystemMixin:
                 elif resolution == "sabotage":
                     self.add_inventory_item("antitoxin_vial", 1, source="a seized city-side medicine pouch")
                     self.say("Mira cannot prosecute ashes, but she can use the damage to tighten the next patrol net.")
+                if self.state.flags.get("neverwinter_private_room_intel") and not self.state.flags.get("neverwinter_contract_house_blackwake_reported"):
+                    self.state.flags["neverwinter_contract_house_blackwake_reported"] = True
+                    self.state.flags["neverwinter_contract_house_political_callback"] = True
+                    self.reward_party(xp=15, gold=10, reason="turning contract-house witnesses into Neverwinter pressure")
+                    self.speaker(
+                        "Sabra Kestrel",
+                        "That is the same correction hand. Blackwake did not steal the manifests after the fact; someone in the city pre-taught the road where to bleed.",
+                    )
+                    self.speaker(
+                        "Oren Vale",
+                        "My room can swear to the booking. Vessa can swear to the buyer phrase. Garren can swear no honest roadwarden writes that cadence.",
+                    )
+                    self.speaker(
+                        "Vessa Marr",
+                        "I can swear to a great many things, provided everyone understands how expensive honesty becomes once officials start needing it.",
+                    )
+                    self.speaker(
+                        "Garren Flint",
+                        "Put my name under the roadwarden line. If a bad seal works because good officers got tired, then tired is done being an excuse.",
+                    )
+                    self.speaker(
+                        "Mira Thann",
+                        "Good. Then this stops being rumor and becomes pressure. I can make Neverwinter's quiet offices answer a thing they can no longer call frontier panic.",
+                    )
+                    self.add_journal(
+                        "Oren, Sabra, Vessa, and Garren backed your Blackwake report, turning the contract-house intel into Neverwinter political pressure against the false-manifest circuit."
+                    )
             self.turn_in_quest("trace_blackwake_cell", giver="Mira Thann")
             self.say("With the report made, the south road waits again. The Phandalin writ is still yours to carry.")
             self.travel_to_act1_node("high_road_ambush")
@@ -2314,6 +2341,16 @@ class MapSystemMixin:
             talk_options.append(("investigation", self.skill_tag("INVESTIGATION", self.action_option("Confront Sereth with specific ledger facts."))))
         if self.state.flags.get("blackwake_forged_papers_found"):
             talk_options.append(("deception", self.skill_tag("DECEPTION", self.action_option("Pretend to represent higher Ashen Brand authority."))))
+        if self.state.flags.get("neverwinter_private_room_intel"):
+            talk_options.append(
+                (
+                    "contract_house",
+                    self.skill_tag(
+                        "CONTRACT HOUSE INTEL",
+                        self.action_option("Name the contract-house booking, Sabra's corrected manifest, and the false roadwarden cadence at once."),
+                    ),
+                )
+            )
         talk_options.append(("strike", self.action_option("Strike immediately before Sereth can spoil the room.")))
         choice = self.scenario_choice("Sereth waits to see whether this becomes bargain, threat, or blood.", [text for _, text in talk_options], allow_meta=False)
         talk_key, talk_text = talk_options[choice - 1]
@@ -2355,6 +2392,17 @@ class MapSystemMixin:
             else:
                 self.state.flags["blackwake_enemy_ambush_advantage"] = True
                 self.say("Sereth recognizes the missing countersign and the room moves on his timing.")
+        elif talk_key == "contract_house":
+            self.state.flags["blackwake_sereth_cornered_by_contract_house"] = True
+            self.state.flags["blackwake_sereth_fate"] = "captured"
+            self.apply_status(enemies[0], "reeling", 2, source="Oren and Sabra's contract-house paper trail")
+            if len(enemies) > 1:
+                self.apply_status(enemies[1], "surprised", 1, source="the false manifest line collapsing")
+            hero_bonus += 2
+            self.add_clue("Oren Vale's room booking, Sabra Kestrel's corrected manifest, and Garren Flint's roadwarden cadence all point to Sereth Vane's Blackwake command line.")
+            self.say(
+                "Sereth's smile survives Oren's booking line. It survives Sabra's manifest correction. It does not survive Garren's false cadence fitting both of them exactly."
+            )
         else:
             self.player_action("Strike immediately before Sereth can spoil the room.")
             hero_bonus += 1
@@ -2531,16 +2579,37 @@ class MapSystemMixin:
                     "Coming here late means the place has had longer to collapse inward on both bodies and evidence. The lower notes are not all going to be recoverable now."
                 )
             self.state.flags["stonehollow_seen"] = True
+        options: list[tuple[str, str]] = [
+            (
+                "investigation",
+                self.skill_tag("INVESTIGATION", self.action_option("Read the support lines and mark the one section that can still hold.")),
+            ),
+            (
+                "athletics",
+                self.skill_tag("ATHLETICS", self.action_option("Brace the lowest beam before the entry throat folds inward.")),
+            ),
+            (
+                "arcana",
+                self.skill_tag("ARCANA", self.action_option("Listen for the old Pact warding under the fresh collapse noise.")),
+            ),
+        ]
+        if self.state.flags.get("quest_reward_jerek_road_knot"):
+            options.append(
+                (
+                    "road_knot",
+                    self.skill_tag(
+                        "HARL ROAD-KNOT",
+                        self.action_option("Use Dain Harl's road-knot habit to tell which braces were tied by working hands instead of looters."),
+                    ),
+                )
+            )
         choice = self.scenario_choice(
             "How do you take the first measure of the dig?",
-            [
-                self.skill_tag("INVESTIGATION", self.action_option("Read the support lines and mark the one section that can still hold.")),
-                self.skill_tag("ATHLETICS", self.action_option("Brace the lowest beam before the entry throat folds inward.")),
-                self.skill_tag("ARCANA", self.action_option("Listen for the old Pact warding under the fresh collapse noise.")),
-            ],
+            [text for _, text in options],
             allow_meta=False,
         )
-        if choice == 1:
+        selection_key, _ = options[choice - 1]
+        if selection_key == "investigation":
             self.player_action("Read the support lines and mark the one section that can still hold.")
             if self.skill_check(self.state.player, "Investigation", 13, context="to read the dig braces under pressure"):
                 self.state.flags["stonehollow_supports_stabilized"] = True
@@ -2548,7 +2617,7 @@ class MapSystemMixin:
                 self.say("You mark the honest braces and the whole entry stops feeling like a mouth about to close.")
             else:
                 self.say("The support pattern is bad in too many places at once. You get through, but not cleanly.")
-        elif choice == 2:
+        elif selection_key == "athletics":
             self.player_action("Brace the lowest beam before the entry throat folds inward.")
             if self.skill_check(self.state.player, "Athletics", 13, context="to brace the collapsing entry"):
                 self.state.flags["stonehollow_entry_braced"] = True
@@ -2557,13 +2626,18 @@ class MapSystemMixin:
             else:
                 self.apply_status(self.state.player, "reeling", 1, source="Stonehollow's unstable entry")
                 self.say("You keep the beam from killing anyone, but it takes a brutal shoulder and a shower of stone.")
-        else:
+        elif selection_key == "arcana":
             self.player_action("Listen for the old Pact warding under the fresh collapse noise.")
             if self.skill_check(self.state.player, "Arcana", 13, context="to hear the warded side-run beneath the collapse noise"):
                 self.state.flags["stonehollow_ward_path_hint"] = True
                 self.say("Beneath the bad echoes, one old ward still answers in a steady pattern. There is a cleaner side-run somewhere below.")
             else:
                 self.say("The echoes answer, but not in any pattern you can trust yet.")
+        else:
+            self.player_action("Use Dain Harl's road-knot habit to tell which braces were tied by working hands instead of looters.")
+            self.state.flags["stonehollow_supports_stabilized"] = True
+            self.reward_party(xp=10, reason="following Dain Harl's road-knot logic through Stonehollow")
+            self.say("The knot pattern tells you which braces were tied by people trying to bring crews home rather than trap them. Stonehollow gives up one honest line immediately.")
         self.complete_act2_map_room(dungeon, room.room_id)
 
     def _stonehollow_slime_cut(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
@@ -3806,31 +3880,58 @@ class MapSystemMixin:
         if self.state.flags.get("black_lake_barracks_watch_read"):
             hero_bonus += 1
             self.apply_status(enemies[0], "surprised", 1, source="you entered on the barracks blind side")
+        options: list[tuple[str, str]] = [
+            (
+                "stealth",
+                self.skill_tag("STEALTH", self.action_option("Cut the messengers first and keep the barracks from warning the far side.")),
+            ),
+            (
+                "investigation",
+                self.skill_tag("INVESTIGATION", self.action_option("Take the rota boards and reserve orders before the fighting scatters them.")),
+            ),
+            (
+                "athletics",
+                self.skill_tag("ATHLETICS", self.action_option("Turn the weapon racks and bunks into a collapsing choke point.")),
+            ),
+        ]
+        if self.state.flags.get("stonehill_quiet_room_intel_decoded"):
+            options.append(
+                (
+                    "quiet_room",
+                    self.skill_tag(
+                        "QUIET ROOM INTEL",
+                        self.action_option("Use Nera's courier-reading and grab the live reserve orders before the room knows which satchel matters."),
+                    ),
+                )
+            )
         choice = self.scenario_choice(
             "How do you strip the barracks?",
-            [
-                self.skill_tag("STEALTH", self.action_option("Cut the messengers first and keep the barracks from warning the far side.")),
-                self.skill_tag("INVESTIGATION", self.action_option("Take the rota boards and reserve orders before the fighting scatters them.")),
-                self.skill_tag("ATHLETICS", self.action_option("Turn the weapon racks and bunks into a collapsing choke point.")),
-            ],
+            [text for _, text in options],
             allow_meta=False,
         )
-        if choice == 1:
+        selection_key, _ = options[choice - 1]
+        if selection_key == "stealth":
             self.player_action("Cut the messengers first and keep the barracks from warning the far side.")
             if self.skill_check(self.state.player, "Stealth", 14, context="to kill the Black Lake message chain before it runs"):
                 hero_bonus += 2
                 self.apply_status(enemies[1], "surprised", 1, source="their messengers dropped first")
-        elif choice == 2:
+        elif selection_key == "investigation":
             self.player_action("Take the rota boards and reserve orders before the fighting scatters them.")
             if self.skill_check(self.state.player, "Investigation", 14, context="to seize the barracks orders intact"):
                 hero_bonus += 1
                 self.state.flags["black_lake_barracks_orders_taken"] = True
                 self.add_clue("Black Lake barracks orders confirm the Quiet Choir keeps its last reserve line on the Forge side of the crossing.")
-        else:
+        elif selection_key == "athletics":
             self.player_action("Turn the weapon racks and bunks into a collapsing choke point.")
             if self.skill_check(self.state.player, "Athletics", 14, context="to make the barracks collapse inward on its own defenders"):
                 hero_bonus += 1
                 self.apply_status(enemies[0], "prone", 1, source="the barracks caving around them")
+        else:
+            self.player_action("Use Nera's courier-reading and grab the live reserve orders before the room knows which satchel matters.")
+            hero_bonus += 1
+            self.state.flags["black_lake_barracks_orders_taken"] = True
+            self.apply_status(enemies[1], "surprised", 1, source="you took the live courier satchel first")
+            self.add_clue("The quiet-room courier habits still hold underground: the real Black Lake reserve orders were carried in the least impressive satchel in the room.")
         outcome = self.run_encounter(
             Encounter(
                 title="Black Lake Barracks",
@@ -5207,6 +5308,52 @@ class MapSystemMixin:
         self.reward_party(xp=35, gold=12, reason="breaking the Cinderfall relay")
         self.return_to_phandalin("Cinderfall goes dark behind you. Whatever waits at Ashfall will now be doing it with thinner reserves and worse timing.")
 
+    def _ashfall_record_blue_scarf_truth(self, *, fallback: bool = False) -> None:
+        assert self.state is not None
+        if self.state.flags.get("ashfall_blue_scarf_truth_found"):
+            if self.has_quest("find_dain_harl") and not self.state.flags.get("dain_harl_truth_found"):
+                self.state.flags["dain_harl_truth_found"] = True
+                self.refresh_quest_statuses(announce=False)
+            return
+        self.state.flags["ashfall_blue_scarf_truth_found"] = True
+        knows_name = any(
+            (
+                self.has_quest("find_dain_harl"),
+                self.quest_is_completed("find_dain_harl"),
+                self.state.flags.get("stonehill_jerek_met"),
+                self.state.flags.get("songs_for_missing_jerek_detail"),
+            )
+        )
+        if fallback:
+            if knows_name:
+                self.say(
+                    "One transfer slip catches harder than the rest: Dain Harl, road hand, dead in the prisoner disturbance. "
+                    "Someone clipped a strip of blue scarf into the order as proof the body was counted."
+                )
+            else:
+                self.say(
+                    "One transfer slip has a strip of blue scarf pinned to it, proof that one east-road worker died in the prisoner disturbance."
+                )
+        else:
+            if knows_name:
+                self.say(
+                    "Against the broken cage line lies a road hand in a soot-stiff blue scarf. "
+                    "A freed prisoner swears Dain Harl cut two locks and shoved strangers through before the enforcers brought him down."
+                )
+            else:
+                self.say(
+                    "Against the broken cage line lies a road hand in a soot-stiff blue scarf. "
+                    "A freed prisoner swears he cut two locks and shoved strangers through before the enforcers brought him down."
+                )
+        if knows_name:
+            self.state.flags["dain_harl_truth_found"] = True
+            self.add_clue("Dain Harl died at Ashfall Watch after cutting prisoners loose.")
+            self.add_journal("At Ashfall Watch you confirmed Dain Harl died freeing prisoners in the yard.")
+            self.refresh_quest_statuses(announce=False)
+        else:
+            self.add_clue("A blue-scarfed east-road worker died freeing prisoners at Ashfall Watch.")
+            self.add_journal("At Ashfall Watch you found proof that one east-road worker died freeing prisoners in the yard.")
+
     def _ashfall_breach_gate(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
         assert self.state is not None
         self.say(
@@ -5309,6 +5456,7 @@ class MapSystemMixin:
                 self.say("A few freed prisoners grab dropped clubs and stones, throwing the barracks response into chaos.")
             else:
                 self.say("You free them, but not cleanly enough to keep the barracks from organizing.")
+            self._ashfall_record_blue_scarf_truth()
             self.complete_map_room(dungeon, "prisoner_yard")
         else:
             self.player_speaker("Read the order board. If Rukhar thinks in patterns, I want them now.")
@@ -5325,6 +5473,7 @@ class MapSystemMixin:
                 self.say("You catch enough of the rotation to know exactly which door the inner response will use.")
             else:
                 self.say("You get fragments, but not the whole shape of his defense.")
+            self._ashfall_record_blue_scarf_truth()
             self.complete_map_room(dungeon, "prisoner_yard")
 
         self.set_current_map_room("lower_barracks")
@@ -5369,6 +5518,7 @@ class MapSystemMixin:
             self.player_action("Cut the locks, shove the prisoners toward cover, and keep moving.")
             self.say("The cages swing open and the yard turns from a pen into a problem the watch can no longer ignore.")
 
+        self._ashfall_record_blue_scarf_truth()
         self.complete_map_room(dungeon, room.room_id)
 
     def _ashfall_signal_basin(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
@@ -5472,16 +5622,42 @@ class MapSystemMixin:
         if self.state.flags.get("elira_hard_verdict"):
             boss_bonus += 1
             boss_enemies[0].current_hp = max(1, boss_enemies[0].current_hp - 2)
+        options: list[tuple[str, str]] = []
+        if self.state.flags.get("stonehill_quiet_room_intel_decoded"):
+            options.append(
+                (
+                    "quiet_room",
+                    self.skill_tag(
+                        "QUIET ROOM INTEL",
+                        self.action_option("Use the stolen countersign and make Rukhar's own line doubt the next order."),
+                    ),
+                )
+            )
+        options.extend(
+            [
+                ("intimidation", self.quoted_option("INTIMIDATION", "Surrender the yard in Phandalin's name.")),
+                ("persuasion", self.quoted_option("PERSUASION", "Your paymaster is already losing. Walk away with the people who still can.")),
+                ("strike", self.action_option("Strike before he can settle the shield line.")),
+            ]
+        )
         choice = self.scenario_choice(
             "Rukhar raises his blade and waits to see how you answer.",
-            [
-                self.quoted_option("INTIMIDATION", "Surrender the yard in Phandalin's name."),
-                self.quoted_option("PERSUASION", "Your paymaster is already losing. Walk away with the people who still can."),
-                self.action_option("Strike before he can settle the shield line."),
-            ],
+            [text for _, text in options],
             allow_meta=False,
         )
-        if choice == 1:
+        selection_key, _ = options[choice - 1]
+        if selection_key == "quiet_room":
+            self.player_action("Use the stolen countersign and make Rukhar's own line doubt the next order.")
+            boss_enemies[0].current_hp = max(1, boss_enemies[0].current_hp - 4)
+            boss_bonus += 1
+            self.apply_status(boss_enemies[0], "reeling", 1, source="Stonehill's stolen countersign turning his line uncertain")
+            if len(boss_enemies) > 1:
+                wavering = boss_enemies.pop()
+                self.say(f"When you bark the stolen countersign, {wavering.name} checks Rukhar instead of the line. The hesitation is all the opening you need.")
+            else:
+                self.say("You speak the countersign from Nera's packet and even Rukhar has to waste a heartbeat recalculating who betrayed whom.")
+            self.reward_party(xp=10, reason="spending Stonehill quiet-room intel at Ashfall")
+        elif selection_key == "intimidation":
             self.player_speaker("Surrender the yard in Phandalin's name.")
             success = self.skill_check(self.state.player, "Intimidation", 13, context="to crack Rukhar's command posture")
             if success:
@@ -5491,7 +5667,7 @@ class MapSystemMixin:
             else:
                 self.apply_status(boss_enemies[0], "emboldened", 2, source="your failed demand")
                 self.speaker("Rukhar Cinderfang", "Good. You arrived with a spine.")
-        elif choice == 2:
+        elif selection_key == "persuasion":
             self.player_speaker("Your paymaster is already losing. Walk away with the people who still can.")
             success = self.skill_check(self.state.player, "Persuasion", 13, context="to separate Rukhar from the men still taking his orders")
             if success:
@@ -5526,6 +5702,8 @@ class MapSystemMixin:
             self.return_to_phandalin("You escape the watchtower and retreat to Phandalin to regroup.")
             return
 
+        if not self.state.flags.get("ashfall_blue_scarf_truth_found"):
+            self._ashfall_record_blue_scarf_truth(fallback=True)
         self.complete_map_room(dungeon, room.room_id)
         self.add_clue("Rukhar carried a soot-black key stamped with the Tresendar crest and orders to move captives beneath the manor hill.")
         self.add_journal("Ashfall Watch is broken, but the Ashen Brand's cellar routes beneath Phandalin are still active.")
@@ -5810,16 +5988,36 @@ class MapSystemMixin:
     def _emberhall_ledger_chain(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
         assert self.state is not None
         self.say("A chained clerk, a table full of ledgers, and a stack of poison vials wait in the narrow room outside the sanctum.")
+        options: list[tuple[str, str]] = []
+        if self.state.flags.get("stonehill_quiet_room_intel_decoded") and not self.state.flags.get("emberhall_ledger_read"):
+            options.append(
+                (
+                    "quiet_room",
+                    self.skill_tag(
+                        "QUIET ROOM INTEL",
+                        self.action_option("Match the quiet-room courier strip to these ledgers before the ink goes warm."),
+                    ),
+                )
+            )
+        options.extend(
+            [
+                ("medicine", self.quoted_option("MEDICINE", "The chained clerk is fading. Get them talking before the poison finishes the job.")),
+                ("investigation", self.quoted_option("INVESTIGATION", "Give me the ledgers. I want the shape of Varyn's exits and lies.")),
+                ("smash", self.action_option("Smash the poison table and flood the hall with glass, fumes, and noise.")),
+            ]
+        )
         choice = self.scenario_choice(
             "What do you do in the lull?",
-            [
-                self.quoted_option("MEDICINE", "The chained clerk is fading. Get them talking before the poison finishes the job."),
-                self.quoted_option("INVESTIGATION", "Give me the ledgers. I want the shape of Varyn's exits and lies."),
-                self.action_option("Smash the poison table and flood the hall with glass, fumes, and noise."),
-            ],
+            [text for _, text in options],
             allow_meta=False,
         )
-        if choice == 1:
+        selection_key, _ = options[choice - 1]
+        if selection_key == "quiet_room":
+            self.player_action("Match the quiet-room courier strip to these ledgers before the ink goes warm.")
+            self.state.flags["emberhall_ledger_read"] = True
+            self.reward_party(xp=15, reason="matching Stonehill quiet-room intel to Emberhall's ledgers")
+            self.say("The Stonehill packet fits the Emberhall books like a stolen key. You have Varyn's fallback routes before anyone can burn the proof.")
+        elif selection_key == "medicine":
             self.player_speaker("The chained clerk is fading. Get them talking before the poison finishes the job.")
             success = self.skill_check(self.state.player, "Medicine", 13, context="to keep the poisoned clerk alive long enough for a final warning")
             if success:
@@ -5829,7 +6027,7 @@ class MapSystemMixin:
                 self.say("The clerk rasps out one useful warning: Varyn keeps a reserve vial for the first enemy who lands a real hit.")
             else:
                 self.say("You save what life you can, but the warning dies in fragments.")
-        elif choice == 2:
+        elif selection_key == "investigation":
             self.player_speaker("Give me the ledgers. I want the shape of Varyn's exits and lies.")
             success = self.skill_check(self.state.player, "Investigation", 13, context="to decode Varyn's fallback routes before the last fight")
             if success:

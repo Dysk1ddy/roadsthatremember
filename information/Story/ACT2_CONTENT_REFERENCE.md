@@ -43,6 +43,7 @@ Act 2 should not start from a blank emotional or strategic slate. Several Act 1 
 | `elira_helped` and whether Elira joined | shrine aid and recruitment | lowers starting `Whisper Pressure`; Agatha and Black Lake scenes become more grounded in mercy instead of panic |
 | `miners_exchange_dispute_resolved`, `miners_exchange_ledgers_checked` | Act 1 Miner's Exchange path | raises starting `Route Control`; Halia is easier to justify as a sponsor, but the player also sees her more clearly |
 | `early_companion_recruited` | Kaelis or Rhogar in Neverwinter | Kaelis improves route logic; Rhogar improves civic steadiness |
+| `neverwinter_contract_house_political_callback` | spending contract-house intel in Blackwake or Mira's Neverwinter follow-up report | raises starting `Route Control`; Oren, Sabra, Vessa, and Garren create city-side witness pressure against copied road authority |
 | `bryn_ledger_sold` vs `bryn_ledger_burned` | `Loose Ends` personal quest | selling the ledger pushes more pressure and distrust into the expedition opening; burning it makes the town start cleaner but poorer |
 | `elira_mercy_blessing` vs `elira_hard_verdict` | `Faith Under Ash` personal quest | shapes whether frontier justice enters Act 2 as hopeful mercy or hard deterrence |
 | Recruiting Bryn, Tolan, or Elira | Act 1 town companion work | each companion now supplies Act 2 sidetrack decisions that change later story pressure instead of only flavor text |

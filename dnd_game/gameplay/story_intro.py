@@ -567,7 +567,7 @@ class StoryIntroMixin:
             options.extend(self.scene_identity_options("neverwinter_briefing"))
             if not self.state.flags.get("neverwinter_preparation_done"):
                 options.append(("prep", self.action_option("Make one more stop in Neverwinter before riding out.")))
-            options.append(("inn", self.action_option("Rest at a Neverwinter inn (5 gp per active party member).")))
+            options.append(("inn", self.action_option("Stop by Oren Vale's contract house (rooms 10 gp per active party member).")))
             options.append(("leave", self.action_option("Take the writ and head for the High Road.")))
             choice = self.scenario_choice("Choose your response to Mira.", [text for _, text in options])
             selection_key, selection = options[choice - 1]
@@ -596,7 +596,7 @@ class StoryIntroMixin:
             elif selection_key == "prep":
                 self.handle_neverwinter_prep()
             elif selection_key == "inn":
-                self.paid_inn_long_rest("a Neverwinter inn")
+                self.visit_neverwinter_contract_house()
             else:
                 self.handle_neverwinter_departure_fork()
                 return
@@ -642,6 +642,480 @@ class StoryIntroMixin:
         else:
             self.say("You keep your focus on the road ahead.")
         self.state.flags["neverwinter_preparation_done"] = True
+
+    def visit_neverwinter_contract_house(self) -> None:
+        assert self.state is not None
+        if not self.state.flags.get("neverwinter_contract_house_seen"):
+            self.state.flags["neverwinter_contract_house_seen"] = True
+            self.banner("Oren Vale's Contract House")
+            self.say(
+                "Half inn, half contracting room, the house sits off the river road where teamsters, wardens, and quiet fixers can all pretend they are only here for stew. "
+                "No one raises their voice unless they mean to buy the room with it.",
+                typed=True,
+            )
+            self.speaker(
+                "Oren Vale",
+                "If Mira sent you, then you are either early, in trouble, or smart enough to know those can all look the same from across a table.",
+            )
+        while True:
+            self.refresh_quest_statuses(announce=False)
+            if self.state.flags.get("neverwinter_ash_in_the_ale_ready"):
+                self.neverwinter_resolve_ash_in_the_ale()
+                continue
+            options: list[tuple[str, str]] = []
+            if self.state.flags.get("quest_reward_neverwinter_private_room_access") and not self.state.flags.get("neverwinter_private_room_scene_done"):
+                options.append(("private_room", self.action_option("Take Oren's offer and use the upstairs private room.")))
+            options.extend(
+                [
+                    ("oren", "\"Oren Vale looks like he already priced this conversation.\""),
+                    ("sabra", "\"Let me see the ledgers Sabra Kestrel keeps glaring at.\""),
+                    ("vessa", "\"Sit in on Vessa Marr's card table.\""),
+                    ("garren", "\"Ask Garren Flint how false roadwarden seals keep getting obeyed.\""),
+                    ("rest", self.action_option("Rent beds upstairs (10 gp per active party member).")),
+                    ("leave", self.action_option("Leave the contract house and return to Mira's rooms.")),
+                ]
+            )
+            choice = self.scenario_choice(
+                "The contract house room keeps three conversations going at once.",
+                [text for _, text in options],
+                allow_meta=False,
+            )
+            selection_key, _ = options[choice - 1]
+            if selection_key == "private_room":
+                self.neverwinter_use_private_room()
+            elif selection_key == "oren":
+                self.neverwinter_talk_oren()
+            elif selection_key == "sabra":
+                self.neverwinter_talk_sabra()
+            elif selection_key == "vessa":
+                self.neverwinter_talk_vessa()
+            elif selection_key == "garren":
+                self.neverwinter_talk_garren()
+            elif selection_key == "rest":
+                self.paid_inn_long_rest("Oren Vale's contract house")
+            else:
+                self.player_action("You leave the contract house and head back toward Mira's borrowed briefing rooms.")
+                return
+
+    def neverwinter_talk_oren(self) -> None:
+        assert self.state is not None
+        if not self.state.flags.get("neverwinter_oren_met"):
+            self.state.flags["neverwinter_oren_met"] = True
+            self.speaker(
+                "Oren Vale",
+                "I do not mind dangerous people. I mind loud ones. Dangerous and quiet can still finish a meal.",
+            )
+        while True:
+            self.refresh_quest_statuses(announce=False)
+            options: list[tuple[str, str]] = []
+            if self.has_quest("false_manifest_circuit") and not self.state.flags.get("false_manifest_oren_detail"):
+                options.append(
+                    (
+                        "detail",
+                        self.skill_tag(
+                            "INSIGHT",
+                            self.action_option("Ask which room booking was written by someone expecting never to be checked."),
+                        ),
+                    )
+                )
+            if not self.state.flags.get("neverwinter_oren_room_asked"):
+                options.append(("room", "\"What kind of business hides in a room like this?\""))
+            if not self.state.flags.get("neverwinter_oren_mira_asked"):
+                options.append(("mira", "\"What does Mira actually buy from you besides quiet tables?\""))
+            if self.state.flags.get("quest_reward_neverwinter_private_room_access") and not self.state.flags.get("neverwinter_private_room_scene_done"):
+                options.append(("access", self.action_option("Ask whether the upstairs room is ready.")))
+            options.append(("leave", self.action_option("Leave Oren to his careful hospitality.")))
+            choice = self.scenario_choice("Choose what you say to Oren Vale.", [text for _, text in options], allow_meta=False)
+            selection_key, _ = options[choice - 1]
+            if selection_key == "detail":
+                self.player_action("Ask which room booking was written by someone expecting never to be checked.")
+                if self.skill_check(self.state.player, "Insight", 12, context="to hear which contract-house booking line belongs to a practiced liar"):
+                    self.state.flags["false_manifest_oren_detail"] = True
+                    self.add_clue("Oren remembers one false booking line that paid cash, used no baggage, and referenced a river-cut pickup the room should not have known.")
+                    self.speaker(
+                        "Oren Vale",
+                        "Room Seven. No luggage, paid too neatly, and asked after a wagon that had not yet officially gone missing. That is not a guest. That is a correction waiting to happen.",
+                    )
+                else:
+                    self.speaker("Oren Vale", "Closer. The lie is in the confidence, not the handwriting.")
+            elif selection_key == "room":
+                self.state.flags["neverwinter_oren_room_asked"] = True
+                self.player_speaker("What kind of business hides in a room like this?")
+                self.speaker(
+                    "Oren Vale",
+                    "Mostly the sort that wants a witness without wanting a crowd. Contracts, reconciliations, and people deciding whether a bad truth is cheaper than a useful lie.",
+                )
+            elif selection_key == "mira":
+                self.state.flags["neverwinter_oren_mira_asked"] = True
+                self.player_speaker("What does Mira actually buy from you besides quiet tables?")
+                self.speaker(
+                    "Oren Vale",
+                    "A place where frightened professionals can tell the truth before they remember who signs their wages. Cities are held together by beams, coin, and one room like this per district.",
+                )
+            elif selection_key == "access":
+                self.player_action("Ask whether the upstairs room is ready.")
+                self.speaker(
+                    "Oren Vale",
+                    "You bought enough truth to merit better walls. Use the back room before somebody poorer in judgment realizes what Sabra just learned.",
+                )
+                self.neverwinter_use_private_room()
+                return
+            else:
+                self.player_action("You leave Oren to his careful hospitality.")
+                return
+
+    def neverwinter_talk_sabra(self) -> None:
+        assert self.state is not None
+        if not self.state.flags.get("neverwinter_sabra_met"):
+            self.state.flags["neverwinter_sabra_met"] = True
+            self.speaker(
+                "Sabra Kestrel",
+                "Missing cargo would bother me less if it stayed missing honestly. These ledgers are being corrected by someone who expects not to be checked.",
+            )
+        while True:
+            self.refresh_quest_statuses(announce=False)
+            options: list[tuple[str, str]] = []
+            if self.quest_is_ready("false_manifest_circuit"):
+                options.append(("turn_in", self.action_option("Bring Sabra the contract-house lies you untangled.")))
+            elif not self.has_quest("false_manifest_circuit") and not self.quest_is_completed("false_manifest_circuit"):
+                options.append(("quest", "\"Which ledger line is wrong enough to matter before I ride?\""))
+            else:
+                options.append(("reminder", "\"Whose detail are you still missing from the manifest line?\""))
+            if not self.state.flags.get("neverwinter_sabra_fear_asked"):
+                options.append(("fear", "\"Which caravan frightens you most?\""))
+            options.append(("leave", self.action_option("Leave Sabra to her ledgers and ink stains.")))
+            choice = self.scenario_choice("Choose what you say to Sabra Kestrel.", [text for _, text in options], allow_meta=False)
+            selection_key, _ = options[choice - 1]
+            if selection_key == "turn_in":
+                self.player_action("Bring Sabra the contract-house lies you untangled.")
+                if self.turn_in_quest("false_manifest_circuit", giver="Sabra Kestrel"):
+                    self.speaker(
+                        "Oren Vale",
+                        "Upstairs room. Back stair. Take the cleaner bottle with you, not the brighter one.",
+                    )
+            elif selection_key == "quest":
+                self.player_speaker("Which ledger line is wrong enough to matter before I ride?")
+                self.speaker(
+                    "Sabra Kestrel",
+                    "Three different liars corrected the same caravan in three different directions: one at the rail, one at the cards, and one in the road cadence. Bring me those three truths and I can name the false manifest circuit before it reaches the south road.",
+                )
+                self.grant_quest(
+                    "false_manifest_circuit",
+                    note="Sabra wants the contract house's three cleanest tells cross-checked before the forged manifest line reaches the High Road.",
+                )
+            elif selection_key == "reminder":
+                missing: list[str] = []
+                if not self.state.flags.get("false_manifest_oren_detail"):
+                    missing.append("Oren")
+                if not self.state.flags.get("false_manifest_vessa_detail"):
+                    missing.append("Vessa")
+                if not self.state.flags.get("false_manifest_garren_detail"):
+                    missing.append("Garren")
+                self.player_speaker("Whose detail are you still missing from the manifest line?")
+                if missing:
+                    self.speaker(
+                        "Sabra Kestrel",
+                        f"Oren, Vessa, and Garren are each holding one clean piece of the lie. Still missing: {', '.join(missing)}.",
+                    )
+                else:
+                    self.speaker(
+                        "Sabra Kestrel",
+                        "That is the whole shape of it, then. Bring it back before the room talks itself into forgetting how obvious it now feels.",
+                    )
+            elif selection_key == "fear":
+                self.state.flags["neverwinter_sabra_fear_asked"] = True
+                self.player_speaker("Which caravan frightens you most?")
+                self.speaker(
+                    "Sabra Kestrel",
+                    "The one marked as delayed before it even left the river cut. Real danger misses schedules. Only people with paper confidence prewrite loss that neatly.",
+                )
+                self.add_clue("Sabra has a Neverwinter manifest showing one caravan marked delayed before departure, which means somebody north of the High Road is prewriting losses.")
+            else:
+                self.player_action("You leave Sabra to her ledgers and ink stains.")
+                return
+
+    def neverwinter_talk_vessa(self) -> None:
+        assert self.state is not None
+        has_blessing = self.has_story_skill_modifier(self.state.player, self.LIARS_BLESSING_MODIFIER_ID)
+        if not self.state.flags.get("neverwinter_vessa_met"):
+            self.state.flags["neverwinter_vessa_met"] = True
+            self.speaker(
+                "Vessa Marr",
+                "Everyone lies at cards. The interesting part is what they choose not to lie about.",
+            )
+        while True:
+            self.refresh_quest_statuses(announce=False)
+            options: list[tuple[str, str]] = []
+            if self.has_quest("false_manifest_circuit") and not self.state.flags.get("false_manifest_vessa_detail"):
+                options.append(
+                    (
+                        "detail",
+                        self.skill_tag(
+                            "INSIGHT",
+                            self.action_option("Watch which seal-color makes Vessa stop joking for half a breath."),
+                        ),
+                    )
+                )
+            if not self.state.flags.get("neverwinter_vessa_cards_played"):
+                options.append(("cards", self.quoted_option("SLEIGHT OF HAND", "Sit for one hand and make the table show its tells.")))
+            if has_blessing and not self.state.flags.get("neverwinter_smuggler_phrase_known"):
+                options.append(
+                    (
+                        "blessing",
+                        self.skill_tag(
+                            "LIAR'S BLESSING",
+                            self.action_option("Name the false buyer Vessa is expecting and let the table correct you."),
+                        ),
+                    )
+                )
+            if not self.state.flags.get("neverwinter_vessa_smoke_asked"):
+                options.append(("smoke", "\"What does the river-cut smoke mean to the people who profit from it?\""))
+            options.append(("leave", self.action_option("Leave Vessa Marr to the cards and the marks.")))
+            choice = self.scenario_choice("Choose what you say to Vessa Marr.", [text for _, text in options], allow_meta=False)
+            selection_key, _ = options[choice - 1]
+            if selection_key == "detail":
+                self.player_action("Watch which seal-color makes Vessa stop joking for half a breath.")
+                if self.skill_check(self.state.player, "Insight", 12, context="to catch Vessa's one honest reaction at the card table"):
+                    self.state.flags["false_manifest_vessa_detail"] = True
+                    self.state.flags["blackwake_millers_ford_lead"] = True
+                    self.speaker(
+                        "Vessa Marr",
+                        "Blue wax on a river manifest means the cargo never plans to meet a real roadwarden. That color is for men who only want the look of authority long enough to wave a wagon sideways.",
+                    )
+                else:
+                    self.speaker("Vessa Marr", "Pretty read. Wrong heartbeat.")
+            elif selection_key == "cards":
+                self.state.flags["neverwinter_vessa_cards_played"] = True
+                self.player_speaker("Sit for one hand and make the table show its tells.")
+                if self.skill_check(self.state.player, "Sleight of Hand", 12, context="to stay ahead of Vessa's card table without becoming the room's punchline"):
+                    self.state.flags["neverwinter_smuggler_phrase_known"] = True
+                    self.reward_party(xp=10, gold=8, reason="surviving Vessa Marr's card table")
+                    self.speaker(
+                        "Vessa Marr",
+                        "Not bad. Since you earned it: if somebody says the load is 'rain-marked,' they mean it already belongs to a forged inspection line.",
+                    )
+                else:
+                    self.say("A loaded cup hits the wall before the hand is even fully called. Too many bruised egos decide they would rather be righteous than lucky.")
+                    self.state.flags["neverwinter_ash_in_the_ale_ready"] = True
+                    return
+            elif selection_key == "blessing":
+                self.player_action("Name the false buyer Vessa is expecting and let the table correct you.")
+                self.state.flags["neverwinter_smuggler_phrase_known"] = True
+                self.reward_party(xp=10, gold=4, reason="turning Liar's Blessing into a card-table passphrase")
+                self.speaker(
+                    "Vessa Marr",
+                    "Rain-marked? Gods, no. That phrase would get you robbed in three districts. The real buyers ask whether the load is blue before they ask whether it is legal.",
+                )
+            elif selection_key == "smoke":
+                self.state.flags["neverwinter_vessa_smoke_asked"] = True
+                self.state.flags["blackwake_millers_ford_lead"] = True
+                self.player_speaker("What does the river-cut smoke mean to the people who profit from it?")
+                self.speaker(
+                    "Vessa Marr",
+                    "That somebody north of Miller's Ford got impatient. Smoke there means papers burned before witnesses could read them, which means the survivors will be worth more than the cargo for a day or two.",
+                )
+            else:
+                self.player_action("You leave Vessa Marr to the cards and the marks.")
+                return
+
+    def neverwinter_talk_garren(self) -> None:
+        assert self.state is not None
+        if not self.state.flags.get("neverwinter_garren_met"):
+            self.state.flags["neverwinter_garren_met"] = True
+            self.speaker(
+                "Garren Flint",
+                "A fake seal only works if honest people are already tired enough to obey it.",
+            )
+        while True:
+            self.refresh_quest_statuses(announce=False)
+            options: list[tuple[str, str]] = []
+            if self.has_quest("false_manifest_circuit") and not self.state.flags.get("false_manifest_garren_detail"):
+                options.append(
+                    (
+                        "detail",
+                        self.skill_tag(
+                            "PERSUASION",
+                            self.action_option("Ask what a real roadwarden would never write on an honest stop order."),
+                        ),
+                    )
+                )
+            if not self.state.flags.get("neverwinter_garren_route_asked"):
+                options.append(("route", "\"How are the false seals getting traction at all?\""))
+            if not self.state.flags.get("neverwinter_garren_pressed"):
+                options.append(("pressure", self.quoted_option("INTIMIDATION", "Stop protecting whoever taught the Brand your cadence.")))
+            options.append(("leave", self.action_option("Leave Garren Flint to his cooling temper.")))
+            choice = self.scenario_choice("Choose what you say to Garren Flint.", [text for _, text in options], allow_meta=False)
+            selection_key, _ = options[choice - 1]
+            if selection_key == "detail":
+                self.player_action("Ask what a real roadwarden would never write on an honest stop order.")
+                if self.skill_check(self.state.player, "Persuasion", 12, context="to get Garren to share the wrong cadence in the false orders"):
+                    self.state.flags["false_manifest_garren_detail"] = True
+                    self.state.flags["road_patrol_writ"] = True
+                    self.speaker(
+                        "Garren Flint",
+                        "No one who ever stood a freezing checkpoint says 'detain pending courtesy review.' That is clerk language wearing a guard's boots. If you see it, the paper is poison.",
+                    )
+                else:
+                    self.speaker("Garren Flint", "Ask me cleaner when the room sounds less thirsty for a spectacle.")
+            elif selection_key == "route":
+                self.state.flags["neverwinter_garren_route_asked"] = True
+                self.state.flags["blackwake_gallows_copse_lead"] = True
+                self.player_speaker("How are the false seals getting traction at all?")
+                self.speaker(
+                    "Garren Flint",
+                    "Because the real road has been tired for months. Too many hungry hands, not enough clean patrols, and one copied seal is all panic needs before it starts obeying the wrong man.",
+                )
+            elif selection_key == "pressure":
+                self.state.flags["neverwinter_garren_pressed"] = True
+                self.player_speaker("Stop protecting whoever taught the Brand your cadence.")
+                if self.skill_check(self.state.player, "Intimidation", 12, context="to force the truth past Garren's pride without breaking the room"):
+                    self.state.flags["blackwake_gallows_copse_lead"] = True
+                    self.speaker(
+                        "Garren Flint",
+                        "Gallows Copse. That is where I would look if I were trying to copy a patrol line without meeting the patrol itself. There. I have said enough in public for one week.",
+                    )
+                else:
+                    self.say("A chair scrapes back too hard. One teamster thinks Garren has been accused of the thing he merely failed to stop, and the room starts choosing sides faster than sense can keep up.")
+                    self.state.flags["neverwinter_ash_in_the_ale_ready"] = True
+                    return
+            else:
+                self.player_action("You leave Garren Flint to his cooling temper.")
+                return
+
+    def neverwinter_resolve_ash_in_the_ale(self) -> None:
+        assert self.state is not None
+        self.state.flags["neverwinter_ash_in_the_ale_ready"] = False
+        self.banner("Ash In The Ale")
+        self.say(
+            "A cup bursts against the wall hard enough to silence three nearby tables. One teamster is on his feet, another swears the cards or the road-talk were rigged, and the whole room has started deciding whose embarrassment deserves help.",
+            typed=True,
+        )
+        choice = self.scenario_choice(
+            "The contract house tilts toward a fight. What do you do?",
+            [
+                self.skill_tag("PERSUASION", self.action_option("Make them sit before pride turns into blood.")),
+                self.skill_tag("INSIGHT", self.action_option("Name the real liar before the loudest fool gets to define the room.")),
+                self.skill_tag("SLEIGHT OF HAND", self.action_option("Make the loaded cup and marked die disappear at the same time.")),
+                self.skill_tag("INTIMIDATION", self.action_option("Freeze the room with one promise nobody wants tested.")),
+                self.skill_tag("ATHLETICS", self.action_option("Step between them and catch the first shove cleanly.")),
+                self.action_option("Let the room settle itself."),
+            ],
+            allow_meta=False,
+        )
+        success = False
+        if choice == 1:
+            self.player_action("Make them sit before pride turns into blood.")
+            success = self.skill_check(self.state.player, "Persuasion", 12, context="to stop the contract-house fight before the room takes a side")
+        elif choice == 2:
+            self.player_action("Name the real liar before the loudest fool gets to define the room.")
+            success = self.skill_check(self.state.player, "Insight", 12, context="to call out the actual liar in the contract-house flare-up")
+        elif choice == 3:
+            self.player_action("Make the loaded cup and marked die disappear at the same time.")
+            success = self.skill_check(self.state.player, "Sleight of Hand", 12, context="to remove the room's excuse for violence before anyone notices your hand")
+        elif choice == 4:
+            self.player_action("Freeze the room with one promise nobody wants tested.")
+            success = self.skill_check(self.state.player, "Intimidation", 12, context="to cow the contract-house room back into its chairs")
+        elif choice == 5:
+            self.player_action("Step between them and catch the first shove cleanly.")
+            success = self.skill_check(self.state.player, "Athletics", 12, context="to absorb the first tavern shove and own the space after it")
+        else:
+            self.player_action("Let the room settle itself.")
+        self.state.flags["neverwinter_ash_in_the_ale_resolved"] = True
+        if success:
+            self.state.flags["neverwinter_oren_trust"] = int(self.state.flags.get("neverwinter_oren_trust", 0)) + 1
+            self.state.flags["blackwake_neverwinter_rumor"] = True
+            self.reward_party(xp=15, gold=6, reason="settling the contract-house flare-up before it became a brawl")
+            self.speaker(
+                "Oren Vale",
+                "Useful. A room that trusts you after a near-fight will tell you more truth than a polite one ever does.",
+            )
+            self.say("The noise ebbs. Somebody laughs from pure relief, and the contract house goes back to pretending it is only an inn.")
+        else:
+            self.apply_status(self.state.player, "reeling", 1, source="the contract-house brawl")
+            self.say("The room resolves itself with scraped knuckles, overturned cups, and one hard shove that reminds you why Oren charges for quiet.")
+
+    def neverwinter_use_private_room(self) -> None:
+        assert self.state is not None
+        self.banner("Upstairs Contract Room")
+        self.say(
+            "Upstairs, Oren closes the door on the common room and Sabra spreads corrected manifests beside a guest register that was never meant to leave the desk. Politics gets smaller in rooms like this, but never cleaner.",
+            typed=True,
+        )
+        has_blessing = self.has_story_skill_modifier(self.state.player, self.LIARS_BLESSING_MODIFIER_ID)
+        options: list[tuple[str, str]] = [
+            (
+                "investigation",
+                self.skill_tag(
+                    "INVESTIGATION",
+                    self.action_option("Lay the corrected manifests over the room register and follow the one hand that lies the same way in both."),
+                ),
+            ),
+            (
+                "insight",
+                self.skill_tag(
+                    "INSIGHT",
+                    self.action_option("Read which missing caravan line Sabra keeps watching when she thinks nobody sees."),
+                ),
+            ),
+            (
+                "persuasion",
+                self.skill_tag(
+                    "PERSUASION",
+                    self.action_option("Get Oren to name which patron buys privacy and never uses the same need twice."),
+                ),
+            ),
+        ]
+        if has_blessing:
+            options.append(
+                (
+                    "blessing",
+                    self.skill_tag(
+                        "LIAR'S BLESSING",
+                        self.action_option("Offer the wrong contract phrase and wait for the room to correct you."),
+                    ),
+                )
+            )
+        choice = self.scenario_choice("How do you read the upstairs contract room?", [text for _, text in options], allow_meta=False)
+        selection_key, _ = options[choice - 1]
+        reward_xp = 10
+        if selection_key == "investigation":
+            self.player_action("Lay the corrected manifests over the room register and follow the one hand that lies the same way in both.")
+            if self.skill_check(self.state.player, "Investigation", 12, context="to line up Sabra's manifests with Oren's quiet-room register"):
+                reward_xp = 15
+                self.state.flags["blackwake_millers_ford_lead"] = True
+                self.state.flags["road_patrol_writ"] = True
+                self.say("The same clerkly hesitation appears in both ledgers: one hand writing authority it has never personally carried.")
+            else:
+                self.say("The overlap is real, but the room gives up only the broad shape of it before the details blur together.")
+        elif selection_key == "insight":
+            self.player_action("Read which missing caravan line Sabra keeps watching when she thinks nobody sees.")
+            if self.skill_check(self.state.player, "Insight", 12, context="to read Sabra's fear past the ledger ink"):
+                reward_xp = 15
+                self.state.flags["blackwake_neverwinter_rumor"] = True
+                self.say("Sabra never watches the most expensive cargo line. She watches the one that disappeared before it was supposed to exist on paper at all.")
+            else:
+                self.say("You catch the fear, if not the neatest explanation behind it.")
+        elif selection_key == "persuasion":
+            self.player_action("Get Oren to name which patron buys privacy and never uses the same need twice.")
+            if self.skill_check(self.state.player, "Persuasion", 12, context="to get Oren to share the upstairs-room pattern plainly"):
+                reward_xp = 15
+                self.state.flags["blackwake_gallows_copse_lead"] = True
+                self.say("Oren finally admits the same buyer rents different needs under different names and always asks which patrol line is short-handed this week.")
+            else:
+                self.say("Oren gives you half a truth and the kind of look that says the rest has to be earned somewhere else.")
+        else:
+            self.player_action("Offer the wrong contract phrase and wait for the room to correct you.")
+            reward_xp = 15
+            self.state.flags["blackwake_millers_ford_lead"] = True
+            self.state.flags["road_patrol_writ"] = True
+            self.say("The lie lands exactly badly enough. Sabra flinches, Oren corrects you on instinct, and the real manifest chain all but writes itself into the silence.")
+        self.state.flags["neverwinter_private_room_scene_done"] = True
+        self.state.flags["neverwinter_private_room_intel"] = True
+        self.add_clue("Oren and Sabra's upstairs room confirms that copied manifests, false room bookings, and fake roadwarden cadence are all part of one Neverwinter-side correction line feeding the frontier.")
+        self.add_journal(
+            "In Oren Vale's upstairs room, you tied Sabra's altered manifests to the same contract-house habits feeding false road authority toward the High Road."
+        )
+        self.reward_party(xp=reward_xp, reason="working the private room above Oren Vale's contract house")
 
     def handle_neverwinter_tymora_shrine(self) -> None:
         assert self.state is not None

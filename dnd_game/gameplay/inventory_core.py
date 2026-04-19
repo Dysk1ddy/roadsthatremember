@@ -289,11 +289,12 @@ class InventoryCoreMixin:
 
     def paid_inn_long_rest_cost(self) -> int:
         assert self.state is not None
-        return 5 * max(1, len(self.state.party_members()))
+        return 10 * max(1, len(self.state.party_members()))
 
     def paid_inn_long_rest(self, inn_name: str) -> bool:
         assert self.state is not None
-        party_size = max(1, len(self.state.party_members()))
+        party_members = self.state.party_members()
+        party_size = max(1, len(party_members))
         cost = self.paid_inn_long_rest_cost()
         member_text = "member" if party_size == 1 else "members"
         if self.state.gold < cost:
@@ -301,6 +302,16 @@ class InventoryCoreMixin:
                 f"A long rest at {inn_name} costs {cost} gp for {party_size} active party {member_text}, "
                 f"but the party only has {self.state.gold} gp."
             )
+            return False
+        resting_members = [member for member in party_members if not member.dead]
+        resting_names = ", ".join(member.name for member in resting_members) if resting_members else "no living active party members"
+        dead_members = [member.name for member in party_members if member.dead]
+        self.say(f"A long rest at {inn_name} will cost {cost} gp total for {party_size} active party {member_text}.")
+        self.say(f"Will long rest: {resting_names}.")
+        if dead_members:
+            self.say(f"Will not be restored by resting: {', '.join(dead_members)} (dead).")
+        if not self.confirm(f"Spend {cost} gp at {inn_name} and long rest this company?"):
+            self.say("You keep your gold and do not rent beds.")
             return False
         self.state.gold -= cost
         self.complete_long_rest_recovery()

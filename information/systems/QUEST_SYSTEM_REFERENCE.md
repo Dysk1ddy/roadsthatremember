@@ -4,7 +4,7 @@ This file documents the current quest implementation for reading, balancing, deb
 
 ## Scope
 
-- Current quest count: 15
+- Current quest count: 20
 - Quest data lives in `dnd_game/data/quests/`
 - Quest runtime behavior lives in `dnd_game/gameplay/quests.py`
 - Quest state is saved on `GameState.quests`
@@ -21,10 +21,11 @@ This file documents the current quest implementation for reading, balancing, deb
 | `dnd_game/data/quests/__init__.py` | Combines Act 1 and Act 2 quest maps into `QUESTS` and `QUEST_ORDER`. |
 | `dnd_game/gameplay/quests.py` | Runtime quest log, status refresh, quest grant, reward summary, and turn-in behavior. |
 | `dnd_game/models.py` | `GameState.quests` stores active save data. |
-| `dnd_game/gameplay/story_town_hub.py` | Steward Tessa Harrow turn-in and quest grant flow. |
+| `dnd_game/gameplay/story_intro.py` | Neverwinter briefing scenes, Oren Vale's contract house hub, `False Manifest Circuit`, and the upstairs private-room reward scene. |
+| `dnd_game/gameplay/story_town_hub.py` | Steward Tessa Harrow flow, Stonehill inn NPC scenes, inn quest grant and turn-in flow, the upstairs quiet-room intel scene, and the Stonehill barfight resolution scene. |
 | `dnd_game/gameplay/story_town_services.py` | Barthen, Elira shrine, and Linene service scenes. |
 | `dnd_game/gameplay/story_act1_expanded.py` | Halia and Daran Act 1 quest scenes. |
-| `dnd_game/gameplay/map_system.py` | Map-driven completion flags, Blackwake turn-in, and companion personal quest resolution. |
+| `dnd_game/gameplay/map_system.py` | Map-driven completion flags, Blackwake turn-in, Ashfall/Emberhall route consequence hooks, and companion personal quest resolution. |
 | `dnd_game/gameplay/story_act2_scaffold.py` | Act 2 quest grants, original-giver report flow, Act 2 metric rewards, and turn-in dialogue. |
 | `dnd_game/data/items/catalog.py` | Item catalog entries used by quest rewards. |
 | `information/catalogs/ITEM_CATALOG.md` | Generated catalog reference for quest reward items. |
@@ -248,6 +249,11 @@ Positive `act2_town_stability` and `act2_route_control` are beneficial. Negative
 | `secure_miners_road` | Stop the Watchtower Raids | Steward Tessa Harrow | `ashfall_watch_cleared` | 100 XP, 50 gp, `roadwarden_cloak`, supplies, miners-road-open flag. |
 | `restore_barthen_supplies` | Keep the Shelves Full | Barthen | `ashfall_watch_cleared` | 75 XP, 35 gp, `barthen_resupply_token`, food, Barthen attitude boost, resupply-credit flag. |
 | `reopen_lionshield_trade` | Reopen the Trade Lane | Linene Graywind | `ashfall_watch_cleared` | 85 XP, 45 gp, `lionshield_quartermaster_badge`, potions, Linene attitude boost, logistics flag. |
+| `marked_keg_investigation` | The Marked Keg | Mara Stonehill | `marked_keg_resolved` | 70 XP, 24 gp, `innkeeper_credit_token`, Stonehill common-room-welcome flag. |
+| `songs_for_the_missing` | Songs for the Missing | Sella Quill | `songs_for_missing_jerek_detail`, `songs_for_missing_tam_detail`, `songs_for_missing_nera_detail` | 65 XP, 18 gp, `sella_ballad_token`, names-carried flag. |
+| `quiet_table_sharp_knives` | Quiet Table, Sharp Knives | Nera Doss | `quiet_table_knives_resolved` | 80 XP, 28 gp, `blackseal_taster_pin`, quiet-room-access flag. |
+| `find_dain_harl` | Bring Back Dain's Name | Jerek Harl | `dain_harl_truth_found` | 85 XP, 26 gp, `harl_road_knot`, Jerek road-knot flag. |
+| `false_manifest_circuit` | False Manifest Circuit | Sabra Kestrel | `false_manifest_oren_detail`, `false_manifest_vessa_detail`, `false_manifest_garren_detail` | 75 XP, 24 gp, `kestrel_ledger_clasp`, Neverwinter private-room access flag. |
 | `silence_old_owl_well` | Silence Old Owl Well | Halia Thornton | `old_owl_well_cleared` | 100 XP, 45 gp, `gravequiet_amulet`, scroll and salve, gravequiet contacts flag. |
 | `break_wyvern_tor_raiders` | Break the Wyvern Tor Raiders | Daran Edermath | `wyvern_tor_cleared` | 100 XP, 40 gp, `edermath_scout_buckle`, healing draught, scout-network flag. |
 | `bryn_loose_ends` | Loose Ends | Bryn Underbough | `bryn_loose_ends_resolved` | 80 XP, 25 gp, `bryns_cache_keyring`, `dust_of_disappearance`, underworld-favor flag. |
@@ -262,9 +268,9 @@ Positive `act2_town_stability` and `act2_route_control` are beneficial. Negative
 
 ## Act 1 Reward Carryover Into Act 2
 
-Act 1 reward flags influence Act 2 starting metrics in `act2_initialize_metrics()`.
+Act 1 reward and callback flags influence Act 2 starting metrics in `act2_initialize_metrics()`.
 
-| Reward flag | Act 2 effect |
+| Reward or callback flag | Act 2 effect |
 | --- | --- |
 | `quest_reward_blackwake_watch_backing` | +1 town stability, +1 route control. |
 | `quest_reward_miners_road_open` | +1 town stability, +1 route control. |
@@ -274,8 +280,9 @@ Act 1 reward flags influence Act 2 starting metrics in `act2_initialize_metrics(
 | `quest_reward_edermath_scout_network` | +1 route control. |
 | `quest_reward_bryn_underworld_favor` | +1 route control. |
 | `quest_reward_elira_mercy_blessing` | +1 town stability, -1 whisper pressure. |
+| `neverwinter_contract_house_political_callback` | +1 route control, Act 2 witness-pressure status text, and claims-council dialogue from Oren, Sabra, Vessa, and Garren. |
 
-This is the main current example of quest rewards unlocking beneficial options further down the story.
+These are the main current examples of quest rewards and connected report callbacks unlocking beneficial options further down the story.
 
 ## Turn-In Integration Points
 
@@ -287,6 +294,8 @@ Current turn-in scenes call `turn_in_quest()` with an explicit original giver.
 | `secure_miners_road` | Steward's Hall in `story_town_hub.py`, giver `Steward Tessa Harrow`. |
 | `restore_barthen_supplies` | Barthen's Provisions in `story_town_services.py`, giver `Barthen`. |
 | `reopen_lionshield_trade` | Lionshield Coster in `story_town_services.py`, giver `Linene Graywind`. |
+| `find_dain_harl` | Stonehill Inn in `story_town_hub.py`, giver `Jerek Harl`. |
+| `false_manifest_circuit` | Oren Vale's contract house in `story_intro.py`, giver `Sabra Kestrel`. |
 | `silence_old_owl_well` | Miner's Exchange in `story_act1_expanded.py`, giver `Halia Thornton`. |
 | `break_wyvern_tor_raiders` | Edermath Orchard in `story_act1_expanded.py`, giver `Daran Edermath`. |
 | `bryn_loose_ends` | Bryn's personal quest resolution in `map_system.py`, giver `Bryn Underbough`. |

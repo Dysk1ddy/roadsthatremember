@@ -112,6 +112,144 @@ ACT_1_QUESTS: dict[str, QuestDefinition] = {
             "finish speaking."
         ),
     ),
+    "marked_keg_investigation": QuestDefinition(
+        quest_id="marked_keg_investigation",
+        title="The Marked Keg",
+        giver="Mara Stonehill",
+        location="Stonehill Inn",
+        summary=(
+            "Mara Stonehill spotted a chalk-marked keg and wants the hand behind it named before Stonehill's common room "
+            "turns fear into entertainment for the wrong people."
+        ),
+        objective="Identify who marked the keg at Stonehill Inn and report back to Mara Stonehill.",
+        turn_in="Return to Mara Stonehill in the Stonehill Inn common room.",
+        completion_flags=("marked_keg_resolved",),
+        reward=QuestReward(
+            xp=70,
+            gold=24,
+            items={"innkeeper_credit_token": 1},
+            flags={"quest_reward_stonehill_common_room_welcome": True},
+        ),
+        accepted_text=(
+            "Mara does not ask for heroics. She asks for judgment fast enough to catch the liar before the first chair "
+            "starts pretending it flew on its own."
+        ),
+        ready_text="You know who marked the keg. Mara Stonehill is waiting for the name and the reason.",
+        turn_in_text=(
+            "Mara hears you out without wasting a blink. By the time you finish, the culprit is no longer a rumor in the "
+            "room but a problem with a face, a motive, and no more cover."
+        ),
+    ),
+    "songs_for_the_missing": QuestDefinition(
+        quest_id="songs_for_the_missing",
+        title="Songs for the Missing",
+        giver="Sella Quill",
+        location="Stonehill Inn",
+        summary=(
+            "Sella Quill wants three true details from Stonehill's frightened regulars so the missing stop shrinking into "
+            "numbers, warnings, and muttered road talk."
+        ),
+        objective="Bring Sella Quill three true details worth carrying into song.",
+        turn_in="Return to Sella Quill in the Stonehill Inn common room.",
+        completion_flags=(
+            "songs_for_missing_jerek_detail",
+            "songs_for_missing_tam_detail",
+            "songs_for_missing_nera_detail",
+        ),
+        reward=QuestReward(
+            xp=65,
+            gold=18,
+            items={"sella_ballad_token": 1},
+            flags={"quest_reward_sella_names_carried": True},
+        ),
+        accepted_text=(
+            "Sella is not asking for gossip. She wants the kind of detail that can keep grief from flattening into habit "
+            "once a frontier town gets tired enough to forget names."
+        ),
+        ready_text="You have gathered three true details for Sella Quill. The song is waiting on you now.",
+        turn_in_text=(
+            "Sella takes the three details like live coals and turns them carefully, already hearing where each one will "
+            "land in the room. By the end, the missing sound less like statistics and more like neighbors whose absence still matters."
+        ),
+    ),
+    "quiet_table_sharp_knives": QuestDefinition(
+        quest_id="quiet_table_sharp_knives",
+        title="Quiet Table, Sharp Knives",
+        giver="Nera Doss",
+        location="Stonehill Inn",
+        summary=(
+            "Nera Doss thinks one quiet Stonehill table is buying arguments, editing messages, and steering the common room "
+            "toward useful violence for the Ashen Brand."
+        ),
+        objective="Expose the quiet-table scheme in Stonehill Inn and report back to Nera Doss.",
+        turn_in="Return to Nera Doss in the Stonehill Inn common room.",
+        completion_flags=("quiet_table_knives_resolved",),
+        reward=QuestReward(
+            xp=80,
+            gold=28,
+            items={"blackseal_taster_pin": 1},
+            flags={"quest_reward_stonehill_quiet_room_access": True},
+        ),
+        accepted_text=(
+            "Nera has no patience for melodrama. She has seen what one bought lie can do to a frightened room, and she would "
+            "prefer Stonehill not become another message delivered in bruises."
+        ),
+        ready_text="The quiet-table scheme has been broken open. Nera Doss is waiting to hear exactly how.",
+        turn_in_text=(
+            "Nera listens with the stillness of a courier checking every word for weight. When you finish, she nods once like "
+            "someone finally got her message to the right address without letting half the road write on it first."
+        ),
+    ),
+    "find_dain_harl": QuestDefinition(
+        quest_id="find_dain_harl",
+        title="Bring Back Dain's Name",
+        giver="Jerek Harl",
+        location="Stonehill Inn",
+        summary=(
+            "Jerek Harl wants truth about his brother Dain, one of the east-road workers swallowed by the crews taken toward Ashfall Watch."
+        ),
+        objective="Search Ashfall Watch for Dain Harl or proof of his fate, then return to Jerek Harl.",
+        turn_in="Return to Jerek Harl in the Stonehill Inn common room.",
+        completion_flags=("dain_harl_truth_found",),
+        reward=QuestReward(
+            xp=85,
+            gold=26,
+            items={"harl_road_knot": 1},
+            flags={"quest_reward_jerek_road_knot": True},
+        ),
+        accepted_text=(
+            "Jerek is not asking for hope. He is asking for truth tough enough to survive the road home, whether that truth walks on its own feet or comes back in your hands."
+        ),
+        ready_text="You know what happened to Dain Harl at Ashfall Watch. Jerek is waiting for the truth, not rumor.",
+        turn_in_text=(
+            "Jerek listens without interrupting, like a man finally letting grief choose one shape instead of all of them at once. When you finish, the room goes quieter around him, but less lost."
+        ),
+    ),
+    "false_manifest_circuit": QuestDefinition(
+        quest_id="false_manifest_circuit",
+        title="False Manifest Circuit",
+        giver="Sabra Kestrel",
+        location="Oren Vale's Contract House",
+        summary=(
+            "Sabra Kestrel has found one Neverwinter manifest corrected by three different liars. She wants the room's cleanest tells named before the forged line reaches the High Road."
+        ),
+        objective="Cross-check Oren, Vessa, and Garren's truths about the forged manifest line, then return to Sabra Kestrel.",
+        turn_in="Return to Sabra Kestrel at Oren Vale's contract house in Neverwinter.",
+        completion_flags=("false_manifest_oren_detail", "false_manifest_vessa_detail", "false_manifest_garren_detail"),
+        reward=QuestReward(
+            xp=75,
+            gold=24,
+            items={"kestrel_ledger_clasp": 1},
+            flags={"quest_reward_neverwinter_private_room_access": True},
+        ),
+        accepted_text=(
+            "Sabra is not asking you to stop the whole network tonight. She just wants one clean manifest lie pinned to the wall before it can keep pretending it is routine paperwork."
+        ),
+        ready_text="You have the three details Sabra needed. The false manifest line can be named now, if you bring it back to her before the room changes its story.",
+        turn_in_text=(
+            "Sabra lines your three details together, exhales once, and finally lets herself call the thing by its proper shape: a forged manifest circuit feeding false road authority south."
+        ),
+    ),
     "silence_old_owl_well": QuestDefinition(
         quest_id="silence_old_owl_well",
         title="Silence Old Owl Well",
