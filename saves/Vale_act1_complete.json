@@ -468,6 +468,9 @@
       "current_dungeon_id": null,
       "current_room_id": null,
       "visited_nodes": [
+        "wayside_luck_shrine",
+        "greywake_triage_yard",
+        "greywake_road_breakout",
         "neverwinter_briefing",
         "high_road_ambush",
         "phandalin_hub",

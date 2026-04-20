@@ -902,7 +902,119 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(900735))
         game.rich_console_width = lambda: 120
         game.detected_terminal_width = lambda: 94
-        self.assertEqual(game.safe_rich_render_width(), 94)
+        self.assertEqual(game.safe_rich_render_width(), 93)
+
+    def test_emit_rich_clamps_requested_width_to_detected_terminal_width(self) -> None:
+        if not RICH_AVAILABLE:
+            self.skipTest("rich is not installed")
+        log: list[str] = []
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(900736))
+        game.rich_console_width = lambda: 120
+        game.detected_terminal_width = lambda: 54
+        map_state = DraftMapState(current_node_id="phandalin_hub", visited_nodes={"phandalin_hub"})
+        rendered = game.emit_rich(build_overworld_panel(ACT1_HYBRID_MAP, map_state), width=108)
+        self.assertTrue(rendered)
+        self.assertTrue(log)
+        self.assertLessEqual(max(len(strip_ansi(line)) for line in log), 53)
+
+    def test_selected_keyboard_choice_menu_stays_inside_terminal_width(self) -> None:
+        if not RICH_AVAILABLE:
+            self.skipTest("rich is not installed")
+        log: list[str] = []
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(9007361))
+        game.detected_terminal_width = lambda: 44
+        option = game.skill_tag(
+            "ATHLETICS",
+            game.action_option("Brace the collapsing wagon frame and haul the trapped drover clear before the axle snaps."),
+        )
+        renderable = game.build_keyboard_choice_menu(
+            "How do you help at the roadside shrine?",
+            [option, "Back"],
+            title="Wayside Luck Shrine",
+            selected_index=0,
+            typed_buffer="",
+            feedback=None,
+            show_instructions=True,
+        )
+        self.assertTrue(game.emit_rich(renderable, width=game.safe_rich_render_width()))
+        visible_lines = [strip_ansi(line) for line in log]
+        self.assertTrue(all(len(line) <= 43 for line in visible_lines))
+        bordered_lines = [line for line in visible_lines if line.startswith("│")]
+        self.assertTrue(bordered_lines)
+        self.assertTrue(all(line.endswith("│") for line in bordered_lines))
+        selected_lines = [line for line in bordered_lines if "[ATHLETICS]" in line or "wagon frame" in line or "drover clear" in line]
+        self.assertTrue(selected_lines)
+        self.assertTrue(all(line.find(">") in {-1, 2} for line in selected_lines))
+
+    def test_keyboard_choice_live_refreshes_when_terminal_width_changes(self) -> None:
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(9007362))
+        game.rich_console_width = lambda: 120
+        game.detected_terminal_width = lambda: 70
+        game._keyboard_choice_resize_poll_seconds = 0.0
+        ready = iter([False, True])
+        updates: list[tuple[str, bool, int]] = []
+        console = SimpleNamespace(width=43)
+        live = SimpleNamespace(
+            update=lambda renderable, *, refresh: updates.append((renderable, refresh, console.width))
+        )
+        game.keyboard_choice_key_ready = lambda: next(ready)
+        game.read_keyboard_choice_key = lambda: ("enter", None)
+
+        action = game.read_keyboard_choice_key_with_resize_poll(
+            live,
+            console,
+            lambda: "resized menu",
+            game.safe_rich_render_width,
+        )
+
+        self.assertEqual(action, ("enter", None))
+        self.assertEqual(console.width, 69)
+        self.assertEqual(updates, [("resized menu", True, 69)])
+
+    def test_keyboard_choice_resize_shrink_clears_reflowed_previous_frame(self) -> None:
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(9007363))
+        updates: list[tuple[str, bool]] = []
+        live_render = SimpleNamespace(_shape=(119, 12))
+        live = SimpleNamespace(
+            _live_render=live_render,
+            update=lambda renderable, *, refresh: updates.append((renderable, refresh)),
+        )
+        console = SimpleNamespace(width=119)
+
+        resized = game.refresh_keyboard_choice_live_if_resized(
+            live,
+            console,
+            lambda: "narrow menu",
+            lambda: 39,
+        )
+
+        self.assertTrue(resized)
+        self.assertEqual(console.width, 39)
+        self.assertEqual(live_render._shape, (39, 48))
+        self.assertEqual(updates, [("narrow menu", True)])
+
+    def test_say_wraps_plain_text_to_detected_terminal_width(self) -> None:
+        log: list[str] = []
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(900737))
+        game.detected_terminal_width = lambda: 42
+        game.say("Cold floodwater chews at the ford stones while wrecked carts pin draft horses against the current.")
+        rendered = self.plain_output(log)
+        self.assertTrue(all(len(line) <= 41 for line in rendered.splitlines()))
+        self.assertIn("floodwater", rendered)
+
+    def test_typewritten_dialogue_wraps_before_terminal_auto_wrap(self) -> None:
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(900738))
+        game.detected_terminal_width = lambda: 42
+        game.sleep_for_animation = lambda duration, require_animation=False: False
+        buffer = io.StringIO()
+        with patch("dnd_game.gameplay.base.sys.stdout", buffer):
+            game.typewrite_dialogue_line(
+                "Mira Thann",
+                "Hold the line because the west gate is turning and the wagon cannot move yet.",
+            )
+        lines = [line for line in buffer.getvalue().splitlines() if line]
+        self.assertTrue(all(len(strip_ansi(line)) <= 41 for line in lines))
+        self.assertIn("wagon cannot move yet.", buffer.getvalue())
 
     def test_dice_animation_skip_fast_forwards_but_keeps_final_pause(self) -> None:
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(90071), animate_dice=True)
@@ -8950,6 +9062,32 @@ class CoreTests(unittest.TestCase):
         self.assertIn("cracked luck bell", rendered)
         self.assertIn("You have seen triage before", rendered)
         self.assertIn("Elira ties the cracked luck bell once", rendered)
+
+    def test_greywake_triage_yard_present_elira_reads_outcome_ledger_humanely(self) -> None:
+        player = build_character(
+            name="Velkor",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        log: list[str] = []
+        game = TextDnDGame(input_fn=lambda _: "3", output_fn=log.append, rng=random.Random(9011001))
+        game.state = GameState(
+            player=player,
+            companions=[create_elira_dawnmantle()],
+            current_scene="greywake_triage_yard",
+        )
+        game.skill_check = lambda actor, skill, dc, context: True  # type: ignore[method-assign]
+
+        game.scene_greywake_triage_yard()
+
+        rendered = self.plain_output(log)
+        self.assertIn("People with breath still in them", rendered)
+        self.assertIn("Treat, hold, lost is what you write after hands and eyes have done the work", rendered)
+        self.assertIn("who gets mercy and who gets erased", rendered)
+        self.assertNotIn("It is assigning endings.", rendered)
 
     def test_wayside_elira_first_read_reflects_background_or_class(self) -> None:
         cases = [

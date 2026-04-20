@@ -230,7 +230,12 @@ class StoryIntroMixin:
         )
         self.add_clue("Greywake's intake board sorted travelers into outcomes before their wagons reached the yard.")
         if self.has_companion("Elira Dawnmantle"):
-            self.speaker("Elira Dawnmantle", "That ledger is not reporting wounds. It is assigning endings.")
+            self.speaker(
+                "Elira Dawnmantle",
+                "Three names. Not cargo, not totals. People with breath still in them, if Tymora gives us a minute. "
+                "Treat, hold, lost is what you write after hands and eyes have done the work. This ledger has them buried before the wagons arrive. "
+                "Someone is not reporting wounds; they are deciding who gets mercy and who gets erased.",
+            )
         elif self.state.flags.get("elira_first_contact"):
             self.speaker(
                 "Elira Dawnmantle",

@@ -7,6 +7,7 @@ import re
 import shutil
 import sys
 import textwrap
+import time
 
 try:
     import msvcrt
@@ -75,15 +76,57 @@ class GameIOMixin:
         except OSError:
             return fallback
 
+    def terminal_render_width(self, requested_width: int | None = None) -> int:
+        requested = self.rich_console_width() if requested_width is None else requested_width
+        try:
+            requested = int(requested)
+        except (TypeError, ValueError):
+            requested = self.rich_console_width()
+        terminal_width = self.detected_terminal_width()
+        if terminal_width > 1:
+            terminal_width -= 1
+        return max(1, min(max(1, requested), terminal_width))
+
     def safe_rich_render_width(self) -> int:
-        return min(self.rich_console_width(), self.detected_terminal_width())
+        return self.terminal_render_width(self.rich_console_width())
+
+    def plain_text_wrap_width(self) -> int:
+        terminal_width = self.detected_terminal_width()
+        if terminal_width > 1:
+            terminal_width -= 1
+        return max(1, min(88, terminal_width))
+
+    def wrap_plain_paragraph(self, text: str) -> str:
+        return textwrap.fill(
+            text,
+            width=self.plain_text_wrap_width(),
+            break_long_words=False,
+            break_on_hyphens=False,
+        )
+
+    def dialogue_terminal_lines(self, speaker_name: str, text: str) -> list[str]:
+        prefix = f'{speaker_name}: "'
+        wrap_width = self.plain_text_wrap_width()
+        prefix_width = len(strip_ansi(prefix))
+        body_width = max(1, wrap_width - prefix_width - 1)
+        body_lines = textwrap.wrap(
+            text,
+            width=body_width,
+            break_long_words=False,
+            break_on_hyphens=False,
+        ) or [""]
+        indent = " " * min(prefix_width, max(0, wrap_width - 1))
+        lines = [f"{prefix}{body_lines[0]}", *(f"{indent}{line}" for line in body_lines[1:])]
+        lines[-1] = f'{lines[-1]}"'
+        return lines
 
     def emit_rich(self, renderable, *, width: int | None = None) -> bool:
         if not self.rich_enabled():
             return False
+        render_width = self.terminal_render_width(width)
         rendered_lines = render_rich_lines(
             renderable,
-            width=width or self.rich_console_width(),
+            width=render_width,
             force_terminal=getattr(self, "_interactive_output", False),
         )
         if not rendered_lines:
@@ -127,6 +170,47 @@ class GameIOMixin:
         show_instructions = not bool(getattr(self, "_keyboard_choice_instructions_seen", False))
         self._keyboard_choice_instructions_seen = True
         return show_instructions
+
+    def keyboard_choice_menu_width(self) -> int:
+        return self.terminal_render_width(min(120, self.rich_console_width()))
+
+    def keyboard_choice_key_ready(self) -> bool:
+        reader = getattr(self, "read_keyboard_choice_key")
+        if getattr(reader, "__func__", None) is not GameIOMixin.read_keyboard_choice_key:
+            return True
+        if msvcrt is None:
+            return True
+        try:
+            return bool(msvcrt.kbhit())
+        except Exception:
+            return True
+
+    def refresh_keyboard_choice_live_if_resized(self, live, console, renderable_factory, width_factory) -> bool:
+        next_width = width_factory()
+        try:
+            current_width = int(console.width)
+        except (TypeError, ValueError):
+            current_width = next_width
+        if next_width == current_width:
+            return False
+        live_render = getattr(live, "_live_render", None)
+        previous_shape = getattr(live_render, "_shape", None)
+        if live_render is not None and previous_shape is not None and next_width < current_width:
+            previous_width, previous_height = previous_shape
+            previous_width = max(1, int(max(previous_width, current_width)))
+            previous_height = max(1, int(previous_height))
+            reflow_factor = max(1, (previous_width + max(1, next_width) - 1) // max(1, next_width))
+            live_render._shape = (max(1, next_width), previous_height * reflow_factor)
+        console.width = next_width
+        live.update(renderable_factory(), refresh=True)
+        return True
+
+    def read_keyboard_choice_key_with_resize_poll(self, live, console, renderable_factory, width_factory) -> tuple[str, str | None]:
+        while True:
+            self.refresh_keyboard_choice_live_if_resized(live, console, renderable_factory, width_factory)
+            if self.keyboard_choice_key_ready():
+                return self.read_keyboard_choice_key()
+            time.sleep(float(getattr(self, "_keyboard_choice_resize_poll_seconds", 0.05)))
 
     def rich_text(self, text: object, color: str | None = None, *, bold: bool = False, dim: bool = False):
         content = strip_ansi(str(text))
@@ -373,12 +457,12 @@ class GameIOMixin:
             prompt_block.append("Type a number or command. Esc clears.", style="dim")
 
         option_table = Table.grid(expand=True, padding=(0, 0))
-        option_table.add_column(width=1)
+        option_table.add_column(width=2)
         option_table.add_column(width=3)
         option_table.add_column(ratio=1)
         for index, option in enumerate(options, start=1):
             active = index - 1 == selected_index
-            marker = self.rich_text(">", "light_green", bold=True) if active else self.rich_text(" ", dim=True)
+            marker = self.rich_text("> ", "light_green", bold=True) if active else self.rich_text("  ", dim=True)
             number = self.rich_text(f"{index}.", "light_yellow" if active else "white", bold=active)
             label = self.rich_from_ansi(self.format_option_text(option))
             if Text is not None and isinstance(label, Text) and active:
@@ -461,7 +545,7 @@ class GameIOMixin:
         selected_index = 0
         typed_buffer = ""
         feedback: str | None = None
-        menu_width = max(96, min(120, self.rich_console_width()))
+        menu_width = self.keyboard_choice_menu_width()
         console = Console(
             force_terminal=True,
             color_system="truecolor",
@@ -474,22 +558,28 @@ class GameIOMixin:
 
         while True:
             submitted_text: str | None = None
+            renderable_factory = lambda: self.build_keyboard_choice_menu(
+                prompt,
+                options,
+                title=resolved_title,
+                selected_index=selected_index,
+                typed_buffer=typed_buffer,
+                feedback=feedback,
+                show_instructions=show_instructions,
+            )
             with Live(
-                self.build_keyboard_choice_menu(
-                    prompt,
-                    options,
-                    title=resolved_title,
-                    selected_index=selected_index,
-                    typed_buffer=typed_buffer,
-                    feedback=feedback,
-                    show_instructions=show_instructions,
-                ),
+                renderable_factory(),
                 console=console,
                 transient=True,
                 auto_refresh=False,
             ) as live:
                 while True:
-                    action, payload = self.read_keyboard_choice_key()
+                    action, payload = self.read_keyboard_choice_key_with_resize_poll(
+                        live,
+                        console,
+                        renderable_factory,
+                        self.keyboard_choice_menu_width,
+                    )
                     hide_instructions_after_update = show_instructions
                     if action == "up":
                         selected_index = (selected_index - 1) % len(options)
@@ -519,18 +609,7 @@ class GameIOMixin:
                         return selected_index + 1
                     if hide_instructions_after_update:
                         show_instructions = False
-                    live.update(
-                        self.build_keyboard_choice_menu(
-                            prompt,
-                            options,
-                            title=resolved_title,
-                            selected_index=selected_index,
-                            typed_buffer=typed_buffer,
-                            feedback=feedback,
-                            show_instructions=show_instructions,
-                        ),
-                        refresh=True,
-                    )
+                    live.update(renderable_factory(), refresh=True)
 
             if submitted_text is None:
                 continue
@@ -783,7 +862,7 @@ class GameIOMixin:
                 self.output_fn(paragraph)
                 rendered_lines.append(paragraph)
                 continue
-            wrapped = textwrap.fill(paragraph, width=88)
+            wrapped = self.wrap_plain_paragraph(paragraph)
             if typed and callable(narrator) and getattr(self, "type_dialogue", False):
                 narrator(wrapped)
             else:

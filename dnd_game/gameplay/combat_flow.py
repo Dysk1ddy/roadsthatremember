@@ -607,12 +607,12 @@ class CombatFlowMixin:
         for section_index, (section, grouped_options) in enumerate(sections):
             action_items.append(self.rich_text(f"{section}:", "light_yellow", bold=True))
             option_table = Table.grid(expand=True, padding=(0, 0))
-            option_table.add_column(width=1)
+            option_table.add_column(width=2)
             option_table.add_column(width=3)
             option_table.add_column(ratio=1)
             for display_index, option in grouped_options:
                 active = display_index - 1 == selected_index
-                marker = self.rich_text(">", "light_green", bold=True) if active else self.rich_text(" ", dim=True)
+                marker = self.rich_text("> ", "light_green", bold=True) if active else self.rich_text("  ", dim=True)
                 number = self.rich_text(f"{display_index}.", "light_yellow" if active else "white", bold=active)
                 label = self.rich_from_ansi(self.format_option_text(option))
                 if Text is not None and isinstance(label, Text) and active:
@@ -682,24 +682,30 @@ class CombatFlowMixin:
 
         while True:
             submitted_text: str | None = None
+            renderable_factory = lambda: self.build_grouped_combat_keyboard_menu(
+                prompt,
+                sections,
+                actor=actor,
+                heroes=heroes,
+                enemies=enemies,
+                selected_index=selected_index,
+                typed_buffer=typed_buffer,
+                feedback=feedback,
+                show_instructions=show_instructions,
+            )
             with Live(
-                self.build_grouped_combat_keyboard_menu(
-                    prompt,
-                    sections,
-                    actor=actor,
-                    heroes=heroes,
-                    enemies=enemies,
-                    selected_index=selected_index,
-                    typed_buffer=typed_buffer,
-                    feedback=feedback,
-                    show_instructions=show_instructions,
-                ),
+                renderable_factory(),
                 console=console,
                 transient=True,
                 auto_refresh=False,
             ) as live:
                 while True:
-                    action, payload = self.read_keyboard_choice_key()
+                    action, payload = self.read_keyboard_choice_key_with_resize_poll(
+                        live,
+                        console,
+                        renderable_factory,
+                        self.safe_rich_render_width,
+                    )
                     hide_instructions_after_update = show_instructions
                     if action == "up":
                         selected_index = (selected_index - 1) % len(options)
@@ -729,20 +735,7 @@ class CombatFlowMixin:
                         return options[selected_index]
                     if hide_instructions_after_update:
                         show_instructions = False
-                    live.update(
-                        self.build_grouped_combat_keyboard_menu(
-                            prompt,
-                            sections,
-                            actor=actor,
-                            heroes=heroes,
-                            enemies=enemies,
-                            selected_index=selected_index,
-                            typed_buffer=typed_buffer,
-                            feedback=feedback,
-                            show_instructions=show_instructions,
-                        ),
-                        refresh=True,
-                    )
+                    live.update(renderable_factory(), refresh=True)
 
             if submitted_text is None:
                 continue

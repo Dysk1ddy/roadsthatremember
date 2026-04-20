@@ -750,10 +750,15 @@ class GameBase:
     def typewrite_dialogue_line(self, speaker_name: str, text: str) -> None:
         self.output_fn("")
         prefix = f'{speaker_name}: "'
+        if callable(getattr(self, "dialogue_terminal_lines", None)):
+            rendered_dialogue = "\n".join(self.dialogue_terminal_lines(speaker_name, text))
+            typed_body = rendered_dialogue[len(prefix) :] if rendered_dialogue.startswith(prefix) else f'{text}"'
+        else:
+            typed_body = f'{text}"'
         sys.stdout.write(prefix)
         sys.stdout.flush()
-        self.typewrite_text(text, delay=self._dialogue_character_delay_seconds)
-        sys.stdout.write('"\n\n')
+        self.typewrite_text(typed_body, delay=self._dialogue_character_delay_seconds)
+        sys.stdout.write("\n\n")
         sys.stdout.flush()
 
     def narration_typing_duration(self, text: str) -> float:
@@ -1094,7 +1099,7 @@ class GameBase:
                     box=box.DOUBLE if kind == "d20" and outcome_kind == "attack" else box.ROUNDED,
                     padding=(0, 1),
                 ),
-                width=max(96, min(118, self.rich_console_width())),
+                width=min(118, self.safe_rich_render_width()),
             )
             if rendered:
                 return
@@ -1182,7 +1187,7 @@ class GameBase:
             )
             return render_rich_lines(
                 renderable,
-                width=max(96, min(118, self.rich_console_width())),
+                width=min(118, self.safe_rich_render_width()),
                 force_terminal=getattr(self, "_interactive_output", False),
             )
 
@@ -1246,7 +1251,7 @@ class GameBase:
                     box=box.ROUNDED,
                     padding=(0, 1),
                 ),
-                width=max(96, min(118, self.rich_console_width())),
+                width=min(118, self.safe_rich_render_width()),
             ):
                 return
 
@@ -2352,7 +2357,12 @@ class GameBase:
             self.typewrite_dialogue_line(styled_name, text)
             return
         self.output_fn("")
-        self.say(f'{styled_name}: "{text}"')
+        dialogue_lines = getattr(self, "dialogue_terminal_lines", None)
+        if getattr(self, "_interactive_output", False) and callable(dialogue_lines):
+            for line in dialogue_lines(styled_name, text):
+                self.output_fn(line)
+        else:
+            self.say(f'{styled_name}: "{text}"')
         self.output_fn("")
 
     def speaker(self, name: str, text: str) -> None:
