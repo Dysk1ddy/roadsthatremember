@@ -76,6 +76,25 @@ python main.py
 
 `rich` is optional for gameplay logic, but strongly recommended now because the Act 1 map system uses it for the overworld and dungeon panels.
 
+## AI-Assisted Writing
+
+If you want OpenAI to help draft or revise dialogue without handing plot control to runtime generation, use the included writer-assist tool:
+
+```bash
+pip install openai
+python tools/story_writer.py --brief "Rewrite Agatha's opening exchange so she feels colder and more dangerous." --scene-key conyberry_agatha --context dnd_game/gameplay/act2/conyberry.py
+```
+
+The tool is intentionally aimed at authoring support rather than live scene control. It keeps your gameplay logic in Python while letting the model help with prose, voice, and scene rewrites. Full setup and examples live in `information/systems/OPENAI_STORY_WRITER.md`.
+
+If you want a desktop wrapper instead of typing commands by hand, launch:
+
+```bash
+python story_writer_studio.py
+```
+
+or double-click `Launch Story Writer Studio.bat` on Windows. The studio lets you save your OpenAI API settings into the local `.env`, attach context files, write the rewrite brief, and watch the live `story_writer.py` output in an embedded console.
+
 ## Act 1 map flow
 
 Act 1 now uses a hybrid navigation structure:
