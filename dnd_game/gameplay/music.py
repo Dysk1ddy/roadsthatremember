@@ -50,6 +50,7 @@ SCENE_MUSIC_CONTEXTS: dict[str, str] = {
     "conyberry_agatha": "dungeon",
     "neverwinter_wood_survey_camp": "dungeon",
     "stonehollow_dig": "dungeon",
+    "glasswater_intake": "dungeon",
     "act2_midpoint_convergence": "dungeon",
     "broken_prospect": "dungeon",
     "south_adit": "dungeon",

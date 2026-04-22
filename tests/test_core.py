@@ -4409,6 +4409,68 @@ class CoreTests(unittest.TestCase):
         )
         self.assertEqual([encounter.title for encounter in encounters], ["Stonehollow Slime Cut", "Stonehollow Breakout"])
 
+    def test_glasswater_intake_uses_playable_act2_room_map_and_purges_headgate(self) -> None:
+        player = build_character(
+            name="Vale",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        encounters: list[Encounter] = []
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(9008635))
+        game.state = GameState(
+            player=player,
+            current_act=2,
+            current_scene="glasswater_intake",
+            flags={
+                "act2_started": True,
+                "agatha_truth_secured": True,
+                "act2_town_stability": 3,
+                "act2_route_control": 2,
+                "act2_whisper_pressure": 2,
+            },
+        )
+        game.skill_check = lambda actor, skill, dc, context: True  # type: ignore[method-assign]
+        game.run_encounter = lambda encounter: encounters.append(encounter) or "victory"  # type: ignore[method-assign]
+
+        def fake_scenario_choice(prompt: str, options: list[str], **kwargs) -> int:
+            plain_options = [strip_ansi(option) for option in options]
+            if prompt == "What do you do from Gatehouse Winch?":
+                for index, option in enumerate(plain_options, start=1):
+                    if "Valve Hall" in option:
+                        return index
+            return 1
+
+        game.scenario_choice = fake_scenario_choice  # type: ignore[method-assign]
+        game.scene_glasswater_intake()
+
+        assert game.state is not None
+        self.assertEqual(game.state.current_scene, "act2_expedition_hub")
+        self.assertTrue(game.state.flags["glasswater_intake_cleared"])
+        self.assertTrue(game.state.flags["glasswater_headgate_purged"])
+        self.assertEqual(game.state.flags["act2_whisper_pressure"], 1)
+        self.assertCountEqual(
+            game.state.flags["act2_map_state"]["cleared_rooms"],
+            [
+                "rock_weir",
+                "intake_yard",
+                "gatehouse_winch",
+                "valve_hall",
+                "settling_cistern",
+                "filter_beds",
+                "pump_gallery",
+                "headgate_chamber",
+            ],
+        )
+        self.assertEqual(game.state.inventory.get("thoughtward_draught"), 1)
+        self.assertEqual(game.state.inventory.get("scroll_clarity"), 1)
+        self.assertEqual(
+            [encounter.title for encounter in encounters],
+            ["Glasswater Intake Yard", "Glasswater Valve Hall", "Glasswater Filter Beds", "Brother Merik Sorn"],
+        )
+
     def test_south_adit_uses_playable_act2_room_map_and_recruits_irielle(self) -> None:
         player = build_character(
             name="Vale",
@@ -4470,6 +4532,114 @@ class CoreTests(unittest.TestCase):
             ["adit_mouth", "silent_cells", "augur_cell", "warden_nave"],
         )
         self.assertEqual(game.state.inventory.get("choirward_amulet_uncommon"), 1)
+        self.assertEqual(game.state.inventory.get("scroll_counter_cadence"), 1)
+        self.assertEqual([encounter.title for encounter in encounters], ["South Adit Wardens"])
+
+    def test_south_adit_high_prison_cadence_emboldens_wardens_and_costs_rescues(self) -> None:
+        player = build_character(
+            name="Vale",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        log: list[str] = []
+        encounters: list[Encounter] = []
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(9008641))
+        game.state = GameState(
+            player=player,
+            current_act=2,
+            current_scene="south_adit",
+            flags={
+                "act2_started": True,
+                "phandalin_sabotage_resolved": True,
+                "act2_town_stability": 3,
+                "act2_route_control": 3,
+                "act2_whisper_pressure": 2,
+            },
+        )
+        game.skill_check = lambda actor, skill, dc, context: False  # type: ignore[method-assign]
+        game.run_encounter = lambda encounter: encounters.append(encounter) or "victory"  # type: ignore[method-assign]
+
+        def fake_scenario_choice(prompt: str, options: list[str], **kwargs) -> int:
+            if prompt == "How do you read the prison mouth before the wardens know you are inside?":
+                return self.option_index_containing(options, "Mark the weakest voices first")
+            if prompt == "What do you do from South Adit Mouth?":
+                return self.option_index_containing(options, "Silent Cells")
+            if prompt == "How do you open the silent cells?":
+                return self.option_index_containing(options, "Let the nearest warden see the cells opening")
+            if prompt == "What do you do from Silent Cells?":
+                return self.option_index_containing(options, "Augur Cell")
+            if prompt == "What do you ask Irielle for before the prison line breaks?":
+                return self.option_index_containing(options, "leaves fewer ghosts behind")
+            return 1
+
+        game.scenario_choice = fake_scenario_choice  # type: ignore[method-assign]
+        game.scene_south_adit()
+
+        assert game.state is not None
+        rendered = strip_ansi("\n".join(log))
+        self.assertEqual(game.state.current_scene, "act2_expedition_hub")
+        self.assertEqual(game.state.flags["south_adit_irielle_plan"], "clean_exit")
+        self.assertEqual(game.state.flags["south_adit_prison_cadence_start"], 3)
+        self.assertEqual(game.state.flags["south_adit_prison_cadence_final"], 4)
+        self.assertEqual(game.state.flags["act2_captive_outcome"], "few_saved")
+        self.assertEqual(game.state.flags["act2_whisper_pressure"], 0)
+        self.assertIn("Prison Cadence: Hammering (4/5).", rendered)
+        self.assertEqual(len(encounters), 1)
+        self.assertTrue(all(enemy.conditions.get("emboldened") == 2 for enemy in encounters[0].enemies))
+
+    def test_south_adit_clean_exit_scene_with_elira_gets_mercy_counterpoint(self) -> None:
+        player = build_character(
+            name="Vale",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        log: list[str] = []
+        encounters: list[Encounter] = []
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(9008642))
+        game.state = GameState(
+            player=player,
+            companions=[create_elira_dawnmantle()],
+            current_act=2,
+            current_scene="south_adit",
+            flags={
+                "act2_started": True,
+                "phandalin_sabotage_resolved": True,
+                "act2_town_stability": 3,
+                "act2_route_control": 3,
+                "act2_whisper_pressure": 2,
+            },
+        )
+        game.skill_check = lambda actor, skill, dc, context: True  # type: ignore[method-assign]
+        game.run_encounter = lambda encounter: encounters.append(encounter) or "victory"  # type: ignore[method-assign]
+
+        def fake_scenario_choice(prompt: str, options: list[str], **kwargs) -> int:
+            if prompt == "What do you do from South Adit Mouth?":
+                return self.option_index_containing(options, "Silent Cells")
+            if prompt == "What do you do from Silent Cells?":
+                return self.option_index_containing(options, "Augur Cell")
+            if prompt == "What do you ask Irielle for before the prison line breaks?":
+                return self.option_index_containing(options, "leaves fewer ghosts behind")
+            return 1
+
+        game.scenario_choice = fake_scenario_choice  # type: ignore[method-assign]
+        game.scene_south_adit()
+
+        assert game.state is not None
+        rendered = strip_ansi("\n".join(log))
+        self.assertEqual(game.state.current_scene, "act2_expedition_hub")
+        self.assertEqual(game.state.flags["south_adit_irielle_plan"], "clean_exit")
+        self.assertEqual(game.state.flags["act2_captive_outcome"], "many_saved")
+        self.assertEqual(game.state.flags["act2_whisper_pressure"], 0)
+        self.assertEqual(game.state.inventory.get("choirward_amulet_rare"), 1)
+        self.assertIsNone(game.state.inventory.get("choirward_amulet_uncommon"))
+        self.assertIn("Break the line if you have to. Just do not make the prisoners pay the price twice.", rendered)
+        self.assertIn("Good. A clean escape is still a kind of justice down here.", rendered)
         self.assertEqual([encounter.title for encounter in encounters], ["South Adit Wardens"])
 
     def test_act2_hub_warns_before_first_late_route_choice(self) -> None:
@@ -4521,6 +4691,49 @@ class CoreTests(unittest.TestCase):
         self.assertIn("Choosing Broken Prospect first commits the expedition to the cleaner cave approach", rendered)
         self.assertEqual(game.state.current_scene, "broken_prospect")
         self.assertNotIn("act2_first_late_route", game.state.flags)
+
+    def test_act2_hub_offers_glasswater_after_first_early_lead(self) -> None:
+        player = build_character(
+            name="Vale",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        captured: list[str] = []
+        log: list[str] = []
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(9008651))
+        game.state = GameState(
+            player=player,
+            current_act=2,
+            current_scene="act2_expedition_hub",
+            flags={
+                "act2_started": True,
+                "agatha_truth_secured": True,
+                "act2_town_stability": 3,
+                "act2_route_control": 2,
+                "act2_whisper_pressure": 2,
+            },
+        )
+
+        def fake_scenario_choice(prompt: str, options: list[str], **kwargs) -> int:
+            plain_options = [strip_ansi(option) for option in options]
+            if prompt == "Where do you push next?":
+                captured.extend(plain_options)
+                for index, option in enumerate(plain_options, start=1):
+                    if "Glasswater Intake" in option:
+                        return index
+            return 1
+
+        game.scenario_choice = fake_scenario_choice  # type: ignore[method-assign]
+        game.scene_act2_expedition_hub()
+
+        assert game.state is not None
+        rendered = self.plain_output(log)
+        self.assertTrue(any("Glasswater Intake" in option for option in captured))
+        self.assertEqual(game.state.current_scene, "glasswater_intake")
+        self.assertIn("Glasswater report has stopped sounding like rumor", rendered)
 
     def test_broken_prospect_uses_playable_act2_room_map(self) -> None:
         player = build_character(
@@ -6219,6 +6432,53 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(player.gear_bonuses["initiative"], 1)
         self.assertEqual(player.gear_bonuses["stealth_advantage"], 1)
         self.assertEqual(player.gear_bonuses["resist_lightning"], 1)
+
+    def test_quiet_mercy_blocks_first_whisper_effect_once_per_encounter(self) -> None:
+        player = build_character(
+            name="Vale",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        log: list[str] = []
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(502))
+        game.state = GameState(player=player, current_scene="road_ambush")
+        player.equipment_slots = {slot: None for slot in ["head", "ring_1", "ring_2", "neck", "chest", "gloves", "boots", "main_hand", "off_hand", "cape"]}
+        player.equipment_slots["neck"] = "choirward_amulet_rare"
+        game.sync_equipment(player)
+
+        self.assertEqual(player.gear_bonuses["quiet_mercy"], 1)
+        game._in_combat = True
+        try:
+            game.apply_status(player, "frightened", 2, source="an obelisk whisper")
+            self.assertNotIn("frightened", player.conditions)
+            self.assertTrue(player.bond_flags["quiet_mercy_used"])
+
+            game.apply_status(player, "reeling", 1, source="a discordant chorus")
+            self.assertEqual(player.conditions.get("reeling"), 1)
+        finally:
+            game._in_combat = False
+
+        enemy = create_enemy("goblin_skirmisher")
+        enemy.current_hp = 0
+        enemy.dead = True
+        outcome = game.run_encounter(
+            SimpleNamespace(
+                title="Quiet Mercy Reset",
+                description="done",
+                enemies=[enemy],
+                allow_flee=False,
+                allow_parley=False,
+                parley_dc=0,
+                hero_initiative_bonus=0,
+                enemy_initiative_bonus=0,
+            )
+        )
+        self.assertEqual(outcome, "victory")
+        self.assertNotIn("quiet_mercy_used", player.bond_flags)
+        self.assertIn("Quiet Mercy", self.plain_output(log))
 
     def test_consumable_can_grant_temporary_resistance(self) -> None:
         player = build_character(
@@ -10043,6 +10303,91 @@ class CoreTests(unittest.TestCase):
         self.assertTrue(game.state.flags["black_lake_barracks_orders_taken"])
         self.assertEqual(len(captured), 1)
         self.assertEqual(captured[0].enemies[1].conditions.get("surprised"), 1)
+
+    def test_black_lake_many_saved_survivor_testimony_auto_reads_barracks_watch(self) -> None:
+        player = build_character(
+            name="Velkor",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        log: list[str] = []
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(4231))
+        game.state = GameState(
+            player=player,
+            current_act=2,
+            current_scene="black_lake_causeway",
+            flags={
+                "act2_started": True,
+                "wave_echo_outer_cleared": True,
+                "act2_captive_outcome": "many_saved",
+                "act2_town_stability": 3,
+                "act2_route_control": 3,
+                "act2_whisper_pressure": 2,
+            },
+        )
+        dungeon = ACT2_ENEMY_DRIVEN_MAP.dungeons["black_lake_crossing"]
+        room = dungeon.rooms["causeway_lip"]
+        game.skill_check = lambda actor, skill, dc, context: False  # type: ignore[method-assign]
+        game.scenario_choice = lambda prompt, options, **kwargs: self.option_index_containing(options, "Test the anchor pull")  # type: ignore[method-assign]
+
+        game._black_lake_causeway_lip(dungeon, room)
+
+        self.assertTrue(game.state.flags["black_lake_survivor_testimony"])
+        self.assertTrue(game.state.flags["black_lake_barracks_watch_read"])
+        self.assertIn("South Adit survivors", self.plain_output(log))
+
+    def test_black_lake_few_saved_reserve_intact_adds_pressure_and_extra_enemy(self) -> None:
+        player = build_character(
+            name="Velkor",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        log: list[str] = []
+        captured: list[Encounter] = []
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(4232))
+        game.state = GameState(
+            player=player,
+            current_act=2,
+            current_scene="black_lake_causeway",
+            flags={
+                "act2_started": True,
+                "wave_echo_outer_cleared": True,
+                "act2_captive_outcome": "few_saved",
+                "act2_town_stability": 3,
+                "act2_route_control": 3,
+                "act2_whisper_pressure": 2,
+            },
+        )
+        dungeon = ACT2_ENEMY_DRIVEN_MAP.dungeons["black_lake_crossing"]
+        causeway_room = dungeon.rooms["causeway_lip"]
+        barracks_room = dungeon.rooms["choir_barracks"]
+        game.skill_check = lambda actor, skill, dc, context: False  # type: ignore[method-assign]
+
+        def choose_option(prompt: str, options: list[str], **kwargs) -> int:
+            if prompt == "What do you read first on the crossing?":
+                return self.option_index_containing(options, "Test the anchor pull")
+            if prompt == "How do you strip the barracks?":
+                return self.option_index_containing(options, "Turn the weapon racks")
+            raise AssertionError(prompt)
+
+        game.scenario_choice = choose_option  # type: ignore[method-assign]
+        game.run_encounter = lambda encounter: captured.append(encounter) or "victory"  # type: ignore[method-assign]
+
+        game._black_lake_causeway_lip(dungeon, causeway_room)
+        self.assertTrue(game.state.flags["black_lake_choir_reserve_intact"])
+        self.assertEqual(game.state.flags["act2_whisper_pressure"], 3)
+
+        game._black_lake_choir_barracks(dungeon, barracks_room)
+
+        self.assertEqual(len(captured), 1)
+        self.assertEqual(len(captured[0].enemies), 3)
+        self.assertIn("reserve line", self.plain_output(log))
 
     def test_sella_song_changes_after_dain_truth_returns(self) -> None:
         player = build_character(

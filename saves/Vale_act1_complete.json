@@ -285,10 +285,12 @@
         "Celestial"
       ],
       "resources": {
-        "spell_slots_1": 2
+        "spell_slots_1": 2,
+        "mp": 13
       },
       "max_resources": {
-        "spell_slots_1": 2
+        "spell_slots_1": 2,
+        "mp": 13
       },
       "inventory": {},
       "conditions": {},

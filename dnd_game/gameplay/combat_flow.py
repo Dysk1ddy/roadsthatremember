@@ -39,6 +39,8 @@ class CombatFlowMixin:
             heroes = [member for member in self.state.party_members() if not member.dead]
             self.prepare_encounter_for_party(encounter, heroes=heroes)
             enemies = encounter.enemies
+            for actor in [*heroes, *enemies]:
+                actor.bond_flags.pop("quiet_mercy_used", None)
             self._active_encounter = encounter
             self._active_combat_heroes = heroes
             self._active_combat_enemies = enemies

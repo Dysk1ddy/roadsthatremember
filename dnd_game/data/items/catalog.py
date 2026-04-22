@@ -705,6 +705,7 @@ SCROLL_EFFECTS = [
     ("scroll_revivify", "Scroll of Revivify", "uncommon", "A tightly warded resurrection script for camp rites after a fresh battlefield death.", "Rarely stocked by frontier traders and occasionally recovered from hard-fought battles.", None, 0, 0, 0, False),
     ("scroll_arcane_refresh", "Scroll of Arcane Refresh", "rare", "An elegant sigil-chain that restores a surge of MP.", "Wizard satchels, hidden libraries, and rare arcane drops.", None, 0, 0, 1, False),
     ("scroll_echo_step", "Scroll of Echo Step", "rare", "A delicate step-script that blurs the reader between falling dust and reflected sound.", "Wave Echo script tubes, hidden survey lockers, and expert scout caches.", None, 0, 0, 0, False),
+    ("scroll_counter_cadence", "Counter-Cadence Script", "uncommon", "A prison-smudged script of wrong-beat notations that turns the Choir's first settling whisper back on itself.", "South Adit caches, freed augur notes, and prisoner escape kits kept against the Quiet Choir.", None, 0, 0, 0, False),
     ("scroll_quell_the_deep", "Scroll of Quell the Deep", "rare", "A warding litany copied by priests and delvers who learned that some caverns answer back.", "Temple satchels, ruined chapels, and counter-cult ward caches.", "2d6", 2, 0, 0, False),
     ("scroll_forge_shelter", "Scroll of Forge Shelter", "rare", "A layered sigil-sheet that kindles a protective halo like banked coals around the reader.", "Forge of Spells annexes, dwarven vault doors, and late-act expedition rewards.", None, 0, 8, 0, False),
     ("scroll_guardian_light", "Scroll of Guardian Light", "uncommon", "A radiant seal that wraps the reader in a protective glow.", "Temple vaults, priestly gifts, and divine loot pools.", None, 0, 6, 0, False),
@@ -1258,7 +1259,7 @@ def gear_enchantment_for(base: dict[str, object], rarity: str) -> dict[str, obje
             "enchantment": "Quiet Mercy",
             "save_bonuses": {"CHA_save": 1},
             "notes": [
-                "Designed by priests who expected hostile whispers, this amulet helps the wearer keep both voice and will their own.",
+                "Designed by priests who expected hostile whispers, this amulet lets the wearer turn aside the first fear or whisper-borne effect each combat.",
             ],
         }
     return {}
@@ -1472,6 +1473,7 @@ def build_consumables() -> list[Item]:
         "scroll_lesser_restoration": {"clear_conditions": ["blinded", "deafened", "paralyzed", "poisoned"]},
         "scroll_clarity": {"clear_conditions": ["charmed", "frightened", "deafened"]},
         "scroll_echo_step": {"clear_conditions": ["restrained"], "apply_conditions": {"invisible": 2}},
+        "scroll_counter_cadence": {"clear_conditions": ["charmed", "frightened", "incapacitated"], "apply_conditions": {"blessed": 2}},
         "scroll_quell_the_deep": {"clear_conditions": ["charmed", "frightened", "incapacitated"]},
         "scroll_forge_shelter": {"apply_conditions": {"blessed": 2}},
         "scroll_guardian_light": {"apply_conditions": {"blessed": 3}},

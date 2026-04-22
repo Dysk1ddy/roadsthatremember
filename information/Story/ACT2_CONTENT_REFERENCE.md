@@ -8,6 +8,7 @@ The tone and structure stay anchored to official Phandalin / Wave Echo Cave mate
 
 - Opening arc: Act 1 aftermath -> Stonehill claims council -> expedition sponsorship choice -> first lead
 - Early branching route: `Conyberry and Agatha's Circuit`, `Neverwinter Wood Survey Camp`, and `Stonehollow Dig`
+- Early side-delve candidate: `Glasswater Intake` can slot between the first and second cleared early leads as a medium optional dungeon about water control, courier traffic, claims fraud, and the first practical signs of whisper contamination
 - Early route rule: any two leads let the player trigger the midpoint, but delaying the third now causes a permanent consequence before that lead can be recovered later
 - First new recruitable companion: `Nim Ardentglass` enters through `Stonehollow Dig`, but recruiting him late changes his trust and the quality of the recovered survey truth
 - Midpoint convergence: sponsor tension -> sabotage night -> protect a priority and accept what slips through elsewhere
@@ -88,20 +89,30 @@ Act 2 should not start from a blank emotional or strategic slate. Several Act 1 
 1. Act 1 aftermath in Phandalin and a claims council at the Miner's Exchange
 2. Sponsor choice: decide whether speed, discipline, or caution defines the expedition's first tone
 3. First lead selection and opening expedition prep
-4. Early lead A: `Conyberry and Agatha's Circuit`
-5. Early lead B: `Neverwinter Wood Survey Camp`
-6. Early lead C: `Stonehollow Dig`
-7. Once any two early leads are cleared, the player can trigger `Sabotage Night`
-8. If the third lead is delayed, it remains playable later but its damage is already written into the campaign state
-9. Midpoint convergence:
+4. Optional side-delve: `Glasswater Intake` can open after the first cleared early lead as a medium dungeon that reshapes metrics and later route reads without replacing a core lead
+5. Early lead A: `Conyberry and Agatha's Circuit`
+6. Early lead B: `Neverwinter Wood Survey Camp`
+7. Early lead C: `Stonehollow Dig`
+8. Once any two early leads are cleared, the player can trigger `Sabotage Night`
+9. If the third lead is delayed, it remains playable later but its damage is already written into the campaign state
+10. Midpoint convergence:
    the player chooses what to protect first in Phandalin and accepts a matching loss elsewhere
-10. Late route A: `Broken Prospect`
-11. Late route B: `South Adit`
-12. The order of 10 and 11 materially changes captives, route posture, and companion texture
-13. `Wave Echo Outer Galleries`
-14. `Black Lake Causeway`, now framed as a shrine / barracks / causeway-priority decision instead of a straight bridge fight
-15. `Forge of Spells`
-16. Act end summary records not just victory, but what kind of victory it was
+11. Late route A: `Broken Prospect`
+12. Late route B: `South Adit`
+13. The order of 11 and 12 materially changes captives, route posture, and companion texture
+14. `Wave Echo Outer Galleries`
+15. `Black Lake Causeway`, now framed as a shrine / barracks / causeway-priority decision instead of a straight bridge fight
+16. `Forge of Spells`
+17. Act end summary records not just victory, but what kind of victory it was
+
+### Drafted Early Side-Dungeon
+
+- `Glasswater Intake`
+  - Best unlocked after the first cleared early lead and before `Sabotage Night`.
+  - Functions as a medium optional dungeon that foreshadows Wave Echo by way of waterworks, courier ledgers, claims fraud, and containment choices instead of full late-act spectacle.
+  - Intended to carry 4 to 5 encounter beats, one real finale, and multiple metric-facing choices rather than reading like a throwaway side room chain.
+  - Its final chamber can center on `Brother Merik Sorn`, a Quiet Choir field operator who treats water pressure, logistics discipline, and doctrine as the same system.
+  - Full draft: `information/Story/ACT2_GLASSWATER_INTAKE_DRAFT.md`
 
 ## Choice Web
 
@@ -198,6 +209,7 @@ These items have been added to the catalog source so future encounter, quest, an
 | `forge_blessing_elixir` | Forge-Blessing Elixir | consumable | late-act courage draught with blessed synergy | forge reliquaries and elite cult loot |
 | `thoughtward_draught` | Thoughtward Draught | consumable | anti-charm / anti-fear counterplay for whisper magic | ward caches and prisoner escape kits |
 | `scroll_echo_step` | Scroll of Echo Step | scroll | stealth / escape tool that rewards smart disengage play | scout tubes and hidden script lockers |
+| `scroll_counter_cadence` | Counter-Cadence Script | scroll | one-shot anti-whisper cleanse with a small courage swing | South Adit caches and prisoner counter-cult kits |
 | `scroll_quell_the_deep` | Scroll of Quell the Deep | scroll | healing plus mental-condition cleanse | shrines, chapels, and anti-cult aid |
 | `scroll_forge_shelter` | Scroll of Forge Shelter | scroll | protective forge buff before key combats | annex vaults and late quest rewards |
 | `delver_lantern_hood_*` | Delver Lantern Hood | equipment | perception / investigation head slot for expedition play | survey caches and side chambers |

@@ -117,6 +117,15 @@ class StatusEffectMixin:
     def effective_armor_class(self, actor) -> int:
         return max(1, actor.armor_class + self.status_value(actor, "ac_bonus") - self.status_value(actor, "ac_penalty"))
 
+    def quiet_mercy_blocks_status(self, status: str, source: str) -> bool:
+        if status == "frightened":
+            return True
+        if status not in {"charmed", "incapacitated", "reeling"}:
+            return False
+        lowered = source.lower()
+        whisper_tokens = ("whisper", "discordant", "lure", "song", "chorus", "cadence", "choir", "obelisk")
+        return any(token in lowered for token in whisper_tokens)
+
     def apply_status(self, actor, status: str, duration: int, *, source: str = "") -> None:
         definition = self.status_definition(status)
         if status in {"charmed", "frightened"} and "dark_devotion" in getattr(actor, "features", []):
@@ -128,6 +137,15 @@ class StatusEffectMixin:
             if not actor.bond_flags.get("spellward_plating_used"):
                 actor.bond_flags["spellward_plating_used"] = True
                 self.say(f"{self.style_name(actor)}'s warded plating rejects the first attempt to {status.replace('_', ' ')} it.")
+                return
+        if (
+            getattr(self, "_in_combat", False)
+            and actor.gear_bonuses.get("quiet_mercy", 0)
+            and self.quiet_mercy_blocks_status(status, source)
+        ):
+            if not actor.bond_flags.get("quiet_mercy_used"):
+                actor.bond_flags["quiet_mercy_used"] = True
+                self.say(f"{self.style_name(actor)}'s Quiet Mercy answers first and turns the wrong note aside.")
                 return
         current = actor.conditions.get(status, 0)
         if status == "exhaustion" and duration > 0:

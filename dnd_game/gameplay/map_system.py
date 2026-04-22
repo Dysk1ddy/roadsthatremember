@@ -1682,6 +1682,11 @@ class MapSystemMixin:
             self.state.current_scene = "stonehollow_dig"
         self.run_act2_dungeon("stonehollow_dig")
 
+    def scene_glasswater_intake(self) -> None:
+        if self.state is not None:
+            self.state.current_scene = "glasswater_intake"
+        self.run_act2_dungeon("glasswater_intake")
+
     def scene_broken_prospect(self) -> None:
         if self.state is not None:
             self.state.current_scene = "broken_prospect"
@@ -2568,6 +2573,18 @@ class MapSystemMixin:
             ("stonehollow_dig", "scholar_pocket"): self._stonehollow_scholar_pocket,
             ("stonehollow_dig", "collapse_lift"): self._stonehollow_collapse_lift,
             ("stonehollow_dig", "lower_breakout"): self._stonehollow_lower_breakout,
+            ("glasswater_intake", "rock_weir"): self._glasswater_rock_weir,
+            ("glasswater_intake", "intake_yard"): self._glasswater_intake_yard,
+            ("glasswater_intake", "gatehouse_winch"): self._glasswater_gatehouse_winch,
+            ("glasswater_intake", "valve_hall"): self._glasswater_valve_hall,
+            ("glasswater_intake", "settling_cistern"): self._glasswater_settling_cistern,
+            ("glasswater_intake", "lamp_chapel"): self._glasswater_lamp_chapel,
+            ("glasswater_intake", "relay_office"): self._glasswater_relay_office,
+            ("glasswater_intake", "ledger_vault"): self._glasswater_ledger_vault,
+            ("glasswater_intake", "overflow_crawl"): self._glasswater_overflow_crawl,
+            ("glasswater_intake", "filter_beds"): self._glasswater_filter_beds,
+            ("glasswater_intake", "pump_gallery"): self._glasswater_pump_gallery,
+            ("glasswater_intake", "headgate_chamber"): self._glasswater_headgate_chamber,
             ("broken_prospect", "broken_shelf"): self._broken_prospect_broken_shelf,
             ("broken_prospect", "pact_markers"): self._broken_prospect_pact_markers,
             ("broken_prospect", "rival_survey_shelf"): self._broken_prospect_rival_survey_shelf,
@@ -2952,6 +2969,744 @@ class MapSystemMixin:
                 )
         self.return_to_act2_hub("Stonehollow exhales stone dust behind you, and the rescued survey truth finally reaches the expedition table.")
 
+    def _glasswater_delayed(self) -> bool:
+        assert self.state is not None
+        return bool(self.state.flags.get("phandalin_sabotage_resolved")) and not self.state.flags.get("glasswater_intake_cleared")
+
+    def _glasswater_active_companion(self, name: str):
+        assert self.state is not None
+        companion = self.find_companion(name)
+        if companion is None or companion not in self.state.companions:
+            return None
+        return companion
+
+    def _glasswater_award_baseline_rewards(self) -> None:
+        assert self.state is not None
+        if not self.state.flags.get("glasswater_reward_thoughtward"):
+            if self.add_inventory_item("thoughtward_draught", source="the Glasswater foreman's reserve"):
+                self.state.flags["glasswater_reward_thoughtward"] = True
+        if not self.state.flags.get("glasswater_reward_clarity"):
+            if self.add_inventory_item("scroll_clarity", source="the Glasswater headgate packet"):
+                self.state.flags["glasswater_reward_clarity"] = True
+
+    def _glasswater_rock_weir(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
+        assert self.state is not None
+        delayed = self._glasswater_delayed()
+        if not self.state.flags.get("glasswater_route_seen"):
+            self.say(
+                "The Glasswater run begins as practical dwarfwork cut into a wet slope: a rock apron, a spill channel, and old maintenance posts silvered by mist. "
+                "Fresh boot marks cut across all of it like insults.",
+                typed=True,
+            )
+            if delayed:
+                self.say(
+                    "You reached it after sabotage night. A few surfaces have already been wiped cleaner than the annex deserves, and one whole layer of panic has had time to dry into habit."
+                )
+            self.state.flags["glasswater_route_seen"] = True
+        choice = self.scenario_choice(
+            "How do you read the annex before the yard sees you?",
+            [
+                self.skill_tag("SURVIVAL", self.action_option("Trace the hauling and drainage rhythm before the water hides it.")),
+                self.skill_tag("STEALTH", self.action_option("Get close enough to hear the yard cadence before anyone counts you.")),
+                self.skill_tag("INVESTIGATION", self.action_option("Read the engineering scars instead of the footsteps.")),
+            ],
+            allow_meta=False,
+        )
+        if choice == 1:
+            self.player_action("Trace the hauling and drainage rhythm before the water hides it.")
+            if self.skill_check(self.state.player, "Survival", 13, context="to read the Glasswater courier timing"):
+                self.state.flags["glasswater_courier_timing_read"] = True
+                self.reward_party(xp=10, reason="reading Glasswater's hauling rhythm")
+                self.say("The annex traffic has a real cadence to it. You mark when the runners look at the water and when they stop trusting it.")
+        elif choice == 2:
+            self.player_action("Get close enough to hear the yard cadence before anyone counts you.")
+            if self.skill_check(self.state.player, "Stealth", 13, context="to take the blind Glasswater approach"):
+                self.state.flags["glasswater_blind_approach"] = True
+                self.say("You find the angle where the yard trusts its own noise more than its eyes.")
+        else:
+            self.player_action("Read the engineering scars instead of the footsteps.")
+            if self.skill_check(self.state.player, "Investigation", 13, context="to spot how Glasswater's runoff is being misdirected"):
+                self.state.flags["glasswater_runoff_named"] = True
+                self.add_clue("Glasswater's runoff is being vented on purpose. The fouling pattern is deliberate, measured, and tied to controlled traffic through the annex.")
+                self.say("The damage is not random neglect. Somebody taught the annex to waste water exactly where it would spread the wrong story.")
+        self.complete_act2_map_room(dungeon, room.room_id)
+
+    def _glasswater_intake_yard(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
+        assert self.state is not None
+        delayed = self._glasswater_delayed()
+        self.say(
+            "The yard is a working lie. Rope slings, valve keys, repair sledges, and stacked supply tins make it look like a maintenance annex held together by hard people. "
+            "Then you notice which crates are guarded harder than the tools."
+        )
+        enemies = [create_enemy("cult_lookout"), create_enemy("expedition_reaver")]
+        if delayed:
+            enemies.append(create_enemy("cult_lookout"))
+        elif len(self.state.party_members()) >= 4:
+            enemies.append(create_enemy("cult_lookout"))
+        hero_bonus = self.apply_scene_companion_support("glasswater_intake")
+        if self.state.flags.get("glasswater_blind_approach"):
+            hero_bonus += 1
+            self.apply_status(enemies[0], "surprised", 1, source="your rock-weir approach")
+        if self.state.flags.get("glasswater_courier_timing_read"):
+            hero_bonus += 1
+            self.say("Because you already read the courier timing, the first shout lands half a beat later than the yard needed.")
+        choice = self.scenario_choice(
+            "How do you enter the Intake Yard?",
+            [
+                self.skill_tag("DECEPTION", self.action_option("Official route inspection. Open the line and stop wasting my time.")),
+                self.skill_tag("STEALTH", self.action_option("Keep low, cut the nearest watcher, and let the yard realize too late what changed.")),
+                self.skill_tag("ATHLETICS", self.action_option("Hit them hard before the report runs.")),
+            ],
+            allow_meta=False,
+        )
+        if choice == 1:
+            self.player_action("Official route inspection. Open the line and stop wasting my time.")
+            if self.skill_check(self.state.player, "Deception", 14, context="to bluff your way through the Glasswater yard"):
+                hero_bonus += 2
+                self.state.flags["glasswater_headgate_count_heard"] = True
+                self.say('A runner mutters that "the headgate only needs one more clean count" before they realize you do not belong there.')
+        elif choice == 2:
+            self.player_action("Keep low, cut the nearest watcher, and let the yard realize too late what changed.")
+            if self.skill_check(self.state.player, "Stealth", 14, context="to break the Glasswater yard from the blind side"):
+                hero_bonus += 2
+                self.apply_status(enemies[0], "surprised", 1, source="the yard lost its first watcher")
+        else:
+            self.player_action("Hit them hard before the report runs.")
+            if self.skill_check(self.state.player, "Athletics", 14, context="to smash through the Glasswater yard cleanly"):
+                hero_bonus += 1
+                self.apply_status(self.state.player, "emboldened", 2, source="taking the yard by force")
+        outcome = self.run_encounter(
+            Encounter(
+                title="Glasswater Intake Yard",
+                description="Maintenance lookouts and route fixers try to hold the annex long enough for the report to run.",
+                enemies=enemies,
+                allow_flee=True,
+                allow_parley=True,
+                parley_dc=14,
+                hero_initiative_bonus=hero_bonus,
+                allow_post_combat_random_encounter=False,
+            )
+        )
+        if outcome == "defeat":
+            self.handle_defeat("The yard holds long enough for Glasswater's operators to clean the lie and keep the annex working against you.")
+            return
+        if outcome == "fled":
+            self.return_to_act2_hub("You break off from the Glasswater yard before the annex can turn its own traffic against the party.")
+            return
+        self.complete_act2_map_room(dungeon, room.room_id)
+
+    def _glasswater_gatehouse_winch(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
+        assert self.state is not None
+        self.say("A narrow gear room hangs over the first drop channel. The winch brake is warm. Somebody has been making the intake choose between flood safety and hidden traffic.")
+        if self._glasswater_active_companion("Tolan Ironshield") is not None:
+            self.speaker(
+                "Tolan Ironshield",
+                "This room is the difference between a site and a trap. Decide which one we are walking into.",
+            )
+        if self._glasswater_active_companion("Kaelis Starling") is not None:
+            self.speaker(
+                "Kaelis Starling",
+                "If we leave ourselves one honest exit, I will take it. If not, I would rather know that now.",
+            )
+        choice = self.scenario_choice(
+            "What do you do with the gatehouse controls?",
+            [
+                self.skill_tag("ATHLETICS", self.action_option("Open the maintenance route and give the party a cleaner line through the upper works.")),
+                self.skill_tag("INVESTIGATION", self.action_option("Jam the emergency release. If somebody downstream needs a panic flood, they do not get one.")),
+                self.skill_tag("SLEIGHT OF HAND", self.action_option("Set the brake to fail on your timing and keep an exit plan in reserve.")),
+            ],
+            allow_meta=False,
+        )
+        if choice == 1:
+            self.player_action("Open the maintenance route and give the party a cleaner line through the upper works.")
+            if self.skill_check(self.state.player, "Athletics", 13, context="to wrench the Glasswater maintenance route open"):
+                self.state.flags["glasswater_maintenance_route_open"] = True
+                self.say("The gate strains, then answers. The annex feels like it has one honest lane again.")
+        elif choice == 2:
+            self.player_action("Jam the emergency release. If somebody downstream needs a panic flood, they do not get one.")
+            if self.skill_check(self.state.player, "Investigation", 13, context="to read and jam the Glasswater emergency release"):
+                self.state.flags["glasswater_flood_release_jammed"] = True
+                self.say("You lock the release just wrong enough that nobody below gets to lean on it cleanly.")
+        else:
+            self.player_action("Set the brake to fail on your timing and keep an exit plan in reserve.")
+            if self.skill_check(self.state.player, "Sleight of Hand", 13, context="to leave the Glasswater brake on your timing"):
+                self.state.flags["glasswater_exit_timed"] = True
+                self.say("The brake looks intact until somebody needs it quickly. Then it will belong to your timing instead of theirs.")
+        self.complete_act2_map_room(dungeon, room.room_id)
+
+    def _glasswater_valve_hall(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
+        assert self.state is not None
+        delayed = self._glasswater_delayed()
+        self.say("Bronze wheels, pressure rods, and mineral-white spray turn the Valve Hall into a storm someone taught to obey numbers.")
+        enemies = [create_enemy("animated_armor")]
+        if delayed or not self.state.flags.get("glasswater_maintenance_route_open"):
+            enemies.append(create_enemy("animated_armor"))
+        hero_bonus = self.apply_scene_companion_support("glasswater_intake")
+        if self.state.flags.get("glasswater_maintenance_route_open"):
+            hero_bonus += 1
+        if self.state.flags.get("glasswater_blind_approach"):
+            hero_bonus += 1
+        choice = self.scenario_choice(
+            "How do you take control of the Valve Hall?",
+            [
+                self.skill_tag("INVESTIGATION", self.action_option("Read the pressure map and shut the dangerous line first.")),
+                self.skill_tag("ATHLETICS", self.action_option("Force the wheels over before the sentinels can lock the room down.")),
+                self.skill_tag("ARCANA", self.action_option("Break the wrong valve and make the hall punish its current masters.")),
+            ],
+            allow_meta=False,
+        )
+        if choice == 1:
+            self.player_action("Read the pressure map and shut the dangerous line first.")
+            if self.skill_check(self.state.player, "Investigation", 14, context="to stabilize the Glasswater valves"):
+                self.state.flags["glasswater_valves_stabilized"] = True
+                hero_bonus += 2
+                self.reward_party(xp=12, reason="stabilizing the Glasswater valve order")
+        elif choice == 2:
+            self.player_action("Force the wheels over before the sentinels can lock the room down.")
+            if self.skill_check(self.state.player, "Athletics", 14, context="to muscle the Glasswater valve line into your control"):
+                hero_bonus += 1
+                self.apply_status(self.state.player, "emboldened", 2, source="forcing the valve line")
+        else:
+            self.player_action("Break the wrong valve and make the hall punish its current masters.")
+            if self.skill_check(self.state.player, "Arcana", 14, context="to make the Glasswater valve pattern turn hostile"):
+                hero_bonus += 1
+                self.state.flags["glasswater_vent_line_broken"] = True
+                self.apply_status(enemies[0], "reeling", 1, source="a burst of wrong pressure")
+        outcome = self.run_encounter(
+            Encounter(
+                title="Glasswater Valve Hall",
+                description="Old sentinels hold a pressure room the Quiet Choir taught to value obedience over safety.",
+                enemies=enemies,
+                allow_flee=True,
+                allow_parley=False,
+                hero_initiative_bonus=hero_bonus,
+                allow_post_combat_random_encounter=False,
+            )
+        )
+        if outcome == "defeat":
+            self.handle_defeat("The Valve Hall closes against the party and Glasswater keeps answering the wrong hands.")
+            return
+        if outcome == "fled":
+            self.return_to_act2_hub("You withdraw from the Valve Hall before the annex can seal your whole line inside it.")
+            return
+        self.complete_act2_map_room(dungeon, room.room_id)
+
+    def _glasswater_settling_cistern(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
+        assert self.state is not None
+        delayed = self._glasswater_delayed()
+        self.say("The cistern should be a quiet basin where silt drops out before clean flow continues. Instead the surface looks filmed over with thinking darkness.")
+        if self._glasswater_active_companion("Elira Dawnmantle") is not None and not delayed:
+            self.speaker(
+                "Elira Dawnmantle",
+                "If someone is still breathing in this room, that is the first clean task we have had since entering it.",
+            )
+        choice = self.scenario_choice(
+            "What matters most in the cistern?",
+            [
+                self.skill_tag("MEDICINE", self.action_option("Cut the trapped worker free and keep them talking.")),
+                self.skill_tag("INVESTIGATION", self.action_option("Read the runoff and learn what was mixed into it.")),
+                self.skill_tag("ACROBATICS", self.action_option("Cross fast before the room decides you belong in it.")),
+            ],
+            allow_meta=False,
+        )
+        if choice == 1:
+            self.player_action("Cut the trapped worker free and keep them talking.")
+            if self.skill_check(self.state.player, "Medicine", 14, context="to save whoever the cistern has not finished with yet"):
+                if delayed:
+                    self.state.flags["glasswater_worker_loss_seen"] = True
+                    self.add_clue("Glasswater's delayed-state cost is human, not abstract. By the time you reached the cistern, one coerced worker had already died holding the wrong line together.")
+                    self.say("You are too late to save them, but not too late to learn who kept the room running and who decided that counted as disposable labor.")
+                else:
+                    self.state.flags["glasswater_trapped_workers_saved"] = True
+                    self.reward_party(xp=15, reason="saving a trapped Glasswater worker")
+                    self.say("The worker coughs black grit, lives, and gives you the look of someone who had already been written off in neat hand.")
+        elif choice == 2:
+            self.player_action("Read the runoff and learn what was mixed into it.")
+            if self.skill_check(self.state.player, "Investigation", 14, context="to read the Glasswater runoff"):
+                self.state.flags["glasswater_runoff_sample"] = True
+                self.add_clue("The Glasswater runoff carries altered grit and chant cadence in measured doses. Someone wanted fear and rumor to travel through an ordinary camp system.")
+                self.say("The fouling is precise. Somebody measured exactly how much wrongness the line could carry before practical people would start calling it superstition.")
+        else:
+            self.player_action("Cross fast before the room decides you belong in it.")
+            if self.skill_check(self.state.player, "Acrobatics", 13, context="to cross the settling cistern without letting it own the pace"):
+                self.state.flags["glasswater_cistern_crossed_fast"] = True
+                self.say("You keep your feet and your nerve, which is more than this room has been granting for a while.")
+        self.complete_act2_map_room(dungeon, room.room_id)
+
+    def _glasswater_lamp_chapel(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
+        assert self.state is not None
+        self.say("The chapel is hardly larger than a pantry: six lamp niches, a worn basin, and a hammered plaque reminding crews that steady hands keep whole towns alive.")
+        if self._glasswater_active_companion("Elira Dawnmantle") is not None:
+            self.speaker(
+                "Elira Dawnmantle",
+                "This is a shrine for people who kept strangers alive without ever meeting them. I would rather not fail them in their own room.",
+            )
+        choice = self.scenario_choice(
+            "How do you answer the chapel?",
+            [
+                self.skill_tag("RELIGION", self.action_option("Wake the old maintenance rite and force one clean line through the annex.")),
+                self.skill_tag("INSIGHT", self.action_option("Read what kind of people wrote a prayer for valves and lamp oil.")),
+                self.skill_tag("SURVIVAL", self.action_option("Take the basin water and move. Reverence can wait until the route is safe.")),
+            ],
+            allow_meta=False,
+        )
+        if choice == 1:
+            self.player_action("Wake the old maintenance rite and force one clean line through the annex.")
+            if self.skill_check(self.state.player, "Religion", 14, context="to answer the Glasswater maintenance rite cleanly"):
+                self.state.flags["glasswater_chapel_answered"] = True
+                self.apply_status(self.state.player, "blessed", 1, source="the Glasswater lamp chapel")
+                self.act2_shift_metric(
+                    "act2_whisper_pressure",
+                    -1,
+                    "Glasswater's lamp chapel remembers that service and obedience were never meant to become the same thing",
+                )
+                self.say("One lamp catches cleanly. The whole annex does not become holy. It only remembers, for a moment, that service and obedience were not meant to be the same thing.")
+        elif choice == 2:
+            self.player_action("Read what kind of people wrote a prayer for valves and lamp oil.")
+            if self.skill_check(self.state.player, "Insight", 13, context="to understand the people who built Glasswater's chapel"):
+                self.state.flags["glasswater_maintenance_creed_read"] = True
+                self.reward_party(xp=10, reason="reading Glasswater's maintenance creed")
+                self.say("The old Pact crews did not pray to the machinery. They prayed to the duty of keeping strangers alive through work nobody would ever praise.")
+        else:
+            self.player_action("Take the basin water and move. Reverence can wait until the route is safe.")
+            if self.skill_check(self.state.player, "Survival", 13, context="to take the chapel basin as a practical ward"):
+                self.state.flags["glasswater_basin_taken"] = True
+                self.say("The basin water is cold enough to feel like a warning, but it steadies your breathing instead of stealing it.")
+        self.complete_act2_map_room(dungeon, room.room_id)
+
+    def _glasswater_relay_office(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
+        assert self.state is not None
+        delayed = self._glasswater_delayed()
+        self.say("The Relay Office is too orderly for a ruin. Satchels hang by route mark, manifests are weighted against damp, and one wall is given over entirely to copied names.")
+        if self._glasswater_active_companion("Bryn Underbough") is not None:
+            self.speaker(
+                "Bryn Underbough",
+                "Ignore the polished case. The real packet is always the one trying hardest not to look like the room is built around it.",
+            )
+        choice = self.scenario_choice(
+            "What do you seize before the room scatters?",
+            [
+                self.skill_tag("STEALTH", self.action_option("Take the live satchel. Real orders matter more than neat shelves.")),
+                self.skill_tag("INVESTIGATION", self.action_option("Read the claim manifests and name who profits from the intake staying sick.")),
+                self.skill_tag("INTIMIDATION", self.action_option("Pressure the clerk or fixer before fear turns them useless.")),
+            ],
+            allow_meta=False,
+        )
+        resolved_cleanly = False
+        if choice == 1:
+            self.player_action("Take the live satchel. Real orders matter more than neat shelves.")
+            if self.skill_check(self.state.player, "Stealth", 14, context="to steal the Glasswater live satchel without blowing the office"):
+                resolved_cleanly = True
+                self.state.flags["glasswater_relay_ledgers_taken"] = True
+                self.state.flags["glasswater_relay_route_decoded"] = True
+                self.add_clue("A Glasswater satchel tracks reserve schedules, copied manifests, and 'special transfers' that do not belong on a waterworks line.")
+                self.say("You lift the real packet before the shelves can become theater. The room suddenly makes sense in the worst possible way.")
+        elif choice == 2:
+            self.player_action("Read the claim manifests and name who profits from the intake staying sick.")
+            if self.skill_check(self.state.player, "Investigation", 14, context="to expose the false manifests in Glasswater's relay office"):
+                resolved_cleanly = True
+                self.state.flags["glasswater_claim_fraud_named"] = True
+                self.add_clue("Glasswater manifests were falsified to protect a profitable lie: delays, fouled water, and missing repair allotments were all serving somebody's route politics.")
+                self.say("The papers stop pretending to be maintenance records and turn into motive.")
+        else:
+            self.player_action("Pressure the clerk or fixer before fear turns them useless.")
+            if self.skill_check(self.state.player, "Intimidation", 14, context="to break Glasswater's relay clerk before the room settles into silence"):
+                resolved_cleanly = True
+                self.state.flags["glasswater_courier_broken"] = True
+                self.add_clue("A shaken Glasswater fixer admits that 'special transfers' moved through lower rooms on the same nights town water ran foul, tying the annex to a deeper prisoner-routing line.")
+                self.say("The fixer cracks before the room can teach them a cleaner lie to die with.")
+        if resolved_cleanly:
+            self.complete_act2_map_room(dungeon, room.room_id)
+            return
+
+        enemies = [create_enemy("expedition_reaver"), create_enemy("cult_lookout")]
+        if delayed:
+            enemies.append(create_enemy("cult_lookout"))
+        hero_bonus = 0
+        if self.state.flags.get("glasswater_courier_timing_read"):
+            hero_bonus += 1
+        if self.state.flags.get("glasswater_headgate_count_heard"):
+            hero_bonus += 1
+        outcome = self.run_encounter(
+            Encounter(
+                title="Glasswater Relay Office",
+                description="When the office stops pretending to be paperwork, hired route muscle and watchers try to erase the real packet with you in the room.",
+                enemies=enemies,
+                allow_flee=True,
+                allow_parley=False,
+                hero_initiative_bonus=hero_bonus,
+                allow_post_combat_random_encounter=False,
+            )
+        )
+        if outcome == "defeat":
+            self.handle_defeat("The relay office closes around the party and the annex keeps its cleaner paperwork intact.")
+            return
+        if outcome == "fled":
+            self.return_to_act2_hub("You break away from the relay office before its panic can turn into a full purge of the records.")
+            return
+        self.complete_act2_map_room(dungeon, room.room_id)
+
+    def _glasswater_ledger_vault(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
+        assert self.state is not None
+        self.say("The vault door is small, ugly, and expensive in the way only practical secrets ever are.")
+        choice = self.scenario_choice(
+            "Which truth do you take out first?",
+            [
+                self.skill_tag("INVESTIGATION", self.action_option("The proof that someone profited from the intake staying unstable.")),
+                self.skill_tag("HISTORY", self.action_option("The route ledgers. You need the living pattern before the guilty names.")),
+                self.skill_tag("SLEIGHT OF HAND", self.action_option("The prisoner-transfer notations before somebody notices the missing page.")),
+            ],
+            allow_meta=False,
+        )
+        if choice == 1:
+            self.player_action("The proof that someone profited from the intake staying unstable.")
+            if self.skill_check(self.state.player, "Investigation", 14, context="to isolate Glasswater's claims-fraud proof"):
+                self.state.flags["glasswater_claim_fraud_named"] = True
+                self.add_clue("Glasswater's hidden ledgers prove repair delays and false route reports were profitable, not accidental.")
+        elif choice == 2:
+            self.player_action("The route ledgers. You need the living pattern before the guilty names.")
+            if self.skill_check(self.state.player, "History", 14, context="to reconstruct Glasswater's live route pattern"):
+                self.state.flags["glasswater_relay_route_decoded"] = True
+                self.add_clue("Glasswater's route ledgers mark which traffic was real, which was copied, and which loads only existed to cover stranger movement through the annex.")
+        else:
+            self.player_action("The prisoner-transfer notations before somebody notices the missing page.")
+            if self.skill_check(self.state.player, "Sleight of Hand", 14, context="to lift the Glasswater transfer notations cleanly"):
+                self.state.flags["glasswater_transfer_notes_found"] = True
+                self.add_clue("Glasswater transfer slips reference lower-room 'special transfers' that do not fit supply work, foreshadowing the South Adit prisoner line.")
+        if not self.state.flags.get("glasswater_reward_thoughtward"):
+            if self.add_inventory_item("thoughtward_draught", source="a sealed foreman's coffer in the Glasswater vault"):
+                self.state.flags["glasswater_reward_thoughtward"] = True
+        self.complete_act2_map_room(dungeon, room.room_id)
+
+    def _glasswater_overflow_crawl(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
+        assert self.state is not None
+        delayed = self._glasswater_delayed()
+        self.say("The crawl smells like old metal, wet lime, and the kind of panic people leave behind when they had to move through a space not built for standing.")
+        enemies = [create_enemy("grimlock_tunneler")]
+        if delayed:
+            enemies.append(create_enemy("ochre_slime"))
+        elif len(self.state.party_members()) >= 4:
+            enemies.append(create_enemy("cult_lookout"))
+        hero_bonus = 0
+        if self.state.flags.get("glasswater_courier_timing_read"):
+            hero_bonus += 1
+        choice = self.scenario_choice(
+            "How do you take the overflow crawl?",
+            [
+                self.skill_tag("STEALTH", self.action_option("Slide through the crawl quietly enough to own the angle first.")),
+                self.skill_tag("SURVIVAL", self.action_option("Read the runoff and let it carry you to the flanking line.")),
+                self.skill_tag("ATHLETICS", self.action_option("Force the bars and make speed your only courtesy.")),
+            ],
+            allow_meta=False,
+        )
+        if choice == 1:
+            self.player_action("Slide through the crawl quietly enough to own the angle first.")
+            if self.skill_check(self.state.player, "Stealth", 14, context="to clear the Glasswater crawl from the blind side"):
+                hero_bonus += 2
+                self.apply_status(enemies[0], "surprised", 1, source="you reached the crawl's blind angle first")
+        elif choice == 2:
+            self.player_action("Read the runoff and let it carry you to the flanking line.")
+            if self.skill_check(self.state.player, "Survival", 14, context="to turn Glasswater's overflow into a flank route"):
+                hero_bonus += 1
+                self.state.flags["glasswater_flank_route"] = True
+        else:
+            self.player_action("Force the bars and make speed your only courtesy.")
+            if self.skill_check(self.state.player, "Athletics", 14, context="to clear the overflow bars before the annex reacts"):
+                hero_bonus += 1
+                self.apply_status(self.state.player, "emboldened", 2, source="forcing the overflow crawl")
+        outcome = self.run_encounter(
+            Encounter(
+                title="Glasswater Overflow Crawl",
+                description="The annex's side-run is miserable, useful, and already occupied by things that learned to hunt in it.",
+                enemies=enemies,
+                allow_flee=True,
+                allow_parley=False,
+                hero_initiative_bonus=hero_bonus,
+                allow_post_combat_random_encounter=False,
+            )
+        )
+        if outcome == "defeat":
+            self.handle_defeat("The overflow crawl chews the party up before the deep line can be flanked.")
+            return
+        if outcome == "fled":
+            self.return_to_act2_hub("You pull out of the overflow crawl before the annex can turn the side-run into a coffin.")
+            return
+        self.complete_act2_map_room(dungeon, room.room_id)
+
+    def _glasswater_filter_beds(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
+        assert self.state is not None
+        delayed = self._glasswater_delayed()
+        self.say("The filtration floor should slow water down until it clarifies. Instead it turns every step into an argument about what deserves to keep moving.")
+        if delayed and not self.state.flags.get("glasswater_delayed_pressure_marked"):
+            self.state.flags["glasswater_delayed_pressure_marked"] = True
+            self.act2_shift_metric(
+                "act2_whisper_pressure",
+                1,
+                "Glasswater's filter beds kept running foul after sabotage night and taught the annex a harsher kind of silence",
+            )
+        enemies = [create_enemy("choir_adept"), create_enemy("cult_lookout")]
+        if delayed or not self.state.flags.get("glasswater_valves_stabilized"):
+            enemies.append(create_enemy("ochre_slime"))
+        elif len(self.state.party_members()) >= 4:
+            enemies.append(create_enemy("starblighted_miner"))
+        hero_bonus = self.apply_scene_companion_support("glasswater_intake")
+        if self.state.flags.get("glasswater_valves_stabilized"):
+            hero_bonus += 1
+        if self.state.flags.get("glasswater_chapel_answered"):
+            hero_bonus += 1
+        if self.state.flags.get("glasswater_relay_route_decoded"):
+            hero_bonus += 1
+        if self.state.flags.get("glasswater_runoff_sample"):
+            hero_bonus += 1
+        if self.state.flags.get("glasswater_flank_route"):
+            hero_bonus += 1
+            self.apply_status(enemies[0], "surprised", 1, source="the overflow crawl gave you the safer angle")
+        choice = self.scenario_choice(
+            "How do you break the Filter Beds line?",
+            [
+                self.skill_tag("ATHLETICS", self.action_option("Push straight through while the room is still trying to decide where to hold you.")),
+                self.skill_tag("ARCANA", self.action_option("Use the valvework you stabilized and make the beds turn against them.")),
+                self.skill_tag("STEALTH", self.action_option("Follow the adepts' safe lane and then cut it out from under them.")),
+            ],
+            allow_meta=False,
+        )
+        if choice == 1:
+            self.player_action("Push straight through while the room is still trying to decide where to hold you.")
+            if self.skill_check(self.state.player, "Athletics", 14, context="to force the Glasswater filter beds"):
+                hero_bonus += 1
+                self.apply_status(self.state.player, "emboldened", 1, source="forcing the filtration line")
+        elif choice == 2:
+            self.player_action("Use the valvework you stabilized and make the beds turn against them.")
+            if self.skill_check(self.state.player, "Arcana", 14, context="to redirect the Glasswater filter flow"):
+                hero_bonus += 2 if self.state.flags.get("glasswater_valves_stabilized") else 1
+                self.state.flags["glasswater_filters_purged"] = True
+                self.apply_status(enemies[0], "reeling", 1, source="the beds lose their tuned cadence")
+        else:
+            self.player_action("Follow the adepts' safe lane and then cut it out from under them.")
+            if self.skill_check(self.state.player, "Stealth", 14, context="to steal the Glasswater safe lane"):
+                hero_bonus += 2 if self.state.flags.get("glasswater_relay_route_decoded") else 1
+                self.apply_status(enemies[1], "surprised", 1, source="you came up the lane they trusted")
+        outcome = self.run_encounter(
+            Encounter(
+                title="Glasswater Filter Beds",
+                description="Half-finished filtration lines, murky footing, and a Choir adept turn the room itself into a sorting system.",
+                enemies=enemies,
+                allow_flee=True,
+                allow_parley=False,
+                hero_initiative_bonus=hero_bonus,
+                allow_post_combat_random_encounter=False,
+            )
+        )
+        if outcome == "defeat":
+            self.handle_defeat("The filter beds sort the party into the wrong side of the annex and the headgate keeps turning.")
+            return
+        if outcome == "fled":
+            self.return_to_act2_hub("You fall back from the filter beds before the murk can turn the whole line against you.")
+            return
+        self.complete_act2_map_room(dungeon, room.room_id)
+
+    def _glasswater_pump_gallery(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
+        assert self.state is not None
+        delayed = self._glasswater_delayed()
+        self.say("The pump gallery is where the annex stops pretending to be neglected. The housings are warm, the rods are greased, and somebody has been keeping this machine alive on purpose.")
+        if delayed:
+            self.say("One set of chain marks has been freshly stripped. Whatever witness line the room once held, somebody started cleaning it before you arrived.")
+        choice = self.scenario_choice(
+            "What do you secure before the headgate chamber?",
+            [
+                self.skill_tag("MEDICINE", self.action_option("Free the trapped workers and force the room to remember witnesses exist.")),
+                self.skill_tag("INVESTIGATION", self.action_option("Sabotage the support pressure before the operator can use it.")),
+                self.skill_tag("INSIGHT", self.action_option("Listen at the chamber door and learn what kind of doctrine talks to pipes.")),
+            ],
+            allow_meta=False,
+        )
+        if choice == 1:
+            self.player_action("Free the trapped workers and force the room to remember witnesses exist.")
+            if self.skill_check(self.state.player, "Medicine", 14, context="to triage Glasswater's last trapped workers"):
+                self.state.flags["glasswater_workers_staged"] = True
+                if not delayed:
+                    self.state.flags["glasswater_trapped_workers_saved"] = True
+                self.say("The survivors do not have to fight for you. It is enough that they remain alive to contradict the room.")
+        elif choice == 2:
+            self.player_action("Sabotage the support pressure before the operator can use it.")
+            if self.skill_check(self.state.player, "Investigation", 14, context="to cut Glasswater's headgate support pressure"):
+                self.state.flags["glasswater_support_pressure_cut"] = True
+                self.reward_party(xp=12, reason="cutting Glasswater's support pressure")
+                self.say("Two turns, one loose pin, and the headgate loses the clean support line it expected.")
+        else:
+            self.player_action("Listen at the chamber door and learn what kind of doctrine talks to pipes.")
+            if self.skill_check(self.state.player, "Insight", 14, context="to overhear Merik's doctrine without giving away the approach"):
+                self.state.flags["glasswater_doctrine_overheard"] = True
+                self.say('Beyond the door, a patient voice says, "Noise is not life. Most of the time it is waste pretending to be freedom."')
+        self.complete_act2_map_room(dungeon, room.room_id)
+
+    def _glasswater_headgate_chamber(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
+        assert self.state is not None
+        delayed = self._glasswater_delayed()
+        self.say("The chamber yawns open around a great iron wheel above a black running channel. Brass rods hum in their brackets. Prayer-strips float in the runoff like things too tired to sink.")
+        self.speaker("Brother Merik Sorn", "Hold the wheel where it is. The count is almost clean.")
+        self.speaker("Brother Merik Sorn", "One more turn and the whole intake starts teaching the same lesson to everyone downstream.")
+        self.speaker("Brother Merik Sorn", "You came all this way to defend confusion, then.")
+        if self.state.flags.get("glasswater_chapel_answered"):
+            self.speaker(
+                "Brother Merik Sorn",
+                "You woke a maintenance prayer in a room built for service. Admirable. Wrong. Service without obedience is only delay.",
+            )
+        if self.state.flags.get("glasswater_claim_fraud_named"):
+            self.speaker(
+                "Brother Merik Sorn",
+                "So you found the paper lie before the water lie. Most people need the sickness first.",
+            )
+        elif self.state.flags.get("glasswater_relay_ledgers_taken"):
+            self.speaker(
+                "Brother Merik Sorn",
+                "The papers mattered less than the rhythm they protected, but people like you always need ink before they trust a wound.",
+            )
+        if delayed:
+            self.speaker("Brother Merik Sorn", "You are late. We already sent the cleaner copies and the dirtier water.")
+
+        merik = create_enemy("choir_adept", name="Brother Merik Sorn")
+        enemies = [merik]
+        if not self.state.flags.get("glasswater_support_pressure_cut"):
+            enemies.append(create_enemy("animated_armor"))
+        if delayed:
+            enemies.append(create_enemy("expedition_reaver"))
+        elif len(self.state.party_members()) >= 4:
+            enemies.append(create_enemy("cult_lookout"))
+
+        hero_bonus = self.apply_scene_companion_support("glasswater_intake")
+        if self.state.flags.get("glasswater_valves_stabilized"):
+            hero_bonus += 1
+        if self.state.flags.get("glasswater_chapel_answered"):
+            hero_bonus += 1
+        if self.state.flags.get("glasswater_relay_route_decoded"):
+            hero_bonus += 1
+        if self.state.flags.get("glasswater_flood_release_jammed"):
+            hero_bonus += 1
+        if self.state.flags.get("glasswater_exit_timed"):
+            hero_bonus += 1
+        if self.state.flags.get("glasswater_support_pressure_cut"):
+            hero_bonus += 1
+        if self.state.flags.get("glasswater_workers_staged"):
+            hero_bonus += 1
+        if self.state.flags.get("glasswater_doctrine_overheard"):
+            hero_bonus += 1
+        if self.state.flags.get("glasswater_headgate_count_heard"):
+            hero_bonus += 1
+        if self.state.flags.get("glasswater_flank_route"):
+            hero_bonus += 1
+            self.apply_status(merik, "surprised", 1, source="you reached the chamber from the overflow flank")
+
+        choice = self.scenario_choice(
+            "How do you open the Headgate confrontation?",
+            [
+                self.quoted_option("GATE", "Open the gate and step away from it."),
+                self.quoted_option("TOWN", "You poisoned a town to test whether fear would travel faster than truth."),
+                self.quoted_option("BREAK", "Break the tuning line now. We end this before the whole valley starts listening."),
+            ],
+            allow_meta=False,
+        )
+        if choice == 1:
+            self.player_speaker("Open the gate and step away from it.")
+            self.speaker("Brother Merik Sorn", "Step away? From the first honest work this annex has done in a century?")
+            self.speaker("Brother Merik Sorn", "No. You do not open a line like this and then hand it back to people who still think mercy means disorder.")
+            if self.skill_check(self.state.player, "Persuasion", 14, context="to shake Merik's certainty before the headgate fight"):
+                hero_bonus += 1
+                self.apply_status(merik, "reeling", 1, source="you force the civic truth of the room back into the argument")
+        elif choice == 2:
+            self.player_speaker("You poisoned a town to test whether fear would travel faster than truth.")
+            self.speaker("Brother Merik Sorn", "Not poisoned. Tuned.")
+            self.speaker("Brother Merik Sorn", "Fear only moves faster than truth when truth insists on arriving in pieces.")
+            if self.skill_check(self.state.player, "Intimidation", 14, context="to pin Merik on the human cost before the fight breaks open"):
+                hero_bonus += 1
+                merik.current_hp = max(1, merik.current_hp - 4)
+        else:
+            self.player_speaker("Break the tuning line now. We end this before the whole valley starts listening.")
+            self.speaker("Brother Merik Sorn", "Then you do understand what this is.")
+            self.speaker("Brother Merik Sorn", "Good. Understanding usually arrives one room before disobedience.")
+            if self.skill_check(self.state.player, "Arcana", 14, context="to break the first tuning line before Merik can stabilize it"):
+                hero_bonus += 2
+                self.state.flags["glasswater_support_pressure_cut"] = True
+                self.apply_status(merik, "reeling", 1, source="the tuning line breaks under your first push")
+
+        if self._glasswater_active_companion("Elira Dawnmantle") is not None:
+            self.speaker("Elira Dawnmantle", "You do not get to call sickness discipline because you wrote it down neatly.")
+        if self._glasswater_active_companion("Bryn Underbough") is not None:
+            self.speaker("Bryn Underbough", "He talks like a clerk who found religion at the bottom of a lockbox.")
+        if self._glasswater_active_companion("Tolan Ironshield") is not None:
+            self.speaker("Tolan Ironshield", "Enough. It is a waterworks annex, not a chapel for frightened accountants.")
+        if self._glasswater_active_companion("Kaelis Starling") is not None:
+            self.speaker("Kaelis Starling", "He keeps saying line because he wants the room to do the threatening for him.")
+
+        outcome = self.run_encounter(
+            Encounter(
+                title="Brother Merik Sorn",
+                description="A Quiet Choir field operator tries to turn Glasswater's headgate into a lesson the whole valley will learn together.",
+                enemies=enemies,
+                allow_flee=True,
+                allow_parley=False,
+                hero_initiative_bonus=hero_bonus,
+                allow_post_combat_random_encounter=False,
+            )
+        )
+        if outcome == "defeat":
+            self.handle_defeat("Merik holds the headgate and Glasswater keeps teaching the valley the wrong lesson together.")
+            return
+        if outcome == "fled":
+            self.return_to_act2_hub("You tear free of the headgate chamber before Glasswater can close the whole annex around you.")
+            return
+
+        self.complete_act2_map_room(dungeon, room.room_id)
+        self.say("Brother Merik Sorn sags against the wheel, still trying to look like the room is the thing that defeated him rather than the people in it.")
+        choice = self.scenario_choice(
+            "What do you do with the headgate now?",
+            [
+                self.quoted_option("PURGE", "Purge the headgate. Let water be water again."),
+                self.quoted_option("LOCK", "Lock the annex down and drag every ledger into daylight."),
+                self.quoted_option("REPURPOSE", "Strip the Choir's tuning and keep the headgate for the expedition."),
+            ],
+            allow_meta=False,
+        )
+        if choice == 1:
+            self.player_speaker("Purge the headgate. Let water be water again.")
+            self.state.flags["glasswater_headgate_purged"] = True
+            self.act2_shift_metric(
+                "act2_whisper_pressure",
+                -1,
+                "the Glasswater headgate stops carrying the Choir's lesson downstream and becomes a water line again",
+            )
+            self.speaker("Brother Merik Sorn", "Back to waste, then. Back to a town teaching itself ten fears badly.")
+            result_text = "Glasswater's headgate runs clean again behind you, and the annex finally sounds like a waterworks instead of a warning."
+        elif choice == 2:
+            self.player_speaker("Lock the annex down and drag every ledger into daylight.")
+            self.state.flags["glasswater_headgate_locked"] = True
+            self.act2_shift_metric(
+                "act2_town_stability",
+                1,
+                "Glasswater's ledgers and headgate both survive long enough to be named in daylight instead of rumor",
+            )
+            self.speaker("Brother Merik Sorn", "Better. Locks admit that value exists.")
+            result_text = "You seal Glasswater under watch and take its ledgers topside, turning the annex into evidence before anyone can clean it into rumor."
+        else:
+            self.player_speaker("Strip the Choir's tuning and keep the headgate for the expedition.")
+            self.state.flags["glasswater_headgate_repurposed"] = True
+            self.act2_shift_metric(
+                "act2_route_control",
+                1,
+                "the expedition takes control of Glasswater's headgate and turns a stolen system back toward its own routework",
+            )
+            self.act2_shift_metric(
+                "act2_whisper_pressure",
+                1,
+                "keeping the headgate means choosing to stand closer to a dangerous signal in exchange for leverage",
+            )
+            self.speaker("Brother Merik Sorn", "There. That is the first honest choice you have made since entering.")
+            result_text = "You strip the Choir's tuning and leave Glasswater running under your side's hand, useful now, but not innocent."
+
+        self.reward_party(xp=65, gold=16, reason="securing Glasswater Intake")
+        self._glasswater_award_baseline_rewards()
+        self.return_to_act2_hub(result_text)
+
     def _broken_prospect_delayed(self) -> bool:
         assert self.state is not None
         return self.state.flags.get("act2_first_late_route") == "south_adit"
@@ -3246,6 +4001,72 @@ class MapSystemMixin:
         assert self.state is not None
         return self.state.flags.get("act2_first_late_route") == "broken_prospect"
 
+    def _south_adit_prison_cadence(self, *, delayed: bool) -> int:
+        assert self.state is not None
+        cadence = 3 + (1 if delayed else 0)
+        for flag in (
+            "south_adit_patrol_rhythm_read",
+            "south_adit_alarm_muted",
+            "south_adit_hush_prayers_broken",
+            "south_adit_counter_cadence_learned",
+        ):
+            if self.state.flags.get(flag):
+                cadence -= 1
+        if self.state.flags.get("south_adit_irielle_plan") == "break":
+            cadence -= 1
+        return max(0, min(5, cadence))
+
+    def _south_adit_prison_cadence_label(self, cadence: int) -> str:
+        if cadence <= 0:
+            return "Broken"
+        if cadence == 1:
+            return "Suppressed"
+        if cadence == 2:
+            return "Shaken"
+        if cadence == 3:
+            return "Pressing"
+        if cadence == 4:
+            return "Hammering"
+        return "Ironbound"
+
+    def _south_adit_prison_cadence_summary(self, cadence: int) -> str:
+        if cadence <= 0:
+            return "The prison line loses its count completely."
+        if cadence == 1:
+            return "The wardens are off-step and shouting to recover the rhythm."
+        if cadence == 2:
+            return "The adit answers unevenly, buying the captives room to move."
+        if cadence == 3:
+            return "Every corridor is still taking the Choir's measure."
+        if cadence == 4:
+            return "The wardens are dragging the whole line back into obedience."
+        return "The prison itself is marching with the Choir."
+
+    def _south_adit_award_route_rewards(self) -> None:
+        assert self.state is not None
+        outcome = str(self.state.flags.get("act2_captive_outcome", "uncertain"))
+        if outcome == "many_saved":
+            self.act2_award_milestone_gear(
+                "act2_south_adit_milestone_gear",
+                "choirward_amulet_rare",
+                source="the South Adit prisoner cache",
+            )
+            self.say(
+                "Wrapped in oilcloth at the back of the prisoner cache is a Starforged Choirward Amulet, worked so one clean refusal can carry a whole fight."
+            )
+            return
+        self.act2_award_milestone_gear(
+            "act2_south_adit_milestone_gear",
+            "choirward_amulet_uncommon",
+            source="the South Adit prisoner cache",
+        )
+        if not self.state.flags.get("act2_south_adit_counter_cadence_cache"):
+            if self.add_inventory_item("scroll_counter_cadence", source="Irielle's counter-cadence cache"):
+                self.state.flags["act2_south_adit_counter_cadence_cache"] = True
+        self.say(
+            "The cache yields an ash-kissed choirward charm and Irielle's Counter-Cadence Script, a one-use answer to the Choir's rhythm."
+        )
+
     def _south_adit_adit_mouth(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
         assert self.state is not None
         if not self.state.flags.get("act2_first_late_route"):
@@ -3408,6 +4229,52 @@ class MapSystemMixin:
                 )
         self.complete_act2_map_room(dungeon, room.room_id)
 
+    def _south_adit_irielle_route_choice(self) -> None:
+        assert self.state is not None
+        if self.state.flags.get("south_adit_irielle_plan") in {"break", "clean_exit"}:
+            return
+        elira = self.find_companion("Elira Dawnmantle")
+        elira_active = elira is not None and elira in self.state.companions
+        self.speaker(
+            "Irielle Ashwake",
+            "Before we move, answer one thing for me. Do you want a way to break the Choir, or a way to leave cleaner than you came in?",
+        )
+        if elira_active:
+            self.speaker(
+                "Elira Dawnmantle",
+                "Break the line if you have to. Just do not make the prisoners pay the price twice.",
+            )
+        choice = self.scenario_choice(
+            "What do you ask Irielle for before the prison line breaks?",
+            [
+                self.quoted_option("BREAK", "Give us the note that breaks the Choir's step."),
+                self.quoted_option("CLEAN", "Give us the way out that leaves fewer ghosts behind."),
+            ],
+            allow_meta=False,
+        )
+        if choice == 1:
+            self.player_speaker("Give us the note that breaks the Choir's step.")
+            self.state.flags["south_adit_irielle_plan"] = "break"
+            self.say(
+                'Irielle traces a single wrong beat into the air. "When the wardens answer together, hit that note and the whole line will stumble."'
+            )
+            if elira_active:
+                self.speaker(
+                    "Elira Dawnmantle",
+                    "Then keep the break on the wardens, not the people behind them.",
+                )
+        else:
+            self.player_speaker("Give us the way out that leaves fewer ghosts behind.")
+            self.state.flags["south_adit_irielle_plan"] = "clean_exit"
+            self.say(
+                'Irielle marks the quiet count the captives can follow without copying the Choir. "Keep them moving on this rhythm and the prison does not get to leave inside them."'
+            )
+            if elira_active:
+                self.speaker(
+                    "Elira Dawnmantle",
+                    "Good. A clean escape is still a kind of justice down here.",
+                )
+
     def _south_adit_recruit_irielle(self, *, delayed: bool) -> None:
         assert self.state is not None
         if self.has_companion("Irielle Ashwake"):
@@ -3466,6 +4333,7 @@ class MapSystemMixin:
             self.say("The counter-cadence catches. For the first time in the adit, the wall sounds like stone instead of a mouth.")
         else:
             self.say("Irielle still understands enough to move, but the cadence keeps some of its teeth.")
+        self._south_adit_irielle_route_choice()
         self._south_adit_recruit_irielle(delayed=delayed)
         self.complete_act2_map_room(dungeon, room.room_id)
 
@@ -3481,6 +4349,8 @@ class MapSystemMixin:
             enemies.append(self.act2_pick_enemy(("cult_lookout", "grimlock_tunneler", "starblighted_miner")))
 
         hero_bonus = self.apply_scene_companion_support("south_adit")
+        cadence = self._south_adit_prison_cadence(delayed=delayed)
+        irielle_plan = self.state.flags.get("south_adit_irielle_plan")
         if self.state.flags.get("elira_field_lantern"):
             hero_bonus += 1
             self.say("Elira's field lantern turns the adit's worst silence from sacred to merely ugly.")
@@ -3495,6 +4365,19 @@ class MapSystemMixin:
             hero_bonus += 1
         if self.state.flags.get("south_adit_counter_cadence_learned"):
             hero_bonus += 1
+        if self.state.flags.get("south_adit_warden_nerve_cracked"):
+            hero_bonus += 1
+        if irielle_plan == "break":
+            hero_bonus += 1
+            self.say("Irielle mouths the fracture note she promised, and the wardens answer half a step too late.")
+        elif irielle_plan == "clean_exit":
+            hero_bonus += 1
+            self.say("Irielle counts off the quiet lane for the captives, mapping where panic will try to copy the Choir and fail.")
+        self.state.flags["south_adit_prison_cadence_start"] = cadence
+        self.say(
+            f"Prison Cadence: {self._south_adit_prison_cadence_label(cadence)} ({cadence}/5). "
+            f"{self._south_adit_prison_cadence_summary(cadence)}"
+        )
 
         choice = self.scenario_choice(
             "How do you crack the prison line?",
@@ -3505,20 +4388,39 @@ class MapSystemMixin:
             ],
             allow_meta=False,
         )
+        success = False
         if choice == 1:
             self.player_action("Open the last cells quietly and arm the captives before the wardens know.")
-            if self.skill_check(self.state.player, "Sleight of Hand", 14, context="to free the first prisoners without raising the line"):
+            success = self.skill_check(self.state.player, "Sleight of Hand", 14, context="to free the first prisoners without raising the line")
+            if success:
                 hero_bonus += 2
                 self.apply_status(enemies[1], "surprised", 1, source="the cells opening behind them")
         elif choice == 2:
             self.player_action("Hit the wardens hard enough that the prisoners remember your side instead.")
-            if self.skill_check(self.state.player, "Intimidation", 14, context="to crack the adit's prison discipline"):
+            success = self.skill_check(self.state.player, "Intimidation", 14, context="to crack the adit's prison discipline")
+            if success:
                 hero_bonus += 1
         else:
             self.player_action("Go for the weakest captives first and keep the line from becoming a slaughter.")
-            if self.skill_check(self.state.player, "Medicine", 14, context="to keep the rescue from turning into a panic crush"):
+            success = self.skill_check(self.state.player, "Medicine", 14, context="to keep the rescue from turning into a panic crush")
+            if success:
                 hero_bonus += 1
                 self.apply_status(self.state.player, "blessed", 1, source="saving the vulnerable first")
+        cadence = max(0, min(5, cadence - 1 if success else cadence + 1))
+        self.state.flags["south_adit_prison_cadence_final"] = cadence
+        self.say(
+            f"Prison Cadence: {self._south_adit_prison_cadence_label(cadence)} ({cadence}/5). "
+            f"{self._south_adit_prison_cadence_summary(cadence)}"
+        )
+        if cadence >= 4:
+            for enemy in enemies:
+                self.apply_status(enemy, "emboldened", 2, source="the prison line catches the Choir's cadence")
+            self.say("The wardens fall back into the prison cadence together, and the whole line hits harder for it.")
+        elif cadence <= 1:
+            hero_bonus += 1
+            if len(enemies) > 1:
+                self.apply_status(enemies[1], "reeling", 1, source="Irielle's counter-cadence breaks the prison line")
+            self.say("The cadence breaks under your push, and the wardens have to improvise in a place built to punish it.")
 
         outcome = self.run_encounter(
             Encounter(
@@ -3539,9 +4441,23 @@ class MapSystemMixin:
             return
 
         self.complete_act2_map_room(dungeon, room.room_id)
-        if delayed:
+        if irielle_plan == "clean_exit":
+            self.act2_shift_metric(
+                "act2_whisper_pressure",
+                -1,
+                "Irielle's clean-exit count keeps the prison cadence from following the survivors out of the adit",
+            )
+        if cadence >= 4:
             self.state.flags["act2_captive_outcome"] = "few_saved"
-            self.say("You still free people, but too many cells are already empty for the party to pretend this delay was clean.")
+            self.say("The prison cadence snaps shut too often to clear every cell before the wardens regain the line.")
+        elif delayed:
+            self.state.flags["act2_captive_outcome"] = "few_saved"
+            if irielle_plan == "clean_exit":
+                self.say(
+                    "You still free people, but the delay leaves too many cells empty. Irielle's quiet count at least keeps the survivors from carrying the prison line back out with them."
+                )
+            else:
+                self.say("You still free people, but too many cells are already empty for the party to pretend this delay was clean.")
         else:
             self.state.flags["act2_captive_outcome"] = "many_saved"
             self.act2_shift_metric(
@@ -3551,11 +4467,7 @@ class MapSystemMixin:
             )
         self._south_adit_recruit_irielle(delayed=delayed)
         self.reward_party(xp=60, gold=18, reason="freeing the South Adit prisoners")
-        self.act2_award_milestone_gear(
-            "act2_south_adit_milestone_gear",
-            "choirward_amulet_uncommon",
-            source="the South Adit prisoner cache",
-        )
+        self._south_adit_award_route_rewards()
         self.return_to_act2_hub("The South Adit prison line breaks open behind you, and its survivors carry the first hard proof of the Choir back toward Phandalin.")
 
     def _wave_echo_rail_junction(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
@@ -3847,6 +4759,7 @@ class MapSystemMixin:
                 typed=True,
             )
             self.state.flags["black_lake_seen"] = True
+        self._black_lake_apply_south_adit_payoff()
         choice = self.scenario_choice(
             "What do you read first on the crossing?",
             [
@@ -3873,6 +4786,35 @@ class MapSystemMixin:
                 self.state.flags["black_lake_anchor_stress_read"] = True
                 self.reward_party(xp=10, reason="reading the causeway's anchor strain")
         self.complete_act2_map_room(dungeon, room.room_id)
+
+    def _black_lake_apply_south_adit_payoff(self) -> None:
+        assert self.state is not None
+        if self.state.flags.get("black_lake_south_adit_payoff_applied"):
+            return
+        outcome = str(self.state.flags.get("act2_captive_outcome", "uncertain"))
+        if outcome == "many_saved":
+            self.state.flags["black_lake_south_adit_payoff_applied"] = True
+            self.state.flags["black_lake_survivor_testimony"] = True
+            self.state.flags["black_lake_barracks_watch_read"] = True
+            self.say(
+                "One of the South Adit survivors halts at the crossing and names the barracks blind-side watch they were forced to count from below."
+            )
+            self.add_clue(
+                "A rescued South Adit witness identifies the Black Lake barracks blind-side watch and the messenger lane the Choir trusted most."
+            )
+            return
+        if outcome != "few_saved":
+            return
+        self.state.flags["black_lake_south_adit_payoff_applied"] = True
+        self.state.flags["black_lake_choir_reserve_intact"] = True
+        self.say(
+            "Too few captives escaped the adit soon enough to foul the Choir's reserve traffic. The Black Lake crossing feels more organized because of it."
+        )
+        self.act2_shift_metric(
+            "act2_whisper_pressure",
+            1,
+            "the Choir's South Adit reserve line reaches Black Lake before the survivors can break its rhythm",
+        )
 
     def _black_lake_drowned_shrine(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
         assert self.state is not None
@@ -3916,14 +4858,20 @@ class MapSystemMixin:
     def _black_lake_choir_barracks(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
         assert self.state is not None
         enemies = [create_enemy("cult_lookout"), create_enemy("choir_adept")]
+        if self.state.flags.get("black_lake_choir_reserve_intact"):
+            enemies.append(self.act2_pick_enemy(("cult_lookout", "starblighted_miner")))
         if self.act2_metric_value("act2_whisper_pressure") >= 4:
             enemies.append(self.act2_pick_enemy(("starblighted_miner", "obelisk_eye", "blacklake_pincerling")))
         elif len(self.state.party_members()) >= 4 or self.act2_metric_value("act2_route_control") <= 2:
             enemies.append(self.act2_pick_enemy(("starblighted_miner", "blacklake_pincerling", "cult_lookout")))
         hero_bonus = self.apply_scene_companion_support("black_lake_causeway")
+        if self.state.flags.get("black_lake_survivor_testimony"):
+            self.say("A rescued South Adit witness mouths the blind-side count as the barracks settles into it.")
         if self.state.flags.get("black_lake_barracks_watch_read"):
             hero_bonus += 1
             self.apply_status(enemies[0], "surprised", 1, source="you entered on the barracks blind side")
+        if self.state.flags.get("black_lake_choir_reserve_intact"):
+            self.say("The reserve line the captives could not break has already folded another body into the barracks.")
         options: list[tuple[str, str]] = [
             (
                 "stealth",

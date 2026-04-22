@@ -1763,6 +1763,8 @@ class GameBase:
                 member.gear_bonuses["damage"] = member.gear_bonuses.get("damage", 0) + item.damage_bonus
             if item.initiative_bonus:
                 member.gear_bonuses["initiative"] = member.gear_bonuses.get("initiative", 0) + item.initiative_bonus
+            if item.enchantment == "Quiet Mercy":
+                member.gear_bonuses["quiet_mercy"] = member.gear_bonuses.get("quiet_mercy", 0) + 1
             if item.spell_attack_bonus:
                 member.gear_bonuses["spell_attack"] = member.gear_bonuses.get("spell_attack", 0) + item.spell_attack_bonus
             if item.spell_damage_bonus:

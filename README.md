@@ -142,7 +142,13 @@ Core regression coverage:
 python -m pytest tests/test_core.py
 ```
 
-That suite now includes coverage for:
+Fast Act 2 content-smoke pass for active route iteration:
+
+```bash
+python -m pytest -m smoke
+```
+
+The core suite includes coverage for:
 
 - Act 1 map-state initialization
 - High Road post-ambush branch routing, side-branch cleanup, and backtrack history behavior
@@ -153,6 +159,12 @@ That suite now includes coverage for:
 - existing Act 1 scene flow compatibility
 - Act 2 local-map progression, route-order consequences, companion recruitment, pressure/digest UI, forge finale routing, and Act 3 handoff flags
 - MP creation, old-save reconciliation, combat menu costs, spell spending, insufficient-MP handling, short-rest recovery, warlock recovery, long-rest refill, and MP-restoring consumables
+
+The smoke layer is intentionally much smaller than `tests/test_core.py` and focuses on the live Act 2 route spine:
+
+- Act 2 start, claims council, and expedition hub progression
+- sabotage-night unlocks and first late-route warning
+- the playable Stonehollow, South Adit, Broken Prospect, Outer Galleries, Black Lake, and Forge route flows
 
 ## Reference docs
 

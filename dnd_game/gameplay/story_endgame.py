@@ -242,26 +242,6 @@ class StoryEndgameMixin:
         self.state.current_scene = "act1_complete"
         self.save_game(slot_name=f"{self.state.player.name}_act1_complete")
 
-    def scene_act1_complete(self) -> None:
-        assert self.state is not None
-        self.banner("Act I Complete")
-        self.say(
-            "Phandalin survives, your companions have names in town, and Act 1 ends with a clear path into a deeper "
-            "Forgotten Realms threat beneath the frontier. Acts 2 and 3 are scaffolded but not implemented yet.",
-            typed=True,
-        )
-        choice = self.choose(
-            "What next?",
-            [
-                "Review the party one last time",
-                "Return to the title screen",
-            ],
-            allow_meta=False,
-        )
-        if choice == 1:
-            self.show_party()
-        self.state = None
-
     def recruit_companion(self, companion: Character) -> None:
         assert self.state is not None
         if self.has_companion(companion.name):
