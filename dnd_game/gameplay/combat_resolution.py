@@ -1340,6 +1340,7 @@ class CombatResolutionMixin:
     def skill_check(self, actor, skill: str, dc: int, *, context: str) -> bool:
         dc = self.effective_skill_dc(dc, context=context)
         if self.always_fail_dice_checks_enabled() and self.is_party_member_actor(actor):
+            self.set_pending_scaled_check_reward(False)
             self.say(f"{self.style_name(actor)} automatically fails the {self.style_skill_label(skill)} check {context}.")
             self.say("")
             return False
@@ -1363,6 +1364,7 @@ class CombatResolutionMixin:
         play_sound_effect = getattr(self, "play_sound_effect", None)
         if callable(play_sound_effect):
             play_sound_effect("skill_success" if success else "skill_fail")
+        self.set_pending_scaled_check_reward(success and self.is_party_member_actor(actor))
         if not success:
             self.say("")
         return success

@@ -453,6 +453,9 @@ class GameIOMixin:
         show_hud: bool = True,
         sticky_trailing_options: int = 0,
     ) -> int:
+        clear_pending_scaled_check_reward = getattr(self, "clear_pending_scaled_check_reward", None)
+        if callable(clear_pending_scaled_check_reward):
+            clear_pending_scaled_check_reward()
         return self.choose_with_display_mode(
             prompt,
             options,

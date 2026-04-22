@@ -13,6 +13,7 @@ from dnd_game.content import (
     create_rhogar_valeguard,
     create_tolan_ironshield,
 )
+from dnd_game.drafts.map_system import ACT2_ENEMY_DRIVEN_MAP
 from dnd_game.game import Encounter, TextDnDGame
 from dnd_game.models import GameState
 from dnd_game.ui.colors import strip_ansi
@@ -145,6 +146,77 @@ class Act2SmokeTests(unittest.TestCase):
         self.assertIn("Trigger sabotage night", rendered)
         self.assertIn("Sabotage Night", rendered)
 
+    def test_neverwinter_wood_smoke_breaks_cover_with_survey_integrity_track(self) -> None:
+        log: list[str] = []
+        game, encounters = self.make_route_game(
+            seed=940031,
+            current_scene="neverwinter_wood_survey_camp",
+            output_lines=log,
+            flags={
+                "act2_started": True,
+                "act2_town_stability": 3,
+                "act2_route_control": 2,
+                "act2_whisper_pressure": 2,
+            },
+        )
+
+        def fake_scenario_choice(prompt: str, options: list[str], **kwargs) -> int:
+            if prompt == "How do you break the sabotage line?":
+                return self.option_index_containing(options, "keep the witnesses alive")
+            return 1
+
+        game.scenario_choice = fake_scenario_choice  # type: ignore[method-assign]
+        game.scene_neverwinter_wood_survey_camp()
+
+        assert game.state is not None
+        rendered = self.plain_output(log)
+        self.assertEqual(game.state.current_scene, "act2_expedition_hub")
+        self.assertTrue(game.state.flags["woodland_survey_cleared"])
+        self.assertTrue(game.state.flags["woodland_living_witnesses_secured"])
+        self.assertTrue(game.state.flags["woodland_sabotage_cover_broken"])
+        self.assertEqual(game.state.flags["woodland_survey_integrity"], 3)
+        self.assertEqual(game.state.flags["woodland_sabotage_cover"], 0)
+        self.assertIn("Survey Integrity", rendered)
+        self.assertIn("Sabotage Cover", rendered)
+        self.assertEqual([encounter.title for encounter in encounters], ["Woodland Saboteurs"])
+
+    def test_neverwinter_wood_delayed_route_salvages_living_witnesses_without_blocking_progress(self) -> None:
+        log: list[str] = []
+        game, encounters = self.make_route_game(
+            seed=940032,
+            current_scene="neverwinter_wood_survey_camp",
+            output_lines=log,
+            flags={
+                "act2_started": True,
+                "phandalin_sabotage_resolved": True,
+                "act2_neglected_lead": "woodland_survey_cleared",
+                "act2_town_stability": 2,
+                "act2_route_control": 2,
+                "act2_whisper_pressure": 3,
+            },
+        )
+
+        def fake_scenario_choice(prompt: str, options: list[str], **kwargs) -> int:
+            if prompt == "How do you break the sabotage line?":
+                return self.option_index_containing(options, "hidden fallback trail")
+            return 1
+
+        game.scenario_choice = fake_scenario_choice  # type: ignore[method-assign]
+        game.scene_neverwinter_wood_survey_camp()
+
+        assert game.state is not None
+        rendered = self.plain_output(log)
+        self.assertEqual(game.state.current_scene, "act2_expedition_hub")
+        self.assertTrue(game.state.flags["woodland_survey_cleared"])
+        self.assertTrue(game.state.flags["woodland_false_routework_exposed"])
+        self.assertTrue(game.state.flags["woodland_living_witnesses_secured"])
+        self.assertEqual(game.state.flags["woodland_survey_integrity"], 3)
+        self.assertEqual(game.state.flags["woodland_sabotage_cover"], 2)
+        self.assertEqual(game.state.flags["act2_route_control"], 3)
+        self.assertEqual(game.state.flags["act2_town_stability"], 3)
+        self.assertIn("corrective, not preventative", rendered)
+        self.assertGreaterEqual(len(encounters[0].enemies), 3)
+
     def test_stonehollow_dig_smoke_route_reaches_hub(self) -> None:
         game, encounters = self.make_route_game(
             seed=94004,
@@ -170,6 +242,43 @@ class Act2SmokeTests(unittest.TestCase):
         self.assertTrue(game.state.flags["stonehollow_dig_cleared"])
         self.assertTrue(game.state.flags["stonehollow_scholars_found"])
         self.assertEqual([encounter.title for encounter in encounters], ["Stonehollow Slime Cut", "Stonehollow Breakout"])
+
+    def test_stonehollow_delayed_route_salvages_scholars_without_blocking_progress(self) -> None:
+        log: list[str] = []
+        game, encounters = self.make_route_game(
+            seed=940042,
+            current_scene="stonehollow_dig",
+            output_lines=log,
+            flags={
+                "act2_started": True,
+                "phandalin_sabotage_resolved": True,
+                "act2_neglected_lead": "stonehollow_dig_cleared",
+                "act2_town_stability": 2,
+                "act2_route_control": 2,
+                "act2_whisper_pressure": 3,
+            },
+        )
+
+        def fake_scenario_choice(prompt: str, options: list[str], **kwargs) -> int:
+            if prompt == "What do you do from Slime Cut?":
+                return self.option_index_containing(options, "Scholar Pocket")
+            return 1
+
+        game.scenario_choice = fake_scenario_choice  # type: ignore[method-assign]
+        game.scene_stonehollow_dig()
+
+        assert game.state is not None
+        rendered = self.plain_output(log)
+        nim = game.find_companion("Nim Ardentglass")
+        self.assertEqual(game.state.current_scene, "act2_expedition_hub")
+        self.assertTrue(game.state.flags["stonehollow_dig_cleared"])
+        self.assertTrue(game.state.flags["stonehollow_scholars_found"])
+        self.assertEqual(game.state.flags["act2_route_control"], 3)
+        self.assertIn("Coming here late means", rendered)
+        self.assertIsNotNone(nim)
+        self.assertEqual(nim.disposition, -1)
+        self.assertEqual([encounter.title for encounter in encounters], ["Stonehollow Slime Cut", "Stonehollow Breakout"])
+        self.assertGreaterEqual(len(encounters[-1].enemies), 2)
 
     def test_glasswater_intake_smoke_route_reaches_hub(self) -> None:
         game, encounters = self.make_route_game(
@@ -246,6 +355,111 @@ class Act2SmokeTests(unittest.TestCase):
         self.assertEqual(game.state.flags["conyberry_warning_exit_choice"], "public")
         self.assertTrue(game.state.flags["agatha_truth_secured"])
         self.assertTrue(game.state.flags["agatha_truth_clear"])
+
+    def test_conyberry_agatha_delayed_smoke_route_reaches_hub_with_bruised_warning(self) -> None:
+        game = self.make_game(
+            seed=940043,
+            current_scene="conyberry_agatha",
+            flags={
+                "act2_started": True,
+                "phandalin_sabotage_resolved": True,
+                "act2_neglected_lead": "agatha_truth_secured",
+                "agatha_circuit_defiled": True,
+                "act2_town_stability": 3,
+                "act2_route_control": 2,
+                "act2_whisper_pressure": 2,
+            },
+        )
+        game.skill_check = lambda actor, skill, dc, context: True  # type: ignore[method-assign]
+
+        def fake_scenario_choice(prompt: str, options: list[str], **kwargs) -> int:
+            if prompt == "How do you answer the frightened road before the circuit answers it for you?":
+                return self.option_index_containing(options, "Follow the one story")
+            if prompt == "How do you read the waymarker cairn before the circuit closes around it?":
+                return self.option_index_containing(options, "tampered line first")
+            if prompt == "What do you do with the defiled sigil?":
+                return self.option_index_containing(options, "Break the sigil")
+            if prompt == "Which second part of the circuit do you answer before Agatha speaks?":
+                return self.option_index_containing(options, "Chapel of Lamps")
+            if prompt == "How do you answer the Chapel of Lamps?":
+                return self.option_index_containing(options, "Relight the chapel")
+            if prompt == "How do you approach the banshee's truth?":
+                return self.option_index_containing(options, "what vow was broken")
+            if prompt == "How do you carry Agatha's warning out of Conyberry?":
+                return self.option_index_containing(options, "Bind the warning")
+            raise AssertionError(f"Unexpected prompt: {prompt!r}")
+
+        game.scenario_choice = fake_scenario_choice  # type: ignore[method-assign]
+        game.scene_conyberry_agatha()
+
+        assert game.state is not None
+        self.assertEqual(game.state.current_scene, "act2_expedition_hub")
+        self.assertTrue(game.state.flags["agatha_truth_secured"])
+        self.assertFalse(game.state.flags["agatha_truth_clear"])
+        self.assertTrue(game.state.flags["agatha_warning_bound"])
+        self.assertEqual(game.state.flags["conyberry_second_site"], "chapel")
+
+    def test_conyberry_route_consequences_smoke_carries_from_sabotage_to_black_lake(self) -> None:
+        log: list[str] = []
+        encounters: list[Encounter] = []
+        game = self.make_game(
+            seed=940044,
+            current_scene="conyberry_agatha",
+            output_lines=log,
+            flags={
+                "act2_started": True,
+                "woodland_survey_cleared": True,
+                "stonehollow_dig_cleared": True,
+                "act2_town_stability": 3,
+                "act2_route_control": 3,
+                "act2_whisper_pressure": 3,
+            },
+        )
+        game.skill_check = lambda actor, skill, dc, context: True  # type: ignore[method-assign]
+        game.run_encounter = lambda encounter: encounters.append(encounter) or "victory"  # type: ignore[method-assign]
+
+        def fake_scenario_choice(prompt: str, options: list[str], **kwargs) -> int:
+            if prompt == "How do you answer the frightened road before the circuit answers it for you?":
+                return self.option_index_containing(options, "Steady the whole group")
+            if prompt == "How do you read the waymarker cairn before the circuit closes around it?":
+                return self.option_index_containing(options, "chapel line first")
+            if prompt == "How do you answer the Chapel of Lamps?":
+                return self.option_index_containing(options, "Relight the chapel")
+            if prompt == "Which second part of the circuit do you answer before Agatha speaks?":
+                return self.option_index_containing(options, "Grave Ring")
+            if prompt == "How do you read the Grave Ring?":
+                return self.option_index_containing(options, "Name the dead aloud")
+            if prompt == "How do you approach the banshee's truth?":
+                return self.option_index_containing(options, "We are not here to plunder your dead")
+            if prompt == "How do you carry Agatha's warning out of Conyberry?":
+                return self.option_index_containing(options, "Share it publicly")
+            if prompt == "What do you protect first when the sabotage breaks wide open?":
+                return self.option_index_containing(options, "shrine lane")
+            if prompt == "What do you read first on the crossing?":
+                return self.option_index_containing(options, "Test the anchor pull")
+            return 1
+
+        game.scenario_choice = fake_scenario_choice  # type: ignore[method-assign]
+        game.scene_conyberry_agatha()
+        game.state.current_scene = "act2_midpoint_convergence"
+        game.scene_act2_midpoint_convergence()
+        game.state.flags["wave_echo_outer_cleared"] = True
+        game.state.current_scene = "black_lake_causeway"
+        dungeon = ACT2_ENEMY_DRIVEN_MAP.dungeons["black_lake_crossing"]
+        game._black_lake_causeway_lip(dungeon, dungeon.rooms["causeway_lip"])
+
+        assert game.state is not None
+        rendered = self.plain_output(log)
+        self.assertTrue(game.state.flags["conyberry_chapel_relit"])
+        self.assertTrue(game.state.flags["conyberry_chapel_sabotage_payoff"])
+        self.assertTrue(game.state.flags["black_lake_conyberry_lamp_guidance"])
+        self.assertTrue(game.state.flags["black_lake_shrine_route_marked"])
+        self.assertTrue(game.state.flags["conyberry_chapel_pressure_payoff_applied"])
+        self.assertNotIn("black_lake_conyberry_pressure_payoff", game.state.flags)
+        self.assertEqual(game.state.flags["act2_whisper_pressure"], 0)
+        self.assertEqual(encounters[0].title, "Midpoint: Sabotage Night")
+        self.assertIn("Pilgrims from Conyberry arrive with lamp discipline", rendered)
+        self.assertIn("The lamp discipline you restored at Conyberry catches at the Black Lake shrine", rendered)
 
     def test_midpoint_convergence_smoke_records_pattern_and_returns_to_hub(self) -> None:
         game = self.make_game(

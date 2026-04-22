@@ -286,6 +286,7 @@ class GameBase:
         self._compact_hud_last_scene_key: tuple[int, str] | None = None
         self._compact_hud_requested = False
         self._latest_narration_lines: list[str] = []
+        self._pending_scaled_check_reward = False
         self._pending_act1_dungeon_map_refresh = False
         self._pending_act1_dungeon_movement_text = ""
         self._pending_act2_dungeon_map_refresh = False

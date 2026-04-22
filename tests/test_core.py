@@ -4867,6 +4867,75 @@ class CoreTests(unittest.TestCase):
         self.assertIn("The clever part is not the sigil. It is making the damage look like nobody practical could have been involved.", rendered)
         self.assertIn("You brought me theft with your reverence and expect me to separate the two.", rendered)
 
+    def test_conyberry_delayed_route_salvages_bruised_warning_without_blocking_progress(self) -> None:
+        player = build_character(
+            name="Vale",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        log: list[str] = []
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(900864221))
+        game.state = GameState(
+            player=player,
+            companions=[create_elira_dawnmantle()],
+            current_act=2,
+            current_scene="conyberry_agatha",
+            flags={
+                "act2_started": True,
+                "phandalin_sabotage_resolved": True,
+                "act2_neglected_lead": "agatha_truth_secured",
+                "agatha_circuit_defiled": True,
+                "act2_town_stability": 3,
+                "act2_route_control": 2,
+                "act2_whisper_pressure": 2,
+            },
+        )
+        game.skill_check = lambda actor, skill, dc, context: True  # type: ignore[method-assign]
+
+        def fake_scenario_choice(prompt: str, options: list[str], **kwargs) -> int:
+            if prompt == "How do you answer the frightened road before the circuit answers it for you?":
+                return self.option_index_containing(options, "Follow the one story")
+            if prompt == "How do you read the waymarker cairn before the circuit closes around it?":
+                return self.option_index_containing(options, "tampered line first")
+            if prompt == "What do you do with the defiled sigil?":
+                return self.option_index_containing(options, "Break the sigil")
+            if prompt == "Which second part of the circuit do you answer before Agatha speaks?":
+                return self.option_index_containing(options, "Chapel of Lamps")
+            if prompt == "How do you answer the Chapel of Lamps?":
+                return self.option_index_containing(options, "Relight the chapel")
+            if prompt == "How do you approach the banshee's truth?":
+                return self.option_index_containing(options, "what vow was broken")
+            if prompt == "How do you carry Agatha's warning out of Conyberry?":
+                return self.option_index_containing(options, "Bind the warning")
+            raise AssertionError(f"Unexpected prompt: {prompt!r}")
+
+        game.scenario_choice = fake_scenario_choice  # type: ignore[method-assign]
+        game.scene_conyberry_agatha()
+
+        assert game.state is not None
+        rendered = strip_ansi("\n".join(log))
+        self.assertEqual(game.state.current_scene, "act2_expedition_hub")
+        self.assertTrue(game.state.flags["agatha_truth_secured"])
+        self.assertFalse(game.state.flags["agatha_truth_clear"])
+        self.assertTrue(game.state.flags["agatha_pact_restraint_known"])
+        self.assertTrue(game.state.flags["agatha_warning_bound"])
+        self.assertEqual(game.state.flags["conyberry_first_site"], "sigil")
+        self.assertEqual(game.state.flags["conyberry_second_site"], "chapel")
+        self.assertTrue(game.state.flags["conyberry_sigil_broken"])
+        self.assertTrue(game.state.flags["conyberry_chapel_relit"])
+        self.assertEqual(game.state.flags["act2_route_control"], 3)
+        self.assertEqual(game.state.flags["act2_whisper_pressure"], 2)
+        self.assertEqual(game.state.xp, 45)
+        self.assertIn("They touched the circuit before you did. That is why I sound smaller than the truth.", rendered)
+        self.assertIn("Agatha still answers, but the warning reaches you through bruised magic", rendered)
+        self.assertIn(
+            "Even damaged, Agatha confirms the southern adit matters and the Forge is being tuned into something that listens back.",
+            game.state.clues,
+        )
+
     def test_conyberry_relit_chapel_reduces_sabotage_night_pressure_once(self) -> None:
         player = build_character(
             name="Vale",
@@ -6081,20 +6150,38 @@ class CoreTests(unittest.TestCase):
             output_fn=lambda _: None,
             save_dir=save_dir,
             rng=random.Random(3031),
+            pace_output=False,
         )
         game.autosaves_enabled = True
         game.state = GameState(player=player, current_scene="road_ambush")
+        game.reward_party = lambda **kwargs: None  # type: ignore[method-assign]
+        game.collect_loot = lambda enemies, source: None  # type: ignore[method-assign]
+        game.recover_after_battle = lambda: None  # type: ignore[method-assign]
+        game.pause_for_combat_transition = lambda: None  # type: ignore[method-assign]
+        game.play_sound_effect = lambda *args, **kwargs: None  # type: ignore[method-assign]
+        game.roll_initiative = lambda heroes, enemies, **kwargs: []  # type: ignore[method-assign]
+
+        def fast_save_game(*, slot_name: str) -> Path:
+            path = game.save_dir / f"{slot_name}.json"
+            path.write_text("{}", encoding="utf-8")
+            return path
+
+        game.save_game = fast_save_game  # type: ignore[method-assign]
 
         try:
             for index in range(17):
                 enemy = create_enemy("goblin_skirmisher")
                 enemy.dead = True
                 enemy.current_hp = 0
+                enemy.xp_value = 0
+                enemy.gold_value = 0
+                enemy.archetype = ""
                 outcome = game.run_encounter(
                     Encounter(
                         title=f"Spent Ambush {index}",
                         description="The danger is already over.",
                         enemies=[enemy],
+                        allow_post_combat_random_encounter=False,
                     )
                 )
                 self.assertEqual(outcome, "victory")
@@ -7698,7 +7785,7 @@ class CoreTests(unittest.TestCase):
         game.scene_neverwinter_briefing()
         rendered = self.plain_output(log)
         self.assertIn("better story and a sharper tongue", rendered)
-        self.assertIn("Reward gained for Bard identity choice: 10 XP, 6 gp.", rendered)
+        self.assertIn("Reward gained for Bard identity choice: 20 XP, 6 gp.", rendered)
 
     def test_neverwinter_briefing_routes_response_menu_through_keyboard_choice_menu(self) -> None:
         player = build_character(
@@ -8463,6 +8550,47 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(game.state.player.level, 2)
         self.assertIn("action_surge", game.state.player.features)
         self.assertEqual(game.state.player.resources.get("action_surge"), 1)
+
+    def test_scaled_check_reward_xp_uses_party_level_floor(self) -> None:
+        player = build_character(
+            name="Velkor",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(1401))
+        game.state = GameState(player=player, current_scene="phandalin_hub", xp=0)
+        self.assertEqual(game.scaled_check_reward_xp(), 20)
+
+        player.level = 3
+        game.state.xp = 900
+        self.assertEqual(game.scaled_check_reward_xp(), 60)
+
+        player.level = 4
+        game.state.xp = 2700
+        self.assertEqual(game.scaled_check_reward_xp(), 80)
+
+    def test_successful_skill_check_scales_only_the_next_xp_reward(self) -> None:
+        player = build_character(
+            name="Velkor",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(1402))
+        game.state = GameState(player=player, current_scene="phandalin_hub")
+        game.roll_check_d20 = lambda *args, **kwargs: SimpleNamespace(kept=17)  # type: ignore[method-assign]
+
+        self.assertTrue(game.skill_check(player, "Athletics", 10, context="to test scaled rewards"))
+        game.reward_party(xp=10, reason="scaled skill reward")
+        self.assertEqual(game.state.xp, 20)
+
+        game.reward_party(xp=10, reason="fixed follow-up reward")
+        self.assertEqual(game.state.xp, 30)
 
     def test_combat_options_only_tag_skill_check_actions(self) -> None:
         player = build_character(

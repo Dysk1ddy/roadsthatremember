@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from .gameplay.base import GameBase, GameInterrupted
 from .gameplay.camp import CampMixin
-from .gameplay.act2 import StoryAct2CouncilMixin
+from .gameplay.act2 import StoryAct2ConyberryMixin, StoryAct2CouncilMixin, StoryAct2WoodSurveyMixin
 from .gameplay.combat_flow import CombatFlowMixin
 from .gameplay.combat_resolution import CombatResolutionMixin
 from .gameplay.companions import CompanionSystemMixin
@@ -39,6 +39,8 @@ class TextDnDGame(
     MapSystemMixin,
     StoryAct1ExpandedMixin,
     StoryAct2CouncilMixin,
+    StoryAct2ConyberryMixin,
+    StoryAct2WoodSurveyMixin,
     StoryAct2ScaffoldMixin,
     StoryAct3ScaffoldMixin,
     StoryEndgameMixin,

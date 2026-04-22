@@ -27,6 +27,7 @@ class CombatFlowMixin:
 
     def run_encounter(self, encounter: Encounter) -> str:
         assert self.state is not None
+        self.clear_pending_scaled_check_reward()
         previous_active_encounter = getattr(self, "_active_encounter", None)
         previous_active_heroes = getattr(self, "_active_combat_heroes", None)
         previous_active_enemies = getattr(self, "_active_combat_enemies", None)
@@ -254,6 +255,7 @@ class CombatFlowMixin:
 
     def resolve_encounter_victory(self, encounter: Encounter, enemies: list[Character]) -> str:
         assert self.state is not None
+        self.clear_pending_scaled_check_reward()
         total_xp = sum(enemy.xp_value for enemy in enemies)
         total_gold = sum(enemy.gold_value for enemy in enemies)
         if total_xp or total_gold:

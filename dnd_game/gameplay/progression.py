@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+
 from ..content import CLASS_LEVEL_PROGRESSION, CLASSES
 from .magic_points import synchronize_magic_points
 from .spell_slots import synchronize_spell_slots
@@ -18,6 +20,19 @@ class ProgressionMixin:
             return None
         return LEVEL_XP_THRESHOLDS.get(self.state.player.level + 1)
 
+    def current_level_floor(self) -> int:
+        if self.state is None:
+            return 0
+        return LEVEL_XP_THRESHOLDS.get(self.state.player.level, 0)
+
+    def max_xp_to_next_level(self) -> int | None:
+        if self.state is None:
+            return None
+        target = self.current_level_target()
+        if target is None:
+            return None
+        return max(0, target - self.current_level_floor())
+
     def xp_to_next_level(self) -> int | None:
         if self.state is None:
             return None
@@ -33,6 +48,21 @@ class ProgressionMixin:
         if target is None:
             return f"Party XP: {self.state.xp} (maximum implemented level reached)"
         return f"Party XP: {self.state.xp} | Next level in {max(0, target - self.state.xp)} XP"
+
+    def scaled_check_reward_xp(self) -> int:
+        if self.state is None:
+            return 0
+        per_level_floor = 20 * max(1, self.state.player.level)
+        band_xp = self.max_xp_to_next_level()
+        if band_xp is None:
+            return per_level_floor
+        return max(per_level_floor, math.ceil(band_xp * 0.025))
+
+    def clear_pending_scaled_check_reward(self) -> None:
+        self._pending_scaled_check_reward = False
+
+    def set_pending_scaled_check_reward(self, enabled: bool) -> None:
+        self._pending_scaled_check_reward = bool(enabled)
 
     def apply_class_level_features(self, actor: Character, level: int, *, announce: bool) -> list[str]:
         progression = CLASS_LEVEL_PROGRESSION.get(actor.class_name, {}).get(level)
@@ -59,6 +89,10 @@ class ProgressionMixin:
     def reward_party(self, *, xp: int = 0, gold: int = 0, reason: str) -> None:
         assert self.state is not None
         gained_parts: list[str] = []
+        use_scaled_check_reward = bool(xp and getattr(self, "_pending_scaled_check_reward", False))
+        if use_scaled_check_reward:
+            xp = self.scaled_check_reward_xp()
+        self.clear_pending_scaled_check_reward()
         if xp:
             self.state.xp += xp
             gained_parts.append(f"{xp} XP")
