@@ -1,5 +1,7 @@
 # Embers Before the Road: Repo-Specific Implementation Checklist
 
+> Cleanup note: The implemented Act 1 Blackwake dialogue options from this checklist are now compiled in `ACT1_DIALOGUE_REFERENCE.md`. Keep this file as historical implementation context; update the compiled reference for current Act 1 dialogue behavior.
+
 This checklist maps the Blackwake Crossing branch onto the current codebase. The existing Act 1 flow is a Python text RPG with scene handlers, a draft-backed route map, room-grid site logic, quest definitions, enemy factories, and companion profiles.
 
 ## Current Status

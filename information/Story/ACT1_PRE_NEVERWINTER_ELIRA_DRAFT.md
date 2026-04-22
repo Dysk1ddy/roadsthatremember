@@ -1,5 +1,7 @@
 # Act 1 Pre-Neverwinter And Elira First Companion Draft
 
+> Cleanup note: The implemented Act 1 dialogue options from this draft are now compiled in `ACT1_DIALOGUE_REFERENCE.md`. Keep this file as historical design context; update the compiled reference for current Act 1 dialogue behavior.
+
 This draft adds one or two shared Act 1 locations between the background prologue and Mira Thann's Neverwinter briefing.
 
 Primary goal:

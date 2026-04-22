@@ -195,19 +195,20 @@ class GameIOMixin:
             return False
         live_render = getattr(live, "_live_render", None)
         previous_shape = getattr(live_render, "_shape", None)
-        if live_render is not None and previous_shape is not None and next_width < current_width:
+        if live_render is not None and previous_shape is not None:
             previous_width, previous_height = previous_shape
-            previous_width = max(1, int(max(previous_width, current_width)))
+            previous_width = max(1, int(max(previous_width, current_width, next_width)))
             previous_height = max(1, int(previous_height))
-            reflow_factor = max(1, (previous_width + max(1, next_width) - 1) // max(1, next_width))
+            narrow_width = max(1, min(current_width, next_width))
+            reflow_factor = max(1, (previous_width + narrow_width - 1) // narrow_width)
             live_render._shape = (max(1, next_width), previous_height * reflow_factor)
         console.width = next_width
-        live.update(renderable_factory(), refresh=True)
         return True
 
     def read_keyboard_choice_key_with_resize_poll(self, live, console, renderable_factory, width_factory) -> tuple[str, str | None]:
         while True:
-            self.refresh_keyboard_choice_live_if_resized(live, console, renderable_factory, width_factory)
+            if self.refresh_keyboard_choice_live_if_resized(live, console, renderable_factory, width_factory):
+                return ("resize", None)
             if self.keyboard_choice_key_ready():
                 return self.read_keyboard_choice_key()
             time.sleep(float(getattr(self, "_keyboard_choice_resize_poll_seconds", 0.05)))
@@ -260,77 +261,81 @@ class GameIOMixin:
         typed = "On" if getattr(self, "_typed_dialogue_preference", getattr(self, "type_dialogue", False)) else "Off"
         return f"Animations {presentation} | Dice {dice_mode_label} | Typed text {typed}"
 
-    def render_title_screen(
+    def title_screen_campaign_summary(self) -> str:
+        return "Acts I and II are playable now, with later acts scaffolded for expansion."
+
+    def build_title_screen_header_panel(self, title: str, subtitle: str, intro_text: str):
+        header = Text(justify="center")
+        header.append(f"{title}\n", style="bold bright_yellow")
+        header.append(f"{subtitle}\n", style="bold bright_cyan")
+        header.append("Frontier roads. Hard bargains. Consequences that travel.\n", style="white")
+        header.append(intro_text, style="dim")
+        return Panel(
+            header,
+            border_style=rich_style_name("light_yellow"),
+            box=box.DOUBLE,
+            padding=(1, 2),
+            title=self.rich_text("Roads That Remember", "light_yellow", bold=True),
+        )
+
+    def build_title_screen_status_panel(
         self,
+        *,
+        campaign_summary: str,
+        save_summary: str,
+        save_detail: str,
+    ):
+        status_table = Table.grid(expand=True, padding=(0, 1))
+        status_table.add_column(style="bold bright_yellow", ratio=1)
+        status_table.add_column(ratio=3)
+        status_table.add_row("Campaign", campaign_summary)
+        status_table.add_row("Saves", save_summary)
+        status_table.add_row("", save_detail)
+        status_table.add_row("Audio", self.title_screen_audio_summary())
+        status_table.add_row("Presentation", self.title_screen_presentation_summary())
+        return Panel(
+            status_table,
+            title=self.rich_text("Campaign Ledger", "light_aqua", bold=True),
+            border_style=rich_style_name("light_aqua"),
+            box=box.ROUNDED,
+            padding=(0, 1),
+        )
+
+    def build_title_screen_options_panel(
+        self,
+        options: list[str],
+        option_details: dict[str, str],
+    ):
+        options_table = Table.grid(expand=True, padding=(0, 1))
+        options_table.add_column(style="bold bright_yellow", width=3)
+        options_table.add_column(style="bold")
+        options_table.add_column(style="dim", ratio=1)
+        for index, option in enumerate(options, start=1):
+            options_table.add_row(f"{index}.", strip_ansi(option), option_details.get(option, ""))
+        return Panel(
+            options_table,
+            title=self.rich_text("What Would You Like To Do?", "light_green", bold=True),
+            border_style=rich_style_name("light_green"),
+            box=box.ROUNDED,
+            padding=(0, 1),
+        )
+
+    def build_title_screen_menu_body(self, status_panel, options_panel, *, render_width: int):
+        if render_width >= 108:
+            return Columns([status_panel, options_panel], expand=True, equal=False)
+        return Group(status_panel, options_panel)
+
+    def render_title_screen_plain(
+        self,
+        *,
         title: str,
         subtitle: str,
         intro_text: str,
         options: list[str],
-        option_details: dict[str, str] | None = None,
+        campaign_summary: str,
+        save_summary: str,
+        save_detail: str,
     ) -> None:
-        option_details = option_details or {}
-        self.output_fn("")
-        save_summary, save_detail = self.title_screen_save_summary()
-        campaign_summary = "Acts I and II are playable now, with later acts scaffolded for expansion."
-
-        if self.rich_title_screen_enabled():
-            header = Text(justify="center")
-            header.append(f"{title}\n", style="bold bright_yellow")
-            header.append(f"{subtitle}\n", style="bold bright_cyan")
-            header.append("Frontier roads. Hard bargains. Consequences that travel.\n", style="white")
-            header.append(intro_text, style="dim")
-
-            status_table = Table.grid(expand=True, padding=(0, 1))
-            status_table.add_column(style="bold bright_yellow", ratio=1)
-            status_table.add_column(ratio=3)
-            status_table.add_row("Campaign", campaign_summary)
-            status_table.add_row("Saves", save_summary)
-            status_table.add_row("", save_detail)
-            status_table.add_row("Audio", self.title_screen_audio_summary())
-            status_table.add_row("Presentation", self.title_screen_presentation_summary())
-
-            options_table = Table.grid(expand=True, padding=(0, 1))
-            options_table.add_column(style="bold bright_yellow", width=3)
-            options_table.add_column(style="bold")
-            options_table.add_column(style="dim", ratio=1)
-            for index, option in enumerate(options, start=1):
-                options_table.add_row(f"{index}.", strip_ansi(option), option_details.get(option, ""))
-
-            rendered = self.emit_rich(
-                Group(
-                    Panel(
-                        header,
-                        border_style=rich_style_name("light_yellow"),
-                        box=box.DOUBLE,
-                        padding=(1, 2),
-                        title=self.rich_text("Roads That Remember", "light_yellow", bold=True),
-                    ),
-                    Columns(
-                        [
-                            Panel(
-                                status_table,
-                                title=self.rich_text("Campaign Ledger", "light_aqua", bold=True),
-                                border_style=rich_style_name("light_aqua"),
-                                box=box.ROUNDED,
-                                padding=(0, 1),
-                            ),
-                            Panel(
-                                options_table,
-                                title=self.rich_text("What Would You Like To Do?", "light_green", bold=True),
-                                border_style=rich_style_name("light_green"),
-                                box=box.ROUNDED,
-                                padding=(0, 1),
-                            ),
-                        ],
-                        expand=True,
-                        equal=False,
-                    ),
-                ),
-                width=max(108, self.rich_console_width()),
-            )
-            if rendered:
-                return
-
         self.output_fn(f"=== {title} ===")
         self.output_fn(subtitle)
         self.say("Frontier roads. Hard bargains. Consequences that travel.")
@@ -344,6 +349,49 @@ class GameIOMixin:
         self.say("What would you like to do?")
         self.render_choice_options(options, staggered=False)
 
+    def render_title_screen(
+        self,
+        title: str,
+        subtitle: str,
+        intro_text: str,
+        options: list[str],
+        option_details: dict[str, str] | None = None,
+    ) -> None:
+        option_details = option_details or {}
+        self.output_fn("")
+        save_summary, save_detail = self.title_screen_save_summary()
+        campaign_summary = self.title_screen_campaign_summary()
+
+        if self.rich_title_screen_enabled():
+            render_width = self.safe_rich_render_width()
+            rendered = self.emit_rich(
+                Group(
+                    self.build_title_screen_header_panel(title, subtitle, intro_text),
+                    self.build_title_screen_menu_body(
+                        self.build_title_screen_status_panel(
+                            campaign_summary=campaign_summary,
+                            save_summary=save_summary,
+                            save_detail=save_detail,
+                        ),
+                        self.build_title_screen_options_panel(options, option_details),
+                        render_width=render_width,
+                    ),
+                ),
+                width=render_width,
+            )
+            if rendered:
+                return
+
+        self.render_title_screen_plain(
+            title=title,
+            subtitle=subtitle,
+            intro_text=intro_text,
+            options=options,
+            campaign_summary=campaign_summary,
+            save_summary=save_summary,
+            save_detail=save_detail,
+        )
+
     def choose_title_menu(
         self,
         title: str,
@@ -354,8 +402,10 @@ class GameIOMixin:
         option_details: dict[str, str] | None = None,
     ) -> int:
         while True:
-            self.render_title_screen(title, subtitle, intro_text, options, option_details)
-            raw = self.read_input("> ").strip()
+            raw = self.read_resize_aware_input(
+                lambda: self.render_title_screen(title, subtitle, intro_text, options, option_details),
+                prompt="> ",
+            ).strip()
             lowered = raw.lower()
             if lowered == "quit":
                 if self.confirm("Quit the program and close the main menu?"):
@@ -426,6 +476,66 @@ class GameIOMixin:
 
     def should_use_keyboard_choice_menu(self) -> bool:
         return self.keyboard_choice_menu_supported()
+
+    def resize_aware_input_supported(self) -> bool:
+        return bool(getattr(self, "_interactive_output", False) and msvcrt is not None)
+
+    def clear_interactive_screen(self, *, clear_scrollback: bool = False) -> None:
+        if self.output_fn is print:
+            scrollback_sequence = "\x1b[3J" if clear_scrollback else ""
+            print(f"\x1b[2J{scrollback_sequence}\x1b[H", end="", flush=True)
+
+    def output_interactive_prompt(self, prompt: str) -> None:
+        if self.output_fn is print:
+            print(prompt, end="", flush=True)
+        else:
+            self.output_fn(prompt)
+
+    def read_resize_aware_input(self, render_screen, *, prompt: str = "> ") -> str:
+        if not self.resize_aware_input_supported():
+            render_screen()
+            return self.read_input(prompt)
+
+        typed_buffer = ""
+        last_width = self.safe_rich_render_width()
+        pending_width: int | None = None
+        pending_render_at: float | None = None
+        debounce_seconds = max(0.0, float(getattr(self, "_resize_aware_input_debounce_seconds", 0.08)))
+
+        def render(*, clear: bool, clear_scrollback: bool = False) -> None:
+            if clear:
+                self.clear_interactive_screen(clear_scrollback=clear_scrollback)
+            render_screen()
+            cursor = "_" if typed_buffer else ""
+            self.output_interactive_prompt(f"{prompt}{typed_buffer}{cursor}")
+
+        render(clear=False)
+        while True:
+            width = self.safe_rich_render_width()
+            if width != last_width:
+                pending_width = width
+                pending_render_at = time.monotonic() + debounce_seconds
+            if pending_render_at is not None and time.monotonic() >= pending_render_at:
+                last_width = pending_width or width
+                pending_width = None
+                pending_render_at = None
+                render(clear=True, clear_scrollback=True)
+            if self.keyboard_choice_key_ready():
+                action, payload = self.read_keyboard_choice_key()
+                if action == "enter":
+                    self.output_fn("")
+                    return typed_buffer
+                if action == "backspace":
+                    typed_buffer = typed_buffer[:-1]
+                    render(clear=True)
+                elif action == "escape":
+                    typed_buffer = ""
+                    render(clear=True)
+                elif action == "char" and payload is not None:
+                    typed_buffer += payload
+                    render(clear=True)
+                continue
+            time.sleep(float(getattr(self, "_keyboard_choice_resize_poll_seconds", 0.05)))
 
     def keyboard_choice_menu_title(self) -> str:
         if self.state is None:
@@ -532,42 +642,45 @@ class GameIOMixin:
             return ("char", key)
         return ("noop", None)
 
-    def run_keyboard_choice_menu(
+    def build_live_choice_console(self, width: int):
+        return Console(
+            force_terminal=True,
+            color_system="truecolor",
+            legacy_windows=False,
+            highlight=False,
+            width=width,
+        )
+
+    def run_live_keyboard_choice_session(
         self,
-        prompt: str,
-        options: list[str],
         *,
-        title: str | None = None,
-    ) -> int | None:
-        if not options or not self.should_use_keyboard_choice_menu():
+        option_count: int,
+        renderable_builder,
+        width_factory,
+        resolve_selection,
+        live_cls=None,
+        invalid_feedback: str = "Type a listed number, use the arrows, or enter a global command.",
+    ):
+        live_cls = Live if live_cls is None else live_cls
+        if option_count <= 0 or Console is None or live_cls is None:
             return None
 
         selected_index = 0
         typed_buffer = ""
         feedback: str | None = None
-        menu_width = self.keyboard_choice_menu_width()
-        console = Console(
-            force_terminal=True,
-            color_system="truecolor",
-            legacy_windows=False,
-            highlight=False,
-            width=menu_width,
-        )
-        resolved_title = title or self.keyboard_choice_menu_title()
         show_instructions = self.begin_keyboard_choice_session()
+        console = self.build_live_choice_console(width_factory())
 
         while True:
             submitted_text: str | None = None
-            renderable_factory = lambda: self.build_keyboard_choice_menu(
-                prompt,
-                options,
-                title=resolved_title,
+            resize_requested = False
+            renderable_factory = lambda: renderable_builder(
                 selected_index=selected_index,
                 typed_buffer=typed_buffer,
                 feedback=feedback,
                 show_instructions=show_instructions,
             )
-            with Live(
+            with live_cls(
                 renderable_factory(),
                 console=console,
                 transient=True,
@@ -578,14 +691,14 @@ class GameIOMixin:
                         live,
                         console,
                         renderable_factory,
-                        self.keyboard_choice_menu_width,
+                        width_factory,
                     )
                     hide_instructions_after_update = show_instructions
                     if action == "up":
-                        selected_index = (selected_index - 1) % len(options)
+                        selected_index = (selected_index - 1) % option_count
                         feedback = None
                     elif action == "down":
-                        selected_index = (selected_index + 1) % len(options)
+                        selected_index = (selected_index + 1) % option_count
                         feedback = None
                     elif action == "backspace":
                         typed_buffer = typed_buffer[:-1]
@@ -594,10 +707,10 @@ class GameIOMixin:
                         typed_buffer = ""
                         feedback = None
                     elif action == "char" and payload is not None:
-                        if not typed_buffer and len(options) <= 9 and payload.isdigit():
+                        if not typed_buffer and option_count <= 9 and payload.isdigit():
                             value = int(payload)
-                            if 1 <= value <= len(options):
-                                return value
+                            if 1 <= value <= option_count:
+                                return resolve_selection(value - 1)
                         typed_buffer += payload
                         feedback = None
                     elif action == "enter":
@@ -606,21 +719,49 @@ class GameIOMixin:
                             typed_buffer = ""
                             show_instructions = False
                             break
-                        return selected_index + 1
+                        return resolve_selection(selected_index)
+                    elif action == "resize":
+                        resize_requested = True
+                        break
                     if hide_instructions_after_update:
                         show_instructions = False
                     live.update(renderable_factory(), refresh=True)
 
+            if resize_requested:
+                continue
             if submitted_text is None:
                 continue
             if submitted_text.isdigit():
                 value = int(submitted_text)
-                if 1 <= value <= len(options):
-                    return value
+                if 1 <= value <= option_count:
+                    return resolve_selection(value - 1)
             if self.handle_meta_command(submitted_text):
                 feedback = None
                 continue
-            feedback = "Type a listed number, use the arrows, or enter a global command."
+            feedback = invalid_feedback
+
+    def run_keyboard_choice_menu(
+        self,
+        prompt: str,
+        options: list[str],
+        *,
+        title: str | None = None,
+    ) -> int | None:
+        if not options or not self.should_use_keyboard_choice_menu():
+            return None
+
+        resolved_title = title or self.keyboard_choice_menu_title()
+        return self.run_live_keyboard_choice_session(
+            option_count=len(options),
+            renderable_builder=lambda **state: self.build_keyboard_choice_menu(
+                prompt,
+                options,
+                title=resolved_title,
+                **state,
+            ),
+            width_factory=self.keyboard_choice_menu_width,
+            resolve_selection=lambda selected_index: selected_index + 1,
+        )
 
     def render_choice_options(self, options: list[str], *, staggered: bool) -> None:
         pause = getattr(self, "pause_for_option_reveal", None)
@@ -685,12 +826,17 @@ class GameIOMixin:
             styled += self.style_text(f"+{member.temp_hp}t", "light_aqua")
         return styled
 
+    def hud_member_magic_text(self, member) -> str:
+        return self.format_member_magic_bar(member, width=6) or ""
+
     def hud_party_summary(self) -> str:
         assert self.state is not None
-        return " | ".join(
-            f"{self.hud_short_name(member)} {self.hud_member_health_text(member)}"
-            for member in self.state.party_members()
-        )
+        summaries: list[str] = []
+        for member in self.state.party_members():
+            magic = self.hud_member_magic_text(member)
+            magic_text = f" {magic}" if magic else ""
+            summaries.append(f"{self.hud_short_name(member)} {self.hud_member_health_text(member)}{magic_text}")
+        return " | ".join(summaries)
 
     def render_compact_hud(self) -> None:
         scene_key = self.compact_hud_scene_key()

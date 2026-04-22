@@ -107,7 +107,7 @@ Reference values with a `+3` spellcasting modifier:
 | 7 | 37 | 21 | 28 |
 | 8 | 41 | 23 | 31 |
 
-These values are intentionally flatter than a direct spell-slot conversion. Spell rank, action economy, class features, and spell effects should carry the power spikes.
+These values are intentionally flatter than a direct spell-slot conversion. Spell rank, class features, and spell effects should carry the power spikes. Action economy still matters, but it should decide whether a spell spends an action or bonus action, not add a separate MP surcharge by itself.
 
 ## Spell Costs
 
@@ -117,7 +117,7 @@ Base cost table:
 | --- | ---: | --- |
 | Cantrip combat spell | 1 | Baseline spell attack, save cantrip, or combat debuff. |
 | Rank 1 standard spell | 3 | Most single-target damage, healing, or simple control. |
-| Rank 1 premium spell | 4 | Bonus-action healing, strong control, or high reliability. |
+| Rank 1 premium spell | 4 | Strong control, unusually efficient riders, or high reliability. |
 | Rank 1 auto-hit spell | 5 | Use for Magic Missile style reliability. |
 | Rank 2 spell | 6 | Standard second-rank effects. |
 | Rank 3 spell | 9 | Standard third-rank effects. |
@@ -127,7 +127,7 @@ Cost modifiers:
 
 | Modifier | MP adjustment | Example use |
 | --- | ---: | --- |
-| Bonus-action spell | `+1` | Healing Word style action economy. |
+| Bonus-action spell | `+0` | The spell spends the bonus action, but its MP cost stays aligned with equivalent action spells. |
 | Auto-hit damage | `+1` or `+2` | Magic Missile. |
 | Multi-target or area spell | `+1` to `+3` | Fireball-style damage or wide control. |
 | Concentration spell | `+0` | Concentration is already a risk and opportunity cost. |
@@ -144,7 +144,7 @@ Initial costs for current player-facing spells:
 | Fire Bolt | Sorcerer, Wizard | 1 | Cantrip, ranged attack. |
 | Eldritch Blast | Warlock | 1 | Cantrip, ranged attack. Future invocations may raise value but not base cost. |
 | Cure Wounds | Bard, Cleric, Druid | 3 | Action heal. |
-| Healing Word | Bard, Cleric, Druid | 4 | Bonus-action heal. |
+| Healing Word | Bard, Cleric, Druid | 3 | Bonus-action heal. Same MP cost as Cure Wounds; the bonus action is paid through turn economy. |
 | Magic Missile | Sorcerer, Wizard | 5 | Auto-hit damage. |
 | Divine Smite | Paladin | 4 | Spend only after a hit. Current implementation rolls the base `2d8`; upcast tuning is future work. |
 | Channel Divinity | Cleric | 0 | Uses `channel_divinity`, not MP. |
@@ -173,6 +173,7 @@ Keep the current action economy shape.
 
 - Action spells spend the action.
 - Bonus-action spells spend the bonus action.
+- Bonus-action spells do not gain an MP surcharge just for being bonus actions.
 - A character can cast one ranked spell per turn.
 - If a bonus-action ranked spell is cast, the action spell that same turn must be a cantrip.
 - If an action ranked spell is cast, no bonus-action ranked spell can be cast that turn.
@@ -227,15 +228,15 @@ Examples:
 
 - `Cast Fire Bolt (1 MP)`
 - `Cast Magic Missile (5 MP)`
-- `Cast Healing Word (4 MP, Bonus Action)`
-- `Attack with Divine Smite (4 MP on hit)`
+- `Cast Healing Word (3 MP, Bonus Action)`
+- `Attack with Divine Smite (4 MP, on hit)`
 
 Current display:
 
-- Combatant lines include the MP segment, for example `AC 13, MP 9/13`
-- Journal party status: include MP after AC for spellcasters.
-- Compact HUD: only show party-wide resource detail if it does not crowd the current layout.
-- Spell unavailable message: `Elira needs 4 MP to cast Healing Word, but has 2 MP.`
+- Combatant summaries show HP and AC first, then put a blue MP bar on the next line aligned under the HP segment, for example `MP [████████    ]  9/13`.
+- Journal party status uses the same below-HP blue MP bar for spellcasters.
+- Compact HUD: include a short blue MP bar for spellcasters beside their HP summary.
+- Spell unavailable message: `Elira needs 3 MP to cast Healing Word, but has 2 MP.`
 
 Do not hide all caster options without explanation. If the menu renderer supports disabled options later, show unaffordable spells dimmed with their MP shortfall. Until then, hiding unaffordable spells is acceptable, but the status line should show low MP clearly.
 
@@ -304,7 +305,7 @@ SPELL_MP_COSTS = {
     "fire_bolt": 1,
     "eldritch_blast": 1,
     "cure_wounds": 3,
-    "healing_word": 4,
+    "healing_word": 3,
     "magic_missile": 5,
     "divine_smite": 4,
 }
@@ -361,7 +362,7 @@ Minimum regression coverage:
 
 - A wizard casting Fire Bolt loses `1 MP`.
 - A cleric casting Sacred Flame loses `1 MP`.
-- A bard casting Healing Word loses `4 MP` and spends the bonus action.
+- A bard casting Healing Word loses `3 MP` and spends the bonus action.
 - A wizard with `4 MP` cannot cast Magic Missile if it costs `5 MP`.
 - Magic Missile spends MP before damage resolution.
 - Divine Smite spends MP only after the weapon hit lands.
@@ -385,8 +386,8 @@ Level 4 cleric with `WIS +3`:
 - Max MP: `25`
 - Sacred Flame: `1 MP`
 - Cure Wounds: `3 MP`
-- Healing Word: `4 MP`
-- The cleric can heal actively, but bonus-action healing has a visible cost.
+- Healing Word: `3 MP`
+- The cleric can choose between action healing and bonus-action healing at the same MP cost; the difference is what the turn still leaves available.
 
 Level 4 warlock with `CHA +3`:
 
@@ -418,7 +419,7 @@ If cantrip spam still dominates:
 If healing becomes too strong:
 
 - Keep Cure Wounds at `3 MP`.
-- Keep Healing Word at `4 MP`.
+- Keep Healing Word at `3 MP`; tune healing dice, availability, or ranked-spell turn rules before adding a bonus-action MP surcharge.
 - Make multi-target healing cost rank base plus `+2`.
 - Avoid free post-combat MP restoration.
 

@@ -1,5 +1,7 @@
 # Mira Neverwinter Branching Dialogue Draft
 
+> Cleanup note: The implemented Act 1 Mira dialogue options from this draft are now compiled in `ACT1_DIALOGUE_REFERENCE.md`. Keep this file as historical design context; update the compiled reference for current Act 1 dialogue behavior.
+
 This draft expands Mira Thann's Neverwinter briefing from a short premise scene into a reactive debrief hub. It covers:
 
 - the first formal briefing after Greywake

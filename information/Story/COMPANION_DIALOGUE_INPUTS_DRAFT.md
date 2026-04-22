@@ -1,5 +1,7 @@
 # Companion Dialogue Inputs Draft
 
+> Cleanup note: The implemented Act 1 companion input topics from this draft are now compiled in `ACT1_DIALOGUE_REFERENCE.md`. Keep this file as historical design context; update the compiled reference for current Act 1 dialogue behavior.
+
 This draft covers companion interjections during ordinary dialogue, route decisions, NPC briefings, quest turn-ins, and act transitions.
 
 It is separate from `COMPANION_CAMP_BANTER_DRAFT.md`. Camp banter is for companion-to-companion scenes at rest. Dialogue inputs are smaller, reactive insertions inside the main story flow.

@@ -33,6 +33,7 @@ from ..models import Character, GameState, SKILL_TO_ABILITY, Weapon
 from ..ui.colors import rich_style_name, strip_ansi
 from ..ui.rich_render import Columns, Group, Panel, Table, Text, box, render_rich_lines
 from .constants import InputFn, LEVEL_XP_THRESHOLDS, MENU_PAGE_SIZE, OutputFn
+from .magic_points import current_magic_points, maximum_magic_points
 
 
 class GameInterrupted(Exception):
@@ -600,17 +601,44 @@ class GameBase:
             return "yellow"
         return "light_red"
 
-    def format_health_bar(self, current_hp: int, max_hp: int, *, width: int | None = None) -> str:
+    def format_resource_bar(
+        self,
+        label: str,
+        current_value: int,
+        max_value: int,
+        *,
+        width: int | None = None,
+        fill_color: str | None = None,
+        fill_color_resolver=None,
+    ) -> str:
         width = width or self._health_bar_width
-        if max_hp <= 0:
-            max_hp = 1
-        clamped = max(0, min(current_hp, max_hp))
-        filled = int(round((clamped / max_hp) * width))
+        max_value = max(1, max_value)
+        clamped = max(0, min(current_value, max_value))
+        filled = int(round((clamped / max_value) * width))
         filled = max(0, min(width, filled))
         empty = width - filled
-        bar = self.style_text("█" * filled, self.health_bar_color(clamped, max_hp)) + (" " * empty)
-        digits = len(str(max_hp))
-        return f"HP [{bar}] {clamped:>{digits}}/{max_hp}"
+        resolved_color = fill_color_resolver(clamped, max_value) if fill_color_resolver is not None else fill_color or "white"
+        bar = self.style_text("█" * filled, resolved_color) + (" " * empty)
+        digits = len(str(max_value))
+        return f"{label} [{bar}] {clamped:>{digits}}/{max_value}"
+
+    def format_health_bar(self, current_hp: int, max_hp: int, *, width: int | None = None) -> str:
+        return self.format_resource_bar(
+            "HP",
+            current_hp,
+            max_hp,
+            width=width,
+            fill_color_resolver=self.health_bar_color,
+        )
+
+    def format_magic_bar(self, current_mp: int, max_mp: int, *, width: int | None = None) -> str:
+        return self.format_resource_bar("MP", current_mp, max_mp, width=width, fill_color="blue")
+
+    def format_member_magic_bar(self, member, *, width: int | None = None) -> str | None:
+        max_mp = maximum_magic_points(member)
+        if max_mp <= 0:
+            return None
+        return self.format_magic_bar(current_magic_points(member), max_mp, width=width)
 
     def health_status_suffix(self, current_hp: int, *, dead: bool = False) -> str:
         if dead:

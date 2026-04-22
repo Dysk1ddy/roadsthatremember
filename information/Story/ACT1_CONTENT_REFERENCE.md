@@ -2,6 +2,8 @@
 
 This file collects the current campaign-facing content that is most useful for debugging story flow, enemy setups, recruitment, and rewards.
 
+For the compiled list of every Act 1 player-facing dialogue option, required conditions, and results, see `ACT1_DIALOGUE_REFERENCE.md`.
+
 The summary sections at the top reflect the expanded Act 1 route and should be treated as the current source of truth where they differ from older shorter-arc notes later in the file.
 
 ## Act 1 Scope

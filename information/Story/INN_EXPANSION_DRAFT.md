@@ -1,5 +1,7 @@
 # Inn Expansion Draft
 
+> Cleanup note: The implemented Act 1 Stonehill Inn dialogue options from this draft are now compiled in `ACT1_DIALOGUE_REFERENCE.md`. Keep this file as historical design context; update the compiled reference for current Act 1 dialogue behavior.
+
 This draft expands inn content into a repeatable social gameplay layer instead of a single rumor-and-rest stop.
 
 It is written to fit the current Act 1 and early Act 2 structure, especially:

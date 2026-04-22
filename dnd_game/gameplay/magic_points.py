@@ -22,7 +22,7 @@ SPELL_MP_COSTS: dict[str, int] = {
     "fire_bolt": 1,
     "eldritch_blast": 1,
     "cure_wounds": 3,
-    "healing_word": 4,
+    "healing_word": 3,
     "magic_missile": 5,
     "divine_smite": 4,
 }

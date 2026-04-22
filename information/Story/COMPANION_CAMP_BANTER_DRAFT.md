@@ -1,5 +1,7 @@
 # Companion Camp Banter Branching Draft
 
+> Cleanup note: The implemented Act 1 camp banter topics from this draft are now compiled in `ACT1_DIALOGUE_REFERENCE.md`. Keep this file as historical design context; update the compiled reference for current Act 1 dialogue behavior.
+
 This draft expands camp from only player-to-companion talks into optional companion-to-companion scenes. The goal is to let the party process route pressure, personal quests, Varyn's visible system, and the later hidden-villain trail without revealing the secret architect before the planned Act 3 midpoint.
 
 ## Design Goals

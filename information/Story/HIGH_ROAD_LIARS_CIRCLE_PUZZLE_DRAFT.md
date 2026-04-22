@@ -1,5 +1,7 @@
 # High Road Puzzle Draft: The Liars' Circle
 
+> Cleanup note: The implemented Act 1 Liar's Circle dialogue and result options from this draft are now compiled in `ACT1_DIALOGUE_REFERENCE.md`. Keep this file as historical design context; update the compiled reference for current Act 1 dialogue behavior.
+
 This draft describes the now-implemented optional wilderness puzzle branch after the High Road ambush and before Phandalin arrival.
 
 ## Implementation Status

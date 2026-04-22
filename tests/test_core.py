@@ -31,7 +31,7 @@ from dnd_game.content import (
 from dnd_game.dice import roll, roll_d20
 from dnd_game.game import Encounter, TextDnDGame
 from dnd_game.gameplay.combat_flow import TurnState
-from dnd_game.gameplay.magic_points import current_magic_points, magic_point_summary
+from dnd_game.gameplay.magic_points import current_magic_points, magic_point_cost, magic_point_summary
 from dnd_game.gameplay.sound_effects import (
     DICE_ROLL_SOUND_EFFECTS,
     DICE_ROLL_SOUND_MAX_SECONDS,
@@ -768,6 +768,12 @@ class CoreTests(unittest.TestCase):
         summary = strip_ansi(game.format_health_bar(9, 12))
         self.assertEqual(summary, "HP [█████████   ]  9/12")
 
+    def test_magic_bar_summary_uses_blue_blocks_and_numbers(self) -> None:
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(900640))
+        rendered = game.format_magic_bar(7, 12)
+        self.assertEqual(strip_ansi(rendered), "MP [███████     ]  7/12")
+        self.assertIn(colorize("███████", "blue"), rendered)
+
     def test_health_bar_thresholds_match_requested_breakpoints(self) -> None:
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(900641))
         self.assertEqual(game.health_bar_color(11, 20), "light_green")
@@ -975,18 +981,17 @@ class CoreTests(unittest.TestCase):
         self.assertTrue(selected_lines)
         self.assertTrue(all(line.find(">") in {-1, 2} for line in selected_lines))
 
-    def test_keyboard_choice_live_refreshes_when_terminal_width_changes(self) -> None:
+    def test_keyboard_choice_live_returns_resize_when_terminal_width_changes(self) -> None:
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(9007362))
         game.rich_console_width = lambda: 120
         game.detected_terminal_width = lambda: 70
         game._keyboard_choice_resize_poll_seconds = 0.0
-        ready = iter([False, True])
         updates: list[tuple[str, bool, int]] = []
         console = SimpleNamespace(width=43)
         live = SimpleNamespace(
             update=lambda renderable, *, refresh: updates.append((renderable, refresh, console.width))
         )
-        game.keyboard_choice_key_ready = lambda: next(ready)
+        game.keyboard_choice_key_ready = lambda: True
         game.read_keyboard_choice_key = lambda: ("enter", None)
 
         action = game.read_keyboard_choice_key_with_resize_poll(
@@ -996,9 +1001,34 @@ class CoreTests(unittest.TestCase):
             game.safe_rich_render_width,
         )
 
-        self.assertEqual(action, ("enter", None))
+        self.assertEqual(action, ("resize", None))
         self.assertEqual(console.width, 69)
-        self.assertEqual(updates, [("resized menu", True, 69)])
+        self.assertEqual(updates, [])
+
+    def test_keyboard_choice_live_uses_normal_screen_for_meta_windows(self) -> None:
+        if not RICH_AVAILABLE:
+            self.skipTest("rich is not installed")
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(90073621))
+        game.should_use_keyboard_choice_menu = lambda: True
+        game.read_keyboard_choice_key_with_resize_poll = lambda *args: ("enter", None)
+        captures: list[dict[str, object]] = []
+
+        class FakeLive:
+            def __init__(self, renderable, **kwargs):
+                captures.append(kwargs)
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, traceback):
+                return False
+
+        with patch("dnd_game.gameplay.io.Live", FakeLive):
+            selected = game.run_keyboard_choice_menu("Choose one.", ["First", "Second"])
+
+        self.assertEqual(selected, 1)
+        self.assertTrue(captures)
+        self.assertFalse(captures[0].get("screen", False))
 
     def test_keyboard_choice_resize_shrink_clears_reflowed_previous_frame(self) -> None:
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(9007363))
@@ -1020,7 +1050,30 @@ class CoreTests(unittest.TestCase):
         self.assertTrue(resized)
         self.assertEqual(console.width, 39)
         self.assertEqual(live_render._shape, (39, 48))
-        self.assertEqual(updates, [("narrow menu", True)])
+        self.assertEqual(updates, [])
+
+    def test_keyboard_choice_live_restarts_after_resize_action(self) -> None:
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(90073631))
+        game.should_use_keyboard_choice_menu = lambda: True
+        actions = iter([("resize", None), ("enter", None)])
+        game.read_keyboard_choice_key_with_resize_poll = lambda *args: next(actions)
+        entries: list[object] = []
+
+        class FakeLive:
+            def __init__(self, renderable, **kwargs):
+                entries.append(renderable)
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, traceback):
+                return False
+
+        with patch("dnd_game.gameplay.io.Live", FakeLive):
+            selected = game.run_keyboard_choice_menu("Choose one.", ["First", "Second"])
+
+        self.assertEqual(selected, 1)
+        self.assertEqual(len(entries), 2)
 
     def test_say_wraps_plain_text_to_detected_terminal_width(self) -> None:
         log: list[str] = []
@@ -1146,6 +1199,29 @@ class CoreTests(unittest.TestCase):
         outcome = game.run_encounter(Encounter(title="Spent Ambush", description="The danger is already over.", enemies=[enemy]))
         self.assertEqual(outcome, "victory")
         self.assertEqual(pauses, ["pause", "pause"])
+
+    def test_run_encounter_does_not_print_battlefield_before_first_turn_menu(self) -> None:
+        player = build_character(
+            name="Velkor",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        enemy = create_enemy("goblin_skirmisher")
+        battlefield_calls: list[str] = []
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(900801))
+        game.state = GameState(player=player, current_scene="road_ambush")
+        game.pause_for_combat_transition = lambda: None
+        game.roll_initiative = lambda heroes, enemies, **kwargs: [player]
+        game.hero_turn = lambda actor, heroes, enemies, encounter, dodging: "fled"
+        game.print_battlefield = lambda heroes, enemies: battlefield_calls.append("printed")
+
+        outcome = game.run_encounter(Encounter(title="Test Ambush", description="Trouble.", enemies=[enemy]))
+
+        self.assertEqual(outcome, "fled")
+        self.assertEqual(battlefield_calls, [])
 
     def test_run_encounter_starts_combat_music_and_restores_scene_music(self) -> None:
         player = build_character(
@@ -7795,6 +7871,29 @@ class CoreTests(unittest.TestCase):
         self.assertIn("Cast Sacred Flame (1 MP)", options)
         self.assertNotIn("Cast Cure Wounds (3 MP)", options)
 
+    def test_healing_word_cost_matches_cure_wounds_and_stays_bonus_action(self) -> None:
+        player = build_character(
+            name="Ash",
+            race="Human",
+            class_name="Cleric",
+            background="Acolyte",
+            base_ability_scores={"STR": 10, "DEX": 12, "CON": 13, "INT": 10, "WIS": 15, "CHA": 14},
+            class_skill_choices=["Medicine", "Persuasion"],
+        )
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(81541))
+        game.state = GameState(player=player, current_scene="road_ambush")
+        options = game.get_player_combat_options(
+            player,
+            SimpleNamespace(allow_parley=False, allow_flee=False),
+            turn_state=TurnState(),
+            heroes=[player],
+        )
+        self.assertEqual(magic_point_cost("healing_word"), magic_point_cost("cure_wounds"))
+        self.assertIn("Cast Cure Wounds (3 MP)", options)
+        self.assertIn("Cast Healing Word (3 MP, Bonus Action)", options)
+        self.assertEqual(game.combat_option_group("Cast Cure Wounds (3 MP)"), "Action")
+        self.assertEqual(game.combat_option_group("Cast Healing Word (3 MP, Bonus Action)"), "Bonus Action")
+
     def test_healing_word_is_bonus_action_and_still_allows_action_cantrip(self) -> None:
         player = build_character(
             name="Ash",
@@ -7812,9 +7911,11 @@ class CoreTests(unittest.TestCase):
         game.state = GameState(player=player, companions=[ally], current_scene="road_ambush")
         game.saving_throw = lambda actor, ability, dc, context, against_poison=False: False
         ally_before = ally.current_hp
+        mp_before = current_magic_points(player)
         game.player_turn(player, [player, ally], [enemy], Encounter(title="Test", description="", enemies=[enemy], allow_flee=False), set())
         self.assertGreater(ally.current_hp, ally_before)
         self.assertLess(enemy.current_hp, enemy.max_hp)
+        self.assertEqual(current_magic_points(player), mp_before - 4)
 
     def test_monk_attack_can_chain_into_martial_arts_bonus_strike(self) -> None:
         player = build_character(
@@ -8111,6 +8212,27 @@ class CoreTests(unittest.TestCase):
         game.state = GameState(player=wizard, current_scene="phandalin_hub")
         game.ensure_state_integrity()
         self.assertEqual(magic_point_summary(wizard), "12/12")
+
+    def test_describe_combatant_shows_blue_mp_bar_for_spellcasters(self) -> None:
+        wizard = build_character(
+            name="Nyra",
+            race="Elf",
+            class_name="Wizard",
+            background="Sage",
+            base_ability_scores={"STR": 8, "DEX": 14, "CON": 12, "INT": 15, "WIS": 13, "CHA": 10},
+            class_skill_choices=["Arcana", "Investigation"],
+        )
+        wizard.resources["mp"] = 7
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(16012))
+        rendered = game.describe_combatant(wizard)
+        lines = strip_ansi(rendered).splitlines()
+        self.assertEqual(len(lines), 2)
+        self.assertIn("Nyra: HP", lines[0])
+        self.assertIn("AC", lines[0])
+        self.assertNotIn("MP", lines[0])
+        self.assertTrue(lines[1].startswith(" " * len("Nyra: ") + "MP ["))
+        self.assertIn("MP [███████     ]  7/12", strip_ansi(rendered))
+        self.assertIn(colorize("███████", "blue"), rendered)
 
     def test_warlock_short_rest_restores_pact_slots(self) -> None:
         warlock = build_character(
@@ -10760,6 +10882,31 @@ class CoreTests(unittest.TestCase):
         self.assertNotIn("[Act I] Phandalin | Objective: Stop the Watchtower Raids", rendered)
         self.assertIn("Choose one.", rendered)
 
+    def test_compact_hud_party_summary_includes_blue_mp_bars_for_spellcasters(self) -> None:
+        player = build_character(
+            name="Velkor",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        cleric = build_character(
+            name="Ash",
+            race="Human",
+            class_name="Cleric",
+            background="Acolyte",
+            base_ability_scores={"STR": 10, "DEX": 12, "CON": 13, "INT": 10, "WIS": 15, "CHA": 14},
+            class_skill_choices=["Medicine", "Persuasion"],
+        )
+        cleric.resources["mp"] = 6
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(400101))
+        game.state = GameState(player=player, companions=[cleric], current_scene="phandalin_hub")
+        rendered = game.hud_party_summary()
+        self.assertIn("Ash", strip_ansi(rendered))
+        self.assertIn("MP [███   ]  6/13", strip_ansi(rendered))
+        self.assertIn(colorize("███", "blue"), rendered)
+
     def test_map_command_opens_map_menu_and_can_show_travel_ledger(self) -> None:
         player = build_character(
             name="Velkor",
@@ -10884,7 +11031,7 @@ class CoreTests(unittest.TestCase):
             self.assertIn("Party", rendered)
             self.assertIn("Enemies", rendered)
 
-    def test_choose_grouped_combat_option_uses_single_row_panel_layout(self) -> None:
+    def test_choose_grouped_combat_option_uses_battlefield_band_above_actions(self) -> None:
         player = build_character(
             name="Velkor",
             race="Human",
@@ -10905,18 +11052,24 @@ class CoreTests(unittest.TestCase):
         )
         captured: dict[str, object] = {}
 
-        def fake_panel_row(panels, *, ratios=None, width=None, padding=(0, 1)):
-            captured["panel_count"] = len(panels)
-            captured["ratios"] = ratios
-            captured["width"] = width
-            captured["padding"] = padding
-            return False
+        def fake_panel_row(panels, *, ratios=None, padding=(0, 1)):
+            captured["battlefield_panel_count"] = len(panels)
+            captured["battlefield_ratios"] = ratios
+            captured["battlefield_padding"] = padding
+            return "battlefield-row"
 
-        game.emit_rich_panel_row = fake_panel_row
+        def fake_emit(renderable, *, width=None):
+            captured["renderable"] = renderable
+            captured["width"] = width
+            return True
+
+        game.rich_panel_row_renderable = fake_panel_row
+        game.emit_rich = fake_emit
         selected = game.choose_grouped_combat_option("Your turn.", options, actor=player, heroes=[player], enemies=[enemy])
         self.assertEqual(selected, f"Attack with {player.weapon.name}")
-        self.assertEqual(captured["panel_count"], 3)
-        self.assertEqual(captured["ratios"], [3, 4, 3])
+        self.assertEqual(captured["battlefield_panel_count"], 2)
+        self.assertEqual(captured["battlefield_ratios"], [1, 1])
+        self.assertEqual(captured["battlefield_padding"], (0, 1))
         self.assertEqual(captured["width"], game.safe_rich_render_width())
 
     def test_choose_grouped_combat_option_uses_keyboard_combat_menu_when_supported(self) -> None:
@@ -10959,6 +11112,193 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(captured["heroes"], [player])
         self.assertEqual(captured["enemies"], [enemy])
         self.assertTrue(any(section == "Action" for section, _ in captured["sections"]))
+
+    def test_combat_live_keyboard_menu_follows_keyboard_support(self) -> None:
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(4005201))
+        player = build_character(
+            name="Velkor",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        enemy = create_enemy("goblin_skirmisher")
+        game.keyboard_choice_menu_supported = lambda: True
+        game.read_keyboard_choice_key_with_resize_poll = lambda *args: ("enter", None)
+        option = f"Attack with {player.weapon.name}"
+        self.assertEqual(
+            game.run_grouped_combat_keyboard_menu(
+                "Your turn.",
+                [option],
+                [("Action", [(1, option)])],
+                actor=player,
+                heroes=[player],
+                enemies=[enemy],
+            ),
+            option,
+        )
+
+    def test_resize_aware_input_redraws_when_terminal_width_changes(self) -> None:
+        log: list[str] = []
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(4005202))
+        game.resize_aware_input_supported = lambda: True
+        game._resize_aware_input_debounce_seconds = 0.0
+        game._keyboard_choice_resize_poll_seconds = 0.0
+        widths = iter([100, 72, 72])
+        ready = iter([False, True])
+        clears: list[bool] = []
+        game.safe_rich_render_width = lambda: next(widths, 72)
+        game.keyboard_choice_key_ready = lambda: next(ready, True)
+        game.read_keyboard_choice_key = lambda: ("enter", None)
+        game.clear_interactive_screen = lambda *, clear_scrollback=False: clears.append(clear_scrollback)
+
+        raw = game.read_resize_aware_input(lambda: log.append("screen"), prompt="> ")
+
+        self.assertEqual(raw, "")
+        self.assertEqual(log.count("screen"), 2)
+        self.assertEqual(clears, [True])
+
+    def test_resize_aware_input_buffers_typed_commands(self) -> None:
+        log: list[str] = []
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(4005203))
+        game.resize_aware_input_supported = lambda: True
+        game.safe_rich_render_width = lambda: 100
+        game.keyboard_choice_key_ready = lambda: True
+        actions = iter([("char", "h"), ("char", "e"), ("enter", None)])
+        game.read_keyboard_choice_key = lambda: next(actions)
+        game.clear_interactive_screen = lambda *, clear_scrollback=False: log.append("clear")
+
+        raw = game.read_resize_aware_input(lambda: log.append("screen"), prompt="> ")
+
+        self.assertEqual(raw, "he")
+        self.assertIn("> h_", log)
+        self.assertIn("> he_", log)
+
+    def test_grouped_combat_option_uses_resize_aware_static_dashboard(self) -> None:
+        if not RICH_AVAILABLE:
+            self.skipTest("rich is not installed")
+        player = build_character(
+            name="Velkor",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        enemy = create_enemy("goblin_skirmisher")
+        log: list[str] = []
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(4005204))
+        game.state = GameState(player=player, current_scene="road_ambush")
+        game._in_combat = True
+        captured: dict[str, object] = {}
+
+        def fake_read(render_screen, *, prompt):
+            captured["prompt"] = prompt
+            render_screen()
+            return "1"
+
+        game.read_resize_aware_input = fake_read
+        option = f"Attack with {player.weapon.name}"
+
+        selected = game.choose_grouped_combat_option("Your turn.", [option], actor=player, heroes=[player], enemies=[enemy])
+
+        self.assertEqual(selected, option)
+        self.assertEqual(captured["prompt"], "> ")
+        rendered = self.plain_output(log)
+        self.assertIn("Party", rendered)
+        self.assertIn("Enemies", rendered)
+        self.assertIn("Your turn.", rendered)
+
+    def test_keyboard_combat_menu_uses_normal_screen_for_meta_windows(self) -> None:
+        if not RICH_AVAILABLE:
+            self.skipTest("rich is not installed")
+        player = build_character(
+            name="Velkor",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        enemy = create_enemy("goblin_skirmisher")
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(400521))
+        game.state = GameState(player=player, current_scene="road_ambush")
+        game._in_combat = True
+        game.combat_keyboard_choice_menu_supported = lambda: True
+        game.keyboard_choice_menu_supported = lambda: True
+        game.read_keyboard_choice_key_with_resize_poll = lambda *args: ("enter", None)
+        captures: list[dict[str, object]] = []
+
+        class FakeLive:
+            def __init__(self, renderable, **kwargs):
+                captures.append(kwargs)
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, traceback):
+                return False
+
+        option = f"Attack with {player.weapon.name}"
+        with patch("dnd_game.gameplay.combat_flow.Live", FakeLive):
+            selected = game.run_grouped_combat_keyboard_menu(
+                "Your turn.",
+                [option],
+                [("Action", [(1, option)])],
+                actor=player,
+                heroes=[player],
+                enemies=[enemy],
+            )
+
+        self.assertEqual(selected, option)
+        self.assertTrue(captures)
+        self.assertFalse(captures[0].get("screen", False))
+
+    def test_keyboard_combat_menu_restarts_after_resize_action(self) -> None:
+        if not RICH_AVAILABLE:
+            self.skipTest("rich is not installed")
+        player = build_character(
+            name="Velkor",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        enemy = create_enemy("goblin_skirmisher")
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(400522))
+        game.state = GameState(player=player, current_scene="road_ambush")
+        game._in_combat = True
+        game.combat_keyboard_choice_menu_supported = lambda: True
+        game.keyboard_choice_menu_supported = lambda: True
+        actions = iter([("resize", None), ("enter", None)])
+        game.read_keyboard_choice_key_with_resize_poll = lambda *args: next(actions)
+        entries: list[object] = []
+
+        class FakeLive:
+            def __init__(self, renderable, **kwargs):
+                entries.append(renderable)
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, traceback):
+                return False
+
+        option = f"Attack with {player.weapon.name}"
+        with patch("dnd_game.gameplay.combat_flow.Live", FakeLive):
+            selected = game.run_grouped_combat_keyboard_menu(
+                "Your turn.",
+                [option],
+                [("Action", [(1, option)])],
+                actor=player,
+                heroes=[player],
+                enemies=[enemy],
+            )
+
+        self.assertEqual(selected, option)
+        self.assertEqual(len(entries), 2)
 
     def test_equipment_comparison_preview_shows_deltas(self) -> None:
         player = build_character(
@@ -11216,6 +11556,61 @@ class CoreTests(unittest.TestCase):
         rendered = self.plain_output(log)
         self.assertIn("4.", rendered)
         self.assertIn("Settings", rendered)
+
+    def test_main_menu_stacks_panels_at_narrow_terminal_width(self) -> None:
+        if not RICH_AVAILABLE:
+            self.skipTest("rich is not installed")
+        log: list[str] = []
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(4031))
+        game.detected_terminal_width = lambda: 72
+        game.render_title_screen(
+            "Roads That Remember",
+            "Acts I-II: Frontier Roads and Echoing Depths",
+            "A choice-driven D&D-inspired text adventure.",
+            ["Start a new game", "Save Files", "Read the lore notes", "Settings", "Quit"],
+            {
+                "Start a new game": "Build a new character and ride south toward Phandalin.",
+                "Save Files": "Browse save files, load a run, or delete old journals.",
+                "Read the lore notes": "Browse Forgotten Realms context, rules guidance, and item basics.",
+                "Settings": "Adjust audio, animations, typed narration, and presentation pacing.",
+                "Quit": "Leave the frontier for now.",
+            },
+        )
+        visible = [strip_ansi(line) for line in log]
+        self.assertTrue(visible)
+        self.assertTrue(all(len(line) <= 71 for line in visible))
+        self.assertTrue(any("Campaign Ledger" in line for line in visible))
+        self.assertTrue(any("What Would You Like To Do?" in line for line in visible))
+
+    def test_title_menu_uses_resize_aware_input(self) -> None:
+        log: list[str] = []
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(4032))
+        captured: dict[str, object] = {}
+
+        def fake_read(render_screen, *, prompt):
+            captured["prompt"] = prompt
+            render_screen()
+            return "1"
+
+        game.read_resize_aware_input = fake_read
+
+        choice = game.choose_title_menu(
+            "Roads That Remember",
+            "Acts I-II: Frontier Roads and Echoing Depths",
+            "A choice-driven D&D-inspired text adventure.",
+            ["Start a new game", "Save Files", "Read the lore notes", "Settings", "Quit"],
+            option_details={
+                "Start a new game": "Build a new character and ride south toward Phandalin.",
+                "Save Files": "Browse save files, load a run, or delete old journals.",
+                "Read the lore notes": "Browse Forgotten Realms context, rules guidance, and item basics.",
+                "Settings": "Adjust audio, animations, typed narration, and presentation pacing.",
+                "Quit": "Leave the frontier for now.",
+            },
+        )
+
+        self.assertEqual(choice, 1)
+        self.assertEqual(captured["prompt"], "> ")
+        self.assertIn("Roads That Remember", self.plain_output(log))
 
     def test_load_command_can_replace_active_game_mid_prompt(self) -> None:
         save_dir = Path.cwd() / "tests_output" / "midgame_load"

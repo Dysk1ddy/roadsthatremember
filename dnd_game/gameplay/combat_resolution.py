@@ -4,10 +4,10 @@ from contextlib import contextmanager
 
 from ..dice import D20Outcome, roll, roll_d20
 from ..items import ITEMS
-from ..ui.colors import rich_style_name
+from ..ui.colors import rich_style_name, strip_ansi
 from ..ui.rich_render import Group, Panel, box
 from .difficulty_policy import ACT_DIFFICULTY_BANDS, clamp_dc_to_band
-from .magic_points import current_magic_points, magic_point_cost, magic_point_summary, spend_magic_points
+from .magic_points import current_magic_points, magic_point_cost, spend_magic_points
 
 
 class CombatResolutionMixin:
@@ -1382,30 +1382,49 @@ class CombatResolutionMixin:
         self.animate_initiative_rolls(entries)
         return [entry["actor"] for entry in entries]
 
+    def describe_living_combatants(self, combatants) -> list[str]:
+        return [self.describe_combatant(combatant) for combatant in combatants if not combatant.dead]
+
+    def combat_roster_panel(self, title: str, color: str, lines: list[str], *, empty_message: str):
+        return Panel(
+            Group(*(self.rich_from_ansi(line) for line in (lines or [empty_message]))),
+            title=self.rich_text(title, color, bold=True),
+            border_style=rich_style_name(color),
+            box=box.ROUNDED,
+            padding=(0, 1),
+        )
+
+    def combat_battlefield_row_renderable(self, hero_lines: list[str], enemy_lines: list[str]):
+        if not self.rich_enabled() or Panel is None or Group is None or box is None:
+            return None
+        party_panel = self.combat_roster_panel(
+            "Party",
+            "light_aqua",
+            hero_lines,
+            empty_message="No one is still standing.",
+        )
+        enemy_panel = self.combat_roster_panel(
+            "Enemies",
+            "light_red",
+            enemy_lines,
+            empty_message="Enemies routed.",
+        )
+        return self.rich_panel_row_renderable([party_panel, enemy_panel], ratios=[1, 1], padding=(0, 1))
+
     def print_battlefield(self, heroes, enemies) -> None:
-        hero_lines = [self.describe_combatant(hero) for hero in heroes if not hero.dead]
-        enemy_lines = [self.describe_combatant(enemy) for enemy in enemies if not enemy.dead]
-        if self.rich_enabled() and Panel is not None and Group is not None and box is not None:
-            party_panel = Panel(
-                Group(*(self.rich_from_ansi(line) for line in (hero_lines or ["No one is still standing."]))),
-                title=self.rich_text("Party", "light_aqua", bold=True),
-                border_style=rich_style_name("light_aqua"),
-                box=box.ROUNDED,
-                padding=(0, 1),
-            )
-            enemy_panel = Panel(
-                Group(*(self.rich_from_ansi(line) for line in (enemy_lines or ["Enemies routed."]))),
-                title=self.rich_text("Enemies", "light_red", bold=True),
-                border_style=rich_style_name("light_red"),
-                box=box.ROUNDED,
-                padding=(0, 1),
-            )
-            if self.emit_rich_panel_row(
-                [party_panel, enemy_panel],
-                ratios=[1, 1],
-                width=self.safe_rich_render_width(),
-            ):
-                return
+        hero_lines = self.describe_living_combatants(heroes)
+        enemy_lines = self.describe_living_combatants(enemies)
+        battlefield_row = self.combat_battlefield_row_renderable(hero_lines, enemy_lines)
+        if battlefield_row is not None and self.emit_rich(battlefield_row, width=self.safe_rich_render_width()):
+            return
+        if any("\n" in line for line in (*hero_lines, *enemy_lines)):
+            self.say("Party:")
+            for line in hero_lines:
+                self.say(line)
+            self.say("Enemies:")
+            for line in enemy_lines:
+                self.say(line)
+            return
         self.say("Party: " + " | ".join(hero_lines))
         self.say("Enemies: " + " | ".join(enemy_lines))
 
@@ -1413,15 +1432,20 @@ class CombatResolutionMixin:
         active_conditions = [self.status_name(name) for name, value in creature.conditions.items() if value != 0]
         conditions = f" ({', '.join(active_conditions)})" if active_conditions else ""
         temp = f", temp {creature.temp_hp}" if creature.temp_hp else ""
-        mp = f", MP {magic_point_summary(creature)}" if creature.max_resources.get("mp", 0) > 0 else ""
         if creature.dead:
             return f"{self.style_name(creature)}: {self.format_health_bar(0, creature.max_hp)} (dead){conditions}"
         if creature.current_hp == 0 and not creature.dead:
             return f"{self.style_name(creature)}: {self.format_health_bar(0, creature.max_hp)} (down){conditions}"
-        return (
-            f"{self.style_name(creature)}: {self.format_health_bar(creature.current_hp, creature.max_hp)}, "
-            f"AC {self.effective_armor_class(creature)}{temp}{mp}{conditions}"
+        name = self.style_name(creature)
+        line = (
+            f"{name}: {self.format_health_bar(creature.current_hp, creature.max_hp)}, "
+            f"AC {self.effective_armor_class(creature)}{temp}{conditions}"
         )
+        magic_bar = self.format_member_magic_bar(creature)
+        if magic_bar is None:
+            return line
+        indent = " " * len(f"{strip_ansi(name)}: ")
+        return f"{line}\n{indent}{magic_bar}"
 
     def handle_defeat(self, reason: str) -> None:
         play_sound_effect = getattr(self, "play_sound_effect", None)
