@@ -203,6 +203,50 @@ class Act2SmokeTests(unittest.TestCase):
             ["Glasswater Intake Yard", "Glasswater Valve Hall", "Glasswater Filter Beds", "Brother Merik Sorn"],
         )
 
+    def test_conyberry_agatha_smoke_route_reaches_hub_with_clean_warning(self) -> None:
+        game = self.make_game(
+            seed=940042,
+            current_scene="conyberry_agatha",
+            flags={
+                "act2_started": True,
+                "act2_town_stability": 3,
+                "act2_route_control": 2,
+                "act2_whisper_pressure": 2,
+            },
+        )
+        game.skill_check = lambda actor, skill, dc, context: True  # type: ignore[method-assign]
+
+        def fake_scenario_choice(prompt: str, options: list[str], **kwargs) -> int:
+            if prompt == "How do you answer the frightened road before the circuit answers it for you?":
+                return self.option_index_containing(options, "Steady the whole group")
+            if prompt == "How do you read the waymarker cairn before the circuit closes around it?":
+                return self.option_index_containing(options, "chapel line first")
+            if prompt == "How do you answer the Chapel of Lamps?":
+                return self.option_index_containing(options, "Relight the chapel")
+            if prompt == "Which second part of the circuit do you answer before Agatha speaks?":
+                return self.option_index_containing(options, "Grave Ring")
+            if prompt == "How do you read the Grave Ring?":
+                return self.option_index_containing(options, "Name the dead aloud")
+            if prompt == "How do you approach the banshee's truth?":
+                return self.option_index_containing(options, "We are not here to plunder your dead")
+            if prompt == "How do you carry Agatha's warning out of Conyberry?":
+                return self.option_index_containing(options, "Share it publicly")
+            raise AssertionError(f"Unexpected prompt: {prompt!r}")
+
+        game.scenario_choice = fake_scenario_choice  # type: ignore[method-assign]
+        game.scene_conyberry_agatha()
+
+        assert game.state is not None
+        self.assertEqual(game.state.current_scene, "act2_expedition_hub")
+        self.assertTrue(game.state.flags["conyberry_pilgrims_steadied"])
+        self.assertTrue(game.state.flags["conyberry_cairn_ward_read"])
+        self.assertTrue(game.state.flags["conyberry_chapel_relit"])
+        self.assertTrue(game.state.flags["conyberry_dead_named"])
+        self.assertEqual(game.state.flags["conyberry_second_site"], "grave")
+        self.assertEqual(game.state.flags["conyberry_warning_exit_choice"], "public")
+        self.assertTrue(game.state.flags["agatha_truth_secured"])
+        self.assertTrue(game.state.flags["agatha_truth_clear"])
+
     def test_midpoint_convergence_smoke_records_pattern_and_returns_to_hub(self) -> None:
         game = self.make_game(
             seed=94005,

@@ -518,14 +518,14 @@
   "xp": 250,
   "gold": 80,
   "inventory": {
-    "chain_mail_common": 2,
-    "longsword_common": 2,
-    "shield_common": 3,
-    "potion_healing": 4,
-    "scale_mail_common": 1,
-    "mace_common": 1,
-    "studded_leather_common": 1,
-    "longbow_common": 1
+    "E0004": 2,
+    "E0097": 2,
+    "E0060": 3,
+    "C0011": 4,
+    "E0012": 1,
+    "E0102": 1,
+    "E0018": 1,
+    "E0093": 1
   },
   "short_rests_remaining": 2
 }

@@ -41,6 +41,11 @@ ACT_2_POST_COMBAT_RANDOM_ENCOUNTERS: tuple[tuple[str, str, str], ...] = (
     ("obsidian_shard_outcrop", "Obsidian Shard Outcrop", "random_encounter_act2_scaffold"),
     ("broken_lift_cradle", "Broken Lift Cradle", "random_encounter_act2_scaffold"),
     ("hushed_campfire", "Hushed Campfire", "random_encounter_act2_scaffold"),
+    ("false_route_beacon", "False-Route Beacon", "random_encounter_act2_scaffold"),
+    ("choir_map_ambush", "Choir Map Ambush", "random_encounter_act2_scaffold"),
+    ("resonance_bleed_pool", "Resonance Bleed Pool", "random_encounter_act2_scaffold"),
+    ("black_lake_verdict", "Black Lake Verdict", "random_encounter_act2_scaffold"),
+    ("forge_heatshadow", "Forge Heatshadow", "random_encounter_act2_scaffold"),
 )
 ACT_3_POST_COMBAT_RANDOM_ENCOUNTERS: tuple[tuple[str, str, str], ...] = ()
 
@@ -70,6 +75,12 @@ class RandomEncounterMixin:
             return bool(self.state.flags.get("saved_wounded_messenger")) and not bool(self.state.flags.get("messenger_return_paid"))
         if encounter_id == "smuggler_revenge_squad":
             return bool(self.state.flags.get("smuggler_revenge_pending")) and not bool(self.state.flags.get("smuggler_revenge_resolved"))
+        if encounter_id == "resonance_bleed_pool":
+            return bool(self.state.flags.get("stonehollow_dig_cleared") or self.state.flags.get("wave_echo_reached"))
+        if encounter_id == "black_lake_verdict":
+            return bool(self.state.flags.get("wave_echo_outer_cleared") or self.state.flags.get("black_lake_crossed"))
+        if encounter_id == "forge_heatshadow":
+            return bool(self.state.flags.get("black_lake_crossed"))
         return True
 
     def weighted_post_combat_random_encounter_pool(self) -> list[tuple[str, str, str]]:
@@ -212,6 +223,118 @@ class RandomEncounterMixin:
 
     def random_encounter_act2_scaffold(self, encounter_id: str) -> None:
         assert self.state is not None
+        if encounter_id == "false_route_beacon":
+            self.random_encounter_intro(
+                "A route beacon ahead glows too cleanly for a cave this wet, and the claim ribbons tied around it point three different directions at once."
+            )
+            enemies = [create_enemy("false_map_skirmisher")]
+            if len(self.state.party_members()) >= 4 or int(self.state.flags.get("act2_route_control", 2)) <= 2:
+                enemies.append(create_enemy("claimbinder_notary"))
+            else:
+                enemies.append(create_enemy("expedition_reaver"))
+            outcome = self.resolve_random_encounter_fight(
+                title="False-Route Beacon",
+                description="A sabotage team tries to turn the next route correction into a killing lane.",
+                enemies=enemies,
+                parley_dc=14,
+                setback_text="The beacon team cuts the route sign, steals a little coin, and leaves the company following the wrong map for an ugly half hour.",
+                flee_text="You back off before the false-route team can drag the whole fight onto their prepared line.",
+            )
+            if outcome == "victory":
+                self.grant_random_encounter_rewards(
+                    reason="the false-route beacon",
+                    gold=6,
+                    items={"delvers_amber": 1},
+                )
+            return
+        if encounter_id == "choir_map_ambush":
+            self.random_encounter_intro(
+                "Pinned under a shard spike, you find half-burned survey sheets that only make sense once the ambushers waiting for you decide the reading is over."
+            )
+            enemies = [create_enemy("choir_cartographer")]
+            if len(self.state.party_members()) >= 4:
+                enemies.append(create_enemy("memory_taker_adept"))
+            else:
+                enemies.append(create_enemy("cult_lookout"))
+            if int(self.state.flags.get("act2_whisper_pressure", 2)) >= 4 and len(self.state.party_members()) >= 4:
+                enemies.append(create_enemy("blackglass_listener"))
+            outcome = self.resolve_random_encounter_fight(
+                title="Choir Map Ambush",
+                description="A Quiet Choir route cell tries to kill witnesses before the real map can be read.",
+                enemies=enemies,
+                parley_dc=15,
+                flee_text="You slip out before the cartographer can finish turning the whole branch into a prepared crossfire.",
+            )
+            if outcome == "victory":
+                self.grant_random_encounter_rewards(
+                    reason="the choir map satchel",
+                    items={"scroll_clarity": 1},
+                )
+            return
+        if encounter_id == "resonance_bleed_pool":
+            self.random_encounter_intro(
+                "A still pool ahead hums with the kind of wrong calm that means something in it has already heard you and is deciding what that means."
+            )
+            enemies = [create_enemy("blackglass_listener")]
+            if len(self.state.party_members()) >= 4 or int(self.state.flags.get("act2_whisper_pressure", 2)) >= 4:
+                enemies.append(create_enemy("resonance_leech"))
+            outcome = self.resolve_random_encounter_fight(
+                title="Resonance Bleed Pool",
+                description="A living resonance pocket and the thing feeding on it lash out before the company can pass cleanly.",
+                enemies=enemies,
+                allow_parley=False,
+                flee_text="You give the pool a wider berth and refuse to become one more rhythm it gets to remember.",
+            )
+            if outcome == "victory":
+                self.grant_random_encounter_rewards(
+                    reason="the resonance bleed",
+                    items={"thoughtward_draught": 1, "resonance_tonic": 1},
+                )
+            return
+        if encounter_id == "black_lake_verdict":
+            self.random_encounter_intro(
+                "At a narrow threshold above black water, old script wakes across the stone just long enough for a guardian shape to decide whether you count as permitted."
+            )
+            enemies = [create_enemy("pact_archive_warden")]
+            if self.state.flags.get("black_lake_crossed") or int(self.state.flags.get("act2_whisper_pressure", 2)) >= 4:
+                enemies.append(create_enemy("blacklake_adjudicator"))
+            elif len(self.state.party_members()) >= 4:
+                enemies.append(create_enemy("starblighted_miner"))
+            outcome = self.resolve_random_encounter_fight(
+                title="Black Lake Verdict",
+                description="Threshold guardians try to deny you access by force and old authority both.",
+                enemies=enemies,
+                allow_parley=False,
+                flee_text="You retreat from the threshold before the verdict can land cleanly.",
+            )
+            if outcome == "victory":
+                self.grant_random_encounter_rewards(
+                    reason="the threshold reliquary",
+                    items={"scroll_guardian_light": 1, "fireward_elixir": 1},
+                )
+            return
+        if encounter_id == "forge_heatshadow":
+            self.random_encounter_intro(
+                "Forge-light crawls along the wall ahead without any visible fire feeding it, and the moving shadow inside that glow suddenly decides it prefers flesh to stone."
+            )
+            enemies = [create_enemy("forge_echo_stalker")]
+            if len(self.state.party_members()) >= 4:
+                enemies.append(create_enemy("memory_taker_adept"))
+            elif int(self.state.flags.get("act2_whisper_pressure", 2)) >= 4:
+                enemies.append(create_enemy("blackglass_listener"))
+            outcome = self.resolve_random_encounter_fight(
+                title="Forge Heatshadow",
+                description="A forge-born hunter and a trailing Choir cutter try to finish an already tired company.",
+                enemies=enemies,
+                allow_parley=False,
+                flee_text="You break sight with the heatshadow before it can choose a better angle.",
+            )
+            if outcome == "victory":
+                self.grant_random_encounter_rewards(
+                    reason="the heatshadow kill site",
+                    items={"resonance_tonic": 1},
+                )
+            return
         details = {
             "echoing_supply_cache": {
                 "intro": "A supply cache wedged behind broken timbers answers every footstep with the wrong echo, as if the stone behind it is deeper than the wall allows.",

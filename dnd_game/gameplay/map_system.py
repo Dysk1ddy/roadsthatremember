@@ -1361,7 +1361,7 @@ class MapSystemMixin:
             return
 
     def handle_meta_command(self, raw: str) -> bool:
-        lowered = raw.lower()
+        lowered = raw.strip().lower()
         if lowered in {"map", "maps", "map menu"}:
             if self.state is None:
                 self.say("There is no active map yet.")
@@ -3038,9 +3038,9 @@ class MapSystemMixin:
             "The yard is a working lie. Rope slings, valve keys, repair sledges, and stacked supply tins make it look like a maintenance annex held together by hard people. "
             "Then you notice which crates are guarded harder than the tools."
         )
-        enemies = [create_enemy("cult_lookout"), create_enemy("expedition_reaver")]
+        enemies = [create_enemy("false_map_skirmisher"), create_enemy("expedition_reaver")]
         if delayed:
-            enemies.append(create_enemy("cult_lookout"))
+            enemies.append(create_enemy("claimbinder_notary"))
         elif len(self.state.party_members()) >= 4:
             enemies.append(create_enemy("cult_lookout"))
         hero_bonus = self.apply_scene_companion_support("glasswater_intake")
@@ -3138,7 +3138,7 @@ class MapSystemMixin:
         assert self.state is not None
         delayed = self._glasswater_delayed()
         self.say("Bronze wheels, pressure rods, and mineral-white spray turn the Valve Hall into a storm someone taught to obey numbers.")
-        enemies = [create_enemy("animated_armor")]
+        enemies = [create_enemy("pact_archive_warden")]
         if delayed or not self.state.flags.get("glasswater_maintenance_route_open"):
             enemies.append(create_enemy("animated_armor"))
         hero_bonus = self.apply_scene_companion_support("glasswater_intake")
@@ -3568,11 +3568,11 @@ class MapSystemMixin:
         merik = create_enemy("choir_adept", name="Brother Merik Sorn")
         enemies = [merik]
         if not self.state.flags.get("glasswater_support_pressure_cut"):
-            enemies.append(create_enemy("animated_armor"))
+            enemies.append(create_enemy("pact_archive_warden"))
         if delayed:
-            enemies.append(create_enemy("expedition_reaver"))
+            enemies.append(create_enemy("claimbinder_notary"))
         elif len(self.state.party_members()) >= 4:
-            enemies.append(create_enemy("cult_lookout"))
+            enemies.append(create_enemy("false_map_skirmisher"))
 
         hero_bonus = self.apply_scene_companion_support("glasswater_intake")
         if self.state.flags.get("glasswater_valves_stabilized"):
@@ -3840,11 +3840,11 @@ class MapSystemMixin:
     def _broken_prospect_sentinel_span(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
         assert self.state is not None
         self.say("The sentinel span crosses old dwarfwork where a suit of armor still remembers a duty nobody living gave it.")
-        enemies = [create_enemy("animated_armor")]
+        enemies = [create_enemy("pact_archive_warden")]
         if self.act2_metric_value("act2_whisper_pressure") >= 4:
-            enemies.append(self.act2_pick_enemy(("obelisk_eye", "iron_prayer_horror")))
+            enemies.append(self.act2_pick_enemy(("blacklake_adjudicator", "obelisk_eye")))
         elif len(self.state.party_members()) >= 4:
-            enemies.append(self.act2_pick_enemy(("cult_lookout", "grimlock_tunneler", "starblighted_miner")))
+            enemies.append(self.act2_pick_enemy(("blackglass_listener", "grimlock_tunneler", "starblighted_miner")))
         hero_bonus = self.apply_scene_companion_support("broken_prospect")
         if self.state.flags.get("prospect_markers_decoded"):
             hero_bonus += 1
@@ -3928,11 +3928,11 @@ class MapSystemMixin:
         delayed = self._broken_prospect_delayed()
         enemies = [create_enemy("spectral_foreman")]
         if not self.state.flags.get("prospect_sentinel_span_cleared"):
-            enemies.insert(0, create_enemy("animated_armor"))
+            enemies.insert(0, create_enemy("pact_archive_warden"))
         if delayed or self.act2_metric_value("act2_route_control") <= 2:
-            enemies.append(self.act2_pick_enemy(("cult_lookout", "iron_prayer_horror", "obelisk_eye")))
+            enemies.append(self.act2_pick_enemy(("blackglass_listener", "survey_chain_revenant", "obelisk_eye")))
         if len(self.state.party_members()) >= 4:
-            enemies.append(self.act2_pick_enemy(("cult_lookout", "grimlock_tunneler", "starblighted_miner")))
+            enemies.append(self.act2_pick_enemy(("cult_lookout", "grimlock_tunneler", "survey_chain_revenant")))
         hero_bonus = 0
         if self.state.flags.get("nim_countermeasure_notes"):
             hero_bonus += 1
@@ -4340,13 +4340,13 @@ class MapSystemMixin:
     def _south_adit_warden_nave(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
         assert self.state is not None
         delayed = self._south_adit_delayed()
-        enemies = [create_enemy("starblighted_miner"), create_enemy("choir_adept")]
+        enemies = [create_enemy("survey_chain_revenant"), create_enemy("choir_adept")]
         if delayed:
-            enemies.append(self.act2_pick_enemy(("cult_lookout", "oathbroken_revenant")))
+            enemies.append(self.act2_pick_enemy(("memory_taker_adept", "oathbroken_revenant")))
         elif len(self.state.party_members()) >= 4:
-            enemies.append(self.act2_pick_enemy(("cult_lookout", "choir_executioner")))
+            enemies.append(self.act2_pick_enemy(("memory_taker_adept", "choir_executioner")))
         if len(self.state.party_members()) >= 4:
-            enemies.append(self.act2_pick_enemy(("cult_lookout", "grimlock_tunneler", "starblighted_miner")))
+            enemies.append(self.act2_pick_enemy(("cult_lookout", "memory_taker_adept", "survey_chain_revenant")))
 
         hero_bonus = self.apply_scene_companion_support("south_adit")
         cadence = self._south_adit_prison_cadence(delayed=delayed)
@@ -4760,6 +4760,7 @@ class MapSystemMixin:
             )
             self.state.flags["black_lake_seen"] = True
         self._black_lake_apply_south_adit_payoff()
+        self._black_lake_apply_conyberry_payoff()
         choice = self.scenario_choice(
             "What do you read first on the crossing?",
             [
@@ -4814,6 +4815,29 @@ class MapSystemMixin:
             "act2_whisper_pressure",
             1,
             "the Choir's South Adit reserve line reaches Black Lake before the survivors can break its rhythm",
+        )
+
+    def _black_lake_apply_conyberry_payoff(self) -> None:
+        assert self.state is not None
+        if not self.state.flags.get("conyberry_chapel_relit"):
+            return
+        if not self.state.flags.get("black_lake_conyberry_lamp_guidance"):
+            self.state.flags["black_lake_conyberry_lamp_guidance"] = True
+            self.state.flags["black_lake_shrine_route_marked"] = True
+            self.say(
+                "The lamp discipline you restored at Conyberry catches at the Black Lake shrine before the water can make it sound like only drowning prayers belong here."
+            )
+            self.add_clue(
+                "Conyberry's relit Chapel of Lamps gives the Black Lake shrine a clean line to answer before the Forge can drown it in Choir rhythm."
+            )
+        if self.state.flags.get("conyberry_chapel_pressure_payoff_applied"):
+            return
+        self.state.flags["conyberry_chapel_pressure_payoff_applied"] = True
+        self.state.flags["black_lake_conyberry_pressure_payoff"] = True
+        self.act2_shift_metric(
+            "act2_whisper_pressure",
+            -1,
+            "Conyberry's relit chapel gives the Black Lake crossing one disciplined prayer the Choir cannot turn into panic",
         )
 
     def _black_lake_drowned_shrine(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
@@ -5298,11 +5322,11 @@ class MapSystemMixin:
 
     def _forge_shard_channels(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
         assert self.state is not None
-        enemies = [create_enemy("obelisk_eye"), create_enemy("starblighted_miner")]
+        enemies = [create_enemy("obelisk_eye"), create_enemy("obelisk_chorister")]
         if self.act2_metric_value("act2_whisper_pressure") >= 4:
-            enemies.append(self.act2_pick_enemy(("iron_prayer_horror", "obelisk_eye", "starblighted_miner")))
+            enemies.append(self.act2_pick_enemy(("covenant_breaker_wight", "forge_echo_stalker", "obelisk_eye")))
         elif len(self.state.party_members()) >= 4:
-            enemies.append(self.act2_pick_enemy(("cult_lookout", "starblighted_miner", "obelisk_eye")))
+            enemies.append(self.act2_pick_enemy(("blackglass_listener", "forge_echo_stalker", "obelisk_chorister")))
         hero_bonus = self.apply_scene_companion_support("forge_of_spells")
         if self.state.flags.get("black_lake_causeway_shaken"):
             hero_bonus += 1
@@ -5373,6 +5397,23 @@ class MapSystemMixin:
                     "Irielle Ashwake",
                     "This is the part the Choir never lets witnesses describe twice. Trust the second thought, not the first one it gives you.",
                 )
+        conyberry_sigil_copied = bool(self.state.flags.get("conyberry_sigil_copied"))
+        if conyberry_sigil_copied:
+            self.say(
+                "The copied Conyberry sigil makes one strand of the lens painfully legible: the Choir is still teaching old service-wards to obey without looking conquered."
+            )
+            if not self.state.flags.get("forge_conyberry_sigil_risk_applied"):
+                self.state.flags["forge_conyberry_sigil_risk_applied"] = True
+                if self.state.flags.get("agatha_warning_bound"):
+                    self.state.flags["forge_conyberry_sigil_bound_safely"] = True
+                    self.say("Because Agatha's warning was bound before it left Conyberry, the copied mark stays a key instead of becoming an open wound.")
+                else:
+                    self.state.flags["forge_conyberry_sigil_moral_risk"] = True
+                    self.act2_shift_metric(
+                        "act2_whisper_pressure",
+                        1,
+                        "using Conyberry's copied wound against the Forge gives the Choir one more live shape to answer through",
+                    )
         dc = 15
         if self.state.flags.get("black_lake_shrine_purified"):
             dc -= 1
@@ -5381,6 +5422,8 @@ class MapSystemMixin:
         if self.state.flags.get("black_lake_causeway_shaken") or self.state.flags.get("black_lake_anchor_weak_point_found"):
             dc -= 1
         if self.state.flags.get("forge_anvil_tuned"):
+            dc -= 1
+        if conyberry_sigil_copied:
             dc -= 1
         choice = self.scenario_choice(
             "How do you map the resonance lens before facing Caldra?",
@@ -5422,6 +5465,9 @@ class MapSystemMixin:
                 self.state.flags["forge_ritual_line_broken"] = True
             if self.state.flags.get("forge_shard_channels_disrupted"):
                 self.state.flags["forge_shard_line_broken"] = True
+            if conyberry_sigil_copied:
+                self.state.flags["forge_lens_conyberry_sigil_used"] = True
+                self.add_journal("You used Conyberry's copied sigil to read one of the Forge lens's obedience seams before Caldra could hide it.")
             self.add_clue("The resonance lens only held because Caldra was braiding witness, ritual, and shard pressure into one engineered lie.")
             self.add_journal("You mapped the resonance lens from inside and learned exactly which lines were keeping Caldra's certainty standing.")
             self.reward_party(xp=15, reason="mapping the resonance lens before the final confrontation")
@@ -5433,15 +5479,15 @@ class MapSystemMixin:
         high_pressure = self.act2_metric_value("act2_whisper_pressure") >= 4
         hard_route = self.act2_metric_value("act2_route_control") <= 2 or self.act2_party_has_strong_route_gear()
         full_party = len(self.state.party_members()) >= 4
-        enemies = [create_enemy("caldra_voss"), create_enemy("choir_adept")]
+        enemies = [create_enemy("caldra_voss"), create_enemy("obelisk_chorister")]
         if full_party:
-            enemies.append(self.act2_pick_enemy(("cult_lookout", "starblighted_miner", "choir_executioner")))
+            enemies.append(self.act2_pick_enemy(("forge_echo_stalker", "memory_taker_adept", "choir_executioner")))
         if self.state.flags.get("black_lake_barracks_raided") and full_party and (hard_route or high_pressure):
-            enemies.append(self.act2_pick_enemy(("cult_lookout", "starblighted_miner")))
+            enemies.append(self.act2_pick_enemy(("memory_taker_adept", "forge_echo_stalker")))
         elif not self.state.flags.get("black_lake_barracks_raided"):
-            enemies.append(self.act2_pick_enemy(("cult_lookout", "choir_executioner", "starblighted_miner")))
+            enemies.append(self.act2_pick_enemy(("memory_taker_adept", "choir_executioner", "starblighted_miner")))
         if high_pressure:
-            enemies.append(self.act2_pick_enemy(("starblighted_miner", "obelisk_eye", "iron_prayer_horror")))
+            enemies.append(self.act2_pick_enemy(("forge_echo_stalker", "obelisk_eye", "covenant_breaker_wight")))
 
         hero_bonus = self.apply_scene_companion_support("forge_of_spells")
         parley_dc = 15
@@ -6156,6 +6202,7 @@ class MapSystemMixin:
         self.handle_varyn_bloodied_reposition(encounter, target, previous_hp)
         self.handle_rukhar_bloodied_order(encounter, target, previous_hp)
         self.clear_barracks_shield_line_if_bearer_downed(encounter, target)
+        self.handle_claimbinder_objection_break(target)
 
     def handle_vaelith_bloodied_ward(self, encounter, target, previous_hp: int) -> None:
         if not self.is_old_owl_vaelith_encounter(encounter):
@@ -6243,6 +6290,19 @@ class MapSystemMixin:
             if enemy is not target:
                 self.clear_status(enemy, "guarded")
         self.say(f"{target.name}'s shield line collapses, and the barracks formation finally opens.")
+
+    def handle_claimbinder_objection_break(self, target) -> None:
+        if getattr(target, "archetype", "") != "claimbinder_notary":
+            return
+        marked_name = str(target.bond_flags.pop("objection_target", "")).strip()
+        if not marked_name:
+            return
+        heroes = list(getattr(self, "_active_combat_heroes", []))
+        marked_hero = next((hero for hero in heroes if hero.name == marked_name), None)
+        if marked_hero is None or not marked_hero.bond_flags.pop("marked_by_claimbinder", None):
+            return
+        self.clear_status(marked_hero, "marked")
+        self.say(f"{target.name}'s objection collapses the instant the notary is hit, and {marked_hero.name} drops off the filed target list.")
 
     def combat_damage_pressure_score(self, hero) -> tuple[int, int, int]:
         class_pressure = {

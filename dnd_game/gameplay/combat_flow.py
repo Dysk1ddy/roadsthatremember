@@ -30,6 +30,7 @@ class CombatFlowMixin:
         previous_active_encounter = getattr(self, "_active_encounter", None)
         previous_active_heroes = getattr(self, "_active_combat_heroes", None)
         previous_active_enemies = getattr(self, "_active_combat_enemies", None)
+        previous_active_round = getattr(self, "_active_round_number", None)
         self._in_combat = True
         heroes: list[Character] = []
         enemies: list[Character] = []
@@ -63,6 +64,7 @@ class CombatFlowMixin:
             )
             round_number = 1
             while True:
+                self._active_round_number = round_number
                 if not any(enemy.is_conscious() for enemy in enemies):
                     return self.resolve_encounter_victory(encounter, enemies)
                 if not any(hero.is_conscious() for hero in heroes):
@@ -110,6 +112,7 @@ class CombatFlowMixin:
             self._active_encounter = previous_active_encounter
             self._active_combat_heroes = previous_active_heroes
             self._active_combat_enemies = previous_active_enemies
+            self._active_round_number = previous_active_round
             self._in_combat = False
             if callable(refresh_scene_music):
                 refresh_scene_music()
@@ -196,12 +199,23 @@ class CombatFlowMixin:
         archetypes = {enemy.archetype for enemy in living}
         races = {enemy.race for enemy in living}
 
-        if archetypes & {"caldra_voss", "choir_adept", "cult_lookout", "choir_executioner"}:
-            return "cult_lookout"
+        if archetypes & {
+            "caldra_voss",
+            "choir_adept",
+            "cult_lookout",
+            "choir_executioner",
+            "claimbinder_notary",
+            "choir_cartographer",
+            "memory_taker_adept",
+            "obelisk_chorister",
+        }:
+            return "false_map_skirmisher" if target_level >= 4 else "cult_lookout"
         if "undead" in tags or "Undead" in races:
+            if target_level >= 5:
+                return "survey_chain_revenant"
             return "lantern_fen_wisp" if target_level >= 3 else "skeletal_sentry"
         if "construct" in tags or "Construct" in races:
-            return "animated_armor"
+            return "pact_archive_warden" if target_level >= 4 else "animated_armor"
         if "plant" in tags or "Plant" in races:
             return "briar_twig"
         if "ooze" in tags or "Ooze" in races:
@@ -209,7 +223,11 @@ class CombatFlowMixin:
         if "beast" in tags or "Beast" in races:
             return "stirge_swarm" if target_level >= 3 else "wolf"
         if "aberration" in tags or "Aberration" in races:
-            return "blacklake_pincerling" if target_level >= 4 else "nothic"
+            if target_level >= 6:
+                return "forge_echo_stalker"
+            if target_level >= 4:
+                return "blackglass_listener"
+            return "nothic"
         if "monstrosity" in tags or "Monstrosity" in races:
             if target_level >= 4:
                 return "carrion_lash_crawler"
@@ -227,6 +245,8 @@ class CombatFlowMixin:
         if "humanoid" in tags or races & {"Human", "Humanoid", "Hobgoblin"}:
             if archetypes & {"gutter_zealot", "ember_channeler"}:
                 return "gutter_zealot"
+            if target_level >= 5 and archetypes & {"expedition_reaver", "false_map_skirmisher", "claimbinder_notary"}:
+                return "claimbinder_notary"
             if target_level >= 3 and archetypes & {"expedition_reaver", "starblighted_miner"}:
                 return "expedition_reaver"
             return "bandit_archer"
@@ -259,6 +279,414 @@ class CombatFlowMixin:
         if not marked:
             return None
         return max(marked, key=lambda hero: (hero.attack_bonus(), hero.current_hp))
+
+    def hero_has_positive_combat_status(self, hero: Character) -> bool:
+        return any(self.has_status(hero, status) for status in ("blessed", "emboldened", "guarded", "invisible"))
+
+    def act2_expansion_enemy_turn(
+        self,
+        actor: Character,
+        conscious_heroes: list[Character],
+        conscious_allies: list[Character],
+        heroes: list[Character],
+        enemies: list[Character],
+        dodging: set[str],
+        marked_target: Character | None,
+    ) -> bool:
+        if actor.archetype == "false_map_skirmisher" and actor.resources.get("route_splice", 0) > 0:
+            target = marked_target or max(conscious_heroes, key=lambda hero: (hero.attack_bonus(), hero.current_hp))
+            actor.resources["route_splice"] = 0
+            self.apply_status(actor, "emboldened", 1, source=f"{actor.name}'s route splice")
+            self.apply_status(target, "marked", 1, source=f"{actor.name}'s false trail")
+            self.say(f"{actor.name} cuts a false route into the fight and leaves {target.name} standing where every ally can read the trap.")
+            return True
+        if actor.archetype == "false_map_skirmisher" and actor.resources.get("mislead_step", 0) > 0:
+            target = marked_target or max(conscious_heroes, key=lambda hero: (hero.attack_bonus(), hero.current_hp))
+            actor.resources["mislead_step"] = 0
+            self.say(f"{actor.name} vanishes behind a survey post and steps back into the line at {target.name}'s blind angle.")
+            if not self.saving_throw(target, "DEX", 13, context=f"against {actor.name}'s mislead step"):
+                self.apply_status(target, "reeling", 1, source=f"{actor.name}'s mislead step")
+            else:
+                self.say(f"{target.name} refuses the wrong angle and keeps their footing.")
+            return True
+        if actor.archetype == "claimbinder_notary" and actor.resources.get("seizure_order", 0) > 0:
+            target = marked_target or max(
+                conscious_heroes,
+                key=lambda hero: (
+                    1 if self.hero_has_positive_combat_status(hero) else 0,
+                    hero.attack_bonus(),
+                    hero.current_hp,
+                ),
+            )
+            actor.resources["seizure_order"] = 0
+            self.say(f"{actor.name} raises a seal-stamped writ and declares {target.name}'s footing unauthorized.")
+            if not self.saving_throw(target, "WIS", 14, context=f"against {actor.name}'s seizure order"):
+                removed: list[str] = []
+                for status in ("blessed", "emboldened", "guarded"):
+                    if self.has_status(target, status):
+                        self.clear_status(target, status)
+                        removed.append(status)
+                self.apply_status(target, "reeling", 2, source=f"{actor.name}'s seizure order")
+                if removed:
+                    self.say(f"{target.name}'s {', '.join(removed)} buffer collapses under the notary's verdict.")
+            else:
+                self.say(f"{target.name} refuses to let paperwork become a weapon.")
+            return True
+        if actor.archetype == "claimbinder_notary" and actor.resources.get("filed_objection", 0) > 0 and marked_target is None:
+            target = max(conscious_heroes, key=lambda hero: (hero.attack_bonus(), hero.current_hp))
+            actor.resources["filed_objection"] = 0
+            actor.bond_flags["objection_target"] = target.name
+            target.bond_flags["marked_by_claimbinder"] = True
+            self.apply_status(target, "marked", 2, source=f"{actor.name}'s filed objection")
+            self.say(f"{actor.name} names {target.name} in a cutting objection and every ally in earshot immediately starts hunting the citation.")
+            return True
+        if actor.archetype == "echo_sapper" and actor.resources.get("survey_charge", 0) > 0:
+            target = min(conscious_heroes, key=lambda hero: (hero.current_hp, hero.armor_class))
+            actor.resources["survey_charge"] = 0
+            self.say(f"{actor.name} slams a breach hammer into the floor and sends a survey charge under {target.name}'s feet.")
+            if not self.saving_throw(target, "DEX", 14, context=f"against {actor.name}'s survey charge"):
+                actual = self.apply_damage(
+                    target,
+                    self.roll_with_display_bonus(
+                        "2d6",
+                        style="damage",
+                        context_label=f"{actor.name}'s survey charge",
+                        outcome_kind="damage",
+                    ).total,
+                    damage_type="force",
+                )
+                self.say(f"{target.name} takes {self.style_damage(actual)} force damage as the ground kicks up under them.")
+                self.announce_downed_target(target)
+                if target.is_conscious():
+                    self.apply_status(target, "prone", 1, source=f"{actor.name}'s survey charge")
+            else:
+                self.say(f"{target.name} rides the crack and keeps clear of the worst of it.")
+            return True
+        if actor.archetype == "echo_sapper" and actor.resources.get("dust_blind", 0) > 0:
+            target = min(
+                conscious_heroes,
+                key=lambda hero: (
+                    0 if self.has_status(hero, "prone") or self.has_status(hero, "reeling") else 1,
+                    hero.current_hp,
+                    hero.armor_class,
+                ),
+            )
+            actor.resources["dust_blind"] = 0
+            self.say(f"{actor.name} follows the collapse with a shovel-kick of grit and lamp ash at {target.name}.")
+            if not self.saving_throw(target, "CON", 14, context=f"against {actor.name}'s dust blind"):
+                self.apply_status(target, "blinded", 1, source=f"{actor.name}'s dust blind")
+                if target.is_conscious() and (self.has_status(target, "prone") or self.has_status(target, "reeling")):
+                    self.apply_status(target, "reeling", 1, source=f"{actor.name}'s dust blind")
+            else:
+                self.say(f"{target.name} keeps enough of their vision to stay dangerous.")
+            return True
+        if actor.archetype == "pact_archive_warden" and actor.resources.get("access_denied", 0) > 0:
+            target = min(conscious_heroes, key=lambda hero: (hero.armor_class, hero.current_hp))
+            actor.resources["access_denied"] = 0
+            self.say(f"{actor.name} plants its spear and projects a hard ward line across {target.name}'s advance.")
+            if not self.saving_throw(target, "STR", 14, context=f"against {actor.name}'s access denied"):
+                self.apply_status(target, "reeling", 1, source=f"{actor.name}'s access denied")
+                if target.is_conscious() and self.has_status(target, "reeling"):
+                    self.apply_status(target, "prone", 1, source=f"{actor.name}'s access denied")
+            else:
+                self.say(f"{target.name} holds against the ward's shove.")
+            return True
+        if actor.archetype == "blackglass_listener" and actor.resources.get("overhear_intent", 0) > 0:
+            target = max(
+                conscious_heroes,
+                key=lambda hero: (
+                    1 if self.hero_has_positive_combat_status(hero) else 0,
+                    1 if hero.class_name in {"Bard", "Cleric", "Paladin", "Sorcerer", "Warlock", "Wizard"} else 0,
+                    hero.attack_bonus(),
+                    hero.current_hp,
+                ),
+            )
+            actor.resources["overhear_intent"] = 0
+            self.say(f"{actor.name} tilts its glass-black head and answers the thought {target.name} has not acted on yet.")
+            if not self.saving_throw(target, "WIS", 14, context=f"against {actor.name}'s overheard intent"):
+                self.apply_status(target, "frightened", 1, source=f"{actor.name}'s overheard intent")
+                self.apply_status(target, "reeling", 1, source=f"{actor.name}'s overheard intent")
+            else:
+                self.say(f"{target.name} forces the private thought back behind steel.")
+            return True
+        if actor.archetype == "blackglass_listener" and actor.resources.get("feedback_pulse", 0) > 0:
+            target = max(
+                conscious_heroes,
+                key=lambda hero: (
+                    1 if self.hero_has_positive_combat_status(hero) else 0,
+                    1 if hero.class_name in {"Bard", "Cleric", "Paladin", "Sorcerer", "Warlock", "Wizard"} else 0,
+                    hero.attack_bonus(),
+                    hero.current_hp,
+                ),
+            )
+            actor.resources["feedback_pulse"] = 0
+            self.say(f"{actor.name} snaps a feedback pulse into {target.name} where certainty and preparation are loudest.")
+            actual = self.apply_damage(
+                target,
+                self.roll_with_display_bonus(
+                    "2d6",
+                    style="damage",
+                    context_label=f"{actor.name}'s feedback pulse",
+                    outcome_kind="damage",
+                ).total,
+                damage_type="psychic",
+            )
+            self.say(f"{target.name} takes {self.style_damage(actual)} psychic damage from the pulse.")
+            self.announce_downed_target(target)
+            if target.is_conscious():
+                self.apply_status(target, "reeling", 1, source=f"{actor.name}'s feedback pulse")
+            return True
+        if actor.archetype == "choir_cartographer" and actor.resources.get("map_the_weakness", 0) > 0 and marked_target is None:
+            target = max(conscious_heroes, key=lambda hero: (hero.attack_bonus(), hero.current_hp))
+            actor.resources["map_the_weakness"] = 0
+            self.apply_status(target, "marked", 2, source=f"{actor.name}'s mapped weakness")
+            self.say(f"{actor.name} sketches one killing line through the fight and every ally around them immediately starts reading it.")
+            if conscious_allies:
+                ally = max(conscious_allies, key=lambda candidate: (candidate.attack_bonus(), candidate.current_hp))
+                self.apply_status(ally, "emboldened", 1, source=f"{actor.name}'s mapped weakness")
+            return True
+        if actor.archetype == "choir_cartographer" and actor.resources.get("stolen_route", 0) > 0 and conscious_allies:
+            actor.resources["stolen_route"] = 0
+            ally = min(conscious_allies, key=lambda candidate: (candidate.current_hp, candidate.armor_class))
+            self.apply_status(actor, "blessed", 1, source=f"{actor.name}'s stolen route")
+            self.apply_status(ally, "guarded", 1, source=f"{actor.name}'s stolen route")
+            self.say(f"{actor.name} folds one route over another and steals a safer angle for {ally.name}.")
+            return True
+        if actor.archetype == "resonance_leech" and actor.resources.get("drain_cadence", 0) > 0:
+            target = max(
+                conscious_heroes,
+                key=lambda hero: (
+                    1 if self.hero_has_positive_combat_status(hero) else 0,
+                    1 if self.has_status(hero, "frightened") or self.has_status(hero, "reeling") else 0,
+                    hero.attack_bonus(),
+                    hero.current_hp,
+                ),
+            )
+            actor.resources["drain_cadence"] = 0
+            self.say(f"{actor.name} latches onto the rhythm around {target.name} and starts drinking the strongest beat out of it.")
+            if not self.saving_throw(target, "CON", 14, context=f"against {actor.name}'s drain cadence"):
+                actual = self.apply_damage(
+                    target,
+                    self.roll_with_display_bonus(
+                        "2d6",
+                        style="damage",
+                        context_label=f"{actor.name}'s drain cadence",
+                        outcome_kind="damage",
+                    ).total,
+                    damage_type="psychic",
+                )
+                self.say(f"{target.name} takes {self.style_damage(actual)} psychic damage as the leech feeds.")
+                self.announce_downed_target(target)
+                for status in ("blessed", "emboldened", "guarded", "invisible"):
+                    if self.has_status(target, status):
+                        self.clear_status(target, status)
+                        break
+                actor.grant_temp_hp(8)
+            else:
+                self.say(f"{target.name} keeps the rhythm from settling into the leech's mouth.")
+            return True
+        if actor.archetype == "survey_chain_revenant" and actor.resources.get("drag_to_marker", 0) > 0 and not any(self.has_status(hero, "grappled") for hero in conscious_heroes):
+            target = min(conscious_heroes, key=lambda hero: (hero.current_hp, hero.armor_class))
+            actor.resources["drag_to_marker"] = 0
+            self.say(f"{actor.name} whips a survey chain around {target.name} and hauls them toward an old, unfinished mark.")
+            if not self.saving_throw(target, "STR", 15, context=f"against {actor.name}'s drag to marker"):
+                self.apply_status(target, "grappled", 2, source=f"{actor.name}'s drag to marker")
+                if target.is_conscious():
+                    self.apply_status(target, "reeling", 1, source=f"{actor.name}'s drag to marker")
+            else:
+                self.say(f"{target.name} tears clear before the chain can set.")
+            return True
+        if actor.archetype == "censer_horror" and actor.resources.get("hush_smoke", 0) > 0:
+            target = max(conscious_heroes, key=lambda hero: (hero.attack_bonus(), hero.current_hp))
+            actor.resources["hush_smoke"] = 0
+            self.say(f"{actor.name} swings wide, and the censer split spills hush-smoke straight into {target.name}'s lungs and eyes.")
+            if not self.saving_throw(target, "CON", 14, context=f"against {actor.name}'s hush smoke"):
+                self.apply_status(target, "blinded", 1, source=f"{actor.name}'s hush smoke")
+                self.apply_status(target, "reeling", 1, source=f"{actor.name}'s hush smoke")
+            else:
+                self.say(f"{target.name} coughs through the smoke without fully losing the line.")
+            return True
+        if actor.archetype == "memory_taker_adept" and actor.resources.get("erase_witness", 0) > 0:
+            target = max(
+                conscious_heroes,
+                key=lambda hero: (
+                    1 if self.hero_has_positive_combat_status(hero) else 0,
+                    hero.attack_bonus(),
+                    hero.current_hp,
+                ),
+            )
+            actor.resources["erase_witness"] = 0
+            self.say(f"{actor.name} cuts for the part of the fight {target.name} will still remember afterward.")
+            if not self.saving_throw(target, "WIS", 14, context=f"against {actor.name}'s erase witness"):
+                for status in ("guarded", "blessed", "emboldened"):
+                    if self.has_status(target, status):
+                        self.clear_status(target, status)
+                self.apply_status(target, "reeling", 2, source=f"{actor.name}'s erase witness")
+            else:
+                self.say(f"{target.name} keeps hold of what matters and refuses the edit.")
+            return True
+        if actor.archetype == "obelisk_chorister" and actor.resources.get("shard_hymn", 0) > 0:
+            target = max(conscious_heroes, key=lambda hero: (hero.attack_bonus(), hero.current_hp))
+            actor.resources["shard_hymn"] = 0
+            self.say(f"{actor.name} lifts a staff of shard-glass and sings one note the chamber was never meant to carry.")
+            if not self.saving_throw(target, "WIS", 15, context=f"against {actor.name}'s shard hymn"):
+                actual = self.apply_damage(
+                    target,
+                    self.roll_with_display_bonus(
+                        "3d6",
+                        style="damage",
+                        context_label=f"{actor.name}'s shard hymn",
+                        outcome_kind="damage",
+                    ).total,
+                    damage_type="psychic",
+                )
+                self.say(f"{target.name} takes {self.style_damage(actual)} psychic damage from the hymn.")
+                self.announce_downed_target(target)
+                if target.is_conscious():
+                    self.apply_status(target, "frightened", 2, source=f"{actor.name}'s shard hymn")
+                    self.apply_status(target, "reeling", 2, source=f"{actor.name}'s shard hymn")
+            else:
+                self.say(f"{target.name} hears the hymn without letting it become a command.")
+            return True
+        if actor.archetype == "obelisk_chorister" and actor.resources.get("choral_screen", 0) > 0:
+            actor.resources["choral_screen"] = 0
+            self.say(f"{actor.name} throws up a choral screen of shard-light and disciplined breath.")
+            for ally in [actor, *conscious_allies]:
+                ally.grant_temp_hp(6)
+                self.clear_status(ally, "frightened")
+            return True
+        if actor.archetype == "blacklake_adjudicator" and actor.resources.get("sentence_of_entry", 0) > 0:
+            target = max(conscious_heroes, key=lambda hero: (hero.attack_bonus(), hero.current_hp))
+            actor.resources["sentence_of_entry"] = 0
+            self.say(f"{actor.name} levels its pike and pronounces a sentence no trespasser was meant to survive hearing.")
+            if not self.saving_throw(target, "WIS", 15, context=f"against {actor.name}'s sentence of entry"):
+                self.apply_status(target, "frightened", 1, source=f"{actor.name}'s sentence of entry")
+                self.apply_status(target, "reeling", 2, source=f"{actor.name}'s sentence of entry")
+            else:
+                self.say(f"{target.name} holds their ground against the verdict.")
+            return True
+        if actor.archetype == "forge_echo_stalker" and actor.resources.get("heatshadow_prowl", 0) > 0 and not self.has_status(actor, "invisible"):
+            actor.resources["heatshadow_prowl"] = 0
+            self.apply_status(actor, "invisible", 1, source=f"{actor.name}'s heatshadow prowl")
+            self.apply_status(actor, "emboldened", 1, source=f"{actor.name}'s heatshadow prowl")
+            self.say(f"{actor.name} smears into forge-light and vanishes into the heatshadow between one blink and the next.")
+            return True
+        if actor.archetype == "forge_echo_stalker" and actor.resources.get("answering_screech", 0) > 0:
+            target = next((hero for hero in conscious_heroes if self.has_status(hero, "reeling")), None)
+            if target is not None:
+                actor.resources["answering_screech"] = 0
+                self.say(f"{actor.name} answers {target.name}'s stagger with a shriek that sounds like the forge itself recognizing weakness.")
+                if not self.saving_throw(target, "CON", 15, context=f"against {actor.name}'s answering screech"):
+                    actual = self.apply_damage(
+                        target,
+                        self.roll_with_display_bonus(
+                            "2d6",
+                            style="damage",
+                            context_label=f"{actor.name}'s answering screech",
+                            outcome_kind="damage",
+                        ).total,
+                        damage_type="thunder",
+                    )
+                    self.say(f"{target.name} takes {self.style_damage(actual)} thunder damage from the screech.")
+                    self.announce_downed_target(target)
+                    if target.is_conscious():
+                        self.apply_status(target, "prone", 1, source=f"{actor.name}'s answering screech")
+                else:
+                    self.say(f"{target.name} braces before the screech can fold them to the floor.")
+                return True
+        if actor.archetype == "covenant_breaker_wight" and actor.resources.get("break_the_line", 0) > 0:
+            target = marked_target or max(
+                conscious_heroes,
+                key=lambda hero: (
+                    1 if self.hero_has_positive_combat_status(hero) else 0,
+                    1 if hero.class_name in {"Bard", "Cleric", "Paladin", "Sorcerer", "Warlock", "Wizard"} else 0,
+                    hero.attack_bonus(),
+                    hero.current_hp,
+                ),
+            )
+            actor.resources["break_the_line"] = 0
+            self.say(f"{actor.name} lowers its split oathblade and drives straight for the place your line expects to hold.")
+            if not self.saving_throw(target, "STR", 15, context=f"against {actor.name}'s break the line"):
+                self.apply_status(target, "prone", 1, source=f"{actor.name}'s break the line")
+                if target.is_conscious():
+                    self.apply_status(target, "frightened", 1, source=f"{actor.name}'s break the line")
+            else:
+                self.say(f"{target.name} absorbs the rush without letting the whole company buckle.")
+            return True
+        if actor.archetype == "hollowed_survey_titan" and actor.resources.get("bearing_collapse", 0) > 0:
+            target = min(conscious_heroes, key=lambda hero: (hero.armor_class, hero.current_hp))
+            actor.resources["bearing_collapse"] = 0
+            self.say(f"{actor.name} hammers its maul down and the whole line answers like load-bearing stone finally giving way.")
+            if not self.saving_throw(target, "DEX", 15, context=f"against {actor.name}'s bearing collapse"):
+                actual = self.apply_damage(
+                    target,
+                    self.roll_with_display_bonus(
+                        "3d6",
+                        style="damage",
+                        context_label=f"{actor.name}'s bearing collapse",
+                        outcome_kind="damage",
+                    ).total,
+                    damage_type="bludgeoning",
+                )
+                self.say(f"{target.name} takes {self.style_damage(actual)} bludgeoning damage from the collapse.")
+                self.announce_downed_target(target)
+                if target.is_conscious():
+                    self.apply_status(target, "prone", 1, source=f"{actor.name}'s bearing collapse")
+            else:
+                self.say(f"{target.name} dives clear before the worst of the collapse lands.")
+            return True
+        return False
+
+    def act2_expansion_priority_target(
+        self,
+        actor: Character,
+        conscious_heroes: list[Character],
+        marked_target: Character | None,
+    ) -> Character | None:
+        if actor.archetype in {
+            "false_map_skirmisher",
+            "claimbinder_notary",
+            "blackglass_listener",
+            "choir_cartographer",
+            "memory_taker_adept",
+            "obelisk_chorister",
+        }:
+            return marked_target or max(
+                conscious_heroes,
+                key=lambda hero: (
+                    1 if self.hero_has_positive_combat_status(hero) else 0,
+                    1 if hero.class_name in {"Bard", "Cleric", "Paladin", "Sorcerer", "Warlock", "Wizard"} else 0,
+                    hero.attack_bonus(),
+                    hero.current_hp,
+                ),
+            )
+        if actor.archetype in {"echo_sapper", "pact_archive_warden", "blacklake_adjudicator", "hollowed_survey_titan"}:
+            return min(conscious_heroes, key=lambda hero: (hero.armor_class, hero.current_hp))
+        if actor.archetype in {"resonance_leech", "censer_horror", "forge_echo_stalker"}:
+            return min(
+                conscious_heroes,
+                key=lambda hero: (
+                    0 if any(self.has_status(hero, status) for status in ("reeling", "frightened", "deafened", "blinded")) else 1,
+                    hero.current_hp,
+                    hero.armor_class,
+                ),
+            )
+        if actor.archetype == "survey_chain_revenant":
+            return min(
+                conscious_heroes,
+                key=lambda hero: (0 if self.has_status(hero, "grappled") else 1, hero.current_hp, hero.armor_class),
+            )
+        if actor.archetype == "covenant_breaker_wight":
+            return marked_target or max(
+                conscious_heroes,
+                key=lambda hero: (
+                    1 if self.hero_has_positive_combat_status(hero) else 0,
+                    1 if hero.class_name in {"Bard", "Cleric", "Paladin", "Sorcerer", "Warlock", "Wizard"} else 0,
+                    hero.attack_bonus(),
+                    hero.current_hp,
+                ),
+            )
+        return None
 
     def apply_companion_combat_openers(
         self,
@@ -952,6 +1380,16 @@ class CombatFlowMixin:
         if not self.can_make_hostile_action(actor):
             self.say(f"{self.style_name(actor)} falters and cannot press a hostile attack while Charmed.")
             return
+        if self.act2_expansion_enemy_turn(
+            actor,
+            conscious_heroes,
+            conscious_allies,
+            heroes,
+            enemies,
+            dodging,
+            marked_target,
+        ):
+            return
         if actor.archetype == "ash_brand_enforcer" and actor.resources.get("punishing_strike", 0) > 0:
             target = next(
                 (
@@ -1598,7 +2036,10 @@ class CombatFlowMixin:
             self.apply_status(actor, "emboldened", 2, source="Varyn's rally")
             self.say(f"{actor.name} barks an order and hardens behind 6 temporary hit points.")
             return
-        if actor.archetype == "grimlock_tunneler":
+        priority_target = self.act2_expansion_priority_target(actor, conscious_heroes, marked_target)
+        if priority_target is not None:
+            target = priority_target
+        elif actor.archetype == "grimlock_tunneler":
             target = min(
                 conscious_heroes,
                 key=lambda hero: (0 if self.has_status(hero, "reeling") else 1, hero.current_hp, hero.armor_class),

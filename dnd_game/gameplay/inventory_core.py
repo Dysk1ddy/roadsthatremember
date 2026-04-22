@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from ..dice import roll
 from ..items import (
+    canonicalize_item_mapping,
     choose_supply_items_to_consume,
     format_inventory_line,
     get_item,
@@ -36,6 +37,7 @@ class InventoryCoreMixin:
 
     def inventory_dict(self) -> dict[str, int]:
         assert self.state is not None
+        self.state.inventory = canonicalize_item_mapping(self.state.inventory)
         return self.state.inventory
 
     def carrying_capacity(self) -> int:
@@ -110,10 +112,11 @@ class InventoryCoreMixin:
         return item_rules_text(item) or item.description
 
     def inventory_rich_item_name(self, item):
+        label = f"{item.name} [{item.item_id}]"
         color = rarity_color(item.rarity)
         if not (RICH_AVAILABLE and Text is not None):
-            return item.name
-        return Text(item.name, style=f"bold {rich_style_name(color)}")
+            return label
+        return Text(label, style=f"bold {rich_style_name(color)}")
 
     def inventory_rich_rarity(self, item):
         color = rarity_color(item.rarity)
@@ -195,12 +198,19 @@ class InventoryCoreMixin:
 
     def count_equipped(self, item_id: str) -> int:
         assert self.state is not None
-        return sum(
-            1
-            for member in [self.state.player, *self.state.all_companions()]
-            for equipped_item_id in member.equipment_slots.values()
-            if equipped_item_id == item_id
-        )
+        target_id = get_item(item_id).item_id
+        count = 0
+        for member in [self.state.player, *self.state.all_companions()]:
+            for equipped_item_id in member.equipment_slots.values():
+                if equipped_item_id is None:
+                    continue
+                try:
+                    equipped_id = get_item(equipped_item_id).item_id
+                except KeyError:
+                    continue
+                if equipped_id == target_id:
+                    count += 1
+        return count
 
     def available_inventory_count(self, item_id: str) -> int:
         return max(0, self.inventory_dict().get(item_id, 0) - self.count_equipped(item_id))
@@ -415,10 +425,10 @@ class InventoryCoreMixin:
         valid_targets = [
             member
             for member in target_pool
-            if not member.dead and (allow_self_healing_potion or item.item_id != "potion_healing" or actor is None or member is not actor)
+            if not member.dead and (allow_self_healing_potion or item.legacy_id != "potion_healing" or actor is None or member is not actor)
         ]
         if not valid_targets:
-            if combat and actor is not None and item.item_id == "potion_healing":
+            if combat and actor is not None and item.legacy_id == "potion_healing":
                 self.say("Drinking a Potion of Healing yourself is a bonus action here. Use the bonus-action option instead.")
             else:
                 self.say(f"There is no valid target for {item.name} right now.")

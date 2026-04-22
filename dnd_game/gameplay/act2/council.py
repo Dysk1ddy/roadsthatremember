@@ -365,6 +365,42 @@ class StoryAct2CouncilMixin:
                 "Elira Dawnmantle",
                 "Then Conyberry's dead were not left speaking into the dark. Tell me the warning cleanly, and I will make sure it is carried gently.",
             )
+            if self.state is not None and self.state.flags.get("agatha_claim_cover_suspected"):
+                sponsor = str(self.state.flags.get("act2_sponsor", "council"))
+                if sponsor == "exchange":
+                    self.speaker(
+                        "Halia Thornton",
+                        "Claim marks on dead ground are not piety. They are bookkeeping with incense on it. Give me the hand that wrote them and I can make half this room stop smiling.",
+                    )
+                    if not self.state.flags.get("agatha_claim_cover_council_reaction_recorded"):
+                        self.act2_shift_metric(
+                            "act2_route_control",
+                            1,
+                            "Halia turns Conyberry's hidden claim marks into leverage against rival route papers",
+                        )
+                elif sponsor == "lionshield":
+                    self.speaker(
+                        "Linene Graywind",
+                        "If someone used graves as cover for route claims, I want names on my desk before another crew leaves with a false map and a brave speech.",
+                    )
+                    if not self.state.flags.get("agatha_claim_cover_council_reaction_recorded"):
+                        self.act2_shift_metric(
+                            "act2_town_stability",
+                            1,
+                            "Linene uses Conyberry's claim-cover proof to slow reckless crews before bad papers become dead miners",
+                        )
+                else:
+                    self.speaker(
+                        "Town Council",
+                        "Then the Conyberry warning is not only spiritual. It is evidence. The next claim read in this room gets read against the dead as well as the ledgers.",
+                    )
+                    if not self.state.flags.get("agatha_claim_cover_council_reaction_recorded"):
+                        self.act2_shift_metric(
+                            "act2_whisper_pressure",
+                            -1,
+                            "naming Conyberry's claim-cover trick keeps the Choir from hiding practical corruption inside sacred dread",
+                        )
+                self.state.flags["agatha_claim_cover_council_reaction_recorded"] = True
         elif quest_id == "rescue_stonehollow_scholars":
             self.speaker(
                 "Linene Graywind",

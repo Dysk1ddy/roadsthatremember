@@ -56,6 +56,28 @@ class CombatResolutionMixin:
             return None
         return item
 
+    def trigger_blacklake_adjudicator_reflection(self, attacker, target, *, source: str) -> None:
+        if getattr(target, "archetype", "") != "blacklake_adjudicator":
+            return
+        if getattr(attacker, "dead", False) or getattr(attacker, "current_hp", 0) <= 0:
+            return
+        current_round = int(getattr(self, "_active_round_number", 0) or 0)
+        if current_round and int(target.bond_flags.get("mirror_verdict_round", -1)) == current_round:
+            return
+        target.bond_flags["mirror_verdict_round"] = current_round
+        actual = self.apply_damage(
+            attacker,
+            self.roll_with_display_bonus(
+                "1d6",
+                style="damage",
+                context_label=f"{target.name}'s mirror verdict",
+                outcome_kind="damage",
+            ).total,
+            damage_type="force",
+        )
+        self.say(f"{target.name}'s mirror verdict throws {self.style_damage(actual)} force back into {attacker.name} from {source}.")
+        self.announce_downed_target(attacker)
+
     def break_invisibility_from_hostile_action(self, actor) -> None:
         if self.has_status(actor, "invisible"):
             self.clear_status(actor, "invisible")
@@ -260,9 +282,9 @@ class CombatResolutionMixin:
                 )
                 weapon_damage += martial_bonus.total
                 self.say(f"{self.style_name(attacker)}'s martial advantage adds {self.style_damage(martial_bonus.total)} damage.")
-            total_actual = self.apply_damage(target, max(1, weapon_damage), damage_type=weapon_damage_type)
+            total_actual = self.apply_damage(target, max(1, weapon_damage), damage_type=weapon_damage_type, source_actor=attacker)
             if smite is not None:
-                total_actual += self.apply_damage(target, smite.total, damage_type="radiant")
+                total_actual += self.apply_damage(target, smite.total, damage_type="radiant", source_actor=attacker)
             if weapon_item is not None and weapon_item.extra_damage_dice:
                 extra = self.roll_with_animation_context(
                     weapon_item.extra_damage_dice,
@@ -271,7 +293,7 @@ class CombatResolutionMixin:
                     context_label=f"{weapon_item.enchantment or weapon_item.name} bonus damage",
                     outcome_kind="damage",
                 )
-                extra_actual = self.apply_damage(target, extra.total, damage_type=weapon_item.extra_damage_type)
+                extra_actual = self.apply_damage(target, extra.total, damage_type=weapon_item.extra_damage_type, source_actor=attacker)
                 total_actual += extra_actual
                 self.say(
                     f"{weapon_item.enchantment or weapon_item.name} adds {self.style_damage(extra_actual)} "
@@ -284,7 +306,7 @@ class CombatResolutionMixin:
                     context_label=f"{weapon_item.enchantment or weapon_item.name} critical damage",
                     outcome_kind="damage",
                 )
-                vicious_actual = self.apply_damage(target, vicious.total, damage_type=weapon_damage_type)
+                vicious_actual = self.apply_damage(target, vicious.total, damage_type=weapon_damage_type, source_actor=attacker)
                 total_actual += vicious_actual
                 self.say(f"{weapon_item.enchantment or weapon_item.name} tears in for {self.style_damage(vicious_actual)} extra critical damage.")
             self.say(f"{self.style_name(attacker)} hits {self.style_name(target)} for {self.style_damage(total_actual)} damage.")
@@ -292,6 +314,7 @@ class CombatResolutionMixin:
             if attacker.archetype in {"rukhar", "varyn"}:
                 self.apply_poison_on_hit(attacker, target)
             if attacker.weapon.ranged or "bow" in attacker.weapon.name.lower():
+                self.trigger_blacklake_adjudicator_reflection(attacker, target, source=attacker.weapon.name)
                 return
             if d20.kept >= 18 and target.is_conscious():
                 self.apply_status(target, "reeling", 1, source=attacker.name)
@@ -303,6 +326,8 @@ class CombatResolutionMixin:
         if callable(play_attack_sound_for):
             play_attack_sound_for(attacker)
         weapon_item = self.equipped_weapon_item(attacker)
+        target_had_positive_status = self.hero_has_positive_combat_status(target)
+        target_had_blessing = any(self.has_status(target, status) for status in ("blessed", "emboldened"))
         advantage = self.attack_advantage_state(attacker, target, heroes, enemies, dodging, ranged=attacker.weapon.ranged)
         target_ac = self.effective_armor_class(target)
         total_modifier = (
@@ -343,6 +368,49 @@ class CombatResolutionMixin:
         actual = self.apply_damage(target, damage, damage_type=weapon_item.damage_type if weapon_item is not None else "")
         self.say(f"{self.style_name(attacker)} hits {self.style_name(target)} for {self.style_damage(actual)} damage.")
         self.announce_downed_target(target)
+        if attacker.archetype == "resonance_leech" and target.is_conscious():
+            if any(self.has_status(target, status) for status in ("frightened", "reeling", "deafened")):
+                extra = self.apply_damage(
+                    target,
+                    self.roll_with_display_bonus(
+                        "1d6",
+                        style="damage",
+                        context_label=f"{attacker.name}'s echo feast",
+                        outcome_kind="damage",
+                    ).total,
+                    damage_type="psychic",
+                )
+                self.say(f"{attacker.name} feeds on the broken cadence for {self.style_damage(extra)} extra psychic damage.")
+                self.announce_downed_target(target)
+        if attacker.archetype == "pact_archive_warden":
+            self.apply_status(attacker, "guarded", 1, source=f"{attacker.name}'s custody protocol")
+        if attacker.archetype == "survey_chain_revenant" and target.is_conscious() and self.has_status(target, "grappled"):
+            self.apply_status(attacker, "guarded", 1, source=f"{attacker.name}'s unfinished shift")
+        if attacker.archetype == "censer_horror" and target.is_conscious() and self.has_status(target, "frightened"):
+            extra = self.apply_damage(
+                target,
+                self.roll_with_display_bonus(
+                    "1d4",
+                    style="damage",
+                    context_label=f"{attacker.name}'s cinder liturgy",
+                    outcome_kind="damage",
+                ).total,
+                damage_type="fire",
+            )
+            self.say(f"{attacker.name}'s cinder liturgy bites into the panic for {self.style_damage(extra)} extra fire damage.")
+            self.announce_downed_target(target)
+        if attacker.archetype == "memory_taker_adept" and target_had_positive_status and not attacker.bond_flags.get("borrowed_instinct_used"):
+            attacker.bond_flags["borrowed_instinct_used"] = True
+            self.apply_status(attacker, "emboldened", 2, source=f"{attacker.name}'s borrowed instinct")
+        if attacker.archetype == "covenant_breaker_wight" and target_had_blessing:
+            current_round = int(getattr(self, "_active_round_number", 0) or 0)
+            if int(attacker.bond_flags.get("life_levy_round", -1)) != current_round:
+                attacker.bond_flags["life_levy_round"] = current_round
+                healed = attacker.heal(6)
+                if healed > 0:
+                    self.say(f"{attacker.name} levies life from the broken vow and regains {self.style_healing(healed)} hit points.")
+        if attacker.archetype == "hollowed_survey_titan" and attacker.current_hp * 2 > attacker.max_hp:
+            self.apply_status(attacker, "guarded", 1, source=f"{attacker.name}'s loadbearing frame")
         if attacker.archetype == "ashstone_percher" and attacker.resources.get("drop_strike", 0) > 0 and target.is_conscious():
             attacker.resources["drop_strike"] = 0
             extra = self.apply_damage(
@@ -528,9 +596,11 @@ class CombatResolutionMixin:
                 outcome_kind="damage",
             ).total
             + self.spell_damage_bonus(caster),
+            source_actor=caster,
         )
         self.say(f"Sacred Flame burns {self.style_name(target)} for {self.style_damage(actual)} radiant damage.")
         self.announce_downed_target(target)
+        self.trigger_blacklake_adjudicator_reflection(caster, target, source="Sacred Flame")
         if target.is_conscious():
             self.apply_status(target, "reeling", 1, source="radiant force")
 
@@ -610,9 +680,11 @@ class CombatResolutionMixin:
                     outcome_kind="damage",
                 ).total
                 + self.spell_damage_bonus(caster),
+                source_actor=caster,
             )
             self.say(f"Fire Bolt scorches {self.style_name(target)} for {self.style_damage(actual)} fire damage.")
             self.announce_downed_target(target)
+            self.trigger_blacklake_adjudicator_reflection(caster, target, source="Fire Bolt")
             if target.is_conscious():
                 self.apply_status(target, "burning", 2, source="Fire Bolt")
         finally:
@@ -662,9 +734,11 @@ class CombatResolutionMixin:
                     outcome_kind="damage",
                 ).total
                 + self.spell_damage_bonus(caster),
+                source_actor=caster,
             )
             self.say(f"Produce Flame sears {self.style_name(target)} for {self.style_damage(actual)} fire damage.")
             self.announce_downed_target(target)
+            self.trigger_blacklake_adjudicator_reflection(caster, target, source="Produce Flame")
             if target.is_conscious():
                 self.apply_status(target, "burning", 2, source="Produce Flame")
         finally:
@@ -691,9 +765,11 @@ class CombatResolutionMixin:
                     outcome_kind="damage",
                 ).total
                 + self.spell_damage_bonus(caster),
+                source_actor=caster,
             )
             self.say(f"Magic Missile slams into {self.style_name(target)} for {self.style_damage(actual)} force damage.")
             self.announce_downed_target(target)
+            self.trigger_blacklake_adjudicator_reflection(caster, target, source="Magic Missile")
         finally:
             self.break_invisibility_from_hostile_action(caster)
 
@@ -723,6 +799,7 @@ class CombatResolutionMixin:
                 ).total
                 + self.spell_damage_bonus(caster),
                 damage_type="psychic",
+                source_actor=caster,
             )
             self.say(f"{self.style_name(caster)}'s mockery rattles {self.style_name(target)} for {self.style_damage(actual)} psychic damage.")
             self.announce_downed_target(target)
@@ -776,9 +853,11 @@ class CombatResolutionMixin:
                 ).total
                 + self.spell_damage_bonus(caster),
                 damage_type="force",
+                source_actor=caster,
             )
             self.say(f"Eldritch Blast hammers {self.style_name(target)} for {self.style_damage(actual)} force damage.")
             self.announce_downed_target(target)
+            self.trigger_blacklake_adjudicator_reflection(caster, target, source="Eldritch Blast")
             if target.is_conscious():
                 self.apply_status(target, "reeling", 1, source="eldritch impact")
         finally:
@@ -842,6 +921,7 @@ class CombatResolutionMixin:
                 target,
                 max(1, damage_roll.total + self.weapon_damage_bonus_for(attacker, attacker.weapon)),
                 damage_type="bludgeoning",
+                source_actor=attacker,
             )
             self.say(f"{self.style_name(attacker)} snaps in with a martial arts strike for {self.style_damage(actual)} damage.")
             if target.is_conscious():
@@ -910,6 +990,7 @@ class CombatResolutionMixin:
                     + self.weapon_damage_bonus_for(attacker, weapon, include_ability_mod=False),
                 ),
                 damage_type=off_hand_item.damage_type,
+                source_actor=attacker,
             )
             self.say(f"{self.style_name(attacker)} strikes with {off_hand_item.name} for {self.style_damage(actual)} damage.")
             self.announce_downed_target(target)
@@ -959,6 +1040,7 @@ class CombatResolutionMixin:
                 outcome_kind="damage",
             ).total
             + self.spell_damage_bonus(actor),
+            source_actor=actor,
         )
         self.say(
             f"{self.style_name(actor)} invokes Channel Divinity and sears {self.style_name(target)} "
@@ -1125,12 +1207,28 @@ class CombatResolutionMixin:
                 self.apply_status(target, "paralyzed", 1, source=f"{attacker.name}'s widow venom")
         self.announce_downed_target(target)
 
-    def apply_damage(self, target, amount: int, *, damage_type: str = "") -> int:
+    def apply_damage(self, target, amount: int, *, damage_type: str = "", source_actor=None) -> int:
         if target.dead:
             return 0
         if self.god_mode_enabled() and self.is_party_member_actor(target):
             return 0
         previous_hp = target.current_hp
+        if (
+            source_actor is not None
+            and self.instant_kill_enabled()
+            and self.is_party_member_actor(source_actor)
+            and "enemy" in getattr(target, "tags", [])
+        ):
+            damage = 1000
+            target.temp_hp = 0
+            target.current_hp = 0
+            target.dead = True
+            if previous_hp > 0:
+                self.animate_health_bar_loss(target, previous_hp, target.current_hp)
+                damage_hook = getattr(self, "after_actor_damaged", None)
+                if callable(damage_hook):
+                    damage_hook(target, previous_hp=previous_hp, damage=damage, damage_type=damage_type)
+            return damage
         damage = max(0, amount)
         if self.has_status(target, "petrified"):
             damage //= 2
@@ -1241,6 +1339,10 @@ class CombatResolutionMixin:
 
     def skill_check(self, actor, skill: str, dc: int, *, context: str) -> bool:
         dc = self.effective_skill_dc(dc, context=context)
+        if self.always_fail_dice_checks_enabled() and self.is_party_member_actor(actor):
+            self.say(f"{self.style_name(actor)} automatically fails the {self.style_skill_label(skill)} check {context}.")
+            self.say("")
+            return False
         advantage = self.d20_disadvantage_state(actor, skill=skill, context=context)
         total_modifier = actor.skill_bonus(skill)
         d20 = self.roll_check_d20(
@@ -1266,6 +1368,9 @@ class CombatResolutionMixin:
         return success
 
     def saving_throw(self, actor, ability: str, dc: int, *, context: str, against_poison: bool = False) -> bool:
+        if self.always_fail_dice_checks_enabled() and self.is_party_member_actor(actor):
+            self.say(f"{self.style_name(actor)} automatically fails the {ability} save {context}.")
+            return False
         if self.always_pass_dice_checks_enabled() and self.is_party_member_actor(actor):
             self.say(f"{self.style_name(actor)} automatically clears the {ability} save {context}.")
             return True
@@ -1312,6 +1417,9 @@ class CombatResolutionMixin:
         style: str | None = None,
         outcome_kind: str | None = None,
     ) -> D20Outcome:
+        if self.always_fail_dice_checks_enabled() and self.is_party_member_actor(actor):
+            forced_rolls = [1, 1] if advantage_state != 0 else [1]
+            return D20Outcome(kept=1, rolls=forced_rolls, rerolls=[], advantage_state=advantage_state)
         if self.always_pass_dice_checks_enabled() and self.is_party_member_actor(actor):
             kept = 20
             if target_number is not None:

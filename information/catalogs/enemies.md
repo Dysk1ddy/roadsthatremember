@@ -542,6 +542,227 @@ The final section also includes a design appendix with proposed future enemies w
 - Encounter locations:
   - Forced final boss: `Boss: Sister Caldra Voss`
 
+## Act 2 Thematic Expansion: Control Of Truth
+
+These fifteen enemies are designed specifically around Act 2's core themes: control of truth, dangerous knowledge, false authority, expedition sabotage, corrupted custody, and listening-horror rising out of Wave Echo Cave.
+
+They are intentionally stronger than the existing Act 1 filler pool. Early Act 2 should already feel like fighting disciplined saboteurs, ritual specialists, warped cave predators, and old Pact defenses that have outlived their judgment.
+
+### Expansion Summary
+
+| Archetype | Name | Level | HP / AC | Core Attack | Role |
+| --- | --- | --- | --- | --- | --- |
+| `false_map_skirmisher` | False-Map Skirmisher | 4 | 38 / 15 | Route Knife `1d8+3` | mobile sabotage attacker |
+| `claimbinder_notary` | Claimbinder Notary | 4 | 40 / 15 | Seal Mace `1d6+3` | control debuffer |
+| `echo_sapper` | Echo Sapper | 4 | 42 / 14 | Breach Hammer `1d10+2` | line-breaker |
+| `pact_archive_warden` | Pact Archive Warden | 4 | 44 / 16 | Archive Spear `1d8+3` | defensive sentinel |
+| `blackglass_listener` | Blackglass Listener | 4 | 41 / 15 | Thought Spike `1d8+2` psychic | anti-caster scout |
+| `choir_cartographer` | Choir Cartographer | 5 | 48 / 15 | Survey Blade `1d8+3` | route-control leader |
+| `resonance_leech` | Resonance Leech | 5 | 50 / 14 | Siphon Tendril `2d6+2` | sustain drain monster |
+| `survey_chain_revenant` | Survey-Chain Revenant | 5 | 52 / 16 | Chain Pick `1d10+3` | undead lock-down bruiser |
+| `censer_horror` | Iron Censer Horror | 5 | 55 / 16 | Smothering Swing `2d6+2` | construct area denial |
+| `memory_taker_adept` | Memory-Taker Adept | 5 | 46 / 15 | Quietus Dagger `1d8+3` | psychic assassin |
+| `obelisk_chorister` | Obelisk Chorister | 6 | 58 / 16 | Choir Staff `1d8+4` | elite cult caster |
+| `blacklake_adjudicator` | Black Lake Adjudicator | 6 | 60 / 17 | Judgement Pike `1d10+4` | elite Pact guardian |
+| `forge_echo_stalker` | Forge-Echo Stalker | 6 | 62 / 16 | Echo Claws `2d6+4` | ambush predator |
+| `covenant_breaker_wight` | Covenant Breaker Wight | 6 | 64 / 17 | Oathsplitter `1d10+4` | commander-killer undead |
+| `hollowed_survey_titan` | Hollowed Survey Titan | 6 | 72 / 15 | Survey Maul `2d8+4` | late-route brute |
+
+### False-Map Skirmisher
+
+- Archetype: `false_map_skirmisher`
+- Base sheet: level 4, 38 HP, AC 15, Route Knife `1d8+3`, XP 175, Gold 14
+- Tags and traits: `enemy`, `humanoid`, `skirmisher`, `parley`
+- Runtime behavior:
+  - `route_splice` once: shifts position, gains `emboldened` 1, and grants the first ally attacking the same target this round `+2` to hit
+  - `mislead_step` once: DEX save DC 13 or target suffers `reeling` 1
+- Encounter locations:
+  - Potential: `Woodland Saboteurs`
+  - Potential: `Midpoint: Sabotage Night`
+  - Potential: delayed-route recovery scenes
+
+### Claimbinder Notary
+
+- Archetype: `claimbinder_notary`
+- Base sheet: level 4, 40 HP, AC 15, Seal Mace `1d6+3`, XP 180, Gold 22
+- Tags and traits: `enemy`, `humanoid`, `leader`, `parley`
+- Runtime behavior:
+  - `seizure_order` once: WIS save DC 14 or target loses `emboldened`/`blessed` style boons and suffers `reeling` 2
+  - `filed_objection` once: marks one target; allies deal +2 damage against that target until the notary is hit
+- Encounter locations:
+  - Potential: claims-war command scenes
+  - Potential: sponsor conflict encounters
+  - Potential: rival expedition leadership fights
+
+### Echo Sapper
+
+- Archetype: `echo_sapper`
+- Base sheet: level 4, 42 HP, AC 14, Breach Hammer `1d10+2`, XP 190, Gold 16
+- Tags and traits: `enemy`, `humanoid`, `siege`
+- Runtime behavior:
+  - `survey_charge` once: DEX save DC 14 or targets take `2d6` force and fall `prone`
+  - `dust_blind` once: targets already `prone` or `reeling` also risk `blinded` 1
+- Encounter locations:
+  - Potential: `Stonehollow Dig`
+  - Potential: `Broken Prospect`
+  - Potential: collapse or breach scenes
+
+### Pact Archive Warden
+
+- Archetype: `pact_archive_warden`
+- Base sheet: level 4, 44 HP, AC 16, Archive Spear `1d8+3`, XP 200, Gold 18
+- Tags and traits: `enemy`, `construct`, `sentinel`
+- Runtime behavior:
+  - `access_denied` once: STR save DC 14 or target is shoved back and `slowed` for 1 round
+  - `custody_protocol` passive: gains +2 AC against the first attack each round from a target it already struck
+- Encounter locations:
+  - Potential: `Broken Prospect`
+  - Potential: archive thresholds
+  - Potential: sealed Pact record rooms
+
+### Blackglass Listener
+
+- Archetype: `blackglass_listener`
+- Base sheet: level 4, 41 HP, AC 15, Thought Spike `1d8+2` psychic, XP 190, Gold 10
+- Tags and traits: `enemy`, `aberration`, `scout`
+- Runtime behavior:
+  - `overhear_intent` once: WIS save DC 14 or target becomes `frightened` 1 and cannot gain advantage-like bonuses until its next turn
+  - `feedback_pulse` once: deals `2d6` psychic to a target that used a spell or support action last round
+- Encounter locations:
+  - Potential: `Conyberry and Agatha's Circuit`
+  - Potential: `Black Lake Causeway`
+  - Potential: high-whisper route events
+
+### Choir Cartographer
+
+- Archetype: `choir_cartographer`
+- Base sheet: level 5, 48 HP, AC 15, Survey Blade `1d8+3`, XP 225, Gold 28
+- Tags and traits: `enemy`, `humanoid`, `leader`, `parley`
+- Runtime behavior:
+  - `map_the_weakness` once: one target takes +2 damage from all allies for 2 rounds
+  - `stolen_route` once: swaps places with a conscious ally and gains `blessed` 1
+- Encounter locations:
+  - Potential: `Midpoint: Sabotage Night`
+  - Potential: late early-route convergence
+  - Potential: `Wave Echo Outer Galleries`
+
+### Resonance Leech
+
+- Archetype: `resonance_leech`
+- Base sheet: level 5, 50 HP, AC 14, Siphon Tendril `2d6+2`, XP 230, Gold 0
+- Tags and traits: `enemy`, `aberration`
+- Runtime behavior:
+  - `drain_cadence` once: CON save DC 14 or target takes `2d6` psychic, loses one active positive status, and the leech gains 8 temp HP
+  - `echo_feast` passive: deals +`1d6` damage to `frightened`, `reeling`, or `silenced` targets
+- Encounter locations:
+  - Potential: `South Adit`
+  - Potential: `Wave Echo Outer Galleries`
+  - Potential: `Black Lake Causeway`
+
+### Survey-Chain Revenant
+
+- Archetype: `survey_chain_revenant`
+- Base sheet: level 5, 52 HP, AC 16, Chain Pick `1d10+3`, XP 240, Gold 20
+- Tags and traits: `enemy`, `undead`, `bruiser`
+- Runtime behavior:
+  - `drag_to_marker` once: STR save DC 15 or target is `grappled` and pulled into melee range
+  - `unfinished_shift` passive: while grappling a target, the revenant reduces incoming weapon damage by 2
+- Encounter locations:
+  - Potential: delayed rescue routes
+  - Potential: `South Adit`
+  - Potential: burial-ledger or rail-line scenes
+
+### Iron Censer Horror
+
+- Archetype: `censer_horror`
+- Base sheet: level 5, 55 HP, AC 16, Smothering Swing `2d6+2`, XP 250, Gold 18
+- Tags and traits: `enemy`, `construct`, `horror`
+- Runtime behavior:
+  - `hush_smoke` once: CON save DC 14 or targets in a small area suffer `blinded` 1 and deal -2 damage with verbal or morale-style abilities
+  - `cinder_liturgy` passive: enemies starting adjacent while `frightened` take `1d4` fire
+- Encounter locations:
+  - Potential: cult chapel rooms
+  - Potential: forge-approach chambers
+  - Potential: shrine profanation fights
+
+### Memory-Taker Adept
+
+- Archetype: `memory_taker_adept`
+- Base sheet: level 5, 46 HP, AC 15, Quietus Dagger `1d8+3`, XP 220, Gold 24
+- Tags and traits: `enemy`, `humanoid`, `assassin`, `parley`
+- Runtime behavior:
+  - `erase_witness` once: WIS save DC 14 or target loses reaction-style defensive options and suffers `reeling` 2
+  - `borrowed_instinct` once: after hitting a target with a positive status, the adept gains `emboldened` 2
+- Encounter locations:
+  - Potential: Quiet Choir kill teams
+  - Potential: sponsor assassination scenes
+  - Potential: `Black Lake Causeway`
+
+### Obelisk Chorister
+
+- Archetype: `obelisk_chorister`
+- Base sheet: level 6, 58 HP, AC 16, Choir Staff `1d8+4`, XP 300, Gold 34
+- Tags and traits: `enemy`, `humanoid`, `leader`, `parley`
+- Runtime behavior:
+  - `shard_hymn` once: WIS save DC 15 or target takes `3d6` psychic, `frightened` 2, and `reeling` 2
+  - `choral_screen` once: self and allies gain 6 temp HP; cult allies also clear `frightened`
+- Encounter locations:
+  - Potential: forge antechambers
+  - Potential: elite cult escort fights
+  - Potential: high-whisper late-route encounters
+
+### Black Lake Adjudicator
+
+- Archetype: `blacklake_adjudicator`
+- Base sheet: level 6, 60 HP, AC 17, Judgement Pike `1d10+4`, XP 310, Gold 26
+- Tags and traits: `enemy`, `construct`, `leader`, `sentinel`
+- Runtime behavior:
+  - `sentence_of_entry` once: WIS save DC 15 or target becomes `slowed` and cannot move closer to the threshold next turn
+  - `mirror_verdict` passive: the first ranged hit it suffers each round reflects `1d6` force back to the attacker
+- Encounter locations:
+  - Potential: `Black Lake Causeway`
+  - Potential: ritual bridgeheads
+  - Potential: pre-Forge threshold rooms
+
+### Forge-Echo Stalker
+
+- Archetype: `forge_echo_stalker`
+- Base sheet: level 6, 62 HP, AC 16, Echo Claws `2d6+4`, XP 325, Gold 0
+- Tags and traits: `enemy`, `aberration`, `ambusher`
+- Runtime behavior:
+  - `answering_screech` once: against a `reeling` target, deals an extra `2d6` thunder and can knock `prone` on CON save DC 15 failure
+  - `heatshadow_prowl` once: gains `invisible` 1 and bonus movement through forge-lit terrain
+- Encounter locations:
+  - Potential: `Wave Echo Outer Galleries`
+  - Potential: forge side halls
+  - Potential: whisper-surged boss support fights
+
+### Covenant Breaker Wight
+
+- Archetype: `covenant_breaker_wight`
+- Base sheet: level 6, 64 HP, AC 17, Oathsplitter `1d10+4`, XP 340, Gold 32
+- Tags and traits: `enemy`, `undead`, `leader`
+- Runtime behavior:
+  - `break_the_line` once: STR or WIS save DC 15 or target suffers `prone` plus `frightened` 1
+  - `life_levy` passive: the wight regains 6 HP the first time each round it damages a `blessed` or `emboldened` target
+- Encounter locations:
+  - Potential: `South Adit`
+  - Potential: late `Broken Prospect`
+  - Potential: Forge guard retinues
+
+### Hollowed Survey Titan
+
+- Archetype: `hollowed_survey_titan`
+- Base sheet: level 6, 72 HP, AC 15, Survey Maul `2d8+4`, XP 375, Gold 30
+- Tags and traits: `enemy`, `construct`, `brute`
+- Runtime behavior:
+  - `bearing_collapse` once: DEX save DC 15 or targets in a short line take `3d6` bludgeoning and become `prone`
+  - `loadbearing_frame` passive: while above half HP, forced movement against the titan automatically fails
+- Encounter locations:
+  - Potential: `Broken Prospect`
+  - Potential: `Wave Echo Outer Galleries`
+  - Potential: Forge boss-support variant
+
 ## Encounter Cross-Reference
 
 ### Background Prologue Combat Pool

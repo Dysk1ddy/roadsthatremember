@@ -419,7 +419,7 @@ class InventoryManagementMixin:
                 return False
         if slot == "main_hand" and item.weapon is not None and item.weapon.hands_required >= 2:
             member.equipment_slots["off_hand"] = None
-        member.equipment_slots[slot] = item.item_id
+        member.equipment_slots[slot] = item.legacy_id or item.item_id
         self.sync_equipment(member)
         self.say(f"{member.name} equips {item.name} in {equipment_slot_label(slot)}.")
         return True

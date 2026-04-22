@@ -113,6 +113,9 @@ Act 2 should not start from a blank emotional or strategic slate. Several Act 1 
   - Intended to carry 4 to 5 encounter beats, one real finale, and multiple metric-facing choices rather than reading like a throwaway side room chain.
   - Its final chamber can center on `Brother Merik Sorn`, a Quiet Choir field operator who treats water pressure, logistics discipline, and doctrine as the same system.
   - Full draft: `information/Story/ACT2_GLASSWATER_INTAKE_DRAFT.md`
+- Additional branch-heavy location packets:
+  - `information/Story/ACT2_LOCATION_BRANCH_PACKETS.md` collects deeper multi-stage branch webs for `Conyberry and Agatha's Circuit`, `Neverwinter Wood Survey Camp`, `Stonehollow Dig`, `Broken Prospect`, and `Black Lake Causeway`
+  - `information/Story/ACT2_CONYBERRY_AGATHA_DRAFT.md` expands `Conyberry and Agatha's Circuit` into a dedicated implementation-facing branch draft with `Circuit Strain`, exact scene beats, Agatha dialogue goals, and warning-custody outcomes
 
 ## Choice Web
 

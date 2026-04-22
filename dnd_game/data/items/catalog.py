@@ -17,6 +17,22 @@ RARITY_TITLES = {
     "epic": "Epic",
     "legendary": "Legendary",
 }
+CATALOG_ID_CATEGORY_PREFIXES = {
+    "consumable": "C",
+    "scroll": "C",
+    "weapon": "E",
+    "armor": "E",
+    "equipment": "E",
+    "supply": "S",
+    "trinket": "M",
+}
+CATALOG_ID_PREFIX_DESCRIPTIONS = (
+    ("C", "consumables and scrolls"),
+    ("E", "equipment, weapons, and armor"),
+    ("S", "supply items"),
+    ("M", "miscellaneous items and trinkets"),
+)
+CATALOG_ID_PREFIX_ORDER = {prefix: index for index, (prefix, _) in enumerate(CATALOG_ID_PREFIX_DESCRIPTIONS)}
 
 
 @dataclass(slots=True)
@@ -30,6 +46,8 @@ class Item:
     source: str
     weight: float
     value: int
+    catalog_id: str = ""
+    legacy_id: str = ""
     slot: str | None = None
     properties: list[str] | None = None
     supply_points: int = 0
@@ -89,6 +107,62 @@ class Item:
 
     def supply_label(self) -> str:
         return f"{self.supply_points} supply" if self.supply_points else "no supply value"
+
+
+class ItemCatalogDict(dict[str, Item]):
+    def _canonical_key(self, key: object) -> object:
+        if isinstance(key, str):
+            resolved = resolve_item_id(key)
+            if resolved is not None:
+                return resolved
+        return key
+
+    def __contains__(self, key: object) -> bool:
+        return dict.__contains__(self, self._canonical_key(key))
+
+    def __getitem__(self, key: str) -> Item:
+        return dict.__getitem__(self, self._canonical_key(key))
+
+    def get(self, key: str, default=None):
+        return dict.get(self, self._canonical_key(key), default)
+
+
+class CanonicalItemIdDict(dict[str, int]):
+    def _canonical_key(self, key: object) -> object:
+        if isinstance(key, str):
+            resolved = resolve_item_id(key)
+            if resolved is not None:
+                return resolved
+        return key
+
+    def __contains__(self, key: object) -> bool:
+        return dict.__contains__(self, self._canonical_key(key))
+
+    def __getitem__(self, key: str) -> int:
+        return dict.__getitem__(self, self._canonical_key(key))
+
+    def __setitem__(self, key: str, value: int) -> None:
+        dict.__setitem__(self, self._canonical_key(key), value)
+
+    def get(self, key: str, default=None):
+        return dict.get(self, self._canonical_key(key), default)
+
+    def pop(self, key: str, default=...):
+        resolved_key = self._canonical_key(key)
+        if default is ...:
+            return dict.pop(self, resolved_key)
+        return dict.pop(self, resolved_key, default)
+
+    def setdefault(self, key: str, default: int | None = None):
+        return dict.setdefault(self, self._canonical_key(key), default)
+
+    def update(self, other=None, /, **kwargs) -> None:
+        if other is not None:
+            items = other.items() if hasattr(other, "items") else other
+            for key, value in items:
+                self[key] = value
+        for key, value in kwargs.items():
+            self[key] = value
 
 
 @dataclass(slots=True)
@@ -1269,6 +1343,36 @@ def normalize_item_id(name: str) -> str:
     return re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_")
 
 
+def catalog_prefix_for_category(category: str) -> str:
+    normalized = re.sub(r"[^a-z]+", "", category.lower())
+    if normalized in CATALOG_ID_CATEGORY_PREFIXES:
+        return CATALOG_ID_CATEGORY_PREFIXES[normalized]
+    return normalized[:1].upper() if normalized else "M"
+
+
+def catalog_sort_key(item: Item) -> tuple[int, str, str]:
+    prefix = catalog_prefix_for_category(item.category)
+    return (CATALOG_ID_PREFIX_ORDER.get(prefix, len(CATALOG_ID_PREFIX_ORDER)), item.category, item.item_id)
+
+
+def assign_catalog_ids(items: list[Item]) -> None:
+    next_number_by_prefix: dict[str, int] = {}
+    seen_catalog_ids: set[str] = set()
+    for item in sorted(items, key=catalog_sort_key):
+        prefix = catalog_prefix_for_category(item.category)
+        number = next_number_by_prefix.get(prefix, 0)
+        if number > 9999:
+            raise ValueError(f"Catalog prefix {prefix} exceeded the supported four-digit range.")
+        catalog_id = f"{prefix}{number:04d}"
+        if catalog_id in seen_catalog_ids:
+            raise ValueError(f"Duplicate catalog id assigned: {catalog_id}")
+        item.legacy_id = item.item_id
+        item.catalog_id = catalog_id
+        item.item_id = catalog_id
+        seen_catalog_ids.add(catalog_id)
+        next_number_by_prefix[prefix] = number + 1
+
+
 def build_weapon_item(base: dict[str, object], rarity: str) -> Item:
     to_hit_bonus, damage_bonus = RARITY_WEAPON_BONUS[rarity]
     magic = weapon_enchantment_for(base, rarity)
@@ -1549,10 +1653,13 @@ def build_catalog() -> dict[str, Item]:
     items.extend(build_consumables())
     items.extend(build_unique_reward_items())
     items.extend(build_trinkets())
+    assign_catalog_ids(items)
     return {item.item_id: item for item in items}
 
 
-ITEMS = build_catalog()
+ITEMS = ItemCatalogDict(build_catalog())
+ITEMS_BY_CATALOG_ID = dict(ITEMS)
+ITEMS_BY_LEGACY_ID = {item.legacy_id: item for item in ITEMS.values() if item.legacy_id}
 
 MERCHANT_STOCKS = {
     "linene_graywind": {
@@ -1788,6 +1895,116 @@ LOOT_TABLES = {
         LootEntry("scroll_ember_ward", 0.28),
         LootEntry("resonance_tonic", 0.5, 1, 2),
     ],
+    "false_map_skirmisher": [
+        LootEntry("potion_healing", 0.22),
+        LootEntry("delvers_amber", 0.15),
+        LootEntry("dagger_uncommon", 0.14),
+        LootEntry("leather_armor_uncommon", 0.12),
+        LootEntry("dust_of_disappearance", 0.05),
+        LootEntry("miners_ration_tin", 0.7, 1, 2),
+    ],
+    "claimbinder_notary": [
+        LootEntry("scroll_clarity", 0.28),
+        LootEntry("thoughtward_draught", 0.08),
+        LootEntry("warhammer_uncommon", 0.14),
+        LootEntry("chain_shirt_uncommon", 0.12),
+        LootEntry("delvers_amber", 0.2),
+        LootEntry("herbal_tea", 0.65, 1, 2),
+    ],
+    "echo_sapper": [
+        LootEntry("fireward_elixir", 0.18),
+        LootEntry("warhammer_uncommon", 0.16),
+        LootEntry("forgehand_gauntlets_uncommon", 0.08),
+        LootEntry("resonance_tonic", 0.14),
+        LootEntry("miners_ration_tin", 0.75, 1, 2),
+    ],
+    "pact_archive_warden": [
+        LootEntry("shield_uncommon", 0.14),
+        LootEntry("chain_mail_uncommon", 0.1),
+        LootEntry("scroll_guardian_light", 0.2),
+        LootEntry("delver_lantern_hood_uncommon", 0.08),
+        LootEntry("fireward_elixir", 0.16),
+    ],
+    "blackglass_listener": [
+        LootEntry("thoughtward_draught", 0.18),
+        LootEntry("resonance_tonic", 0.18),
+        LootEntry("choirward_amulet_uncommon", 0.08),
+        LootEntry("dagger_uncommon", 0.1),
+        LootEntry("mushroom_broth_flask", 0.45),
+    ],
+    "choir_cartographer": [
+        LootEntry("delvers_amber", 0.22),
+        LootEntry("scroll_clarity", 0.28),
+        LootEntry("studded_leather_uncommon", 0.12),
+        LootEntry("dagger_uncommon", 0.1),
+        LootEntry("thoughtward_draught", 0.08),
+        LootEntry("miners_ration_tin", 0.75, 1, 2),
+    ],
+    "resonance_leech": [
+        LootEntry("resonance_tonic", 0.24),
+        LootEntry("thoughtward_draught", 0.1),
+        LootEntry("sigil_anchor_ring_rare", 0.03),
+        LootEntry("delver_lantern_hood_uncommon", 0.07),
+        LootEntry("mushroom_broth_flask", 0.55),
+    ],
+    "survey_chain_revenant": [
+        LootEntry("warhammer_uncommon", 0.16),
+        LootEntry("chain_mail_uncommon", 0.12),
+        LootEntry("delver_lantern_hood_uncommon", 0.12),
+        LootEntry("scroll_guardian_light", 0.18),
+        LootEntry("greater_healing_draught", 0.2),
+    ],
+    "censer_horror": [
+        LootEntry("fireward_elixir", 0.22),
+        LootEntry("scroll_guardian_light", 0.2),
+        LootEntry("forgehand_gauntlets_uncommon", 0.1),
+        LootEntry("shield_uncommon", 0.1),
+        LootEntry("resonance_tonic", 0.16),
+    ],
+    "memory_taker_adept": [
+        LootEntry("dust_of_disappearance", 0.12),
+        LootEntry("thoughtward_draught", 0.12),
+        LootEntry("dagger_uncommon", 0.14),
+        LootEntry("studded_leather_uncommon", 0.12),
+        LootEntry("scroll_clarity", 0.2),
+        LootEntry("moonmint_drops", 0.45),
+    ],
+    "obelisk_chorister": [
+        LootEntry("resonance_tonic", 0.28),
+        LootEntry("choirward_amulet_rare", 0.12),
+        LootEntry("choirward_amulet_uncommon", 0.14),
+        LootEntry("scroll_clarity", 0.28),
+        LootEntry("scroll_lesser_restoration", 0.16),
+        LootEntry("dagger_uncommon", 0.1),
+    ],
+    "blacklake_adjudicator": [
+        LootEntry("sigil_anchor_ring_rare", 0.1),
+        LootEntry("shield_rare", 0.08),
+        LootEntry("chain_mail_uncommon", 0.14),
+        LootEntry("scroll_guardian_light", 0.2),
+        LootEntry("fireward_elixir", 0.2),
+    ],
+    "forge_echo_stalker": [
+        LootEntry("thoughtward_draught", 0.18),
+        LootEntry("resonance_tonic", 0.22),
+        LootEntry("dust_of_disappearance", 0.12),
+        LootEntry("delver_lantern_hood_uncommon", 0.08),
+        LootEntry("mushroom_broth_flask", 0.45),
+    ],
+    "covenant_breaker_wight": [
+        LootEntry("superior_healing_elixir", 0.45),
+        LootEntry("chain_mail_rare", 0.14),
+        LootEntry("sigil_anchor_ring_rare", 0.12),
+        LootEntry("scroll_guardian_light", 0.22),
+        LootEntry("resonance_tonic", 0.22),
+    ],
+    "hollowed_survey_titan": [
+        LootEntry("breastplate_rare", 0.16),
+        LootEntry("forgehand_gauntlets_rare", 0.1),
+        LootEntry("scroll_arcane_refresh", 0.18),
+        LootEntry("fireward_elixir", 0.18),
+        LootEntry("miners_ration_tin", 0.8, 1, 3),
+    ],
 }
 
 
@@ -1857,12 +2074,48 @@ STARTER_ARMOR_IDS = {
 }
 
 
+def resolve_item_id(item_id: str | None) -> str | None:
+    if item_id is None:
+        return None
+    token = str(item_id).strip()
+    if not token:
+        return token
+    upper = token.upper()
+    if upper in ITEMS_BY_CATALOG_ID:
+        return upper
+    item = ITEMS_BY_LEGACY_ID.get(token)
+    if item is not None:
+        return item.item_id
+    return token
+
+
+def canonicalize_item_mapping(mapping: dict[str, int] | None) -> CanonicalItemIdDict:
+    if isinstance(mapping, CanonicalItemIdDict):
+        return mapping
+    normalized = CanonicalItemIdDict()
+    for raw_key, raw_value in dict(mapping or {}).items():
+        try:
+            quantity = int(raw_value)
+        except (TypeError, ValueError):
+            continue
+        if quantity == 0:
+            continue
+        key = raw_key if not isinstance(raw_key, str) else resolve_item_id(raw_key)
+        if isinstance(key, str):
+            normalized[key] = normalized.get(key, 0) + quantity
+    return normalized
+
+
 def get_item(item_id: str) -> Item:
-    return ITEMS[item_id]
+    return ITEMS[resolve_item_id(item_id) or item_id]
+
+
+def get_item_by_catalog_id(catalog_id: str) -> Item:
+    return ITEMS_BY_CATALOG_ID[(resolve_item_id(catalog_id) or catalog_id).upper()]
 
 
 def initial_merchant_stock(merchant_id: str, *, rng: random.Random | None = None) -> dict[str, int]:
-    stock = dict(MERCHANT_STOCKS.get(merchant_id, {}))
+    stock = canonicalize_item_mapping(MERCHANT_STOCKS.get(merchant_id, {}))
     if rng is not None:
         for item_id, quantity, chance in RARE_MERCHANT_OFFERS.get(merchant_id, []):
             if rng.random() <= chance:
@@ -1871,11 +2124,11 @@ def initial_merchant_stock(merchant_id: str, *, rng: random.Random | None = None
 
 
 def inventory_weight(inventory: dict[str, int]) -> float:
-    return sum(ITEMS[item_id].weight * quantity for item_id, quantity in inventory.items() if item_id in ITEMS for quantity in [quantity])
+    return sum(get_item(item_id).weight * quantity for item_id, quantity in inventory.items() if item_id in ITEMS for quantity in [quantity])
 
 
 def inventory_supply_points(inventory: dict[str, int]) -> int:
-    return sum(ITEMS[item_id].supply_points * quantity for item_id, quantity in inventory.items() if item_id in ITEMS)
+    return sum(get_item(item_id).supply_points * quantity for item_id, quantity in inventory.items() if item_id in ITEMS)
 
 
 def party_carry_capacity(party: list[Character]) -> int:
@@ -1887,7 +2140,8 @@ def roll_loot_for_enemy(enemy: Character, rng: random.Random) -> dict[str, int]:
     for entry in LOOT_TABLES.get(enemy.archetype, []):
         if rng.random() <= entry.chance:
             quantity = rng.randint(entry.minimum, entry.maximum)
-            drops[entry.item_id] = drops.get(entry.item_id, 0) + quantity
+            item_id = resolve_item_id(entry.item_id) or entry.item_id
+            drops[item_id] = drops.get(item_id, 0) + quantity
     return drops
 
 
@@ -1976,13 +2230,13 @@ def item_rules_text(item: Item) -> str:
 
 
 def format_inventory_line(item_id: str, quantity: int) -> str:
-    item = ITEMS[item_id]
+    item = get_item(item_id)
     total_weight = item.weight * quantity
     item_name = colorize(item.name, rarity_color(item.rarity))
     rarity_title = colorize(item.rarity_title, rarity_color(item.rarity))
     rules = item_rules_text(item)
     return (
-        f"{item_name} x{quantity} [{rarity_title}] "
+        f"{item_name} [{item.item_id}] x{quantity} [{rarity_title}] "
         f"({item.category}/{item.item_type}, {total_weight:.1f} lb, {item.supply_label()}, {item.value} gp each) "
         + (f"- {rules}" if rules else "")
     ).strip()
@@ -2016,7 +2270,12 @@ def write_item_catalog(destination: Path) -> None:
         "",
         f"Total items: {len(ITEMS)}",
         "",
-        "Each entry lists rarity, category, combat rules, weight, supply value, and where it is obtained.",
+        "Catalog ID prefixes: "
+        + ", ".join(f"`{prefix}` = {description}" for prefix, description in CATALOG_ID_PREFIX_DESCRIPTIONS)
+        + ".",
+        "Four-digit counters run from `0000` through `9999` within each prefix.",
+        "",
+        "Each entry lists catalog ID, internal item key, rarity, category, combat rules, weight, supply value, and where it is obtained.",
         "",
     ]
     for rarity in RARITY_ORDER:
@@ -2027,7 +2286,7 @@ def write_item_catalog(destination: Path) -> None:
         for item in rarity_items:
             rules = item_rules_text(item) or "No special combat rules."
             lines.append(
-                f"- **{item.name}** (`{item.item_id}`) [{item.category}] "
+                f"- **{item.name}** (`{item.item_id}`, legacy key `{item.legacy_id}`) [{item.category}] "
                 f"{item.weight:.1f} lb, {item.supply_label()}, {item.value} gp, type `{item.item_type}`. "
                 f"{item.description} Rules: {rules}. Obtain from: {item.source}"
             )

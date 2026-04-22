@@ -17,22 +17,28 @@ from ..content import (
     ACTS,
     create_bryn_underbough,
     create_elira_dawnmantle,
+    create_enemy,
     create_tolan_ironshield,
 )
 from ..data.story.lore import LORE_INTRO, TITLE_LORE_SECTIONS, manual_text_for_entry
 from ..dice import roll
+from ..drafts.map_system import ACT1_HYBRID_MAP, ACT2_ENEMY_DRIVEN_MAP
 from ..items import (
     EQUIPMENT_SLOTS,
     ITEMS,
     LEGACY_ITEM_NAMES,
+    canonicalize_item_mapping,
     canonical_equipment_slot,
+    get_item,
     initial_merchant_stock,
+    item_rules_text,
     starter_item_ids_for_character,
 )
 from ..models import Character, GameState, SKILL_TO_ABILITY, Weapon
 from ..ui.colors import rich_style_name, strip_ansi
 from ..ui.rich_render import Columns, Group, Panel, Table, Text, box, render_rich_lines
 from .constants import InputFn, LEVEL_XP_THRESHOLDS, MENU_PAGE_SIZE, OutputFn
+from .encounter import Encounter
 from .magic_points import current_magic_points, maximum_magic_points
 
 
@@ -162,6 +168,8 @@ class GameBase:
     }
     DEV_GOD_MODE_FLAG = "dev_god_mode"
     DEV_PASS_CHECKS_FLAG = "dev_pass_every_dice_check"
+    DEV_FAIL_CHECKS_FLAG = "dev_fail_every_dice_check"
+    DEV_INSTANT_KILL_FLAG = "dev_instant_kill"
     STORY_SKILL_MODIFIER_KEY = "story_skill_modifiers"
     LIARS_BLESSING_MODIFIER_ID = "liars_blessing"
     LIARS_CURSE_MODIFIER_ID = "liars_curse"
@@ -1603,7 +1611,7 @@ class GameBase:
     def ensure_state_integrity(self) -> None:
         if self.state is None:
             return
-        self.state.inventory = dict(self.state.inventory)
+        self.state.inventory = canonicalize_item_mapping(self.state.inventory)
         self.state.short_rests_remaining = max(0, self.state.short_rests_remaining)
         ensure_quest_log = getattr(self, "ensure_quest_log", None)
         if callable(ensure_quest_log):
@@ -1635,7 +1643,8 @@ class GameBase:
         merchant_stocks = self.state.flags.setdefault("merchant_stocks", {})
         if merchant_id not in merchant_stocks:
             merchant_stocks[merchant_id] = initial_merchant_stock(merchant_id, rng=self.rng)
-        stock = merchant_stocks[merchant_id]
+        stock = canonicalize_item_mapping(merchant_stocks[merchant_id])
+        merchant_stocks[merchant_id] = stock
         for item_id in list(stock):
             if stock[item_id] <= 0:
                 stock.pop(item_id, None)
@@ -1682,10 +1691,10 @@ class GameBase:
         return 1.0 / self.buy_price_multiplier(merchant_id)
 
     def merchant_buy_price(self, merchant_id: str, item_id: str) -> int:
-        return max(1, int(ITEMS[item_id].value * self.buy_price_multiplier(merchant_id) + 0.5))
+        return max(1, int(get_item(item_id).value * self.buy_price_multiplier(merchant_id) + 0.5))
 
     def merchant_sell_price(self, merchant_id: str, item_id: str) -> int:
-        return max(1, int(ITEMS[item_id].value / self.buy_price_multiplier(merchant_id) + 0.5))
+        return max(1, int(get_item(item_id).value / self.buy_price_multiplier(merchant_id) + 0.5))
 
     def merchant_trade_summary(self, merchant_id: str, merchant_name: str) -> str:
         negotiator = self.trade_negotiator()
@@ -1779,7 +1788,15 @@ class GameBase:
                 member.gear_bonuses[f"resist_{damage_type}"] = 1
 
     def handle_meta_command(self, raw: str) -> bool:
-        lowered = raw.lower()
+        lowered = raw.strip().lower()
+        if lowered in {"~", "console", "console menu", "console commands"}:
+            if self.open_console_commands_menu():
+                self._compact_hud_last_scene_key = None
+                raise ResumeLoadedGame()
+            return True
+        if lowered in {"helpconsole", "console help"}:
+            self.show_console_command_reference()
+            return True
         if lowered == "load":
             if self.open_save_files_menu():
                 self._compact_hud_last_scene_key = None
@@ -1804,11 +1821,6 @@ class GameBase:
             return True
         if lowered == "help":
             self.show_global_commands()
-            return True
-        if lowered == "dev":
-            if self.open_developer_tools_menu():
-                self._compact_hud_last_scene_key = None
-                raise ResumeLoadedGame()
             return True
         if lowered == "settings":
             self.open_settings_menu()
@@ -2039,6 +2051,12 @@ class GameBase:
     def always_pass_dice_checks_enabled(self) -> bool:
         return self.developer_flag_enabled(self.DEV_PASS_CHECKS_FLAG)
 
+    def always_fail_dice_checks_enabled(self) -> bool:
+        return self.developer_flag_enabled(self.DEV_FAIL_CHECKS_FLAG)
+
+    def instant_kill_enabled(self) -> bool:
+        return self.developer_flag_enabled(self.DEV_INSTANT_KILL_FLAG)
+
     def set_developer_flag(self, flag_key: str, enabled: bool) -> None:
         assert self.state is not None
         self.state.flags[flag_key] = bool(enabled)
@@ -2063,7 +2081,25 @@ class GameBase:
         assert self.state is not None
         enabled = not self.always_pass_dice_checks_enabled()
         self.set_developer_flag(self.DEV_PASS_CHECKS_FLAG, enabled)
+        if enabled:
+            self.set_developer_flag(self.DEV_FAIL_CHECKS_FLAG, False)
         self.say(f"Pass every player dice check is now {'ON' if enabled else 'OFF'}.")
+        return enabled
+
+    def toggle_fail_every_dice_check(self) -> bool:
+        assert self.state is not None
+        enabled = not self.always_fail_dice_checks_enabled()
+        self.set_developer_flag(self.DEV_FAIL_CHECKS_FLAG, enabled)
+        if enabled:
+            self.set_developer_flag(self.DEV_PASS_CHECKS_FLAG, False)
+        self.say(f"Fail every player dice check is now {'ON' if enabled else 'OFF'}.")
+        return enabled
+
+    def toggle_instant_kill(self) -> bool:
+        assert self.state is not None
+        enabled = not self.instant_kill_enabled()
+        self.set_developer_flag(self.DEV_INSTANT_KILL_FLAG, enabled)
+        self.say(f"Instant kill for player attacks is now {'ON' if enabled else 'OFF'}.")
         return enabled
 
     def add_developer_gold(self, amount: int = 10_000) -> int:
@@ -2119,6 +2155,8 @@ class GameBase:
         preserved_flags = {
             self.DEV_GOD_MODE_FLAG: self.god_mode_enabled(),
             self.DEV_PASS_CHECKS_FLAG: self.always_pass_dice_checks_enabled(),
+            self.DEV_FAIL_CHECKS_FLAG: self.always_fail_dice_checks_enabled(),
+            self.DEV_INSTANT_KILL_FLAG: self.instant_kill_enabled(),
         }
         self.state.companions = []
         self.state.camp_companions = []
@@ -2150,8 +2188,396 @@ class GameBase:
         refresh_scene_music = getattr(self, "refresh_scene_music", None)
         if callable(refresh_scene_music):
             refresh_scene_music()
-        self.say("Developer snapshot loaded: Act II begins with Bryn, Elira, and Tolan at level 4.")
+        self.say("Act II snapshot loaded: Act II begins with Bryn, Elira, and Tolan at level 4.")
         return True
+
+    def console_command_reference(self) -> list[str]:
+        return [
+            "give <item id> [quantity] - add item(s) to the shared inventory; quantity defaults to 1",
+            "give gold [quantity] - add gold; quantity defaults to 1,000 gp",
+            "god - toggle party god mode",
+            "heal - heal every living active party member to full HP",
+            "revive - revive every dead or downed active party member at 1 HP",
+            "rest - complete a free long rest without consuming supplies",
+            "clearconditions - remove all conditions from the active party",
+            "levelup - level up the company by 1",
+            "instantact2 - rebuild this run at the Act II level 4 start",
+            "passallchecks - toggle automatic success for player dice checks",
+            "failallchecks - toggle automatic failure for player dice checks",
+            "instantkill - toggle 1,000-damage instant kills on player attacks",
+            "unlockmap - reveal the current act map and its dungeon rooms",
+            "unlockallmaps - reveal every Act I and Act II map node and dungeon room",
+            "setscene <scene id> - jump to a scene and restart the scene loop",
+            "setflag <flag> <true|false> - set a story flag",
+            "spawn <enemy id> [quantity] - start a console combat encounter; quantity defaults to 1",
+            "killall - kill every currently active enemy in combat",
+            "identify <item id> - print catalog details for an item",
+            "helpconsole - show this command reference",
+        ]
+
+    def show_console_command_reference(self) -> None:
+        self.banner("Console Commands")
+        self.say("Available console commands:")
+        for line in self.console_command_reference():
+            self.say(f"- {line}")
+
+    def open_console_commands_menu(self) -> bool:
+        while True:
+            self.show_console_command_reference()
+            self.say("Type a command below, or type `back` to return to the game.")
+            raw = self.read_input("console> ").strip()
+            if raw.lower() in {"", "back", "exit", "quit"}:
+                return False
+            if self.execute_console_command(raw):
+                return True
+
+    def active_console_state_available(self) -> bool:
+        if self.state is not None:
+            return True
+        self.say("Start or load an adventure before using console commands.")
+        return False
+
+    def parse_console_quantity(self, token: str | None, *, default: int) -> int | None:
+        if token is None:
+            return default
+        try:
+            quantity = int(token)
+        except ValueError:
+            self.say("Quantity must be a positive whole number.")
+            return None
+        if quantity <= 0:
+            self.say("Quantity must be at least 1.")
+            return None
+        return quantity
+
+    def execute_console_command(self, raw: str) -> bool:
+        tokens = raw.split()
+        if not tokens:
+            return False
+        command = tokens[0].lower()
+        if command == "give":
+            return self.execute_give_console_command(tokens)
+        if command == "god":
+            if self.active_console_state_available():
+                self.toggle_god_mode()
+            return False
+        if command == "heal":
+            if self.active_console_state_available():
+                self.console_heal_party()
+            return False
+        if command == "revive":
+            if self.active_console_state_available():
+                self.console_revive_party()
+            return False
+        if command == "rest":
+            if self.active_console_state_available():
+                self.console_long_rest()
+            return False
+        if command == "clearconditions":
+            if self.active_console_state_available():
+                self.console_clear_party_conditions()
+            return False
+        if command == "levelup":
+            if self.active_console_state_available():
+                self.level_up_party_instantly()
+            return False
+        if command == "instantact2":
+            if self.active_console_state_available():
+                return self.jump_to_act2_developer_start()
+            return False
+        if command == "passallchecks":
+            if self.active_console_state_available():
+                self.toggle_pass_every_dice_check()
+            return False
+        if command == "failallchecks":
+            if self.active_console_state_available():
+                self.toggle_fail_every_dice_check()
+            return False
+        if command == "instantkill":
+            if self.active_console_state_available():
+                self.toggle_instant_kill()
+            return False
+        if command == "unlockmap":
+            if self.active_console_state_available():
+                self.console_unlock_current_map()
+            return False
+        if command == "unlockallmaps":
+            if self.active_console_state_available():
+                self.console_unlock_all_maps()
+            return False
+        if command == "setscene":
+            return self.execute_setscene_console_command(tokens)
+        if command == "setflag":
+            return self.execute_setflag_console_command(tokens)
+        if command == "spawn":
+            return self.execute_spawn_console_command(tokens)
+        if command == "killall":
+            if self.active_console_state_available():
+                self.console_kill_all_active_enemies()
+            return False
+        if command == "identify":
+            self.execute_identify_console_command(tokens)
+            return False
+        if command == "helpconsole":
+            self.show_console_command_reference()
+            return False
+        self.say(f"Unknown console command: {command}.")
+        return False
+
+    def execute_give_console_command(self, tokens: list[str]) -> bool:
+        if len(tokens) < 2 or len(tokens) > 3:
+            self.say("Usage: give <item id> [quantity] or give gold [quantity].")
+            return False
+        if not self.active_console_state_available():
+            return False
+        target = tokens[1]
+        if target.lower() == "gold":
+            quantity = self.parse_console_quantity(tokens[2] if len(tokens) == 3 else None, default=1_000)
+            if quantity is None:
+                return False
+            self.state.gold += quantity
+            self.say(f"Console grants {quantity:,} gp. Total gold: {self.state.gold:,} gp.")
+            return False
+        quantity = self.parse_console_quantity(tokens[2] if len(tokens) == 3 else None, default=1)
+        if quantity is None:
+            return False
+        try:
+            item = get_item(target)
+        except KeyError:
+            self.say(f"Unknown item id: {target}.")
+            return False
+        inventory = self.inventory_dict()
+        inventory[item.item_id] = inventory.get(item.item_id, 0) + quantity
+        self.say(f"Console grants {item.name} [{item.item_id}] x{quantity}.")
+        return False
+
+    def console_heal_party(self) -> None:
+        assert self.state is not None
+        healed = 0
+        skipped_dead = 0
+        for member in self.state.party_members():
+            if member.dead:
+                skipped_dead += 1
+                continue
+            member.current_hp = member.max_hp
+            member.stable = False
+            member.death_successes = 0
+            member.death_failures = 0
+            healed += 1
+        message = f"Console heals {healed} active party member{'s' if healed != 1 else ''} to full HP."
+        if skipped_dead:
+            message += " Dead party members still need `revive`."
+        self.say(message)
+
+    def console_revive_party(self) -> None:
+        assert self.state is not None
+        revived = 0
+        for member in self.state.party_members():
+            if not member.dead and member.current_hp > 0:
+                continue
+            member.dead = False
+            member.current_hp = max(1, min(member.max_hp, 1))
+            member.stable = False
+            member.death_successes = 0
+            member.death_failures = 0
+            revived += 1
+        self.say(f"Console revives {revived} active party member{'s' if revived != 1 else ''} at 1 HP.")
+
+    def console_long_rest(self) -> None:
+        assert self.state is not None
+        self.complete_long_rest_recovery()
+        self.say("Console completes a free long rest. Supplies were not consumed.")
+
+    def console_clear_party_conditions(self) -> None:
+        assert self.state is not None
+        cleared = 0
+        for member in self.state.party_members():
+            cleared += sum(1 for value in member.conditions.values() if value != 0)
+            member.conditions.clear()
+        self.say(f"Console clears {cleared} condition{'s' if cleared != 1 else ''} from the active party.")
+
+    def append_unique_strings(self, target: list[str], values) -> int:
+        existing = set(target)
+        added = 0
+        for value in values:
+            if not isinstance(value, str) or value in existing:
+                continue
+            target.append(value)
+            existing.add(value)
+            added += 1
+        return added
+
+    def unlock_map_payload(self, blueprint, payload: dict) -> tuple[int, int]:
+        node_count = self.append_unique_strings(payload["visited_nodes"], blueprint.nodes.keys())
+        room_ids = [room_id for dungeon in blueprint.dungeons.values() for room_id in dungeon.rooms]
+        room_count = self.append_unique_strings(payload["cleared_rooms"], room_ids)
+        story_count = self.append_unique_strings(payload["seen_story_beats"], [beat.beat_id for beat in blueprint.story_beats])
+        return node_count, room_count + story_count
+
+    def clear_console_map_cache(self) -> None:
+        clear_map_cache = getattr(self, "_clear_map_view_cache", None)
+        if callable(clear_map_cache):
+            clear_map_cache()
+        self._compact_hud_last_scene_key = None
+
+    def console_unlock_act1_map(self) -> tuple[int, int]:
+        payload = self._map_state_payload()
+        return self.unlock_map_payload(ACT1_HYBRID_MAP, payload)
+
+    def console_unlock_act2_map(self) -> tuple[int, int]:
+        payload = self._act2_map_state_payload()
+        return self.unlock_map_payload(ACT2_ENEMY_DRIVEN_MAP, payload)
+
+    def console_current_scene_is_act2_map(self) -> bool:
+        assert self.state is not None
+        return self.state.current_scene in {node.scene_key for node in ACT2_ENEMY_DRIVEN_MAP.nodes.values()}
+
+    def console_unlock_current_map(self) -> None:
+        assert self.state is not None
+        if self.state.current_act >= 2 or self.console_current_scene_is_act2_map():
+            label = "Act II"
+            nodes, details = self.console_unlock_act2_map()
+        else:
+            label = "Act I"
+            nodes, details = self.console_unlock_act1_map()
+        self.clear_console_map_cache()
+        self.say(f"Console unlocks the {label} map: {nodes} new node(s), {details} new room/story marker(s).")
+
+    def console_unlock_all_maps(self) -> None:
+        assert self.state is not None
+        act1_nodes, act1_details = self.console_unlock_act1_map()
+        act2_nodes, act2_details = self.console_unlock_act2_map()
+        self.clear_console_map_cache()
+        self.say(
+            "Console unlocks all maps: "
+            f"{act1_nodes + act2_nodes} new node(s), {act1_details + act2_details} new room/story marker(s)."
+        )
+
+    def infer_console_scene_act(self, scene_id: str) -> int:
+        if scene_id.startswith("act3_"):
+            return 3
+        act2_scenes = {
+            "act2_claims_council",
+            "act2_expedition_hub",
+            "conyberry_agatha",
+            "neverwinter_wood_survey_camp",
+            "stonehollow_dig",
+            "act2_midpoint_convergence",
+            "broken_prospect",
+            "south_adit",
+            "wave_echo_outer_galleries",
+            "black_lake_causeway",
+            "forge_of_spells",
+            "act2_scaffold_complete",
+        }
+        return 2 if scene_id in act2_scenes else 1
+
+    def execute_setscene_console_command(self, tokens: list[str]) -> bool:
+        if len(tokens) != 2:
+            self.say("Usage: setscene <scene id>.")
+            return False
+        if not self.active_console_state_available():
+            return False
+        scene_id = tokens[1]
+        if scene_id not in self._scene_handlers:
+            self.say(f"Unknown scene id: {scene_id}.")
+            return False
+        self.state.current_scene = scene_id
+        self.state.current_act = self.infer_console_scene_act(scene_id)
+        self._compact_hud_last_scene_key = None
+        refresh_scene_music = getattr(self, "refresh_scene_music", None)
+        if callable(refresh_scene_music):
+            refresh_scene_music()
+        self.say(f"Console jumps to scene `{scene_id}`.")
+        return True
+
+    def parse_console_bool(self, token: str) -> bool | None:
+        lowered = token.strip().lower()
+        if lowered in {"true", "t", "1", "yes", "y", "on"}:
+            return True
+        if lowered in {"false", "f", "0", "no", "n", "off"}:
+            return False
+        self.say("Flag value must be true or false.")
+        return None
+
+    def execute_setflag_console_command(self, tokens: list[str]) -> bool:
+        if len(tokens) != 3:
+            self.say("Usage: setflag <flag> <true|false>.")
+            return False
+        if not self.active_console_state_available():
+            return False
+        value = self.parse_console_bool(tokens[2])
+        if value is None:
+            return False
+        self.state.flags[tokens[1]] = value
+        self.say(f"Console sets flag `{tokens[1]}` to {value}.")
+        return False
+
+    def execute_spawn_console_command(self, tokens: list[str]) -> bool:
+        if len(tokens) < 2 or len(tokens) > 3:
+            self.say("Usage: spawn <enemy id> [quantity].")
+            return False
+        if not self.active_console_state_available():
+            return False
+        if getattr(self, "_in_combat", False):
+            self.say("Finish the current combat before spawning a new encounter.")
+            return False
+        quantity = self.parse_console_quantity(tokens[2] if len(tokens) == 3 else None, default=1)
+        if quantity is None:
+            return False
+        if quantity > 20:
+            self.say("Spawn quantity cannot exceed 20 enemies at once.")
+            return False
+        try:
+            enemies = [create_enemy(tokens[1]) for _ in range(quantity)]
+        except KeyError:
+            self.say(f"Unknown enemy id: {tokens[1]}.")
+            return False
+        label = enemies[0].name if quantity == 1 else f"{enemies[0].name} x{quantity}"
+        encounter = Encounter(
+            title=f"Console Spawn: {label}",
+            description=f"The console folds {label} into the current scene for a test fight.",
+            enemies=enemies,
+            allow_flee=True,
+            allow_parley=False,
+            allow_post_combat_random_encounter=False,
+        )
+        result = self.run_encounter(encounter)
+        self.say(f"Console spawn encounter ended: {result}.")
+        return False
+
+    def console_kill_all_active_enemies(self) -> None:
+        enemies = list(getattr(self, "_active_combat_enemies", []) or [])
+        living_enemies = [enemy for enemy in enemies if "enemy" in getattr(enemy, "tags", []) and enemy.is_conscious()]
+        if not getattr(self, "_in_combat", False) or not living_enemies:
+            self.say("There are no active combat enemies to kill.")
+            return
+        for enemy in living_enemies:
+            enemy.temp_hp = 0
+            enemy.current_hp = 0
+            enemy.dead = True
+        self.say(f"Console kills {len(living_enemies)} active enem{'y' if len(living_enemies) == 1 else 'ies'}.")
+
+    def execute_identify_console_command(self, tokens: list[str]) -> None:
+        if len(tokens) != 2:
+            self.say("Usage: identify <item id>.")
+            return
+        try:
+            item = get_item(tokens[1])
+        except KeyError:
+            self.say(f"Unknown item id: {tokens[1]}.")
+            return
+        rules = item_rules_text(item) or "No special rules."
+        self.banner(f"Identify: {item.name}")
+        self.say(f"ID: {item.item_id}")
+        if item.legacy_id:
+            self.say(f"Legacy ID: {item.legacy_id}")
+        self.say(f"Category: {item.category} / {item.item_type}")
+        self.say(f"Rarity: {item.rarity_title}")
+        self.say(f"Value: {item.value} gp | Weight: {item.weight:.1f} lb")
+        self.say(f"Description: {item.description}")
+        self.say(f"Rules: {rules}")
+        self.say(f"Source: {item.source}")
 
     def open_developer_tools_menu(self) -> bool:
         if self.state is None:
@@ -2186,7 +2612,8 @@ class GameBase:
     def show_global_commands(self) -> None:
         commands = [
             ("help", "Show the list of global commands and what they do."),
-            ("dev", "Open developer tools for debug toggles, instant leveling, and the Act II test snapshot."),
+            ("~ / console", "Open the console commands menu for give, god, levelup, Act II jump, and dice-check toggles."),
+            ("helpconsole", "Show the console command reference without opening the console prompt."),
             ("settings", "Open the settings menu for audio and presentation toggles."),
             ("save", "Save the current run to a named slot."),
             ("load", "Load another save slot immediately and continue from there."),
@@ -2207,7 +2634,7 @@ class GameBase:
             for command, description in commands:
                 table.add_row(self.rich_text(command, "light_yellow", bold=True), description)
             guidance = self.rich_text(
-                "Type any of these at most prompts. `map`, `maps`, and `map menu` all open the same map menu.",
+                "Type any of these at most prompts. `map`, `maps`, and `map menu` all open the same map menu, and `~` opens the console commands menu.",
                 "cyan",
             )
             if self.emit_rich(
