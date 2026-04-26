@@ -5663,6 +5663,216 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(game.state.flags["act2_whisper_pressure"], 3)
         self.assertIn("copied Hushfen sigil", rendered)
 
+    def test_drowned_shrine_records_caldra_doctrine_trace(self) -> None:
+        player = build_character(
+            name="Vale",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        log: list[str] = []
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(900864250))
+        game.state = GameState(
+            player=player,
+            current_act=2,
+            current_scene="black_lake_causeway",
+            flags={
+                "act2_started": True,
+                "wave_echo_outer_cleared": True,
+                "act2_town_stability": 3,
+                "act2_route_control": 3,
+                "act2_whisper_pressure": 2,
+            },
+        )
+        dungeon = ACT2_ENEMY_DRIVEN_MAP.dungeons["black_lake_crossing"]
+        room = dungeon.rooms["drowned_shrine"]
+        game.skill_check = lambda actor, skill, dc, context: True  # type: ignore[method-assign]
+        game.scenario_choice = lambda prompt, options, **kwargs: self.option_index_containing(options, "Wake the old rite")  # type: ignore[method-assign]
+
+        game._black_lake_drowned_shrine(dungeon, room)
+
+        assert game.state is not None
+        rendered = strip_ansi("\n".join(log))
+        self.assertTrue(game.state.flags["black_lake_shrine_sanctity_named"])
+        self.assertTrue(game.state.flags["caldra_drowned_shrine_doctrine"])
+        self.assertEqual(game.state.flags["caldra_doctrine_seen_count"], 1)
+        self.assertEqual(game.state.flags["act2_caldra_traces_seen"], 1)
+        self.assertTrue(any("drowned shrine doctrine" in clue for clue in game.state.clues))
+        self.assertIn("shell-lacquered doctrine slate", rendered)
+
+    def test_south_adit_infirmary_names_tovin_marr_as_caldra_victim(self) -> None:
+        player = build_character(
+            name="Vale",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        log: list[str] = []
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(9008642501))
+        game.state = GameState(
+            player=player,
+            current_act=2,
+            current_scene="south_adit",
+            flags={
+                "act2_started": True,
+                "iron_hollow_sabotage_resolved": True,
+                "act2_town_stability": 3,
+                "act2_route_control": 3,
+                "act2_whisper_pressure": 2,
+            },
+        )
+        dungeon = ACT2_ENEMY_DRIVEN_MAP.dungeons["south_adit_prison_line"]
+        room = dungeon.rooms["infirmary_cut"]
+        game.skill_check = lambda actor, skill, dc, context: True  # type: ignore[method-assign]
+        game.scenario_choice = lambda prompt, options, **kwargs: self.option_index_containing(options, "Stabilize the captives")  # type: ignore[method-assign]
+
+        game._south_adit_infirmary_cut(dungeon, room)
+
+        assert game.state is not None
+        rendered = strip_ansi("\n".join(log))
+        self.assertTrue(game.state.flags["caldra_harmed_tovin_marr"])
+        self.assertTrue(game.state.flags["tovin_marr_stabilized"])
+        self.assertEqual(game.state.flags["caldra_specific_victims_seen_count"], 1)
+        self.assertEqual(game.state.flags["act2_caldra_traces_seen"], 1)
+        self.assertTrue(any("Tovin Marr's wrist slate" in clue for clue in game.state.clues))
+        self.assertIn("Greywake rope clerk", rendered)
+        self.assertIn("Tovin's breathing stops following the little bell", rendered)
+
+    def test_two_caldra_corrected_ledgers_unlock_forge_lens_method_read(self) -> None:
+        player = build_character(
+            name="Vale",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        checks: list[tuple[str, int, str]] = []
+        log: list[str] = []
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(900864251))
+        game.state = GameState(
+            player=player,
+            current_act=2,
+            current_scene="forge_of_spells",
+            flags={
+                "act2_started": True,
+                "black_lake_crossed": True,
+                "caldra_corrected_ledger_siltlock": True,
+                "caldra_corrected_ledger_south_adit": True,
+                "act2_town_stability": 3,
+                "act2_route_control": 3,
+                "act2_whisper_pressure": 2,
+            },
+        )
+        dungeon = ACT2_ENEMY_DRIVEN_MAP.dungeons["forge_resonance_lens"]
+        room = dungeon.rooms["resonance_lens"]
+
+        def capture_check(actor, skill: str, dc: int, context: str) -> bool:
+            checks.append((skill, dc, context))
+            return True
+
+        game.skill_check = capture_check  # type: ignore[method-assign]
+        game.scenario_choice = lambda prompt, options, **kwargs: self.option_index_containing(options, "Name Caldra's correction method")  # type: ignore[method-assign]
+
+        game._forge_resonance_lens(dungeon, room)
+
+        assert game.state is not None
+        rendered = strip_ansi("\n".join(log))
+        self.assertEqual(checks, [("Investigation", 14, "to name Caldra's correction method inside the lens")])
+        self.assertTrue(game.state.flags["forge_lens_caldra_correction_method_readable"])
+        self.assertTrue(game.state.flags["forge_lens_caldra_method_named"])
+        self.assertTrue(game.state.flags["forge_lens_support_line_named"])
+        self.assertIn("red ash ticks", rendered)
+
+    def test_caldra_reacts_when_forge_lens_names_correction_method(self) -> None:
+        player = build_character(
+            name="Vale",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        log: list[str] = []
+        encounters: list[Encounter] = []
+        game = TextDnDGame(input_fn=lambda _: "3", output_fn=log.append, rng=random.Random(900864252))
+        game.state = GameState(
+            player=player,
+            current_act=2,
+            current_scene="forge_of_spells",
+            flags={
+                "act2_started": True,
+                "black_lake_crossed": True,
+                "forge_lens_caldra_method_named": True,
+                "act2_town_stability": 3,
+                "act2_route_control": 3,
+                "act2_whisper_pressure": 2,
+            },
+        )
+        dungeon = ACT2_ENEMY_DRIVEN_MAP.dungeons["forge_resonance_lens"]
+        room = dungeon.rooms["caldra_dais"]
+        game.scenario_choice = lambda prompt, options, **kwargs: self.option_index_containing(options, "Hit the chamber hard")  # type: ignore[method-assign]
+        game.run_encounter = lambda encounter: encounters.append(encounter) or "victory"  # type: ignore[method-assign]
+
+        game._forge_caldra_dais(dungeon, room)
+
+        rendered = strip_ansi("\n".join(log))
+        self.assertEqual(encounters[0].title, "Boss: Sister Caldra Voss")
+        self.assertEqual(encounters[0].parley_dc, 14)
+        self.assertIn("Your red ash corrections are the ritual", rendered)
+        self.assertIn("Correction is mercy", rendered)
+
+    def test_caldra_finale_names_full_pattern_when_doctrine_victim_and_ledgers_align(self) -> None:
+        player = build_character(
+            name="Vale",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        log: list[str] = []
+        encounters: list[Encounter] = []
+        game = TextDnDGame(input_fn=lambda _: "3", output_fn=log.append, rng=random.Random(900864253))
+        game.state = GameState(
+            player=player,
+            current_act=2,
+            current_scene="forge_of_spells",
+            flags={
+                "act2_started": True,
+                "black_lake_crossed": True,
+                "forge_lens_caldra_method_named": True,
+                "caldra_drowned_shrine_doctrine": True,
+                "caldra_harmed_tovin_marr": True,
+                "act2_town_stability": 3,
+                "act2_route_control": 3,
+                "act2_whisper_pressure": 2,
+            },
+        )
+        dungeon = ACT2_ENEMY_DRIVEN_MAP.dungeons["forge_resonance_lens"]
+        room = dungeon.rooms["caldra_dais"]
+        game.scenario_choice = lambda prompt, options, **kwargs: self.option_index_containing(options, "Hit the chamber hard")  # type: ignore[method-assign]
+        game.run_encounter = lambda encounter: encounters.append(encounter) or "victory"  # type: ignore[method-assign]
+
+        game._forge_caldra_dais(dungeon, room)
+
+        assert game.state is not None
+        rendered = strip_ansi("\n".join(log))
+        self.assertEqual(encounters[0].title, "Boss: Sister Caldra Voss")
+        self.assertEqual(encounters[0].parley_dc, 12)
+        self.assertTrue(game.state.flags["forge_caldra_full_pattern_named"])
+        self.assertEqual(game.state.flags["act3_caldra_method_record"], "exposed")
+        self.assertEqual(game.state.flags["act3_caldra_harmed_witness"], "Tovin Marr")
+        self.assertIn("Tovin Marr had a name", rendered)
+        self.assertIn("drowned shrine has your doctrine", rendered)
+        self.assertIn("your corrections turn a person into paperwork", rendered)
+        self.assertTrue(any("doctrine blesses correction" in clue for clue in game.state.clues))
+        self.assertIn("Tovin Marr's case", game.act3_forge_handoff_line())
+
     def test_agatha_claim_cover_changes_sponsor_turnin_reaction(self) -> None:
         player = build_character(
             name="Vale",

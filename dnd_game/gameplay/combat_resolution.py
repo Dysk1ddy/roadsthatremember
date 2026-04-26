@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
+from dataclasses import dataclass
 
 from ..data.story.public_terms import ability_label, spell_label, target_guard_label
 from ..dice import D20Outcome, roll, roll_d20
@@ -9,6 +10,22 @@ from ..ui.colors import rich_style_name, strip_ansi
 from ..ui.rich_render import Group, Panel, box
 from .difficulty_policy import ACT_DIFFICULTY_BANDS, clamp_dc_to_band
 from .magic_points import current_magic_points, magic_point_cost, spend_magic_points
+
+
+PHYSICAL_DEFENSE_DAMAGE_TYPES = {"", "slashing", "piercing", "bludgeoning"}
+
+
+@dataclass(slots=True)
+class DamageResolution:
+    raw_damage: int = 0
+    resisted_damage: int = 0
+    defense_percent: int = 0
+    armor_break_percent: int = 0
+    mitigated_damage: int = 0
+    temp_hp_absorbed: int = 0
+    hp_damage: int = 0
+    glance: bool = False
+    wound: bool = False
 
 
 class CombatResolutionMixin:
@@ -216,6 +233,107 @@ class CombatResolutionMixin:
             return True
         return self.has_status(actor, f"resist_{damage_type}")
 
+    def damage_type_uses_defense(self, damage_type: str) -> bool:
+        return (damage_type or "").lower() in PHYSICAL_DEFENSE_DAMAGE_TYPES
+
+    def armor_defense_percent(self, armor) -> int:
+        if armor is None:
+            return 0
+        explicit = getattr(armor, "defense_percent", None)
+        if explicit is not None:
+            return max(0, int(explicit))
+        armor_type = str(getattr(armor, "armor_type", "") or "").lower()
+        base_ac = int(getattr(armor, "base_ac", 10))
+        if armor_type == "clothing":
+            return max(0, (base_ac - 10) * 5)
+        if getattr(armor, "heavy", False) or armor_type == "heavy":
+            return min(45, 35 + max(0, base_ac - 16) * 10)
+        if armor_type == "medium":
+            return 20 if base_ac <= 13 else min(35, 25 + max(0, base_ac - 14) * 5)
+        if armor_type == "light":
+            return min(25, 10 + max(0, base_ac - 11) * 5)
+        return min(70, max(0, (base_ac - 10) * 5))
+
+    def defense_bonus_percent(self, actor) -> int:
+        total = 0
+        for bonuses in (actor.equipment_bonuses, actor.gear_bonuses, actor.relationship_bonuses):
+            total += int(bonuses.get("defense_percent", 0))
+            total += int(bonuses.get("defense", 0)) * 5
+            total += int(bonuses.get("AC", 0)) * 5
+        total += self.status_value(actor, "defense_bonus_percent")
+        return total
+
+    def defense_cap_percent(self, actor) -> int:
+        for bonuses in (actor.equipment_bonuses, actor.gear_bonuses, actor.relationship_bonuses):
+            cap = int(bonuses.get("defense_cap_percent", bonuses.get("defense_cap", 0)))
+            if cap > 0:
+                return cap
+        armor = getattr(actor, "armor", None)
+        armor_type = str(getattr(armor, "armor_type", "") or "").lower() if armor is not None else ""
+        if "heavy_armor_specialist" in getattr(actor, "features", []):
+            return 80
+        if armor is None or armor_type in {"clothing", "light"}:
+            return 45
+        return 75
+
+    def total_armor_break_percent(self, target, *, source_actor=None, incoming_percent: int = 0, incoming_steps: int = 0) -> int:
+        total = max(0, int(incoming_percent)) + max(0, int(incoming_steps)) * 10
+        total += max(0, int(getattr(target, "conditions", {}).get("armor_broken", 0))) * 10
+        total += self.status_value(target, "armor_break_percent")
+        if source_actor is not None:
+            for bonuses in (source_actor.equipment_bonuses, source_actor.gear_bonuses, source_actor.relationship_bonuses):
+                total += int(bonuses.get("armor_break_percent", 0))
+                total += int(bonuses.get("armor_break", 0)) * 10
+        return max(0, total)
+
+    def effective_defense_percent(
+        self,
+        actor,
+        *,
+        damage_type: str = "",
+        armor_break_percent: int = 0,
+    ) -> int:
+        if not self.damage_type_uses_defense(damage_type):
+            return 0
+        defense = self.armor_defense_percent(getattr(actor, "armor", None))
+        if getattr(actor, "shield", False):
+            defense += 5
+        defense += self.defense_bonus_percent(actor)
+        defense -= max(0, int(armor_break_percent))
+        return max(0, min(defense, self.defense_cap_percent(actor)))
+
+    def effective_avoidance(self, actor) -> int:
+        if any(self.has_status(actor, status) for status in ("stunned", "paralyzed", "unconscious")):
+            return -5
+        dex_mod = actor.ability_mod("DEX")
+        armor = getattr(actor, "armor", None)
+        if armor is not None:
+            cap = 0 if getattr(armor, "heavy", False) else getattr(armor, "dex_cap", None)
+            if cap is not None:
+                dex_mod = min(dex_mod, int(cap))
+        total = dex_mod
+        for bonuses in (actor.equipment_bonuses, actor.gear_bonuses, actor.relationship_bonuses):
+            total += int(bonuses.get("avoidance", 0))
+            total += int(bonuses.get("avoidance_bonus", 0))
+        total += self.status_value(actor, "avoidance_bonus")
+        total -= self.status_value(actor, "avoidance_penalty")
+        return total
+
+    def effective_attack_target_number(self, actor) -> int:
+        return max(1, 10 + self.effective_avoidance(actor))
+
+    def attack_target_label(self, target_number: int) -> str:
+        return f"Avoidance {target_number}"
+
+    def last_damage_resolution(self) -> DamageResolution:
+        return getattr(self, "_last_damage_resolution", DamageResolution())
+
+    def last_damage_was_glance(self) -> bool:
+        return self.last_damage_resolution().glance
+
+    def last_damage_caused_wound(self) -> bool:
+        return self.last_damage_resolution().wound
+
     def perform_weapon_attack(self, attacker, target, heroes, enemies, dodging, *, use_smite: bool = False) -> None:
         if not self.can_make_hostile_action(attacker):
             self.say(f"{self.style_name(attacker)} can't bring themselves to make a hostile move while Charmed.")
@@ -226,7 +344,7 @@ class CombatResolutionMixin:
         weapon_item = self.equipped_weapon_item(attacker)
         try:
             advantage = self.attack_advantage_state(attacker, target, heroes, enemies, dodging, ranged=attacker.weapon.ranged)
-            target_ac = self.effective_armor_class(target)
+            target_number = self.effective_attack_target_number(target)
             total_modifier = (
                 attacker.attack_bonus()
                 + self.ally_pressure_bonus(attacker, heroes, ranged=attacker.weapon.ranged)
@@ -236,8 +354,8 @@ class CombatResolutionMixin:
             d20 = self.roll_check_d20(
                 attacker,
                 advantage,
-                target_number=target_ac,
-                target_label=target_guard_label(target_ac),
+                target_number=target_number,
+                target_label=self.attack_target_label(target_number),
                 modifier=total_modifier,
                 style="attack",
                 outcome_kind="attack",
@@ -251,8 +369,8 @@ class CombatResolutionMixin:
             if critical_hit and target.gear_bonuses.get("crit_immunity", 0):
                 critical_hit = False
                 self.say(f"{self.style_name(target)}'s armor turns a critical hit into a normal one.")
-            if not critical_hit and total < target_ac:
-                self.say(f"{self.style_name(attacker)} attacks {self.style_name(target)} but misses {target_guard_label(target_ac)}.")
+            if not critical_hit and total < target_number:
+                self.say(f"{self.style_name(attacker)} attacks {self.style_name(target)} but misses {self.attack_target_label(target_number)}.")
                 return
             damage_roll = self.roll_with_display_bonus(
                 attacker.weapon.damage,
@@ -297,7 +415,13 @@ class CombatResolutionMixin:
                 )
                 weapon_damage += martial_bonus.total
                 self.say(f"{self.style_name(attacker)}'s martial edge adds {self.style_damage(martial_bonus.total)} damage.")
-            total_actual = self.apply_damage(target, max(1, weapon_damage), damage_type=weapon_damage_type, source_actor=attacker)
+            total_actual = self.apply_damage(
+                target,
+                max(1, weapon_damage),
+                damage_type=weapon_damage_type,
+                source_actor=attacker,
+                apply_defense=True,
+            )
             if smite is not None:
                 total_actual += self.apply_damage(target, smite.total, damage_type="radiant", source_actor=attacker)
             if weapon_item is not None and weapon_item.extra_damage_dice:
@@ -308,7 +432,7 @@ class CombatResolutionMixin:
                     context_label=f"{weapon_item.enchantment or weapon_item.name} bonus damage",
                     outcome_kind="damage",
                 )
-                extra_actual = self.apply_damage(target, extra.total, damage_type=weapon_item.extra_damage_type, source_actor=attacker)
+                extra_actual = self.apply_damage(target, extra.total, damage_type=weapon_item.extra_damage_type, source_actor=attacker, apply_defense=True)
                 total_actual += extra_actual
                 self.say(
                     f"{weapon_item.enchantment or weapon_item.name} adds {self.style_damage(extra_actual)} "
@@ -321,12 +445,15 @@ class CombatResolutionMixin:
                     context_label=f"{weapon_item.enchantment or weapon_item.name} critical damage",
                     outcome_kind="damage",
                 )
-                vicious_actual = self.apply_damage(target, vicious.total, damage_type=weapon_damage_type, source_actor=attacker)
+                vicious_actual = self.apply_damage(target, vicious.total, damage_type=weapon_damage_type, source_actor=attacker, apply_defense=True)
                 total_actual += vicious_actual
                 self.say(f"{weapon_item.enchantment or weapon_item.name} tears in for {self.style_damage(vicious_actual)} extra critical damage.")
-            self.say(f"{self.style_name(attacker)} hits {self.style_name(target)} for {self.style_damage(total_actual)} damage.")
+            if total_actual <= 0 and self.last_damage_was_glance():
+                self.say(f"{self.style_name(attacker)} hits {self.style_name(target)}, but the blow glances off their Defense.")
+            else:
+                self.say(f"{self.style_name(attacker)} hits {self.style_name(target)} for {self.style_damage(total_actual)} damage.")
             self.announce_downed_target(target)
-            if attacker.archetype in {"rukhar", "varyn"}:
+            if total_actual > 0 and attacker.archetype in {"rukhar", "varyn"}:
                 self.apply_poison_on_hit(attacker, target)
             if attacker.weapon.ranged or "bow" in attacker.weapon.name.lower():
                 self.trigger_blacklake_adjudicator_reflection(attacker, target, source=attacker.weapon.name)
@@ -344,7 +471,7 @@ class CombatResolutionMixin:
         target_had_positive_status = self.hero_has_positive_combat_status(target)
         target_had_blessing = any(self.has_status(target, status) for status in ("blessed", "emboldened"))
         advantage = self.attack_advantage_state(attacker, target, heroes, enemies, dodging, ranged=attacker.weapon.ranged)
-        target_ac = self.effective_armor_class(target)
+        target_number = self.effective_attack_target_number(target)
         total_modifier = (
             attacker.attack_bonus()
             + self.ally_pressure_bonus(attacker, enemies, ranged=attacker.weapon.ranged)
@@ -354,8 +481,8 @@ class CombatResolutionMixin:
         d20 = self.roll_check_d20(
             attacker,
             advantage,
-            target_number=target_ac,
-            target_label=target_guard_label(target_ac),
+            target_number=target_number,
+            target_label=self.attack_target_label(target_number),
             modifier=total_modifier,
             style="attack",
             outcome_kind="attack",
@@ -363,7 +490,7 @@ class CombatResolutionMixin:
         )
         total = d20.kept + total_modifier
         critical_hit = d20.kept == 20 and not target.gear_bonuses.get("crit_immunity", 0)
-        if d20.kept == 1 or (not critical_hit and d20.kept != 20 and total < target_ac):
+        if d20.kept == 1 or (not critical_hit and d20.kept != 20 and total < target_number):
             self.say(f"{self.style_name(attacker)} fails to land a hit on {self.style_name(target)}.")
             return False
         if d20.kept == 20 and not critical_hit:
@@ -380,8 +507,17 @@ class CombatResolutionMixin:
         if self.has_status(target, "marked"):
             damage += 2
             self.say(f"The ember mark on {target.name} flares and gives {attacker.name} a cleaner wound to drive into.")
-        actual = self.apply_damage(target, damage, damage_type=weapon_item.damage_type if weapon_item is not None else "")
-        self.say(f"{self.style_name(attacker)} hits {self.style_name(target)} for {self.style_damage(actual)} damage.")
+        actual = self.apply_damage(
+            target,
+            damage,
+            damage_type=weapon_item.damage_type if weapon_item is not None else "",
+            source_actor=attacker,
+            apply_defense=True,
+        )
+        if actual <= 0 and self.last_damage_was_glance():
+            self.say(f"{self.style_name(attacker)} hits {self.style_name(target)}, but the blow glances off their Defense.")
+        else:
+            self.say(f"{self.style_name(attacker)} hits {self.style_name(target)} for {self.style_damage(actual)} damage.")
         self.announce_downed_target(target)
         if attacker.archetype == "resonance_leech" and target.is_conscious():
             if any(self.has_status(target, status) for status in ("frightened", "reeling", "deafened")):
@@ -461,7 +597,7 @@ class CombatResolutionMixin:
         if attacker.archetype == "briar_twig" and target.is_conscious():
             if not self.saving_throw(target, "STR", 11, context=f"against {attacker.name}'s snagging thorns"):
                 self.apply_status(target, "reeling", 2, source=f"{attacker.name}'s snagging thorns")
-        if attacker.archetype == "carrion_stalker" and target.is_conscious():
+        if actual > 0 and attacker.archetype == "carrion_stalker" and target.is_conscious():
             self.apply_status(target, "bleeding", 2, source=f"{attacker.name}'s serrated talons")
         if attacker.archetype == "bandit" and d20.kept >= 18 and target.is_conscious():
             if not self.saving_throw(target, "STR", 11, context=f"against {attacker.name}'s clinch"):
@@ -490,7 +626,7 @@ class CombatResolutionMixin:
         if attacker.archetype == "nothic" and d20.kept >= 18 and target.is_conscious():
             if not self.saving_throw(target, "WIS", 12, context=f"against {attacker.name}'s invasive whisper"):
                 self.apply_status(target, "frightened", 1, source=attacker.name)
-        if attacker.archetype in {"rukhar", "varyn", "mireweb_spider", "ettervine_webherd", "duskmire_matriarch"}:
+        if actual > 0 and attacker.archetype in {"rukhar", "varyn", "mireweb_spider", "ettervine_webherd", "duskmire_matriarch"}:
             self.apply_poison_on_hit(attacker, target)
         if attacker.archetype == "cache_mimic" and target.is_conscious():
             if attacker.resources.get("adhesive_grab", 0) > 0:
@@ -667,7 +803,7 @@ class CombatResolutionMixin:
         try:
             attack_bonus = self.spell_attack_bonus(caster, "INT")
             advantage = self.attack_advantage_state(caster, target, self.state.party_members(), [target], dodging, ranged=True)
-            target_ac = self.effective_armor_class(target)
+            target_number = self.effective_attack_target_number(target)
             total_modifier = (
                 attack_bonus
                 + self.ally_pressure_bonus(caster, self.state.party_members(), ranged=True)
@@ -677,15 +813,15 @@ class CombatResolutionMixin:
             d20 = self.roll_check_d20(
                 caster,
                 advantage,
-                target_number=target_ac,
-                target_label=target_guard_label(target_ac),
+                target_number=target_number,
+                target_label=self.attack_target_label(target_number),
                 modifier=total_modifier,
                 style="attack",
                 outcome_kind="attack",
                 context_label=f"{caster.name} channels {channel}",
             )
             total = d20.kept + total_modifier
-            if d20.kept == 1 or (d20.kept != 20 and total < target_ac):
+            if d20.kept == 1 or (d20.kept != 20 and total < target_number):
                 self.say(f"{self.style_name(caster)}'s {channel} misses {self.style_name(target)}.")
                 return
             actual = self.apply_damage(
@@ -722,7 +858,7 @@ class CombatResolutionMixin:
         try:
             attack_bonus = self.spell_attack_bonus(caster, "WIS")
             advantage = self.attack_advantage_state(caster, target, self.state.party_members(), [target], dodging, ranged=True)
-            target_ac = self.effective_armor_class(target)
+            target_number = self.effective_attack_target_number(target)
             total_modifier = (
                 attack_bonus
                 + self.ally_pressure_bonus(caster, self.state.party_members(), ranged=True)
@@ -732,15 +868,15 @@ class CombatResolutionMixin:
             d20 = self.roll_check_d20(
                 caster,
                 advantage,
-                target_number=target_ac,
-                target_label=target_guard_label(target_ac),
+                target_number=target_number,
+                target_label=self.attack_target_label(target_number),
                 modifier=total_modifier,
                 style="attack",
                 outcome_kind="attack",
                 context_label=f"{caster.name} hurls {channel}",
             )
             total = d20.kept + total_modifier
-            if d20.kept == 1 or (d20.kept != 20 and total < target_ac):
+            if d20.kept == 1 or (d20.kept != 20 and total < target_number):
                 self.say(f"{self.style_name(caster)}'s {channel} misses {self.style_name(target)}.")
                 return
             actual = self.apply_damage(
@@ -843,7 +979,7 @@ class CombatResolutionMixin:
         try:
             attack_bonus = self.spell_attack_bonus(caster, "CHA")
             advantage = self.attack_advantage_state(caster, target, self.state.party_members(), [target], dodging, ranged=True)
-            target_ac = self.effective_armor_class(target)
+            target_number = self.effective_attack_target_number(target)
             total_modifier = (
                 attack_bonus
                 + self.ally_pressure_bonus(caster, self.state.party_members(), ranged=True)
@@ -853,15 +989,15 @@ class CombatResolutionMixin:
             d20 = self.roll_check_d20(
                 caster,
                 advantage,
-                target_number=target_ac,
-                target_label=target_guard_label(target_ac),
+                target_number=target_number,
+                target_label=self.attack_target_label(target_number),
                 modifier=total_modifier,
                 style="attack",
                 outcome_kind="attack",
                 context_label=f"{caster.name} channels {channel}",
             )
             total = d20.kept + total_modifier
-            if d20.kept == 1 or (d20.kept != 20 and total < target_ac):
+            if d20.kept == 1 or (d20.kept != 20 and total < target_number):
                 self.say(f"{self.style_name(caster)}'s {channel} tears sparks from stone but misses {self.style_name(target)}.")
                 return
             actual = self.apply_damage(
@@ -910,7 +1046,7 @@ class CombatResolutionMixin:
             play_attack_sound_for(attacker)
         try:
             advantage = self.attack_advantage_state(attacker, target, heroes, enemies, dodging, ranged=False)
-            target_ac = self.effective_armor_class(target)
+            target_number = self.effective_attack_target_number(target)
             total_modifier = (
                 self.weapon_attack_bonus_for(attacker, attacker.weapon)
                 + self.ally_pressure_bonus(attacker, heroes, ranged=False)
@@ -920,8 +1056,8 @@ class CombatResolutionMixin:
             d20 = self.roll_check_d20(
                 attacker,
                 advantage,
-                target_number=target_ac,
-                target_label=target_guard_label(target_ac),
+                target_number=target_number,
+                target_label=self.attack_target_label(target_number),
                 modifier=total_modifier,
                 style="attack",
                 outcome_kind="attack",
@@ -929,7 +1065,7 @@ class CombatResolutionMixin:
             )
             total = d20.kept + total_modifier
             critical_hit = d20.kept >= self.critical_threshold(attacker)
-            if d20.kept == 1 or (not critical_hit and d20.kept != 20 and total < target_ac):
+            if d20.kept == 1 or (not critical_hit and d20.kept != 20 and total < target_number):
                 self.say(f"{self.style_name(attacker)}'s Close Form strike misses {self.style_name(target)}.")
                 return
             damage_roll = self.roll_with_display_bonus(
@@ -945,6 +1081,7 @@ class CombatResolutionMixin:
                 max(1, damage_roll.total + self.weapon_damage_bonus_for(attacker, attacker.weapon)),
                 damage_type="bludgeoning",
                 source_actor=attacker,
+                apply_defense=True,
             )
             self.say(f"{self.style_name(attacker)} snaps in with a Close Form strike for {self.style_damage(actual)} damage.")
             if target.is_conscious():
@@ -976,7 +1113,7 @@ class CombatResolutionMixin:
         weapon = off_hand_item.weapon
         try:
             advantage = self.attack_advantage_state(attacker, target, heroes, enemies, dodging, ranged=weapon.ranged)
-            target_ac = self.effective_armor_class(target)
+            target_number = self.effective_attack_target_number(target)
             total_modifier = (
                 self.weapon_attack_bonus_for(attacker, weapon)
                 + self.ally_pressure_bonus(attacker, heroes, ranged=weapon.ranged)
@@ -986,8 +1123,8 @@ class CombatResolutionMixin:
             d20 = self.roll_check_d20(
                 attacker,
                 advantage,
-                target_number=target_ac,
-                target_label=target_guard_label(target_ac),
+                target_number=target_number,
+                target_label=self.attack_target_label(target_number),
                 modifier=total_modifier,
                 style="attack",
                 outcome_kind="attack",
@@ -995,7 +1132,7 @@ class CombatResolutionMixin:
             )
             total = d20.kept + total_modifier
             critical_hit = d20.kept >= self.critical_threshold(attacker)
-            if d20.kept == 1 or (not critical_hit and d20.kept != 20 and total < target_ac):
+            if d20.kept == 1 or (not critical_hit and d20.kept != 20 and total < target_number):
                 self.say(f"{self.style_name(attacker)}'s off-hand attack misses {self.style_name(target)}.")
                 return
             actual = self.apply_damage(
@@ -1014,6 +1151,7 @@ class CombatResolutionMixin:
                 ),
                 damage_type=off_hand_item.damage_type,
                 source_actor=attacker,
+                apply_defense=True,
             )
             self.say(f"{self.style_name(attacker)} strikes with {off_hand_item.name} for {self.style_damage(actual)} damage.")
             self.announce_downed_target(target)
@@ -1231,7 +1369,18 @@ class CombatResolutionMixin:
                 self.apply_status(target, "paralyzed", 1, source=f"{attacker.name}'s widow venom")
         self.announce_downed_target(target)
 
-    def apply_damage(self, target, amount: int, *, damage_type: str = "", source_actor=None) -> int:
+    def apply_damage(
+        self,
+        target,
+        amount: int,
+        *,
+        damage_type: str = "",
+        source_actor=None,
+        apply_defense: bool = False,
+        armor_break_percent: int = 0,
+        armor_break: int = 0,
+    ) -> int:
+        self._last_damage_resolution = DamageResolution(raw_damage=max(0, amount))
         if target.dead:
             return 0
         if self.god_mode_enabled() and self.is_party_member_actor(target):
@@ -1247,6 +1396,13 @@ class CombatResolutionMixin:
             target.temp_hp = 0
             target.current_hp = 0
             target.dead = True
+            self._last_damage_resolution = DamageResolution(
+                raw_damage=max(0, amount),
+                resisted_damage=damage,
+                mitigated_damage=damage,
+                hp_damage=damage,
+                wound=damage > 0,
+            )
             if previous_hp > 0:
                 self.animate_health_bar_loss(target, previous_hp, target.current_hp)
                 damage_hook = getattr(self, "after_actor_damaged", None)
@@ -1254,6 +1410,7 @@ class CombatResolutionMixin:
                     damage_hook(target, previous_hp=previous_hp, damage=damage, damage_type=damage_type)
             return damage
         damage = max(0, amount)
+        raw_damage = damage
         if self.has_status(target, "petrified"):
             damage //= 2
         resisted = False
@@ -1265,10 +1422,40 @@ class CombatResolutionMixin:
             resisted = True
         if resisted:
             damage //= 2
+        resisted_damage = damage
+        defense_percent = 0
+        total_armor_break_percent = 0
+        if apply_defense and self.damage_type_uses_defense(damage_type):
+            total_armor_break_percent = self.total_armor_break_percent(
+                target,
+                source_actor=source_actor,
+                incoming_percent=armor_break_percent,
+                incoming_steps=armor_break,
+            )
+            defense_percent = self.effective_defense_percent(
+                target,
+                damage_type=damage_type,
+                armor_break_percent=total_armor_break_percent,
+            )
+            damage = damage * (100 - defense_percent) // 100
+        mitigated_damage = damage
+        temp_hp_absorbed = 0
         if target.temp_hp > 0:
             absorbed = min(target.temp_hp, damage)
             target.temp_hp -= absorbed
             damage -= absorbed
+            temp_hp_absorbed = absorbed
+        self._last_damage_resolution = DamageResolution(
+            raw_damage=raw_damage,
+            resisted_damage=resisted_damage,
+            defense_percent=defense_percent,
+            armor_break_percent=total_armor_break_percent,
+            mitigated_damage=mitigated_damage,
+            temp_hp_absorbed=temp_hp_absorbed,
+            hp_damage=max(0, damage),
+            glance=apply_defense and raw_damage > 0 and resisted_damage > 0 and mitigated_damage <= 0,
+            wound=damage > 0,
+        )
         if damage <= 0:
             return 0
         if target.current_hp == 0 and "enemy" not in target.tags:

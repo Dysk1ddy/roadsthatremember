@@ -65,9 +65,71 @@ class StoryAct2ScaffoldMixin:
         "splint_armor_rare",
         "shield_rare",
     )
+    ACT2_CALDRA_CORRECTED_LEDGER_FLAGS = (
+        "caldra_corrected_ledger_siltlock",
+        "caldra_corrected_ledger_south_adit",
+        "caldra_corrected_ledger_blackglass",
+    )
+    ACT2_CALDRA_DOCTRINE_FLAGS = (
+        "caldra_drowned_shrine_doctrine",
+    )
+    ACT2_CALDRA_SPECIFIC_HARM_FLAGS = (
+        "caldra_harmed_tovin_marr",
+    )
 
     def act2_pick_enemy(self, templates, *, name: str | None = None):
         return create_enemy(self.rng.choice(tuple(templates)), name=name)
+
+    def act2_record_caldra_trace(self, flag_name: str, *, trace_type: str, clue: str, journal: str) -> None:
+        assert self.state is not None
+        if self.state.flags.get(flag_name):
+            return
+        self.state.flags[flag_name] = True
+        trace_count = self.state.flags.get("act2_caldra_traces_seen", 0)
+        if isinstance(trace_count, bool) or not isinstance(trace_count, int):
+            trace_count = 0
+        self.state.flags["act2_caldra_traces_seen"] = trace_count + 1
+        if trace_type == "letter":
+            letter_count = self.state.flags.get("caldra_letters_seen_count", 0)
+            if isinstance(letter_count, bool) or not isinstance(letter_count, int):
+                letter_count = 0
+            self.state.flags["caldra_letters_seen_count"] = letter_count + 1
+        elif trace_type == "corrected_ledger":
+            ledger_count = self.state.flags.get("caldra_corrected_ledgers_seen_count", 0)
+            if isinstance(ledger_count, bool) or not isinstance(ledger_count, int):
+                ledger_count = 0
+            self.state.flags["caldra_corrected_ledgers_seen_count"] = ledger_count + 1
+        elif trace_type == "doctrine":
+            doctrine_count = self.state.flags.get("caldra_doctrine_seen_count", 0)
+            if isinstance(doctrine_count, bool) or not isinstance(doctrine_count, int):
+                doctrine_count = 0
+            self.state.flags["caldra_doctrine_seen_count"] = doctrine_count + 1
+        elif trace_type == "victim":
+            victim_count = self.state.flags.get("caldra_specific_victims_seen_count", 0)
+            if isinstance(victim_count, bool) or not isinstance(victim_count, int):
+                victim_count = 0
+            self.state.flags["caldra_specific_victims_seen_count"] = victim_count + 1
+        self.add_clue(clue)
+        self.add_journal(journal)
+
+    def act2_caldra_corrected_ledger_count(self) -> int:
+        assert self.state is not None
+        stored_count = self.state.flags.get("caldra_corrected_ledgers_seen_count", 0)
+        if isinstance(stored_count, bool) or not isinstance(stored_count, int):
+            stored_count = 0
+        flag_count = sum(1 for flag_name in self.ACT2_CALDRA_CORRECTED_LEDGER_FLAGS if self.state.flags.get(flag_name))
+        return max(stored_count, flag_count)
+
+    def act2_knows_caldra_correction_method(self) -> bool:
+        return self.act2_caldra_corrected_ledger_count() >= 2
+
+    def act2_knows_caldra_drowned_doctrine(self) -> bool:
+        assert self.state is not None
+        return any(self.state.flags.get(flag_name) for flag_name in self.ACT2_CALDRA_DOCTRINE_FLAGS)
+
+    def act2_has_caldra_named_victim(self) -> bool:
+        assert self.state is not None
+        return any(self.state.flags.get(flag_name) for flag_name in self.ACT2_CALDRA_SPECIFIC_HARM_FLAGS)
 
     def normalize_act2_legacy_flags(self) -> None:
         assert self.state is not None
@@ -201,9 +263,11 @@ class StoryAct2ScaffoldMixin:
         else:
             line = "Act 3 inherits the Meridian Forge mostly as aftermath rather than as a fully read instrument."
         if lens_state == "mapped":
-            return f"{line} The mapped resonance lens gives later scenes a reliable read on how Caldra held witness, ritual, and shard pressure together."
+            line = f"{line} The mapped resonance lens gives later scenes a reliable read on how Caldra held witness, ritual, and shard pressure together."
         if lens_state == "shattered_blind":
-            return f"{line} The lens broke before it could be fully read, so later scenes have to work from fallout, rumor, and surviving echoes."
+            line = f"{line} The lens broke before it could be fully read, so later scenes have to work from fallout, rumor, and surviving echoes."
+        if self.state.flags.get("act3_caldra_method_record") == "exposed":
+            return f"{line} Tovin Marr's case and the drowned shrine doctrine give later scenes a name, a body, and a ritual text for Caldra's correction method."
         return line
 
     def act2_sponsor_fallout_line(self) -> str:
@@ -741,6 +805,19 @@ class StoryAct2ScaffoldMixin:
         else:
             self.state.flags["act3_forge_route_state"] = "direct"
         self.state.flags["act3_forge_lens_state"] = "mapped" if self.state.flags.get("forge_lens_mapped") else "shattered_blind"
+        if self.state.flags.get("forge_caldra_full_pattern_named") or (
+            self.state.flags.get("forge_lens_caldra_method_named")
+            and self.act2_knows_caldra_drowned_doctrine()
+            and self.act2_has_caldra_named_victim()
+        ):
+            self.state.flags["act3_caldra_method_record"] = "exposed"
+            self.state.flags["act3_caldra_harmed_witness"] = "Tovin Marr"
+        elif self.state.flags.get("forge_lens_caldra_method_named") or self.act2_knows_caldra_correction_method():
+            self.state.flags["act3_caldra_method_record"] = "partial"
+            self.state.flags.pop("act3_caldra_harmed_witness", None)
+        else:
+            self.state.flags.pop("act3_caldra_method_record", None)
+            self.state.flags.pop("act3_caldra_harmed_witness", None)
         self.act2_refresh_secret_handoff_flags()
 
     def scene_stonehollow_dig(self) -> None:

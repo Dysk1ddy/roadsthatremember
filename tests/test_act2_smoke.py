@@ -313,6 +313,29 @@ class Act2SmokeTests(unittest.TestCase):
             ["Glasswater Intake Yard", "Glasswater Valve Hall", "Glasswater Filter Beds", "Brother Merik Sorn"],
         )
 
+    def test_glasswater_relay_office_records_caldra_letter(self) -> None:
+        game, encounters = self.make_route_game(
+            seed=9400441,
+            current_scene="glasswater_intake",
+            flags={
+                "act2_started": True,
+                "act2_town_stability": 3,
+                "act2_route_control": 2,
+                "act2_whisper_pressure": 2,
+            },
+        )
+        dungeon = ACT2_ENEMY_DRIVEN_MAP.dungeons["glasswater_intake_annex"]
+        game.scenario_choice = lambda prompt, options, **kwargs: 1  # type: ignore[method-assign]
+
+        game._glasswater_relay_office(dungeon, dungeon.rooms["relay_office"])
+
+        assert game.state is not None
+        self.assertEqual(encounters, [])
+        self.assertTrue(game.state.flags["caldra_letter_glasswater"])
+        self.assertEqual(game.state.flags["caldra_letters_seen_count"], 1)
+        self.assertEqual(game.state.flags["act2_caldra_traces_seen"], 1)
+        self.assertIn("relay_office", game.state.flags["act2_map_state"]["cleared_rooms"])
+
     def test_siltlock_counting_house_smoke_route_reaches_hub_and_sets_payoffs(self) -> None:
         game, encounters = self.make_route_game(
             seed=940043,
@@ -347,7 +370,38 @@ class Act2SmokeTests(unittest.TestCase):
         self.assertTrue(game.state.flags["glasswater_permit_fraud_exposed"])
         self.assertTrue(game.state.flags["sabotage_supply_watch_warned"])
         self.assertTrue(game.state.flags["act2_sponsor_pressure_named"])
+        self.assertTrue(game.state.flags["caldra_letter_siltlock"])
+        self.assertEqual(game.state.flags["caldra_letters_seen_count"], 1)
+        self.assertEqual(game.state.flags["act2_caldra_traces_seen"], 1)
         self.assertEqual([encounter.title for encounter in encounters], ["Siltlock Auditor's Stair"])
+
+    def test_siltlock_permit_stacks_records_caldra_correction_marks(self) -> None:
+        game, _ = self.make_route_game(
+            seed=9400442,
+            current_scene="siltlock_counting_house",
+            flags={
+                "act2_started": True,
+                "act2_town_stability": 3,
+                "act2_route_control": 2,
+                "act2_whisper_pressure": 2,
+            },
+        )
+        dungeon = ACT2_ENEMY_DRIVEN_MAP.dungeons["siltlock_counting_house"]
+
+        def fake_scenario_choice(prompt: str, options: list[str], **kwargs) -> int:
+            if prompt == "How do you break the permit chain?":
+                return self.option_index_containing(options, "rehearsed before the permits")
+            return 1
+
+        game.scenario_choice = fake_scenario_choice  # type: ignore[method-assign]
+        game._siltlock_permit_stacks(dungeon, dungeon.rooms["permit_stacks"])
+
+        assert game.state is not None
+        self.assertTrue(game.state.flags["caldra_letter_siltlock"])
+        self.assertTrue(game.state.flags["caldra_corrected_ledger_siltlock"])
+        self.assertEqual(game.state.flags["caldra_letters_seen_count"], 1)
+        self.assertEqual(game.state.flags["caldra_corrected_ledgers_seen_count"], 1)
+        self.assertEqual(game.state.flags["act2_caldra_traces_seen"], 2)
 
     def test_conyberry_agatha_smoke_route_reaches_hub_with_clean_warning(self) -> None:
         game = self.make_game(
@@ -595,6 +649,9 @@ class Act2SmokeTests(unittest.TestCase):
         self.assertTrue(game.state.flags["south_adit_cleared"])
         self.assertTrue(game.state.flags["counter_cadence_known"])
         self.assertEqual(game.state.flags["south_adit_irielle_plan"], "break")
+        self.assertTrue(game.state.flags["caldra_corrected_ledger_south_adit"])
+        self.assertEqual(game.state.flags["caldra_corrected_ledgers_seen_count"], 1)
+        self.assertEqual(game.state.flags["act2_caldra_traces_seen"], 1)
         self.assertIn("Prison Cadence: Suppressed (1/5).", rendered)
         self.assertIn("Prison Cadence: Broken (0/5).", rendered)
         self.assertIsNotNone(game.find_companion("Irielle Ashwake"))
@@ -699,6 +756,36 @@ class Act2SmokeTests(unittest.TestCase):
             ["Blackglass Barracks", "Blackglass Waterline", "Blackglass Causeway"],
         )
 
+    def test_black_lake_barracks_records_caldra_correction_ledger(self) -> None:
+        game, encounters = self.make_route_game(
+            seed=940101,
+            current_scene="black_lake_causeway",
+            flags={
+                "act2_started": True,
+                "wave_echo_outer_cleared": True,
+                "black_lake_reached": True,
+                "act2_town_stability": 3,
+                "act2_route_control": 3,
+                "act2_whisper_pressure": 2,
+            },
+        )
+        dungeon = ACT2_ENEMY_DRIVEN_MAP.dungeons["black_lake_crossing"]
+
+        def fake_scenario_choice(prompt: str, options: list[str], **kwargs) -> int:
+            if prompt == "How do you strip the barracks?":
+                return self.option_index_containing(options, "rota boards")
+            return 1
+
+        game.scenario_choice = fake_scenario_choice  # type: ignore[method-assign]
+        game._black_lake_choir_barracks(dungeon, dungeon.rooms["choir_barracks"])
+
+        assert game.state is not None
+        self.assertTrue(game.state.flags["black_lake_barracks_orders_taken"])
+        self.assertTrue(game.state.flags["caldra_corrected_ledger_blackglass"])
+        self.assertEqual(game.state.flags["caldra_corrected_ledgers_seen_count"], 1)
+        self.assertEqual(game.state.flags["act2_caldra_traces_seen"], 1)
+        self.assertEqual([encounter.title for encounter in encounters], ["Blackglass Barracks"])
+
     def test_blackglass_relay_smoke_route_reaches_hub_and_sets_forge_payoffs(self) -> None:
         game, encounters = self.make_route_game(
             seed=94012,
@@ -734,6 +821,9 @@ class Act2SmokeTests(unittest.TestCase):
         self.assertTrue(game.state.flags["forge_reserve_timing_known"])
         self.assertTrue(game.state.flags["blackglass_relay_bell_tuned"])
         self.assertTrue(game.state.flags["blackglass_relay_cables_cleared"])
+        self.assertTrue(game.state.flags["caldra_letter_blackglass"])
+        self.assertEqual(game.state.flags["caldra_letters_seen_count"], 1)
+        self.assertEqual(game.state.flags["act2_caldra_traces_seen"], 1)
         self.assertEqual(
             [encounter.title for encounter in encounters],
             ["Blackglass Relay Cable Sump", "Blackglass Relay Crown"],

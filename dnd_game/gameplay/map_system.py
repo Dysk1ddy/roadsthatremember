@@ -3377,6 +3377,17 @@ class MapSystemMixin:
                 self.add_clue("A shaken Glasswater fixer admits that 'special transfers' moved through lower rooms on the same nights town water ran foul, tying the annex to a deeper prisoner-routing line.")
                 self.say("The fixer cracks before the room can teach them a cleaner lie to die with.")
         if resolved_cleanly:
+            if not self.state.flags.get("caldra_letter_glasswater"):
+                self.say(
+                    "Inside the packet, a damp half-page has green valve wax pressed through its fold. Caldra's hand is narrow and exact: "
+                    '"Correct flow before correcting faith. Merik may preach after the town drinks what the sluice teaches."'
+                )
+                self.act2_record_caldra_trace(
+                    "caldra_letter_glasswater",
+                    trace_type="letter",
+                    clue="A Glasswater letter in Caldra's hand orders Brother Merik to make water flow teachable before he preaches over it.",
+                    journal="Caldra trace: a wet Glasswater letter names Brother Merik as field doctrine under her orders.",
+                )
             self.complete_act2_map_room(dungeon, room.room_id)
             return
 
@@ -3835,6 +3846,7 @@ class MapSystemMixin:
             "The permit stacks breathe wet paper and lamp soot. Blue cord binds water passes, ferry claims, and repair delays into bundles that look official until the ink catches the light."
         )
         dc = 13 if self.state.flags.get("siltlock_clerk_script_read") or self.state.flags.get("glasswater_intake_cleared") else 14
+        permit_success = False
         choice = self.scenario_choice(
             "How do you break the permit chain?",
             [
@@ -3847,21 +3859,45 @@ class MapSystemMixin:
         if choice == 1:
             self.player_action("Match the false water permits by seal pressure and clerk hand.")
             if self.skill_check(self.state.player, "Investigation", dc, context="to expose Siltlock's false water permits"):
+                permit_success = True
                 self.state.flags["siltlock_false_permit_hand_named"] = True
                 self.add_clue("Siltlock's false water permits were signed before Glasswater reported trouble, giving the lie a civic costume before the sickness spread.")
                 self.reward_party(xp=10, reason="exposing Siltlock's false permit hand")
         elif choice == 2:
             self.player_action("Read which corrections were rehearsed before the permits were signed.")
             if self.skill_check(self.state.player, "Insight", dc, context="to read the rehearsed corrections in Siltlock's stacks"):
+                permit_success = True
                 self.state.flags["siltlock_rehearsed_corrections_read"] = True
                 self.add_clue("Several Siltlock corrections were rehearsed in the margin before the permits were issued, which means the water delay had a script.")
+                if not self.state.flags.get("caldra_corrected_ledger_siltlock"):
+                    self.say(
+                        "Two permit rows carry red ash ticks beside the corrections. Failed crews become voluntary withdrawals; missing ration tins become deferred civic aid."
+                    )
+                    self.act2_record_caldra_trace(
+                        "caldra_corrected_ledger_siltlock",
+                        trace_type="corrected_ledger",
+                        clue="Siltlock's corrected ledgers turn failed crews into voluntary withdrawals and missing rations into deferred aid, all under red ash ticks.",
+                        journal="Caldra trace: Siltlock's permit stacks show red ash corrections that recast losses as orderly withdrawals.",
+                    )
                 self.reward_party(xp=10, reason="reading Siltlock's rehearsed corrections")
         else:
             self.player_action("Corner the stack clerk with dates the books cannot make agree.")
             if self.skill_check(self.state.player, "Persuasion", dc, context="to crack the Siltlock stack clerk with bad dates"):
+                permit_success = True
                 self.state.flags["siltlock_stack_clerk_cracked"] = True
                 self.add_clue("A Siltlock clerk names the permit shelf tied to Glasswater's relay office and the auditor who ordered it copied twice.")
                 self.reward_party(xp=10, reason="cracking Siltlock's stack clerk")
+        if permit_success and not self.state.flags.get("caldra_letter_siltlock"):
+            self.say(
+                "A copied instruction is tucked under the blue cord, its margin dusted with the same red ash: "
+                '"Amend ration tabs before grief teaches witnesses to count."'
+            )
+            self.act2_record_caldra_trace(
+                "caldra_letter_siltlock",
+                trace_type="letter",
+                clue="A copied Siltlock instruction in Caldra's cadence orders ration tabs amended before witnesses can count the losses.",
+                journal="Caldra trace: Siltlock preserved a copied instruction to amend ration tabs before public grief could harden into testimony.",
+            )
         self.complete_act2_map_room(dungeon, room.room_id)
 
     def _siltlock_ration_cellar(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
@@ -4531,6 +4567,7 @@ class MapSystemMixin:
     def _south_adit_silent_cells(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
         assert self.state is not None
         self.say("The first cell row holds people too tired to shout and wardens confident enough to mistake that for control.")
+        cells_opened_cleanly = False
         choice = self.scenario_choice(
             "How do you open the silent cells?",
             [
@@ -4543,19 +4580,32 @@ class MapSystemMixin:
         if choice == 1:
             self.player_action("Open the locks quietly and pass tools through before anyone runs.")
             if self.skill_check(self.state.player, "Sleight of Hand", 14, context="to open the South Adit cells quietly"):
+                cells_opened_cleanly = True
                 self.state.flags["south_adit_cells_quietly_opened"] = True
                 self.reward_party(xp=10, reason="opening the South Adit cells quietly")
                 self.say("Locks give one after another, quiet enough that hope has to be whispered down the row.")
         elif choice == 2:
             self.player_speaker("No running blind. Breathe, pass it down, and move when I move.")
             if self.skill_check(self.state.player, "Persuasion", 13, context="to keep the captives steady"):
+                cells_opened_cleanly = True
                 self.state.flags["south_adit_prisoners_steadied"] = True
                 self.say("The row becomes a line instead of a panic.")
         else:
             self.player_action("Let the nearest warden see the cells opening and understand what comes next.")
             if self.skill_check(self.state.player, "Intimidation", 14, context="to break the first warden's nerve"):
+                cells_opened_cleanly = True
                 self.state.flags["south_adit_warden_nerve_cracked"] = True
                 self.say("The nearest guard backs away from the cell row before the fight has technically started.")
+        if cells_opened_cleanly and not self.state.flags.get("caldra_corrected_ledger_south_adit"):
+            self.say(
+                "At the row's end, a cell board lists names in black ink and outcomes in red ash. Three prisoners have been changed from missing to reassigned."
+            )
+            self.act2_record_caldra_trace(
+                "caldra_corrected_ledger_south_adit",
+                trace_type="corrected_ledger",
+                clue="South Adit's cell board uses red ash corrections to change missing prisoners into reassigned assets.",
+                journal="Caldra trace: the South Adit cell board turns missing prisoners into reassigned assets with red ash ticks.",
+            )
         self.complete_act2_map_room(dungeon, room.room_id)
 
     def _south_adit_drainage_exit(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
@@ -4613,6 +4663,17 @@ class MapSystemMixin:
     def _south_adit_infirmary_cut(self, dungeon: DungeonMap, room: DungeonRoom) -> None:
         assert self.state is not None
         self.say("The infirmary cut is not mercy. It is sorting: the weak on blankets, the useful on chains, and the dead already written off.")
+        if not self.state.flags.get("caldra_harmed_tovin_marr"):
+            self.say(
+                "The middle cot holds Tovin Marr, a Greywake rope clerk with lake mud dried under his nails. His wrist slate began as ROUTE WITNESS. "
+                "Caldra's red ash changes it to OBEDIENT WITNESS, then SPENT WITNESS, and every bell in the adit makes his hands lock around an invisible ledger."
+            )
+            self.act2_record_caldra_trace(
+                "caldra_harmed_tovin_marr",
+                trace_type="victim",
+                clue="Tovin Marr's wrist slate shows Caldra's corrections turning a Greywake route witness into spent witness while the infirmary kept him breathing for the Forge.",
+                journal="Caldra trace: Tovin Marr was hurt by Caldra's red ash categories before any blade reached him.",
+            )
         choice = self.scenario_choice(
             "What do you save from the infirmary cut?",
             [
@@ -4626,23 +4687,29 @@ class MapSystemMixin:
             self.player_action("Stabilize the captives who will not survive a running rescue.")
             if self.skill_check(self.state.player, "Medicine", 14, context="to stabilize the weakest South Adit captives"):
                 self.state.flags["south_adit_weakest_saved"] = True
+                self.state.flags["tovin_marr_stabilized"] = True
                 self.apply_status(self.state.player, "blessed", 1, source="saving the vulnerable first")
                 self.reward_party(xp=10, reason="stabilizing the weakest South Adit captives")
+                self.say("Tovin's breathing stops following the little bell. His fingers uncurl, one at a time, from the shape of a book.")
         elif choice == 2:
             self.player_action("Find the prisoner the wardens kept alive because they knew something.")
             if self.skill_check(self.state.player, "Insight", 14, context="to spot the informed captive"):
                 self.state.flags["south_adit_witness_found"] = True
+                self.state.flags["tovin_marr_testimony_taken"] = True
                 self.add_clue("A South Adit captive names the Quiet Choir's prisoner-sorting cadence and points toward the deeper nave.")
+                self.add_clue("Tovin Marr heard Caldra call him proof of category before the wardens carried him to the infirmary cut.")
                 self.say("One captive is less broken than hidden. They give you the rhythm the wardens use to move witnesses below.")
         else:
             self.player_action("Break the Choir's hush-prayers before they follow the wounded out.")
             if self.skill_check(self.state.player, "Religion", 14, context="to break the Choir's hush-prayers"):
                 self.state.flags["south_adit_hush_prayers_broken"] = True
+                self.state.flags["tovin_marr_hush_prayer_broken"] = True
                 self.act2_shift_metric(
                     "act2_whisper_pressure",
                     -1,
                     "the infirmary prayers stop carrying the Choir's cadence into the captives' breathing",
                 )
+                self.say("The red ash word SPENT cracks across Tovin's wrist slate, and the nearest hush-prayer loses its rhythm.")
         self.complete_act2_map_room(dungeon, room.room_id)
 
     def _south_adit_irielle_route_choice(self) -> None:
@@ -5287,6 +5354,17 @@ class MapSystemMixin:
             -1,
             "the drowned shrine answers before the forge can drown it entirely in the Choir's rhythm",
         )
+        if not self.state.flags.get("caldra_drowned_shrine_doctrine"):
+            self.say(
+                "Behind the drowned altar, a shell-lacquered doctrine slate hangs from green wire. Caldra's hand turns correction into rite work: "
+                "name the drift, assign the witness, seal the category, let water teach the old name to blur."
+            )
+            self.act2_record_caldra_trace(
+                "caldra_drowned_shrine_doctrine",
+                trace_type="doctrine",
+                clue="Caldra's drowned shrine doctrine turns correction into rite work: name the drift, assign the witness, seal the category, then let water blur the old name.",
+                journal="Caldra trace: the drowned shrine doctrine shows her treating erased names as ritual discipline.",
+            )
         if shrine_bonus:
             self.state.flags["black_lake_shrine_sanctity_named"] = True
             self.apply_status(self.state.player, "blessed", 2, source="the reclaimed Blackglass shrine")
@@ -5342,6 +5420,7 @@ class MapSystemMixin:
             allow_meta=False,
         )
         selection_key, _ = options[choice - 1]
+        orders_taken_here = False
         if selection_key == "stealth":
             self.player_action("Cut the messengers first and keep the barracks from warning the far side.")
             if self.skill_check(self.state.player, "Stealth", 14, context="to kill the Blackglass message chain before it runs"):
@@ -5352,6 +5431,7 @@ class MapSystemMixin:
             if self.skill_check(self.state.player, "Investigation", 14, context="to seize the barracks orders intact"):
                 hero_bonus += 1
                 self.state.flags["black_lake_barracks_orders_taken"] = True
+                orders_taken_here = True
                 self.add_clue("Blackglass barracks orders confirm the Quiet Choir keeps its last reserve line on the Meridian Forge side of the crossing.")
         elif selection_key == "athletics":
             self.player_action("Turn the weapon racks and bunks into a collapsing choke point.")
@@ -5362,8 +5442,19 @@ class MapSystemMixin:
             self.player_action("Use Nera's courier-reading and grab the live reserve orders before the room knows which satchel matters.")
             hero_bonus += 1
             self.state.flags["black_lake_barracks_orders_taken"] = True
+            orders_taken_here = True
             self.apply_status(enemies[1], "surprised", 1, source="you took the live courier satchel first")
             self.add_clue("The quiet-room courier habits still hold underground: Blackglass reserve orders rode in the least impressive satchel in the room.")
+        if orders_taken_here and not self.state.flags.get("caldra_corrected_ledger_blackglass"):
+            self.say(
+                "The rota board keeps one column in Caldra's correction hand. Bodies are crossed from reserve into witness, then into silence, with no rank or unit named."
+            )
+            self.act2_record_caldra_trace(
+                "caldra_corrected_ledger_blackglass",
+                trace_type="corrected_ledger",
+                clue="Blackglass barracks orders use Caldra's correction hand to move bodies from reserve into witness, then into silence.",
+                journal="Caldra trace: Blackglass orders show her reserve line treating people as witness stock before the Forge.",
+            )
         outcome = self.run_encounter(
             Encounter(
                 title="Blackglass Barracks",
@@ -5590,6 +5681,17 @@ class MapSystemMixin:
                 self.state.flags["blackglass_relay_gate_route_marked"] = True
                 self.state.flags["forge_reserve_timing_known"] = True
                 self.add_clue("The relay gate teeth match the Forge reserve traffic marks. Caldra's support pulse still comes through the little bell.")
+                if not self.state.flags.get("caldra_letter_blackglass"):
+                    self.say(
+                        "A dry strip of vellum has been pinned behind the gate latch, written in the same pressed hand as the timing marks: "
+                        '"Keep three witnesses breathing until the Forge hears them. Silence after resonance, never before."'
+                    )
+                    self.act2_record_caldra_trace(
+                        "caldra_letter_blackglass",
+                        trace_type="letter",
+                        clue="A Blackglass relay note in Caldra's hand orders three witnesses kept alive until the Forge can hear them.",
+                        journal="Caldra trace: the Blackglass relay note shows her timing witnesses around the Forge support pulse.",
+                    )
                 self.reward_party(xp=10, reason="reading the Blackglass relay gate")
         elif choice == 2:
             self.player_action("Listen for the support pulse riding under the little bell.")
@@ -5681,24 +5783,39 @@ class MapSystemMixin:
             ],
             allow_meta=False,
         )
+        ledger_success = False
         if choice == 1:
             self.player_action("Lay the timing slates beside the Blackglass orders and mark Caldra's reserve beat.")
             if self.skill_check(self.state.player, "Investigation", dc, context="to read the keeper ledger against the Blackglass orders"):
                 self.state.flags["blackglass_relay_reserve_beat_marked"] = True
                 self.add_clue("The relay ledger gives Caldra's reserve beat: three short bell pulls, one counterweight drop, then the Forge answers.")
                 self.reward_party(xp=10, reason="marking the relay reserve beat")
+                ledger_success = True
         elif choice == 2:
             self.player_action("Read the keeper's panic notes and find which bell pull scared them most.")
             if self.skill_check(self.state.player, "Insight", dc, context="to find the feared bell pull in the keeper's notes"):
                 self.state.flags["blackglass_relay_keeper_fear_read"] = True
                 self.add_clue("The keeper feared the null bell more than Caldra. Its dead note can make the support pulse fall into its own counterweight.")
                 self.reward_party(xp=10, reason="reading the relay keeper's panic")
+                ledger_success = True
         else:
             self.player_action("Trace the slate dust where old bell timing has started behaving like spellwork.")
             if self.skill_check(self.state.player, "Arcana", dc, context="to trace the relay ledger's spell-timing"):
                 self.state.flags["blackglass_relay_spell_timing_traced"] = True
                 self.add_clue("Old bell arithmetic has become spell timing inside the relay house, and the null bell can still spoil the count.")
                 self.reward_party(xp=10, reason="tracing the relay spell timing")
+                ledger_success = True
+        if ledger_success and not self.state.flags.get("caldra_letter_blackglass"):
+            self.say(
+                "Folded inside the timing board is a dry strip of vellum, written in the same pressed hand: "
+                '"Keep three witnesses breathing until the Forge hears them. Silence after resonance, never before."'
+            )
+            self.act2_record_caldra_trace(
+                "caldra_letter_blackglass",
+                trace_type="letter",
+                clue="A Blackglass relay note in Caldra's hand orders three witnesses kept alive until the Forge can hear them.",
+                journal="Caldra trace: the Blackglass relay note shows her timing witnesses around the Forge support pulse.",
+            )
         self.complete_act2_map_room(dungeon, room.room_id)
         self.add_journal("You took the Blackglass relay ledger and learned the timing Caldra's Forge support line expects.")
 
@@ -6104,6 +6221,13 @@ class MapSystemMixin:
                         1,
                         "using Hushfen's copied wound against the Meridian Forge gives the Choir one more live shape to answer through",
                     )
+        knows_caldra_method = self.act2_knows_caldra_correction_method()
+        if knows_caldra_method:
+            self.state.flags["forge_lens_caldra_correction_method_readable"] = True
+            self.say(
+                "The red ash ticks from Siltlock, South Adit, and Blackglass line up across the lens. Caldra's corrections do the same work everywhere: "
+                "change a living loss into an obedient category, then make the room act as if the category was always true."
+            )
         dc = 15
         if self.state.flags.get("black_lake_shrine_purified"):
             dc -= 1
@@ -6117,26 +6241,46 @@ class MapSystemMixin:
             dc -= 1
         if conyberry_sigil_copied:
             dc -= 1
+        if knows_caldra_method:
+            dc -= 1
+        options: list[tuple[str, str]] = [
+            (
+                "support",
+                self.skill_tag("INVESTIGATION", self.action_option("Lay every side objective over the lens and find the one support line she still needs.")),
+            ),
+            (
+                "tempo",
+                self.skill_tag("ARCANA", self.action_option("Break the lens tempo now, while it is still pretending to be stable.")),
+            ),
+            (
+                "truth",
+                self.skill_tag("PERSUASION", self.action_option("Name the lie the Choir is telling itself and make the lens carry doubt instead of certainty.")),
+            ),
+        ]
+        if knows_caldra_method:
+            options.append(
+                (
+                    "method",
+                    self.skill_tag("INVESTIGATION", self.action_option("Name Caldra's correction method and make the lens admit what her ledgers already did.")),
+                )
+            )
         choice = self.scenario_choice(
             "How do you map the resonance lens before facing Caldra?",
-            [
-                self.skill_tag("INVESTIGATION", self.action_option("Lay every side objective over the lens and find the one support line she still needs.")),
-                self.skill_tag("ARCANA", self.action_option("Break the lens tempo now, while it is still pretending to be stable.")),
-                self.skill_tag("PERSUASION", self.action_option("Name the lie the Choir is telling itself and make the lens carry doubt instead of certainty.")),
-            ],
+            [text for _, text in options],
             allow_meta=False,
         )
-        if choice == 1:
+        selection_key, _ = options[choice - 1]
+        if selection_key == "support":
             self.player_action("Lay every side objective over the lens and find the one support line she still needs.")
             success = self.skill_check(self.state.player, "Investigation", dc, context="to map the Forge lens from the inside")
             if success:
                 self.state.flags["forge_lens_support_line_named"] = True
-        elif choice == 2:
+        elif selection_key == "tempo":
             self.player_action("Break the lens tempo now, while it is still pretending to be stable.")
             success = self.skill_check(self.state.player, "Arcana", dc, context="to break the resonance lens tempo before the boss fight")
             if success:
                 self.state.flags["forge_lens_tempo_broken"] = True
-        else:
+        elif selection_key == "truth":
             persuasion_dc = dc
             if self.state.flags.get("act2_captive_outcome") == "many_saved":
                 persuasion_dc -= 1
@@ -6146,6 +6290,12 @@ class MapSystemMixin:
             success = self.skill_check(self.state.player, "Persuasion", persuasion_dc, context="to name the lie the lens is built around")
             if success:
                 self.state.flags["forge_lens_truth_named"] = True
+        else:
+            self.player_action("Name Caldra's correction method and make the lens admit what her ledgers already did.")
+            success = self.skill_check(self.state.player, "Investigation", dc, context="to name Caldra's correction method inside the lens")
+            if success:
+                self.state.flags["forge_lens_caldra_method_named"] = True
+                self.state.flags["forge_lens_support_line_named"] = True
         self.complete_act2_map_room(dungeon, room.room_id)
         if success:
             if self.state.flags.get("south_adit_counter_cadence_learned") and irielle is not None:
@@ -6160,6 +6310,9 @@ class MapSystemMixin:
             if conyberry_sigil_copied:
                 self.state.flags["forge_lens_conyberry_sigil_used"] = True
                 self.add_journal("You used Hushfen's copied sigil to read one of the Meridian Forge lens's obedience seams before Caldra could hide it.")
+            if self.state.flags.get("forge_lens_caldra_method_named"):
+                self.add_clue("Caldra's correction method treats red ash ledger edits as ritual instructions: records change the category, then the Forge pressures reality to obey it.")
+                self.add_journal("You named Caldra's red ash correction method inside the Forge lens before she could hide the ledgers inside doctrine.")
             self.add_clue("The resonance lens only held because Caldra was braiding witness, ritual, and shard pressure into one engineered lie.")
             self.add_journal("You mapped the resonance lens from inside and learned exactly which lines were keeping Caldra's certainty standing.")
             self.reward_party(xp=15, reason="mapping the resonance lens before the final confrontation")
@@ -6183,6 +6336,8 @@ class MapSystemMixin:
 
         hero_bonus = self.apply_scene_companion_support("forge_of_spells")
         parley_dc = 15
+        caldra_doctrine_known = self.act2_knows_caldra_drowned_doctrine()
+        caldra_named_victim_seen = self.act2_has_caldra_named_victim()
         if self.state.flags.get("black_lake_shrine_purified") or self.state.flags.get("forge_threshold_sanctified"):
             self.apply_status(self.state.player, "blessed", 2, source="the reclaimed Blackglass shrine")
             hero_bonus += 1
@@ -6212,6 +6367,32 @@ class MapSystemMixin:
             enemies[0].current_hp = max(1, enemies[0].current_hp - 4)
             self.say("Irielle's counter-cadence lands first and steals part of the forge's certainty before steel ever crosses it.")
             parley_dc -= 1
+
+        if caldra_doctrine_known:
+            hero_bonus += 1
+            parley_dc -= 1
+            self.player_speaker("The drowned shrine has your doctrine nailed behind the altar: correction, witness, obedience, all dressed as mercy.")
+            self.speaker("Sister Caldra Voss", "Doctrine gives the flood a grammar. Without it, every grief learns to eat.")
+        if caldra_named_victim_seen:
+            parley_dc -= 1
+            if len(enemies) > 1:
+                self.apply_status(enemies[1], "frightened", 1, source="Tovin Marr's name reaching the Forge")
+            self.player_speaker("Tovin Marr had a name before your slate gave him a category.")
+            self.speaker("Sister Caldra Voss", "A name that breaks under pressure becomes a burden someone stronger must carry.")
+        if self.state.flags.get("forge_lens_caldra_method_named"):
+            hero_bonus += 1
+            parley_dc -= 1
+            self.player_speaker("Your red ash corrections are the ritual. Missing becomes reassigned, witness becomes silence, and then the Forge is forced to agree.")
+            self.speaker("Sister Caldra Voss", "Correction is mercy for a world that keeps misnaming its wounds.")
+        if self.state.flags.get("forge_lens_caldra_method_named") and caldra_doctrine_known and caldra_named_victim_seen:
+            self.state.flags["forge_caldra_full_pattern_named"] = True
+            hero_bonus += 1
+            enemies[0].current_hp = max(1, enemies[0].current_hp - 4)
+            self.player_speaker(
+                "Siltlock, South Adit, Blackglass, the drowned shrine, and Tovin Marr all say the same thing: "
+                "your corrections turn a person into paperwork, then make the room hurt the body until the paperwork wins."
+            )
+            self.speaker("Sister Caldra Voss", "Pain was already there. I gave it a ledger line and a use.")
 
         self.speaker("Sister Caldra Voss", "The Forge does not create. It clarifies.")
         self.speaker("Sister Caldra Voss", "Every vow has an echo. Every echo has an owner.")
@@ -6279,6 +6460,9 @@ class MapSystemMixin:
             self.add_clue(
                 "Even broken, the Forge keeps trying to answer a call from farther down. The party is not leaving Resonant Vaults with clean silence."
             )
+        if self.state.flags.get("forge_caldra_full_pattern_named"):
+            self.add_clue("Caldra's method is exposed as a chain: doctrine blesses correction, ledgers assign categories, and the Forge makes bodies answer the new record.")
+            self.add_journal("You carried Tovin Marr's harmed body, the drowned shrine doctrine, and the corrected ledgers into Caldra's final room.")
         self.add_journal("You broke Sister Caldra Voss and tore the Meridian Forge out of the Quiet Choir's grip.")
         self.reward_party(xp=120, gold=40, reason="breaking the Quiet Choir's Resonant Vaults cell")
         self.act2_record_epilogue_flags()

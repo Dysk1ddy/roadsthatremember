@@ -45,7 +45,8 @@
       "armor_type": "heavy",
       "dex_cap": 0,
       "heavy": true,
-      "stealth_disadvantage": true
+      "stealth_disadvantage": true,
+      "defense_percent": null
     },
     "hit_die": 10,
     "current_hp": 12,
@@ -157,7 +158,8 @@
         "armor_type": "heavy",
         "dex_cap": 0,
         "heavy": true,
-        "stealth_disadvantage": true
+        "stealth_disadvantage": true,
+        "defense_percent": null
       },
       "hit_die": 10,
       "current_hp": 13,
@@ -272,7 +274,8 @@
         "armor_type": "medium",
         "dex_cap": 2,
         "heavy": false,
-        "stealth_disadvantage": true
+        "stealth_disadvantage": true,
+        "defense_percent": null
       },
       "hit_die": 8,
       "current_hp": 10,
@@ -396,7 +399,8 @@
         "armor_type": "light",
         "dex_cap": null,
         "heavy": false,
-        "stealth_disadvantage": false
+        "stealth_disadvantage": false,
+        "defense_percent": null
       },
       "hit_die": 10,
       "current_hp": 11,
@@ -529,5 +533,17 @@
     "E0018": 1,
     "E0093": 1
   },
-  "short_rests_remaining": 2
+  "short_rests_remaining": 2,
+  "playtime_seconds": 0.004554400002234615,
+  "save_metadata": {
+    "kind": "manual",
+    "saved_at": "2026-04-26T18:39:17",
+    "act": 1,
+    "act_label": "Act I",
+    "scene": "act1_complete",
+    "scene_label": "Iron Hollow",
+    "party_level": 1,
+    "playtime_seconds": 0,
+    "last_objective": "Close out Act I and prepare for the next march."
+  }
 }

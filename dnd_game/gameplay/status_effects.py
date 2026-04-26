@@ -27,7 +27,8 @@ STATUS_DEFINITIONS: dict[str, dict[str, object]] = {
         "combat_only": True,
         "ongoing_damage": "1d4",
         "damage_type": "acid",
-        "ac_penalty": 1,
+        "armor_break_percent": 10,
+        "avoidance_penalty": 1,
     },
     "reeling": {
         "name": "Reeling",
@@ -43,6 +44,7 @@ STATUS_DEFINITIONS: dict[str, dict[str, object]] = {
         "name": "Restrained",
         "combat_only": True,
         "ac_penalty": 2,
+        "avoidance_penalty": 4,
     },
     "emboldened": {
         "name": "Emboldened",
@@ -60,6 +62,8 @@ STATUS_DEFINITIONS: dict[str, dict[str, object]] = {
         "name": "Guarded",
         "combat_only": True,
         "ac_bonus": 1,
+        "defense_bonus_percent": 5,
+        "avoidance_bonus": 1,
     },
     "attack_pressure": {
         "name": "Attack Pressure",
@@ -83,6 +87,7 @@ STATUS_DEFINITIONS: dict[str, dict[str, object]] = {
     "resist_cold": {"name": "Cold-Resistant", "combat_only": True},
     "resist_lightning": {"name": "Lightning-Resistant", "combat_only": True},
     "resist_poison": {"name": "Poison-Resistant", "combat_only": True},
+    "armor_broken": {"name": "Armor Broken", "combat_only": True},
     "stunned": {"name": "Stunned", "combat_only": True},
     "unconscious": {"name": "Unconscious", "combat_only": True},
 }
