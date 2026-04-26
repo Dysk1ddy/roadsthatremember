@@ -46,6 +46,18 @@ COMPANION_PROFILES: dict[str, dict[str, object]] = {
         "exceptional_dialogue": "Shield-kin. That's what you are to me now. This campfire feels more like home than any barracks has in years.",
         "great_bonuses": {"AC": 1},
         "exceptional_bonuses": {"CON_save": 1},
+        "assist_skills": ["Athletics", "Intimidation", "Survival"],
+        "camp_counsel": {
+            "name": "shield-line drill",
+            "bonuses": {"Athletics": 1, "Intimidation": 1},
+            "text": "Tolan runs the company through a blunt shield-line drill until the rhythm sits in your shoulders.",
+        },
+        "combat_opener": {
+            "name": "Hold the Line",
+            "text": "Tolan plants his feet and calls Hold the Line before steel ever meets steel.",
+            "ally_statuses": {"guarded": 2},
+            "exceptional_ally_statuses": {"emboldened": 1},
+        },
         "scene_support": {
             "ashfall_watch": {
                 "text": "Tolan quietly maps the tower angles for you and helps the party tighten their approach.",
@@ -98,6 +110,18 @@ COMPANION_PROFILES: dict[str, dict[str, object]] = {
         "exceptional_dialogue": "I don't plan my exit route first anymore when you walk into a room. That's new.",
         "great_bonuses": {"Stealth": 1, "initiative": 1},
         "exceptional_bonuses": {"Perception": 1},
+        "assist_skills": ["Perception", "Sleight of Hand", "Stealth"],
+        "camp_counsel": {
+            "name": "exit-map briefing",
+            "bonuses": {"Perception": 1, "Stealth": 1},
+            "text": "Bryn marks exits, blind spots, and bad floorboards until the next dangerous room already feels half-read.",
+        },
+        "combat_opener": {
+            "name": "Shadow Volley",
+            "text": "Bryn opens with a quick shadow-sign that gives the company one clean beat before the room catches up.",
+            "ally_statuses": {"invisible": 1},
+            "exceptional_ally_statuses": {"emboldened": 1},
+        },
         "scene_support": {
             "old_owl_well": {
                 "text": "Bryn quietly points out the blind angles in the dig ring and the one trench line nobody is properly watching.",
@@ -155,6 +179,18 @@ COMPANION_PROFILES: dict[str, dict[str, object]] = {
         "exceptional_dialogue": "I pray for your future by name now, not because I fear losing you, but because I believe in what you'll become.",
         "great_bonuses": {"healing": 1},
         "exceptional_bonuses": {"WIS_save": 1},
+        "assist_skills": ["Insight", "Medicine", "Persuasion"],
+        "camp_counsel": {
+            "name": "Lantern triage",
+            "bonuses": {"Insight": 1, "Medicine": 1},
+            "text": "Elira walks you through breath, pulse, and panic until mercy has a procedure again.",
+        },
+        "combat_opener": {
+            "name": "Lantern Ward",
+            "text": "Elira lifts the Lantern symbol and gives the company a steadier first breath.",
+            "ally_statuses": {"blessed": 1},
+            "exceptional_ally_statuses": {"guarded": 1},
+        },
         "scene_support": {
             "camp_rest": {
                 "text": "Elira blesses the camp before sleep, and everyone wakes steadier than expected.",
@@ -207,6 +243,18 @@ COMPANION_PROFILES: dict[str, dict[str, object]] = {
         "exceptional_dialogue": "I'd follow your trail by instinct even without prints to guide me.",
         "great_bonuses": {"Perception": 1, "initiative": 1},
         "exceptional_bonuses": {"attack": 1},
+        "assist_skills": ["Perception", "Stealth", "Survival"],
+        "camp_counsel": {
+            "name": "trail read",
+            "bonuses": {"Perception": 1, "Survival": 1},
+            "text": "Kaelis redraws the next route in dirt and boot-scrapes, leaving you with cleaner instincts for the trail.",
+        },
+        "combat_opener": {
+            "name": "Shadow Volley",
+            "text": "Kaelis reads the brush like a page and murmurs the exact second to strike.",
+            "ally_statuses": {"invisible": 1},
+            "exceptional_ally_statuses": {"attack_pressure": 1},
+        },
         "scene_support": {
             "wyvern_tor": {
                 "text": "Kaelis reads the shelf wind and the worg tracks in one glance, giving you the cleaner first angle.",
@@ -264,6 +312,18 @@ COMPANION_PROFILES: dict[str, dict[str, object]] = {
         "exceptional_dialogue": "Your banner would be one I could swear to without hesitation.",
         "great_bonuses": {"damage": 1},
         "exceptional_bonuses": {"AC": 1},
+        "assist_skills": ["Athletics", "Intimidation", "Persuasion"],
+        "camp_counsel": {
+            "name": "oath counsel",
+            "bonuses": {"Athletics": 1, "Persuasion": 1},
+            "text": "Rhogar tests every promise in your plan until the weak joints stop creaking.",
+        },
+        "combat_opener": {
+            "name": "Oath Challenge",
+            "text": "Rhogar speaks an open challenge, and the company steps into the first clash with cleaner resolve.",
+            "ally_statuses": {"emboldened": 1},
+            "exceptional_ally_statuses": {"guarded": 1},
+        },
         "scene_support": {
             "ashfall_watch": {
                 "text": "Rhogar's certainty steadies the campfire briefing and turns hesitation into resolve.",
@@ -309,6 +369,18 @@ COMPANION_PROFILES: dict[str, dict[str, object]] = {
         "exceptional_dialogue": "I trust you with unfinished notes now. That is either friendship or professional recklessness, and I think I'm all right with either.",
         "great_bonuses": {"Arcana": 1, "Investigation": 1},
         "exceptional_bonuses": {"spell_attack": 1},
+        "assist_skills": ["Arcana", "History", "Investigation"],
+        "camp_counsel": {
+            "name": "survey notes",
+            "bonuses": {"Arcana": 1, "Investigation": 1},
+            "text": "Nim leaves you with a tidy packet of route marks, old-mechanism tells, and one warning written twice.",
+        },
+        "combat_opener": {
+            "name": "Surveyor's Angles",
+            "text": "Nim calls the first bad angle before anyone steps into it.",
+            "ally_statuses": {"attack_pressure": 1},
+            "exceptional_ally_statuses": {"blessed": 1},
+        },
         "scene_support": {
             "stonehollow_dig": {
                 "text": "Nim sketches a cleaner route through the dig and quietly points out which noises mean 'duck now.'",
@@ -354,6 +426,18 @@ COMPANION_PROFILES: dict[str, dict[str, object]] = {
         "exceptional_dialogue": "When the whispers start pressing at the edges, you're the reason they still sound like something outside me instead of inside.",
         "great_bonuses": {"spell_damage": 1, "Insight": 1},
         "exceptional_bonuses": {"WIS_save": 1},
+        "assist_skills": ["Arcana", "Insight", "Religion"],
+        "camp_counsel": {
+            "name": "counter-cadence lesson",
+            "bonuses": {"Arcana": 1, "Insight": 1},
+            "text": "Irielle taps out a counter-cadence on a tin cup until the wrong silences become easier to hear.",
+        },
+        "combat_opener": {
+            "name": "Counter-Cadence",
+            "text": "Irielle catches the enemy rhythm before it settles and cuts a clean beat through it.",
+            "ally_statuses": {"blessed": 1},
+            "exceptional_ally_statuses": {"attack_pressure": 1},
+        },
         "scene_support": {
             "south_adit": {
                 "text": "Irielle catches the cult's rhythm before it settles over the room and tears a clean opening through it.",

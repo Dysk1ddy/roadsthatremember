@@ -5,15 +5,21 @@ This file is a source-oriented reference for reading and debugging the current g
 ## Scope
 
 - Current fully playable campaign scope: Act 1
-- Current partially playable scaffold: Act 2 route framework and local-map expedition slices
+- Current playable scaffold: Act 2 route framework, claims council, expedition hub, local-map slices, and Act 3 handoff flags
 - Current level cap: 4
 - Party progression is shared across the whole company
+- The terminal UI supports Rich panels for interactive play and plain-safe output for pipes, scripted input, and smoke tests.
 - The game uses a compact SRD-derived d20 rules layer internally while public terminology is being moved toward Aethrune.
 
 ## Source Map
 
 - `dnd_game/game.py`: main composed game class
+- `main.py`: CLI entry point and smoke-test flags
 - `dnd_game/gameplay/creation.py`: character creation flow
+- `dnd_game/gameplay/io.py`: prompt rendering, Rich/plain fallback, command shelf, non-interactive safeguards, and save manager UI
+- `dnd_game/gameplay/journal.py`: decision ledger, clue log, faction pressure, and companion disposition summary
+- `dnd_game/gameplay/companions.py`: companion recruitment, trust changes, assists, camp counsel, and refusal hooks
+- `dnd_game/gameplay/camp.py`: rest flow, camp actions, companion talks, and camp banter entry points
 - `dnd_game/data/story/character_options/classes.py`: classes and level progression
 - `dnd_game/data/story/character_options/races.py`: races
 - `dnd_game/data/story/character_options/backgrounds.py`: backgrounds
@@ -29,6 +35,41 @@ This file is a source-oriented reference for reading and debugging the current g
 - `dnd_game/data/quests/act1.py`: quest definitions
 - `information/systems/QUEST_SYSTEM_REFERENCE.md`: detailed quest lifecycle, rewards, turn-in, and maintenance reference
 - `information/catalogs/ITEM_CATALOG.md`: generated item and equipment catalog
+- `tools/prose_lint.py`: public-facing prose lint for banned patterns and legacy names
+- `tools/sync_android_port.py`: desktop-to-Android drift checker and sync helper
+
+## Terminal, CLI, And Saves
+
+### Non-interactive safety
+
+- `--plain` forces plain output.
+- `--no-animation` disables typed narration, dice pacing, and other wait-heavy presentation.
+- `--no-audio` skips audio setup and playback.
+- `--load-save SLOT` loads a save slot at startup.
+- `--scripted-input FILE` reads prompt answers from a text file.
+- When stdin or stdout is piped, `io.py` disables Rich live menus, keyboard polling, box drawing, animations, and resize-aware rendering.
+
+### Prompt commands
+
+- Choice prompts show a small command shelf under the scene text.
+- Exploration shelves include `map`, `journal`, `party`, `inventory`, `camp`, `save`, and `settings` when each command is currently available.
+- Combat shelves omit unavailable commands such as `map` and `camp`.
+- Global commands still work at ordinary prompts, even when a scene has temporarily disabled meta-menu interruptions for the choice itself.
+- The help menu is grouped by use and keeps `quit` last.
+- The developer console uses a Rich table in interactive mode and grouped plain text in non-interactive mode.
+
+### Save previews
+
+- Save rows show compact metadata: autosave/manual state, slot or label, act, scene, party level, and playtime.
+- The current objective stays available in the detail view so the save list remains short.
+- Metadata is derived during save writes and reconciled when old saves are loaded.
+
+### Android mirror drift
+
+- Desktop `dnd_game/` is the shared source.
+- `python tools\sync_android_port.py` reports drift against `android_port/dnd_game/`.
+- `python tools\sync_android_port.py --apply` copies changed and missing shared files into the Android mirror.
+- Stale Android-only files still need hand review before deletion.
 
 ## Campaign State Layers
 
@@ -61,6 +102,22 @@ This file is a source-oriented reference for reading and debugging the current g
 - Quest log statuses are `active`, `ready_to_turn_in`, and `completed`
 - Readiness is driven from flags, not scene position alone
 - Some Act 1 quests are auto-granted from companion trust thresholds rather than a town-giver menu
+
+## Journal And Decision Ledger
+
+- `journal.py` presents the journal as a decision ledger instead of a simple quest list.
+- Major choices appear with their current consequences when flags or metrics expose a result.
+- Faction pressure entries summarize route control, civic fear, Act 2 pressure, and related campaign metrics.
+- Companion entries show disposition, recent trust changes, unlocked support, and refusal risk.
+- Unresolved clues remain visible until the campaign records a resolved flag or follow-up state.
+
+## Companion Trust Mechanics
+
+- Companion profiles define trust events, assist skills, camp counsel, and combat opener data.
+- Disposition `6+` can unlock skill-check assists, trusted camp counsel, and encounter openers.
+- Disposition `9+` can strengthen some trusted-support outcomes.
+- Disposition `-3` or lower can create social-check tension and withhold support.
+- Very low trust can trigger active-party refusal or altered quest outcomes when a companion's values are directly crossed.
 
 ## Character Creation
 
@@ -278,6 +335,8 @@ Present as tags and lore, but not given dedicated runtime logic yet:
 ### Turn structure
 
 - Each turn starts with `1` action and `1` bonus action
+- Player combat options are grouped by `Action`, `Bonus Action`, `Item`, `Social`, `Escape`, and `End Turn`
+- Display numbers remain sequential from top to bottom across the grouped menu
 - Some abilities add or trade on top of that:
   - Fighter Action Surge grants one extra action
   - Monk Flurry of Blows, Patient Defense, and Step of the Wind use bonus action and ki
@@ -295,8 +354,11 @@ Present as tags and lore, but not given dedicated runtime logic yet:
 ### Companion combat support
 
 - Scene support bonuses are separate from combat-start openers
-- At disposition `6+`, Kaelis can fire `Shadow Volley` to give the conscious party `Invisible 1` at encounter start
-- At disposition `6+`, Tolan can call `Hold the Line` to give the conscious party `Guarded 2` at encounter start
+- Companion profiles can define `combat_opener` data rather than hard-coded opener branches
+- At disposition `6+`, trusted companions can apply opener statuses or tactical pressure at encounter start
+- Kaelis currently uses scout pressure through `Shadow Volley`
+- Tolan currently uses shield-line pressure through `Hold the Line`
+- Low-trust companions can withhold opener support
 
 ### Enemy coordination hooks
 

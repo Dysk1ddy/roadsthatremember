@@ -620,10 +620,16 @@ class CampMixin:
             for topic in available_topics:
                 prefix = "" if topic["id"] not in talked_topics else "(Already discussed) "
                 options.append((topic["id"], prefix + topic["prompt"]))
+            if companion.disposition >= 6 and self.companion_camp_counsel(companion):
+                counsel = self.companion_camp_counsel(companion)
+                options.append(("counsel", self.action_option(f"Ask for {counsel.get('name', 'trusted counsel')}.")))
             options.append(("view", self.action_option("Ask how they see you now.")))
             options.append(("leave", self.action_option("Return to the campfire.")))
             choice = self.choose(f"What do you say to {companion.name}?", [text for _, text in options], allow_meta=False)
             topic_id, _ = options[choice - 1]
+            if topic_id == "counsel":
+                self.use_trusted_companion_camp_counsel(companion)
+                continue
             if topic_id == "view":
                 self.describe_companion_relationship(companion)
                 continue
@@ -654,6 +660,42 @@ class CampMixin:
             self.say(f"{companion.name} has almost no trust left to give.")
         else:
             self.say(f"{companion.name} is still measuring you carefully.")
+        effect_lines_getter = getattr(self, "companion_mechanical_effect_lines", None)
+        effect_lines = effect_lines_getter(companion) if callable(effect_lines_getter) else []
+        for line in effect_lines:
+            self.output_fn(f"- {line}")
+
+    def use_trusted_companion_camp_counsel(self, companion) -> bool:
+        assert self.state is not None
+        if companion.disposition < 6:
+            self.say(f"{companion.name} is not ready to offer that kind of counsel.")
+            return False
+        counsel = self.companion_camp_counsel(companion)
+        if not counsel:
+            self.say(f"{companion.name} has no special camp counsel available right now.")
+            return False
+        bonuses = {
+            str(skill): int(amount)
+            for skill, amount in dict(counsel.get("bonuses", {})).items()
+            if int(amount) != 0
+        }
+        if not bonuses:
+            self.say(f"{companion.name}'s counsel is useful, but it does not change your current training.")
+            return False
+        source = f"{companion.name}: {counsel.get('name', 'trusted counsel')}"
+        changed = self.apply_story_skill_modifier(
+            self.state.player,
+            self.TRUSTED_COMPANION_COUNSEL_MODIFIER_ID,
+            bonuses,
+            source=source,
+            duration="until another companion counsel replaces it",
+        )
+        self.say(str(counsel.get("text") or f"{companion.name} helps you prepare for the next hard choice."))
+        if changed:
+            bonus_summary = ", ".join(f"{skill} {amount:+d}" for skill, amount in sorted(bonuses.items()))
+            self.say(f"Trusted counsel active: {bonus_summary}.")
+            self.record_companion_trust_event(f"{source} granted {bonus_summary}.")
+        return True
 
     def visit_magic_mirror(self) -> None:
         assert self.state is not None

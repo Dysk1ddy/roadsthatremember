@@ -758,32 +758,33 @@ class CombatFlowMixin:
     ) -> None:
         if self.state is None:
             return
-        kaelis = next(
-            (
-                hero
-                for hero in heroes
-                if hero.is_conscious() and hero.companion_id == "kaelis_starling" and hero.disposition >= 6
-            ),
-            None,
-        )
-        if kaelis is not None:
-            self.say(f"{kaelis.name} opens with a Shadow Volley that keeps the whole company under cover for one decisive beat.")
+        for companion in heroes:
+            if not companion.is_conscious() or not companion.companion_id:
+                continue
+            opener_getter = getattr(self, "companion_combat_opener", None)
+            opener = opener_getter(companion) if callable(opener_getter) else {}
+            if not opener:
+                continue
+            opener_name = str(opener.get("name") or "trusted opener")
+            if companion.disposition < 6:
+                if companion.disposition <= -3 and not companion.bond_flags.get("low_trust_opener_warning_seen"):
+                    self.say(f"{companion.name} keeps their own counsel and offers no {opener_name} opener.")
+                    companion.bond_flags["low_trust_opener_warning_seen"] = True
+                    recorder = getattr(self, "record_companion_trust_event", None)
+                    if callable(recorder):
+                        recorder(f"{companion.name} withheld {opener_name} in combat at low trust.")
+                continue
+            opener_text = str(opener.get("text") or f"{companion.name} creates a trusted opening.")
+            self.say(opener_text)
+            status_payload = dict(opener.get("ally_statuses", {}))
+            if companion.disposition >= 9:
+                for status, duration in dict(opener.get("exceptional_ally_statuses", {})).items():
+                    status_payload[status] = max(int(status_payload.get(status, 0)), int(duration))
             for hero in heroes:
-                if hero.is_conscious():
-                    self.apply_status(hero, "invisible", 1, source=f"{kaelis.name}'s Shadow Volley")
-        tolan = next(
-            (
-                hero
-                for hero in heroes
-                if hero.is_conscious() and hero.companion_id == "tolan_ironshield" and hero.disposition >= 6
-            ),
-            None,
-        )
-        if tolan is not None:
-            self.say(f"{tolan.name} plants his feet and calls Hold the Line before steel ever meets steel.")
-            for hero in heroes:
-                if hero.is_conscious():
-                    self.apply_status(hero, "guarded", 2, source=f"{tolan.name}'s Hold the Line")
+                if not hero.is_conscious():
+                    continue
+                for status, duration in status_payload.items():
+                    self.apply_status(hero, str(status), int(duration), source=f"{companion.name}'s {opener_name}")
 
     def hero_turn(
         self,
@@ -1102,6 +1103,14 @@ class CombatFlowMixin:
 
     def combat_option_group(self, option: str) -> str:
         action = self.combat_action_key(option)
+        if action == "End Turn":
+            return "End Turn"
+        if action in {"Use an Item", "Drink a Healing Potion"}:
+            return "Item"
+        if action == "Attempt Parley":
+            return "Social"
+        if action == "Try to Flee":
+            return "Escape"
         if action in {
             "Use Martial Arts",
             "Use Flurry of Blows",
@@ -1113,36 +1122,36 @@ class CombatFlowMixin:
             "Use Bardic Inspiration",
             "Cast Healing Word",
             "Make Off-Hand Attack",
-            "Drink a Healing Potion",
         }:
             return "Bonus Action"
-        if action in {
-            "Use Action Surge",
-            "Help a Downed Ally",
-            "Use an Item",
-            "Attempt Parley",
-            "Try to Flee",
-            "Take the Dodge action",
-            "End Turn",
-        }:
-            return "Tactical"
         return "Action"
 
     def group_combat_options(self, options: list[str]) -> tuple[dict[int, str], list[tuple[str, list[tuple[int, str]]]]]:
         indexed: dict[int, str] = {}
-        sections: list[tuple[str, list[tuple[int, str]]]] = []
-        section_lookup: dict[str, list[tuple[int, str]]] = {}
-        for display_index, option in enumerate(options, start=1):
+        section_lookup: dict[str, list[str]] = {}
+        for option in options:
             section = self.combat_option_group(option)
             if section not in section_lookup:
                 section_lookup[section] = []
-                sections.append((section, section_lookup[section]))
-            section_lookup[section].append((display_index, option))
-            indexed[display_index] = option
+            section_lookup[section].append(option)
+        section_order = ("Action", "Bonus Action", "Item", "Social", "Escape", "End Turn")
+        sections: list[tuple[str, list[tuple[int, str]]]] = []
+        display_index = 1
+        for section in section_order:
+            options_in_section = section_lookup.get(section)
+            if not options_in_section:
+                continue
+            grouped_options: list[tuple[int, str]] = []
+            for option in options_in_section:
+                grouped_options.append((display_index, option))
+                indexed[display_index] = option
+                display_index += 1
+            sections.append((section, grouped_options))
         return indexed, sections
 
     def combat_dashboard_rendering_supported(self) -> bool:
-        return self.rich_enabled() and Panel is not None and Group is not None and box is not None
+        can_emit_rich_output = getattr(self, "can_emit_rich_output", None)
+        return bool(callable(can_emit_rich_output) and can_emit_rich_output() and Panel is not None and Group is not None and box is not None)
 
     def combat_action_panel_title(self, actor: Character | None) -> str:
         return "Action Box" if actor is None else f"{actor.name}'s Turn"
@@ -1182,6 +1191,7 @@ class CombatFlowMixin:
                 action_items.append(self.rich_from_ansi(f"  {display_index}. {self.format_option_text(option)}"))
             if section_index < len(sections) - 1:
                 action_items.append(self.rich_text("", dim=True))
+        action_items.extend([self.rich_text("", dim=True), self.rich_text(self.command_shelf_text(), "light_aqua", dim=True)])
         action_panel = self.build_combat_action_panel(action_items, actor=actor)
         return self.emit_rich(
             self.build_combat_dashboard_renderable(
@@ -1204,6 +1214,7 @@ class CombatFlowMixin:
             self.output_fn(self.style_text(f"{section}:", "light_yellow"))
             for display_index, option in grouped_options:
                 self.output_fn(f"  {display_index}. {self.format_option_text(option)}")
+        self.render_command_shelf()
 
     def build_grouped_combat_keyboard_menu(
         self,
@@ -1229,6 +1240,7 @@ class CombatFlowMixin:
                     dim=True,
                 )
             )
+        action_items.append(self.rich_text(self.command_shelf_text(), "light_aqua", dim=True))
         action_items.append(self.rich_text("", dim=True))
         for section_index, (section, grouped_options) in enumerate(sections):
             action_items.append(self.rich_text(f"{section}:", "light_yellow", bold=True))
@@ -1271,14 +1283,16 @@ class CombatFlowMixin:
         actor: Character | None,
         heroes: list[Character],
         enemies: list[Character],
+        indexed: dict[int, str] | None = None,
     ) -> str | None:
         if not self.combat_keyboard_choice_menu_supported():
             return None
         if Panel is None or Group is None or Table is None or box is None:
             return None
+        selection_lookup = indexed or {index: option for index, option in enumerate(options, start=1)}
 
         return self.run_live_keyboard_choice_session(
-            option_count=len(options),
+            option_count=len(selection_lookup),
             renderable_builder=lambda **state: self.build_grouped_combat_keyboard_menu(
                 prompt,
                 sections,
@@ -1288,7 +1302,7 @@ class CombatFlowMixin:
                 **state,
             ),
             width_factory=self.safe_rich_render_width,
-            resolve_selection=lambda selected_index: options[selected_index],
+            resolve_selection=lambda selected_index: selection_lookup[selected_index + 1],
             live_cls=Live,
         )
 
@@ -1312,6 +1326,7 @@ class CombatFlowMixin:
                     actor=actor,
                     heroes=heroes,
                     enemies=enemies,
+                    indexed=indexed,
                 )
                 if selected_option is not None:
                     return selected_option

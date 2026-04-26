@@ -8,11 +8,20 @@ It is separate from `COMPANION_CAMP_BANTER_DRAFT.md`. Camp banter is for compani
 
 ## Goals
 
-- Make the active party feel present in conversations, not only combat.
+- Make the active party feel present in conversations, with combat presence handled through opener and assist systems.
 - Let past choices change who speaks, what they notice, and how much they trust the player's framing.
 - Give party composition a visible texture without requiring any one companion for main progression.
 - Use companion input to clarify stakes before a choice, echo consequences after a choice, and occasionally create companion tension.
 - Keep Act 3 secret-architect guardrails intact. Before the midpoint reveal, no companion should name Malzurath or explain the Ninth Ledger as an intelligent force.
+
+## Current Runtime Fit
+
+The full scene-dialogue input registry remains a draft target. The current runtime has companion trust mechanics that already touch dialogue-adjacent play:
+
+- High trust can unlock skill-check assists through companion profile `assist_skills`.
+- High trust can unlock camp counsel that applies a small story-skill modifier and records support in the ledger.
+- Low trust can add social-check tension or withhold active-party support.
+- Trust changes appear in the journal decision ledger with recent events and mechanical support notes.
 
 ## Input Types
 
@@ -43,7 +52,7 @@ It is separate from `COMPANION_CAMP_BANTER_DRAFT.md`. Camp banter is for compani
 Dialogue input should consider these factors in roughly this order:
 
 1. Active party membership: only companions in the active party should speak in live scene dialogue.
-2. Scene and dialogue topic: the input must answer the immediate conversation, not just advertise the companion.
+2. Scene and dialogue topic: the input must answer the immediate conversation instead of advertising the companion.
 3. Required flags: evidence, route order, quest state, prior choice, or reveal state.
 4. Blocked flags: do not repeat one-shot lines.
 5. Personal stakes: companion quest state outranks generic expertise.
@@ -412,7 +421,7 @@ Gate: `steward_seen`
 
 When Tessa asks where to spend scarce defense:
 
-- Rhogar: "A town survives when people know what they are defending, not only what they fear."
+- Rhogar: "A town survives when people know what they are defending and what fear is trying to take."
 - Tolan: "Put strength where panic will look first."
 - Bryn: "And leave one quiet exit. Not for running. For moving the people too scared to ask."
 
@@ -497,7 +506,7 @@ Gate: `lionshield_seen`
 
 When Linene explains trade pressure:
 
-- Kaelis: "They are not only stealing weapons. They are deciding who feels safe enough to hold one."
+- Kaelis: "They are stealing weapons and deciding who feels safe enough to hold one."
 - Rhogar: "A town denied tools is a town asked to kneel politely."
 - Bryn: "And if the crates arrive late enough, everyone blames the shop instead of the hand on the road."
 
@@ -995,7 +1004,7 @@ Gate: `forge_of_spells`
 
 Entry:
 
-- Nim: "The Forge is not only making magic stronger. It is making intention louder."
+- Nim: "The Forge strengthens magic and makes intention louder."
 - Irielle: "Caldra wanted quiet so something else could hear itself through us."
 - Elira: "Then keep naming people. Names are heavy. They keep souls from becoming instruments."
 

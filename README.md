@@ -8,12 +8,13 @@ The project is currently in an Aethrune retcon pass. The implementation still pr
 
 Act 1 is fully playable and Act 2 is playable as a scaffolded expedition campaign. The current build includes:
 
-- Character creation, companions, party XP, inventory, equipment, leveling, relationship bonuses, and camp management.
+- Character creation, companions, party XP, inventory, equipment, leveling, relationship bonuses, trust-driven assists, and camp management.
 - A route-driven Act 1 with background prologues, roadside branches, a frontier hub, branching expedition sites, hidden-route discovery, fortress assault, and a final descent.
 - A scaffolded Act 2 with a claims council, expedition hub, pressure tracking, local maps, route-order consequences, companion recruitment, and Act 3 handoff flags.
-- Turn-based combat with checks, initiative, attacks, defenses, conditions, healing, death-state handling, class features, channel-like abilities, consumables, parley, fleeing, and chained encounters.
-- A live map system for overworld travel and dungeon rooms, with Rich-powered panels when `rich` is installed and plain-text fallback when it is not.
-- Optional audio, typed narration, pacing controls, dice animation, manual saves, journal, party, inventory, equipment, sheet, camp, and settings commands.
+- Turn-based combat with checks, initiative, grouped action menus, attacks, defenses, conditions, healing, death-state handling, class features, channel-like abilities, consumables, parley, fleeing, and chained encounters.
+- A live map system for overworld travel and dungeon rooms, with Rich-powered panels when `rich` is installed and plain-safe output when the terminal is piped.
+- Optional audio, typed narration, pacing controls, dice animation, compact save previews, a decision-ledger journal, party, inventory, equipment, sheet, camp, and settings commands.
+- Context-aware command shelves appear under prompts so common commands stay visible during choice-heavy scenes.
 
 ## Aethrune Retcon Direction
 
@@ -72,6 +73,16 @@ python main.py --plain --no-animation --no-audio --scripted-input scripted_input
 python main.py --plain --no-animation --no-audio --load-save Vale_act1_complete
 python tools/prose_lint.py README.md
 ```
+
+Useful CLI flags:
+
+- `--plain`: force plain terminal output.
+- `--no-animation`: skip typed narration and dice pacing.
+- `--no-audio`: disable sound startup and playback.
+- `--load-save SLOT`: load a save slot at startup.
+- `--scripted-input FILE`: read prompt answers from a file for smoke tests.
+
+When stdin or stdout is piped, the game automatically disables Rich live menus, keyboard polling, box drawing, animations, and resize-aware rendering.
 
 ## AI-Assisted Writing
 
@@ -139,26 +150,34 @@ During the retcon, some tests may continue to reference internal legacy IDs unti
 
 ## Useful In-Game Commands
 
-- `save`
-- `settings`
-- `map`
-- `party`
-- `journal`
-- `inventory` / `backpack` / `bag`
-- `equipment` / `gear`
-- `sheet` / `sheets`
-- `camp`
-- `help`
+The prompt shelf shows the most useful commands for the current context. Combat hides unavailable commands such as `map` and `camp`; exploration prompts show the broader shelf.
+
+- `map`: open travel, overworld, and site maps when available.
+- `journal`: open the decision ledger, clues, consequences, and companion trust notes.
+- `party`: review active party stats and conditions.
+- `inventory` / `backpack` / `bag`: manage shared items.
+- `camp`: rest, talk, and use camp actions outside combat.
+- `save`: create a named manual save.
+- `saves` / `save files`: load or delete saves with compact metadata previews.
+- `settings`: adjust audio and presentation toggles.
+- `help`: show commands grouped by use; `quit` is listed last.
+- `~` / `console`: open the developer console; `helpconsole` prints its command reference.
 
 ## Files Worth Knowing
 
 - `main.py`: entry point.
 - `dnd_game/`: main game code. The package name is retained for compatibility during the retcon.
+- `dnd_game/gameplay/io.py`: terminal rendering, prompt handling, command shelf, and pipe-safe output behavior.
+- `dnd_game/gameplay/journal.py`: decision ledger, clue log, faction pressure, and companion disposition notes.
+- `dnd_game/gameplay/companions.py`: companion trust changes, skill-check assists, combat openers, and refusal hooks.
+- `dnd_game/gameplay/combat_flow.py`: turn menu grouping, action economy, and combat AI.
 - `information/Retcon story/Plans/AETHRUNE_RETCON_IMPLEMENTATION_PLAN.md`: active implementation plan.
 - `information/Retcon story/Plans/IP_CLEANUP_PLAN.md`: IP cleanup audit and strategy.
 - `information/Retcon story/World/`: Aethrune world and map-remap references.
 - `information/Retcon story/Systems/`: variable and quest-matrix retcon references.
 - `information/catalogs/ITEM_CATALOG.md`: generated item catalog pending Aethrune item-language cleanup.
+- `tools/prose_lint.py`: public-text lint for banned prose patterns and legacy names.
+- `tools/sync_android_port.py`: drift checker and sync helper for `android_port/dnd_game/`.
 - `saves/`: JSON save files.
 - `tests/test_core.py`: core regression coverage.
 

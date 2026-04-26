@@ -1372,7 +1372,14 @@ class CombatResolutionMixin:
             self.say("")
             return False
         advantage = self.d20_disadvantage_state(actor, skill=skill, context=context)
-        total_modifier = actor.skill_bonus(skill)
+        companion_modifier = 0
+        companion_lines: list[str] = []
+        companion_assist = getattr(self, "companion_skill_check_assist", None)
+        if callable(companion_assist):
+            companion_modifier, companion_lines = companion_assist(actor, skill, context)
+        for line in companion_lines:
+            self.say(line)
+        total_modifier = actor.skill_bonus(skill) + companion_modifier
         d20 = self.roll_check_d20(
             actor,
             advantage,

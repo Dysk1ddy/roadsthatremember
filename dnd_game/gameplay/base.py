@@ -271,12 +271,19 @@ class GameBase:
         self.input_fn = input_fn
         self.output_fn = output_fn
         self._plain_output = bool(plain_output)
+        stdio_is_interactive = getattr(self, "stdio_is_interactive", None)
+        self._stdio_interactive = bool(stdio_is_interactive() if callable(stdio_is_interactive) else True)
+        self._default_stdio = bool(input_fn is input and output_fn is print)
+        self._presentation_forced_off = bool(
+            self._plain_output
+            or (self._default_stdio and not self._stdio_interactive)
+        )
         self._uses_default_save_dir = save_dir is None
         self.save_dir = Path(save_dir or Path.cwd() / "saves")
         self.save_dir.mkdir(parents=True, exist_ok=True)
         self.settings_path = self.save_dir / self.SETTINGS_FILENAME
         self.rng = rng or random.Random()
-        self._interactive_output = bool(input_fn is input and output_fn is print and not self._plain_output)
+        self._interactive_output = bool(self._default_stdio and not self._presentation_forced_off)
         self.autosaves_enabled = self._interactive_output
         should_apply_persisted_settings = self._interactive_output or not self._uses_default_save_dir
         persisted_settings = self.load_persisted_settings() if should_apply_persisted_settings else {}
@@ -310,6 +317,11 @@ class GameBase:
             if staggered_reveals is None
             else staggered_reveals
         )
+        if self._presentation_forced_off:
+            requested_dice_mode = "off"
+            requested_pacing = False
+            requested_dialogue_typing = False
+            requested_staggered_reveals = False
         self._dice_animation_mode_preference = (
             requested_dice_mode if requested_dice_mode in self.DICE_ANIMATION_MODES else "off"
         )
@@ -479,6 +491,9 @@ class GameBase:
 
     def apply_dice_animation_mode_profile(self) -> None:
         mode = self.current_dice_animation_mode()
+        if getattr(self, "_presentation_forced_off", False):
+            mode = "off"
+            self._dice_animation_mode_preference = "off"
         profiles = {
             "off": {
                 "min_seconds": 0.0,
@@ -774,7 +789,7 @@ class GameBase:
         return ""
 
     def should_animate_health_bars(self) -> bool:
-        return self.pace_output and self.output_fn is print
+        return bool(self.pace_output and self.output_fn is print and getattr(self, "_interactive_output", False))
 
     def begin_animation_skip_scope(self) -> None:
         self._animation_skip_scope_depth += 1
@@ -1008,12 +1023,13 @@ class GameBase:
             return roll(expression, self.rng, critical=critical)
 
     def rich_dice_panel_enabled(self) -> bool:
+        can_emit_rich_output = getattr(self, "can_emit_rich_output", None)
         return (
             self.current_dice_animation_mode() == "full"
             and callable(getattr(self, "emit_rich", None))
             and callable(getattr(self, "rich_text", None))
-            and callable(getattr(self, "rich_enabled", None))
-            and self.rich_enabled()
+            and callable(can_emit_rich_output)
+            and can_emit_rich_output()
             and Columns is not None
             and Group is not None
             and Panel is not None
@@ -2312,41 +2328,132 @@ class GameBase:
         self.say("Act II snapshot loaded: Act II begins with Bryn, Elira, and Tolan at level 4.")
         return True
 
-    def console_command_reference(self) -> list[str]:
+    def console_command_groups(self) -> list[tuple[str, list[tuple[str, str]]]]:
         return [
-            "give <item id> [quantity] - add item(s) to the shared inventory; quantity defaults to 1",
-            "give gold [quantity] - add gold; quantity defaults to 1,000 (marks also works)",
-            "god - toggle party god mode",
-            "heal - heal every living active party member to full HP",
-            "revive - revive every dead or downed active party member at 1 HP",
-            "rest - complete a free long rest without consuming supplies",
-            "clearconditions - remove all conditions from the active party",
-            "levelup - level up the company by 1",
-            "instantact2 - rebuild this run at the Act II level 4 start",
-            "passallchecks - toggle automatic success for player dice checks",
-            "failallchecks - toggle automatic failure for player dice checks",
-            "instantkill - toggle 1,000-damage instant kills on player attacks",
-            "unlockmap - reveal the current act map and its dungeon rooms",
-            "unlockallmaps - reveal every Act I and Act II map node and dungeon room",
-            "setscene <scene id> - jump to a scene and restart the scene loop",
-            "setflag <flag> <true|false> - set a story flag",
-            "spawn <enemy id> [quantity] - start a console combat encounter; quantity defaults to 1",
-            "killall - kill every currently active enemy in combat",
-            "identify <item id> - print catalog details for an item",
-            "helpconsole - show this command reference",
+            (
+                "Inventory And Gold",
+                [
+                    ("give <item id> [quantity]", "Add item(s) to the shared inventory; quantity defaults to 1."),
+                    ("give gold [quantity]", "Add gold; quantity defaults to 1,000. `marks` also works."),
+                    ("identify <item id>", "Print catalog details for an item."),
+                ],
+            ),
+            (
+                "Party State",
+                [
+                    ("god", "Toggle party god mode."),
+                    ("heal", "Heal every living active party member to full HP."),
+                    ("revive", "Revive every dead or downed active party member at 1 HP."),
+                    ("rest", "Complete a free long rest without consuming supplies."),
+                    ("clearconditions", "Remove all conditions from the active party."),
+                ],
+            ),
+            (
+                "Progression",
+                [
+                    ("levelup", "Level up the company by 1."),
+                    ("instantact2", "Rebuild this run at the Act II level 4 start."),
+                ],
+            ),
+            (
+                "Checks And Combat",
+                [
+                    ("passallchecks", "Toggle automatic success for player dice checks."),
+                    ("failallchecks", "Toggle automatic failure for player dice checks."),
+                    ("instantkill", "Toggle 1,000-damage instant kills on player attacks."),
+                    ("spawn <enemy id> [quantity]", "Start a console combat encounter; quantity defaults to 1."),
+                    ("killall", "Kill every currently active enemy in combat."),
+                ],
+            ),
+            (
+                "Map And Scene",
+                [
+                    ("unlockmap", "Reveal the current act map and its dungeon rooms."),
+                    ("unlockallmaps", "Reveal every Act I and Act II map node and dungeon room."),
+                    ("setscene <scene id>", "Jump to a scene and restart the scene loop."),
+                    ("setflag <flag> <true|false>", "Set a story flag."),
+                ],
+            ),
+            (
+                "Reference",
+                [
+                    ("helpconsole", "Show this command reference."),
+                ],
+            ),
         ]
 
-    def show_console_command_reference(self) -> None:
+    def console_command_reference(self) -> list[str]:
+        return [
+            f"{command} - {description.rstrip('.')}"
+            for _, commands in self.console_command_groups()
+            for command, description in commands
+        ]
+
+    def build_console_command_table(self):
+        if Table is None or box is None:
+            return None
+        table = Table(box=box.SIMPLE_HEAVY, expand=True, pad_edge=False)
+        table.add_column("Command", style=f"bold {rich_style_name('light_yellow')}", width=30)
+        table.add_column("Use", ratio=1)
+        for group_index, (category, commands) in enumerate(self.console_command_groups()):
+            if group_index:
+                table.add_section()
+            table.add_row(self.rich_text(category, "light_aqua", bold=True), "")
+            for command, description in commands:
+                table.add_row(self.rich_text(command, "light_yellow", bold=True), description)
+        return table
+
+    def console_command_terminal_renderable(self):
+        if Group is None or Panel is None or Text is None or box is None:
+            return None
+        table = self.build_console_command_table()
+        if table is None:
+            return None
+        prompt = Text()
+        prompt.append("console", style=f"bold {rich_style_name('light_green')}")
+        prompt.append("> ", style=f"bold {rich_style_name('light_green')}")
+        prompt.append("Type a command, or ")
+        prompt.append("back", style=f"bold {rich_style_name('light_yellow')}")
+        prompt.append(" to return.")
+        return Panel(
+            Group(table, prompt),
+            title=self.rich_text("Developer Console", "light_yellow", bold=True),
+            border_style=rich_style_name("light_green"),
+            box=box.ROUNDED,
+            padding=(0, 1),
+        )
+
+    def emit_console_command_reference_rich(self) -> bool:
+        if not self.should_use_rich_ui():
+            return False
+        renderable = self.console_command_terminal_renderable()
+        if renderable is None:
+            return False
+        if self.emit_rich(renderable, width=self.safe_rich_render_width()):
+            self.output_fn("")
+            return True
+        return False
+
+    def show_console_command_reference_plain(self) -> None:
         self.banner("Console Commands")
-        self.say("Available console commands:")
-        for line in self.console_command_reference():
-            self.say(f"- {line}")
+        self.output_fn("Available console commands:")
+        for category, commands in self.console_command_groups():
+            self.output_fn("")
+            self.output_fn(f"{category}:")
+            for command, description in commands:
+                self.output_fn(f"  {command} - {description}")
+
+    def show_console_command_reference(self) -> None:
+        if self.emit_console_command_reference_rich():
+            return
+        self.show_console_command_reference_plain()
 
     def open_console_commands_menu(self) -> bool:
         while True:
-            self.show_console_command_reference()
-            self.say("Type a command below, or type `back` to return to the game.")
-            raw = self.read_input("console> ").strip()
+            raw = self.read_resize_aware_input(
+                self.show_console_command_reference,
+                prompt="console> ",
+            ).strip()
             if raw.lower() in {"", "back", "exit", "quit"}:
                 return False
             if self.execute_console_command(raw):
@@ -2731,29 +2838,63 @@ class GameBase:
                 return False
 
     def show_global_commands(self) -> None:
-        commands = [
-            ("help", "Show the list of global commands and what they do."),
-            ("~ / console", "Open the console commands menu for give, god, levelup, Act II jump, and dice-check toggles."),
-            ("helpconsole", "Show the console command reference without opening the console prompt."),
-            ("settings", "Open the settings menu for audio and presentation toggles."),
-            ("save", "Save the current run to a named slot."),
-            ("load", "Load another save slot immediately and continue from there."),
-            ("saves / save files", "Open the Save Files manager to load or delete save slots."),
-            ("quit", "Return to the main menu, or close the program if you are already there."),
-            ("map / maps / map menu", "Open the map menu, including Travel Ledger, overworld, and current-site views when available."),
-            ("party", "Review quick party combat stats, statuses, and roster state."),
-            ("journal", "Open the journal and clues log."),
-            ("inventory / backpack / bag", "Open the shared inventory and item management view."),
-            ("equipment / gear", "Open the full equipment manager for any company member."),
-            ("sheet / sheets", "Open full character sheets for the company."),
-            ("camp", "Open camp when you are not in combat."),
+        command_groups = [
+            (
+                "Navigation And Status",
+                [
+                    ("map / maps / map menu", "Open the map menu, including Travel Ledger, overworld, and current-site views when available."),
+                    ("journal", "Open the journal and clues log."),
+                    ("party", "Review quick party combat stats, statuses, and roster state."),
+                ],
+            ),
+            (
+                "Inventory And Rest",
+                [
+                    ("inventory / backpack / bag", "Open the shared inventory and item management view."),
+                    ("equipment / gear", "Open the full equipment manager for any company member."),
+                    ("sheet / sheets", "Open full character sheets for the company."),
+                    ("camp", "Open camp when you are not in combat."),
+                ],
+            ),
+            (
+                "Save And Load",
+                [
+                    ("save", "Save the current run to a named slot."),
+                    ("load", "Load another save slot immediately and continue from there."),
+                    ("saves / save files", "Open the Save Files manager to load or delete save slots."),
+                ],
+            ),
+            (
+                "Settings And Help",
+                [
+                    ("settings", "Open the settings menu for audio and presentation toggles."),
+                    ("help", "Show the list of global commands and what they do."),
+                    ("helpconsole", "Show the console command reference without opening the console prompt."),
+                ],
+            ),
+            (
+                "Advanced",
+                [
+                    ("~ / console", "Open the console commands menu for give, god, levelup, Act II jump, and dice-check toggles."),
+                ],
+            ),
+            (
+                "Exit",
+                [
+                    ("quit", "Return to the main menu, or close the program if you are already there."),
+                ],
+            ),
         ]
         if self.should_use_rich_ui() and Group is not None and Panel is not None and Table is not None and box is not None:
             table = Table(box=box.SIMPLE_HEAVY, expand=True, pad_edge=False)
             table.add_column("Command", style=f"bold {rich_style_name('light_yellow')}", width=24)
             table.add_column("Use", ratio=1)
-            for command, description in commands:
-                table.add_row(self.rich_text(command, "light_yellow", bold=True), description)
+            for group_index, (category, commands) in enumerate(command_groups):
+                if group_index:
+                    table.add_section()
+                table.add_row(self.rich_text(category, "light_aqua", bold=True), "")
+                for command, description in commands:
+                    table.add_row(self.rich_text(command, "light_yellow", bold=True), description)
             guidance = self.rich_text(
                 "Type any of these at most prompts. `map`, `maps`, and `map menu` all open the same map menu, and `~` opens the console commands menu.",
                 "cyan",
@@ -2771,8 +2912,11 @@ class GameBase:
                 return
         self.banner("Global Commands")
         self.say("These commands can be typed at most prompts.")
-        for command, description in commands:
-            self.output_fn(f"- {command}: {description}")
+        for category, commands in command_groups:
+            self.output_fn(f"{category}:")
+            for command, description in commands:
+                self.output_fn(f"- {command}: {description}")
+            self.output_fn("")
 
     def refresh_presentation_bundle_preference(self) -> None:
         self._animations_and_delays_preference = bool(
@@ -2799,14 +2943,22 @@ class GameBase:
                 pass
 
     def apply_typed_dialogue_preference(self) -> None:
-        self.type_dialogue = bool(getattr(self, "_typed_dialogue_preference", self.type_dialogue) and self.output_fn is print)
+        self.type_dialogue = bool(
+            getattr(self, "_typed_dialogue_preference", self.type_dialogue)
+            and self.output_fn is print
+            and not getattr(self, "_presentation_forced_off", False)
+        )
 
     def apply_pacing_preference(self) -> None:
-        self.pace_output = bool(getattr(self, "_pacing_pauses_preference", self.pace_output))
+        self.pace_output = bool(
+            getattr(self, "_pacing_pauses_preference", self.pace_output)
+            and not getattr(self, "_presentation_forced_off", False)
+        )
 
     def apply_staggered_reveal_preference(self) -> None:
         self.staggered_reveals_enabled = bool(
             getattr(self, "_staggered_reveals_preference", getattr(self, "staggered_reveals_enabled", False))
+            and not getattr(self, "_presentation_forced_off", False)
         )
 
     def set_dice_animations_enabled(self, enabled: bool) -> None:
@@ -2962,8 +3114,21 @@ class GameBase:
         self.introduce_character(name)
         self.emit_dialogue_line(name, text, color="green", typed=True)
 
+    def active_party_leader(self):
+        if self.state is None:
+            return None
+        party = self.state.party_members()
+        for member in party:
+            if member.is_conscious():
+                return member
+        for member in party:
+            if not member.dead:
+                return member
+        return self.state.player
+
     def player_speaker(self, text: str) -> None:
-        speaker_name = self.state.player.name if self.state is not None else "You"
+        leader = self.active_party_leader()
+        speaker_name = leader.name if leader is not None else "You"
         self.emit_dialogue_line(speaker_name, text, color="blue", typed=False)
         self.pause_for_choice_resolution()
 

@@ -46,6 +46,14 @@ python tools\sync_android_port.py --apply
 
 Review stale Android files by hand before deleting them.
 
+Recent desktop runtime work that should be mirrored after verification:
+
+- Pipe-safe terminal behavior and CLI smoke-test flags.
+- Compact save metadata previews.
+- Context-aware prompt command shelves.
+- Grouped combat actions.
+- Decision-ledger journal and visible companion trust mechanics.
+
 ## Packaging An APK Later
 
 The included `buildozer.spec` is a starter config for packaging.
@@ -75,6 +83,7 @@ android_port/bin/
 - Numbered choices become touch buttons.
 - You can still type commands like `save`, `journal`, `inventory`, and `camp`.
 - Text-entry prompts like character names and quantity prompts use the text box at the bottom.
+- Desktop-only Rich terminal features are reduced or replaced in the Android wrapper.
 
 ## Retcon Note
 

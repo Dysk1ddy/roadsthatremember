@@ -22,6 +22,8 @@ from .constants import MENU_PAGE_SIZE
 
 
 class GameIOMixin:
+    COMMAND_SHELF_COMMANDS = ("map", "journal", "party", "inventory", "camp", "save", "settings")
+
     def stdio_is_interactive(self) -> bool:
         try:
             stdin_ready = not hasattr(sys.stdin, "isatty") or sys.stdin.isatty()
@@ -29,6 +31,9 @@ class GameIOMixin:
         except Exception:
             return False
         return bool(stdin_ready and stdout_ready)
+
+    def presentation_output_is_interactive(self) -> bool:
+        return bool(getattr(self, "_interactive_output", False) and self.stdio_is_interactive())
 
     def output_supports_unicode(self) -> bool:
         if bool(getattr(self, "_plain_output", False)):
@@ -43,7 +48,32 @@ class GameIOMixin:
         return True
 
     def can_emit_rich_output(self) -> bool:
-        return self.rich_enabled() and self.output_supports_unicode()
+        return bool(
+            self.rich_enabled()
+            and not getattr(self, "_presentation_forced_off", False)
+            and self.output_supports_unicode()
+        )
+
+    def command_shelf_commands(self) -> tuple[str, ...]:
+        has_state = self.state is not None
+        in_combat = bool(getattr(self, "_in_combat", False))
+        commands: list[str] = []
+        if has_state and not in_combat:
+            commands.append("map")
+        if has_state:
+            commands.extend(["journal", "party", "inventory"])
+        if has_state and not in_combat:
+            commands.append("camp")
+        if has_state:
+            commands.append("save")
+        commands.append("settings")
+        return tuple(commands)
+
+    def command_shelf_text(self) -> str:
+        return "Commands: " + " | ".join(self.command_shelf_commands())
+
+    def render_command_shelf(self, *, allow_meta: bool = True) -> None:
+        self.output_fn(self.style_text(self.command_shelf_text(), "light_aqua"))
 
     def style_text(self, text: object, color: str) -> str:
         return colorize(text, color)
@@ -203,12 +233,12 @@ class GameIOMixin:
         reader = getattr(self, "read_keyboard_choice_key")
         if getattr(reader, "__func__", None) is not GameIOMixin.read_keyboard_choice_key:
             return True
-        if msvcrt is None:
-            return True
+        if msvcrt is None or not self.stdio_is_interactive():
+            return False
         try:
             return bool(msvcrt.kbhit())
         except Exception:
-            return True
+            return False
 
     def refresh_keyboard_choice_live_if_resized(self, live, console, renderable_factory, width_factory) -> bool:
         next_width = width_factory()
@@ -612,6 +642,7 @@ class GameIOMixin:
         feedback: str | None,
         show_instructions: bool,
     ):
+        show_command_shelf = bool(getattr(self, "_keyboard_choice_show_command_shelf", True))
         prompt_block = Text()
         if prompt:
             prompt_block.append(prompt, style="bold bright_white")
@@ -649,13 +680,10 @@ class GameIOMixin:
         group_items = []
         if prompt or show_instructions:
             group_items.extend([prompt_block, self.rich_text("", dim=True)])
-        group_items.extend(
-            [
-                option_table,
-                self.rich_text("", dim=True),
-                *footer_items,
-            ]
-        )
+        group_items.extend([option_table, self.rich_text("", dim=True)])
+        if show_command_shelf:
+            group_items.append(self.rich_text(self.command_shelf_text(), "light_aqua", dim=True))
+        group_items.extend(footer_items)
 
         return Panel(
             Group(*group_items),
@@ -722,6 +750,7 @@ class GameIOMixin:
         resolve_selection,
         live_cls=None,
         invalid_feedback: str = "Type a listed number, use the arrows, or enter a global command.",
+        allow_meta: bool = True,
     ):
         live_cls = Live if live_cls is None else live_cls
         if option_count <= 0 or Console is None or live_cls is None:
@@ -808,22 +837,36 @@ class GameIOMixin:
         options: list[str],
         *,
         title: str | None = None,
+        allow_meta: bool = True,
     ) -> int | None:
         if not options or not self.should_use_keyboard_choice_menu():
             return None
 
         resolved_title = title or self.keyboard_choice_menu_title()
-        return self.run_live_keyboard_choice_session(
-            option_count=len(options),
-            renderable_builder=lambda **state: self.build_keyboard_choice_menu(
-                prompt,
-                options,
-                title=resolved_title,
-                **state,
-            ),
-            width_factory=self.keyboard_choice_menu_width,
-            resolve_selection=lambda selected_index: selected_index + 1,
-        )
+        sentinel = object()
+        previous_shelf = getattr(self, "_keyboard_choice_show_command_shelf", sentinel)
+        self._keyboard_choice_show_command_shelf = True
+        try:
+            return self.run_live_keyboard_choice_session(
+                option_count=len(options),
+                renderable_builder=lambda **state: self.build_keyboard_choice_menu(
+                    prompt,
+                    options,
+                    title=resolved_title,
+                    **state,
+                ),
+                width_factory=self.keyboard_choice_menu_width,
+                resolve_selection=lambda selected_index: selected_index + 1,
+                allow_meta=allow_meta,
+            )
+        finally:
+            if previous_shelf is sentinel:
+                try:
+                    delattr(self, "_keyboard_choice_show_command_shelf")
+                except AttributeError:
+                    pass
+            else:
+                self._keyboard_choice_show_command_shelf = previous_shelf
 
     def render_choice_options(self, options: list[str], *, staggered: bool) -> None:
         pause = getattr(self, "pause_for_option_reveal", None)
@@ -1007,6 +1050,7 @@ class GameIOMixin:
                     continue
                 self.say(paged_prompt)
                 self.render_choice_options(labels, staggered=staggered)
+                self.render_command_shelf()
                 raw = self.read_input("> ").strip()
                 if self.handle_meta_command(raw):
                     continue
@@ -1032,6 +1076,7 @@ class GameIOMixin:
             if prompt:
                 self.say(prompt)
             self.render_choice_options(options, staggered=staggered)
+            self.render_command_shelf()
             raw = self.read_input("> ").strip()
             if self.handle_meta_command(raw):
                 continue
@@ -1271,14 +1316,19 @@ class GameIOMixin:
 
     def save_preview_menu_label(self, path: Path) -> str:
         preview = self.save_preview_payload(path)
-        kind_tag = f"[{preview['kind']}]"
+        kind = str(preview["kind"])
+        kind_tag = "[Auto]" if kind.lower() == "autosave" else f"[{kind}]"
         label = str(preview["label"])
-        if label.startswith(kind_tag):
-            label = label[len(kind_tag):].strip()
+        for prefix in (kind_tag, "[Autosave]", "[Manual]"):
+            if label.startswith(prefix):
+                label = label[len(prefix):].strip()
+                break
+        if kind.lower() == "autosave" and " | " in label:
+            label = label.split(" | ", 1)[0].strip()
         return (
             f"{kind_tag} {label} | {preview['act_label']} | "
-            f"{preview['scene_label']} | Party Lv {preview['party_level']} | "
-            f"{preview['playtime']} | {preview['objective']}"
+            f"{preview['scene_label']} | Lv {preview['party_level']} | "
+            f"{preview['playtime']}"
         )
 
     def save_preview_detail(self, path: Path) -> str:

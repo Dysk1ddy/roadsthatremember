@@ -1,6 +1,6 @@
 # Aethrune Story Content Summary
 
-Last updated: 2026-04-23
+Last updated: 2026-04-26
 
 This summary keeps the useful story map and drops the old module-style setting writeup. It is intentionally short; detailed implementation behavior should live in code, tests, or focused act references.
 
@@ -10,6 +10,9 @@ This summary keeps the useful story map and drops the old module-style setting w
 - Act II is playable as a scaffolded expedition campaign.
 - Act III is roadmap content.
 - The live route uses the map system and several save-safe legacy scene ids.
+- The journal now presents a decision ledger with major choices, current consequences, faction pressure, companion disposition, and unresolved clues.
+- Companion trust now has visible mechanical hooks: trusted assists, camp counsel, encounter openers, social tension, and refusal risk.
+- Terminal play now has context-aware command shelves, grouped combat actions, compact save previews, and pipe-safe output for scripted smoke tests.
 - `android_port/` is a legacy mirror and should be updated only after stable desktop retcon passes.
 
 ## Canon Direction
@@ -75,9 +78,14 @@ Internal mechanics keys can remain while public labels move Aethrune-facing:
 ## Primary Source Files
 
 - Story runtime: `dnd_game/gameplay/`
+- Terminal and prompt runtime: `dnd_game/gameplay/io.py`
+- Journal runtime: `dnd_game/gameplay/journal.py`
+- Companion trust runtime: `dnd_game/gameplay/companions.py`
 - Story data: `dnd_game/data/story/`
 - Quest data: `dnd_game/data/quests/`
 - Codex: `dnd_game/data/story/lore.py`
 - Public vocabulary adapters: `dnd_game/data/story/public_terms.py`
+- Android drift helper: `tools/sync_android_port.py`
+- Public prose lint: `tools/prose_lint.py`
 - Active retcon plan: `information/Retcon story/Plans/AETHRUNE_RETCON_IMPLEMENTATION_PLAN.md`
 - Cleanup audit: `information/Retcon story/Plans/IP_CLEANUP_PLAN.md`

@@ -1,6 +1,6 @@
 # Companion Camp Banter Branching Draft
 
-> Cleanup note: The implemented Act 1 camp banter topics from this draft are now compiled in `ACT1_DIALOGUE_REFERENCE.md`. Keep this file as historical design context; update the compiled reference for current Act 1 dialogue behavior.
+> Cleanup note: The implemented Act 1 camp banter topics from this draft are now compiled in `ACT1_DIALOGUE_REFERENCE.md`. The runtime now supports campfire banter, companion talks, and trusted camp counsel. Keep this file as historical design context; update the compiled reference for current Act 1 dialogue behavior.
 
 This draft expands camp from only player-to-companion talks into optional companion-to-companion scenes. The goal is to let the party process route pressure, personal quests, Varyn's visible system, and the later hidden-villain trail without revealing the secret architect before the planned Act 3 midpoint.
 
@@ -14,13 +14,14 @@ This draft expands camp from only player-to-companion talks into optional compan
 
 ## Current Runtime Fit
 
-The current camp menu supports one-on-one companion talks through each companion profile's `camp_topics`. Companion banter can be added as a separate registry instead of overloading those talks.
+The current camp menu supports one-on-one companion talks through each companion profile's `camp_topics`, trusted camp counsel from high-disposition companions, and companion-to-companion scenes through the camp banter registry.
 
-Suggested menu text:
+Runtime menu text:
 
 - `Listen around the campfire`
 - Opens the highest-priority available banter scene, or a short list if multiple are available.
-- Banters should be one-shot by default, with rare recurring "state check" variants for major act transitions.
+- Banters are one-shot by default, with rare recurring "state check" variants for major act transitions.
+- Great trust can expose companion counsel that adds a small story-skill modifier during camp planning.
 
 Suggested data shape:
 
@@ -46,6 +47,7 @@ Optional branch helpers:
 - `requires_metric`: Act 2 pressure thresholds such as high `Whisper Pressure` or low `Town Stability`.
 - `variant_flags`: pick replacement lines when a prior choice happened.
 - `outcomes`: small relationship changes only when the banter contains a real disagreement.
+- `camp_counsel`: trusted support keyed to a skill, value, and short line in the companion profile.
 
 ## Secret-Villain Guardrail
 
@@ -674,12 +676,12 @@ Variant C, if Elira carries the shrine bell motif:
 
 ## Implementation Slices
 
-1. Add a companion banter registry and availability helper.
-2. Add a camp menu option that chooses one available banter and marks it seen.
-3. Implement Act 1 early banters for Elira, Tolan, Bryn, Kaelis, and Rhogar.
-4. Add Act 1 late banters keyed to Ashfall, Tresendar, Varyn, and victory tier.
-5. Add Act 2 banters for Nim and Irielle once those companions are implemented.
-6. Add Act 3 reveal banters only after the `act3_malzurath_revealed` flag exists.
+1. Implemented: companion banter registry and availability helper.
+2. Implemented: camp menu option that chooses available banter and marks it seen.
+3. Implemented baseline: Act 1 early banters for Elira, Tolan, Bryn, Kaelis, and Rhogar.
+4. Expand next: Act 1 late banters keyed to Ashfall, Duskmere, Varyn, and victory tier.
+5. Expand next: Act 2 banters for Nim and Irielle as their route states settle.
+6. Hold: Act 3 reveal banters until the `act3_malzurath_revealed` flag exists.
 
 ## Priority Banter Flags
 
