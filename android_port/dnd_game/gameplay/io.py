@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import re
 import textwrap
+import time
 
 from ..models import GameState
 from ..ui.colors import ANSI_RE, colorize, rarity_color
@@ -219,8 +220,19 @@ class GameIOMixin:
         safe_name = re.sub(r"[^A-Za-z0-9_-]+", "_", slot_name).strip("_") or "save"
         return self.save_dir / f"{safe_name}.json"
 
+    def refresh_playtime_seconds(self) -> None:
+        if self.state is None:
+            self._playtime_checkpoint = time.monotonic()
+            return
+        now = time.monotonic()
+        previous = float(getattr(self, "_playtime_checkpoint", now))
+        elapsed = max(0.0, now - previous)
+        self.state.playtime_seconds = max(0.0, float(getattr(self.state, "playtime_seconds", 0.0) or 0.0) + elapsed)
+        self._playtime_checkpoint = now
+
     def save_game(self, *, slot_name: str) -> Path:
         assert self.state is not None
+        self.refresh_playtime_seconds()
         path = self.save_path_for_slot_name(slot_name)
         with path.open("w", encoding="utf-8") as handle:
             json.dump(self.state.to_dict(), handle, indent=2)
@@ -236,6 +248,7 @@ class GameIOMixin:
         with path.open("r", encoding="utf-8") as handle:
             data = json.load(handle)
         self.state = GameState.from_dict(data)
+        self._playtime_checkpoint = time.monotonic()
         self.ensure_state_integrity()
         self.say(f"Loaded {self.save_display_label(path)}.")
 

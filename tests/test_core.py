@@ -12,6 +12,7 @@ from unittest.mock import patch
 
 import dnd_game.gameplay.base as gameplay_base
 import dnd_game.gameplay.audio_backend as audio_backend
+from dnd_game.cli import ScriptedInput, build_argument_parser, create_game_from_args, plain_output_text, resolve_save_path
 from dnd_game.content import (
     BACKGROUNDS,
     CLASSES,
@@ -247,6 +248,55 @@ class CoreTests(unittest.TestCase):
     def test_game_disables_music_for_custom_io_by_default(self) -> None:
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(900312))
         self.assertFalse(game.music_enabled)
+
+    def test_plain_cli_flag_disables_presentation_and_audio_surfaces(self) -> None:
+        parser = build_argument_parser()
+        args = parser.parse_args(["--plain", "--no-animation", "--no-audio"])
+        game = create_game_from_args(args)
+
+        self.assertFalse(game.can_emit_rich_output())
+        self.assertFalse(game.animate_dice)
+        self.assertFalse(game.pace_output)
+        self.assertFalse(game.type_dialogue)
+        self.assertFalse(game.staggered_reveals_enabled)
+        self.assertFalse(game.music_enabled)
+        self.assertFalse(game.sound_effects_enabled)
+
+    def test_plain_output_text_strips_ansi_and_replaces_rich_glyphs(self) -> None:
+        rendered = plain_output_text("\x1b[93m┌──█┐\x1b[0m “route”")
+
+        self.assertEqual(rendered, '+--#+ "route"')
+
+    def test_scripted_input_exhaustion_becomes_game_interrupt(self) -> None:
+        scripted = ScriptedInput(["5"])
+        self.assertEqual(scripted("> "), "5")
+        game = TextDnDGame(input_fn=scripted, output_fn=lambda _: None, rng=random.Random(90051))
+
+        with self.assertRaises(gameplay_base.GameInterrupted):
+            game.read_input("> ")
+
+    def test_resolve_save_path_accepts_slot_and_filename(self) -> None:
+        save_dir = Path.cwd() / "tests_output" / "cli_save_lookup"
+        save_dir.mkdir(parents=True, exist_ok=True)
+        player = build_character(
+            name="Vale",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, save_dir=save_dir, rng=random.Random(90052))
+        game.state = GameState(player=player, current_scene="phandalin_hub")
+        save_path = game.save_game(slot_name="campaign")
+
+        self.assertEqual(resolve_save_path(game, "campaign"), save_path)
+        self.assertEqual(resolve_save_path(game, "campaign.json"), save_path)
+
+        save_path.unlink(missing_ok=True)
+        settings_path = save_dir / "settings.json"
+        settings_path.unlink(missing_ok=True)
+        save_dir.rmdir()
 
     def test_music_contexts_use_named_subfolder_assets(self) -> None:
         self.assertEqual(MUSIC_CONTEXT_FOLDERS["boss_combat"], ("Miniboss combat",))
@@ -6460,6 +6510,94 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(restored.inventory["potion_healing"], 2)
         self.assertEqual(restored.short_rests_remaining, 1)
         Path(path).unlink(missing_ok=True)
+
+    def test_save_metadata_preview_includes_campaign_context(self) -> None:
+        player = build_character(
+            name="Iri",
+            race="Human",
+            class_name="Wizard",
+            background="Sage",
+            base_ability_scores={"STR": 8, "DEX": 14, "CON": 12, "INT": 15, "WIS": 13, "CHA": 10},
+            class_skill_choices=["Arcana", "Investigation"],
+        )
+        companion = create_bryn_underbough()
+        companion.level = 3
+        save_dir = Path.cwd() / "tests_output"
+        save_dir.mkdir(exist_ok=True)
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, save_dir=save_dir, rng=random.Random(3012))
+        game.state = GameState(
+            player=player,
+            companions=[companion],
+            current_act=1,
+            current_scene="phandalin_hub",
+            playtime_seconds=125.0,
+        )
+        game._playtime_checkpoint = 100.0
+        path = save_dir / "campaign_preview.json"
+        autosave_path = save_dir / f"{game.AUTOSAVE_PREFIX}preview_checkpoint.json"
+        try:
+            with patch("dnd_game.gameplay.io.time.monotonic", return_value=100.0):
+                path = game.save_game(slot_name="campaign_preview")
+
+            loaded = json.loads(Path(path).read_text(encoding="utf-8"))
+            metadata = loaded["save_metadata"]
+            self.assertEqual(metadata["kind"], "manual")
+            self.assertEqual(metadata["act_label"], "Act I")
+            self.assertEqual(metadata["scene_label"], "Iron Hollow")
+            self.assertEqual(metadata["party_level"], 3)
+            self.assertEqual(metadata["playtime_seconds"], 125)
+            self.assertEqual(metadata["last_objective"], "Choose which pressure in Iron Hollow to answer next.")
+
+            menu_label = game.save_preview_menu_label(Path(path))
+            self.assertIn("[Manual] campaign_preview | Act I | Iron Hollow | Party Lv 3 | 2m 05s", menu_label)
+            self.assertIn("Choose which pressure in Iron Hollow to answer next.", menu_label)
+            detail = game.save_preview_detail(Path(path))
+            self.assertIn("Type: Manual", detail)
+            self.assertIn("Last objective: Choose which pressure in Iron Hollow to answer next.", detail)
+
+            with patch("dnd_game.gameplay.io.time.monotonic", return_value=100.0):
+                autosave_path = game.save_game(slot_name=f"{game.AUTOSAVE_PREFIX}preview_checkpoint")
+            autosave_data = json.loads(Path(autosave_path).read_text(encoding="utf-8"))
+            self.assertEqual(autosave_data["save_metadata"]["kind"], "autosave")
+            autosave_label = game.save_preview_menu_label(Path(autosave_path))
+            self.assertIn("[Autosave] preview checkpoint | Act I | Iron Hollow", autosave_label)
+            self.assertNotIn("[Autosave] [Autosave]", autosave_label)
+        finally:
+            Path(path).unlink(missing_ok=True)
+            Path(autosave_path).unlink(missing_ok=True)
+
+    def test_save_preview_falls_back_for_legacy_save_files(self) -> None:
+        player = build_character(
+            name="Iri",
+            race="Human",
+            class_name="Wizard",
+            background="Sage",
+            base_ability_scores={"STR": 8, "DEX": 14, "CON": 12, "INT": 15, "WIS": 13, "CHA": 10},
+            class_skill_choices=["Arcana", "Investigation"],
+        )
+        save_dir = Path.cwd() / "tests_output"
+        save_dir.mkdir(exist_ok=True)
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, save_dir=save_dir, rng=random.Random(3013))
+        legacy_state = GameState(
+            player=player,
+            current_act=2,
+            current_scene="act2_expedition_hub",
+            playtime_seconds=61.0,
+        )
+        legacy_path = save_dir / "legacy_preview.json"
+        try:
+            legacy_path.write_text(json.dumps(legacy_state.to_dict(), indent=2), encoding="utf-8")
+
+            preview = game.save_preview_payload(legacy_path)
+
+            self.assertEqual(preview["kind"], "Manual")
+            self.assertEqual(preview["act_label"], "Act II")
+            self.assertEqual(preview["scene_label"], "Act II Expedition Hub")
+            self.assertEqual(preview["party_level"], 1)
+            self.assertEqual(preview["playtime"], "1m 01s")
+            self.assertEqual(preview["objective"], "Pick the next Act II lead and keep the expedition moving.")
+        finally:
+            legacy_path.unlink(missing_ok=True)
 
     def test_inline_save_keeps_existing_file_when_overwrite_declined(self) -> None:
         player = build_character(

@@ -22,6 +22,29 @@ from .constants import MENU_PAGE_SIZE
 
 
 class GameIOMixin:
+    def stdio_is_interactive(self) -> bool:
+        try:
+            stdin_ready = not hasattr(sys.stdin, "isatty") or sys.stdin.isatty()
+            stdout_ready = not hasattr(sys.stdout, "isatty") or sys.stdout.isatty()
+        except Exception:
+            return False
+        return bool(stdin_ready and stdout_ready)
+
+    def output_supports_unicode(self) -> bool:
+        if bool(getattr(self, "_plain_output", False)):
+            return False
+        if self.output_fn is not print:
+            return True
+        encoding = getattr(sys.stdout, "encoding", None) or "utf-8"
+        try:
+            "┌─│└█".encode(encoding)
+        except (LookupError, UnicodeEncodeError):
+            return False
+        return True
+
+    def can_emit_rich_output(self) -> bool:
+        return self.rich_enabled() and self.output_supports_unicode()
+
     def style_text(self, text: object, color: str) -> str:
         return colorize(text, color)
 
@@ -62,7 +85,7 @@ class GameIOMixin:
         return RICH_AVAILABLE and all(component is not None for component in (Group, Panel, Text, box))
 
     def should_use_rich_ui(self) -> bool:
-        return self.rich_enabled() and bool(getattr(self, "_interactive_output", False))
+        return self.can_emit_rich_output() and bool(getattr(self, "_interactive_output", False))
 
     def rich_console_width(self) -> int:
         fallback = 108 if getattr(self, "_interactive_output", False) else 100
@@ -123,7 +146,7 @@ class GameIOMixin:
         return lines
 
     def emit_rich(self, renderable, *, width: int | None = None) -> bool:
-        if not self.rich_enabled():
+        if not self.can_emit_rich_output():
             return False
         render_width = self.terminal_render_width(width)
         rendered_lines = render_rich_lines(
@@ -235,7 +258,7 @@ class GameIOMixin:
         return text_from_ansi(text)
 
     def rich_title_screen_enabled(self) -> bool:
-        return self.rich_enabled() and Columns is not None and Table is not None
+        return self.can_emit_rich_output() and Columns is not None and Table is not None
 
     def title_screen_save_summary(self) -> tuple[str, str]:
         saves = self.loadable_save_paths()
@@ -510,7 +533,7 @@ class GameIOMixin:
         return self.keyboard_choice_menu_supported()
 
     def resize_aware_input_supported(self) -> bool:
-        return bool(getattr(self, "_interactive_output", False) and msvcrt is not None)
+        return bool(getattr(self, "_interactive_output", False) and self.stdio_is_interactive() and msvcrt is not None)
 
     def clear_interactive_screen(self, *, clear_scrollback: bool = False) -> None:
         if self.output_fn is print:
@@ -1075,11 +1098,84 @@ class GameIOMixin:
         safe_name = re.sub(r"[^A-Za-z0-9_-]+", "_", slot_name).strip("_") or "save"
         return self.save_dir / f"{safe_name}.json"
 
+    def refresh_playtime_seconds(self) -> None:
+        if self.state is None:
+            self._playtime_checkpoint = time.monotonic()
+            return
+        now = time.monotonic()
+        previous = float(getattr(self, "_playtime_checkpoint", now))
+        elapsed = max(0.0, now - previous)
+        self.state.playtime_seconds = max(0.0, float(getattr(self.state, "playtime_seconds", 0.0) or 0.0) + elapsed)
+        self._playtime_checkpoint = now
+
+    def format_playtime(self, seconds: object) -> str:
+        try:
+            total_seconds = max(0, int(float(seconds)))
+        except (TypeError, ValueError):
+            total_seconds = 0
+        hours, remainder = divmod(total_seconds, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        if hours:
+            return f"{hours}h {minutes:02d}m"
+        if minutes:
+            return f"{minutes}m {seconds:02d}s"
+        return f"{seconds}s"
+
+    def party_level_from_save_data(self, data: dict[str, object]) -> int:
+        companions = data.get("companions", [])
+        members = [data.get("player"), *(companions if isinstance(companions, list) else [])]
+        levels: list[int] = []
+        for member in members:
+            if not isinstance(member, dict):
+                continue
+            try:
+                levels.append(int(member.get("level", 1)))
+            except (TypeError, ValueError):
+                continue
+        return max(levels or [1])
+
+    def scene_label_from_key(self, scene_key: object) -> str:
+        raw_scene = str(scene_key or "")
+        scene_labels = getattr(self, "SCENE_LABELS", {})
+        return scene_labels.get(raw_scene, raw_scene.replace("_", " ").title() or "Unknown")
+
+    def act_label_from_number(self, act_number: object) -> str:
+        try:
+            numeric = int(act_number)
+        except (TypeError, ValueError):
+            numeric = 1
+        act_labels = getattr(self, "ACT_LABELS", {})
+        return f"Act {act_labels.get(numeric, numeric)}"
+
+    def current_save_metadata(self, *, slot_name: str) -> dict[str, object]:
+        assert self.state is not None
+        scene_key = self.state.current_scene
+        objective = ""
+        objective_getter = getattr(self, "hud_objective_label", None)
+        if callable(objective_getter):
+            objective = str(objective_getter())
+        if not objective:
+            objective = str(getattr(self, "SCENE_OBJECTIVES", {}).get(scene_key, "Press on."))
+        return {
+            "kind": "autosave" if slot_name.startswith(getattr(self, "AUTOSAVE_PREFIX", "autosave__")) else "manual",
+            "saved_at": datetime.now().isoformat(timespec="seconds"),
+            "act": self.state.current_act,
+            "act_label": self.act_label_from_number(self.state.current_act),
+            "scene": scene_key,
+            "scene_label": self.scene_label_from_key(scene_key),
+            "party_level": max(member.level for member in self.state.party_members()),
+            "playtime_seconds": int(float(getattr(self.state, "playtime_seconds", 0.0) or 0.0)),
+            "last_objective": objective,
+        }
+
     def save_game(self, *, slot_name: str) -> Path:
         assert self.state is not None
+        self.refresh_playtime_seconds()
         path = self.save_path_for_slot_name(slot_name)
+        payload = self.state.to_dict()
+        payload["save_metadata"] = self.current_save_metadata(slot_name=slot_name)
         with path.open("w", encoding="utf-8") as handle:
-            json.dump(self.state.to_dict(), handle, indent=2)
+            json.dump(payload, handle, indent=2)
         return path
 
     def is_autosave_path(self, path: Path) -> bool:
@@ -1142,10 +1238,65 @@ class GameIOMixin:
         )
         return f"[Autosave] {label.title()} | {timestamp}"
 
+    def read_save_data_for_preview(self, path: Path) -> dict[str, object]:
+        try:
+            with path.open("r", encoding="utf-8") as handle:
+                data = json.load(handle)
+        except (OSError, json.JSONDecodeError):
+            return {}
+        return data if isinstance(data, dict) else {}
+
+    def save_preview_payload(self, path: Path) -> dict[str, object]:
+        data = self.read_save_data_for_preview(path)
+        metadata = data.get("save_metadata", {})
+        if not isinstance(metadata, dict):
+            metadata = {}
+        scene_key = metadata.get("scene", data.get("current_scene", ""))
+        act = metadata.get("act", data.get("current_act", 1))
+        objective = metadata.get("last_objective") or getattr(self, "SCENE_OBJECTIVES", {}).get(str(scene_key), "Press on.")
+        playtime_seconds = metadata.get("playtime_seconds", data.get("playtime_seconds", 0))
+        try:
+            party_level = int(metadata.get("party_level") or self.party_level_from_save_data(data))
+        except (TypeError, ValueError):
+            party_level = self.party_level_from_save_data(data)
+        return {
+            "label": self.save_display_label(path),
+            "kind": str(metadata.get("kind") or ("autosave" if self.is_autosave_path(path) else "manual")).title(),
+            "act_label": str(metadata.get("act_label") or self.act_label_from_number(act)),
+            "scene_label": str(metadata.get("scene_label") or self.scene_label_from_key(scene_key)),
+            "party_level": party_level,
+            "playtime": self.format_playtime(playtime_seconds),
+            "objective": str(objective),
+        }
+
+    def save_preview_menu_label(self, path: Path) -> str:
+        preview = self.save_preview_payload(path)
+        kind_tag = f"[{preview['kind']}]"
+        label = str(preview["label"])
+        if label.startswith(kind_tag):
+            label = label[len(kind_tag):].strip()
+        return (
+            f"{kind_tag} {label} | {preview['act_label']} | "
+            f"{preview['scene_label']} | Party Lv {preview['party_level']} | "
+            f"{preview['playtime']} | {preview['objective']}"
+        )
+
+    def save_preview_detail(self, path: Path) -> str:
+        preview = self.save_preview_payload(path)
+        return (
+            f"Type: {preview['kind']}\n"
+            f"Act: {preview['act_label']}\n"
+            f"Scene: {preview['scene_label']}\n"
+            f"Party level: {preview['party_level']}\n"
+            f"Playtime: {preview['playtime']}\n"
+            f"Last objective: {preview['objective']}"
+        )
+
     def load_save_path(self, path: Path) -> None:
         with path.open("r", encoding="utf-8") as handle:
             data = json.load(handle)
         self.state = GameState.from_dict(data)
+        self._playtime_checkpoint = time.monotonic()
         self.ensure_state_integrity()
         self._compact_hud_last_scene_key = None
         refresh_scene_music = getattr(self, "refresh_scene_music", None)
@@ -1174,7 +1325,7 @@ class GameIOMixin:
                 return False
             choice = self.choose(
                 "Save Files",
-                [self.save_display_label(path) for path in saves] + ["Back"],
+                [self.save_preview_menu_label(path) for path in saves] + ["Back"],
                 allow_meta=False,
                 sticky_trailing_options=1,
             )
@@ -1182,6 +1333,7 @@ class GameIOMixin:
                 return False
             selected = saves[choice - 1]
             label = self.save_display_label(selected)
+            self.say(self.save_preview_detail(selected))
             action = self.choose(
                 f"{label}",
                 [

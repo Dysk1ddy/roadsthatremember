@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import time
+
 from ..data.story.background_openings import BACKGROUND_STARTS, background_start_summary
 from ..data.story.lore import BACKGROUND_LORE, CLASS_LORE, RACE_LORE
 from ..content import (
@@ -107,6 +109,7 @@ class CharacterCreationMixin:
             },
             short_rests_remaining=2,
         )
+        self._playtime_checkpoint = time.monotonic()
         self.state.player.inventory.clear()
         self.ensure_state_integrity()
         start_note = BACKGROUND_STARTS.get(character.background, {}).get("arrival_note", "")

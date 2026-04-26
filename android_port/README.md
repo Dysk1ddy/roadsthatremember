@@ -30,6 +30,22 @@ python -m pip install -r requirements.txt
 python main.py
 ```
 
+## Syncing The Engine Copy
+
+Desktop `dnd_game/` is the source for shared game code. From the repo root, check drift with:
+
+```powershell
+python tools\sync_android_port.py
+```
+
+Copy changed and missing shared files into the Android package with:
+
+```powershell
+python tools\sync_android_port.py --apply
+```
+
+Review stale Android files by hand before deleting them.
+
 ## Packaging An APK Later
 
 The included `buildozer.spec` is a starter config for packaging.

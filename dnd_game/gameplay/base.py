@@ -265,15 +265,18 @@ class GameBase:
         type_dialogue: bool | None = None,
         play_music: bool | None = None,
         play_sfx: bool | None = None,
+        staggered_reveals: bool | None = None,
+        plain_output: bool = False,
     ) -> None:
         self.input_fn = input_fn
         self.output_fn = output_fn
+        self._plain_output = bool(plain_output)
         self._uses_default_save_dir = save_dir is None
         self.save_dir = Path(save_dir or Path.cwd() / "saves")
         self.save_dir.mkdir(parents=True, exist_ok=True)
         self.settings_path = self.save_dir / self.SETTINGS_FILENAME
         self.rng = rng or random.Random()
-        self._interactive_output = input_fn is input and output_fn is print
+        self._interactive_output = bool(input_fn is input and output_fn is print and not self._plain_output)
         self.autosaves_enabled = self._interactive_output
         should_apply_persisted_settings = self._interactive_output or not self._uses_default_save_dir
         persisted_settings = self.load_persisted_settings() if should_apply_persisted_settings else {}
@@ -302,7 +305,11 @@ class GameBase:
             if type_dialogue is None
             else type_dialogue
         )
-        requested_staggered_reveals = persisted_settings.get("staggered_reveals_enabled", default_presentation)
+        requested_staggered_reveals = (
+            persisted_settings.get("staggered_reveals_enabled", default_presentation)
+            if staggered_reveals is None
+            else staggered_reveals
+        )
         self._dice_animation_mode_preference = (
             requested_dice_mode if requested_dice_mode in self.DICE_ANIMATION_MODES else "off"
         )
@@ -319,7 +326,13 @@ class GameBase:
         self.animate_dice = self._dice_animations_preference
         self.apply_dice_animation_mode_profile()
         self.pace_output = self._pacing_pauses_preference
-        self.type_dialogue = bool(self._typed_dialogue_preference and output_fn is print)
+        output_supports_unicode = getattr(self, "output_supports_unicode", None)
+        self.type_dialogue = bool(
+            self._typed_dialogue_preference
+            and output_fn is print
+            and not self._plain_output
+            and (output_supports_unicode() if callable(output_supports_unicode) else True)
+        )
         self.staggered_reveals_enabled = self._staggered_reveals_preference
         self._dice_animation_width = 0
         self._choice_pause_seconds = 1.0
@@ -343,6 +356,7 @@ class GameBase:
         self._pending_act1_dungeon_movement_text = ""
         self._pending_act2_dungeon_map_refresh = False
         self._pending_act2_dungeon_movement_text = ""
+        self._playtime_checkpoint = time.monotonic()
         self._music_enabled_preference = bool(
             persisted_settings.get(
                 "music_enabled",
@@ -681,6 +695,9 @@ class GameBase:
         except KeyboardInterrupt as exc:
             self.output_fn("")
             raise GameInterrupted() from exc
+        except EOFError as exc:
+            self.output_fn("")
+            raise GameInterrupted() from exc
 
     def pause_for_choice_resolution(self) -> None:
         if self.pace_output:
@@ -725,7 +742,9 @@ class GameBase:
         filled = max(0, min(width, filled))
         empty = width - filled
         resolved_color = fill_color_resolver(clamped, max_value) if fill_color_resolver is not None else fill_color or "white"
-        bar = self.style_text("█" * filled, resolved_color) + (" " * empty)
+        output_supports_unicode = getattr(self, "output_supports_unicode", None)
+        fill_character = "█" if (output_supports_unicode() if callable(output_supports_unicode) else True) else "#"
+        bar = self.style_text(fill_character * filled, resolved_color) + (" " * empty)
         digits = len(str(max_value))
         return f"{label} [{bar}] {clamped:>{digits}}/{max_value}"
 

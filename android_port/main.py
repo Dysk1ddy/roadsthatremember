@@ -146,8 +146,10 @@ class AndroidTextDnDGame(TextDnDGame):
         *,
         allow_meta: bool = True,
         staggered: bool = False,
+        show_hud: bool = True,
+        sticky_trailing_options: int = 0,
     ) -> int:
-        del allow_meta, staggered
+        del allow_meta, staggered, show_hud, sticky_trailing_options
         if not options:
             raise ValueError("Choice lists must contain at least one option.")
 

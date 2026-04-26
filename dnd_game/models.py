@@ -264,6 +264,7 @@ class GameState:
     gold: int = 0
     inventory: dict[str, int] = field(default_factory=dict)
     short_rests_remaining: int = 2
+    playtime_seconds: float = 0.0
 
     def party_members(self) -> list[Character]:
         return [self.player, *self.companions]
@@ -287,6 +288,7 @@ class GameState:
             "gold": self.gold,
             "inventory": dict(self.inventory),
             "short_rests_remaining": self.short_rests_remaining,
+            "playtime_seconds": float(self.playtime_seconds),
         }
 
     @classmethod
@@ -309,4 +311,5 @@ class GameState:
             gold=data.get("gold", 0),
             inventory=dict(data.get("inventory", {})),
             short_rests_remaining=data.get("short_rests_remaining", 2),
+            playtime_seconds=float(data.get("playtime_seconds", 0.0) or 0.0),
         )

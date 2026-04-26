@@ -1,8 +1,5 @@
-from dnd_game.game import TextDnDGame
+from dnd_game.cli import main
 
 
 if __name__ == "__main__":
-    try:
-        TextDnDGame().run()
-    except KeyboardInterrupt:
-        print("\nInput interrupted. Exiting cleanly.")
+    raise SystemExit(main())

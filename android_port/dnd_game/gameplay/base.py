@@ -95,6 +95,7 @@ class GameBase:
             except Exception:
                 self.animate_dice = False
         self.state: GameState | None = None
+        self._playtime_checkpoint = time.monotonic()
         self._pending_story_check_option: tuple[str, str] | None = None
         self._in_combat = False
         self._scene_handlers = {

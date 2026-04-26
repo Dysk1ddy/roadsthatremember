@@ -65,6 +65,14 @@ python main.py
 
 `rich` is optional for gameplay logic but recommended for readable map and panel output.
 
+Smoke-test friendly options:
+
+```powershell
+python main.py --plain --no-animation --no-audio --scripted-input scripted_input.txt
+python main.py --plain --no-animation --no-audio --load-save Vale_act1_complete
+python tools/prose_lint.py README.md
+```
+
 ## AI-Assisted Writing
 
 The repo includes an optional OpenAI-backed drafting tool for scene prose, dialogue, and lore revision. It is for authoring support only; runtime story logic stays deterministic in Python and data files.
