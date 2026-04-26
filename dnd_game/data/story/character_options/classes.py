@@ -118,7 +118,7 @@ CLASSES = {
         "weapon": Weapon(name="Rapier", damage="1d8", ability="FINESSE", finesse=True),
         "armor": Armor(name="Leather Armor", base_ac=11),
         "shield": False,
-        "features": ["sneak_attack", "expertise"],
+        "features": ["sneak_attack", "expertise", "rogue_edge", "rogue_mark", "rogue_satchel", "rogue_poison"],
         "resources": {},
         "spellcasting_ability": None,
     },
@@ -161,6 +161,19 @@ CLASSES = {
         "resources": {},
         "spellcasting_ability": "INT",
     },
+    "Warrior": {
+        "description": "Warriors hold ground with reach, leverage, practiced shell, and the nerve to make enemies spend force where it helps the party.",
+        "hit_die": 10,
+        "saving_throws": ["STR", "CON"],
+        "skill_choices": ["Acrobatics", "Animal Handling", "Athletics", "History", "Insight", "Intimidation", "Perception", "Survival"],
+        "skill_picks": 2,
+        "weapon": Weapon(name="Longsword", damage="1d8", ability="STR", properties=["versatile"]),
+        "armor": Armor(name="Chain Mail", base_ac=16, dex_cap=0, heavy=True),
+        "shield": True,
+        "features": ["warrior_grit", "warrior_guard", "warrior_shove", "weapon_read"],
+        "resources": {"grit": 1},
+        "spellcasting_ability": None,
+    },
 }
 
 CLASS_LEVEL_PROGRESSION = {
@@ -176,6 +189,7 @@ CLASS_LEVEL_PROGRESSION = {
     "Sorcerer": {2: {"features": [("Flux Overflow", "Your offensive channels gain +1 damage.")], "feature_ids": ["arcane_overflow"], "equipment_bonuses": {"spell_damage": 1}}, 3: {"features": [("Warped Grace", "Gain +1 initiative and +1 Charisma resists.")], "feature_ids": ["warped_grace"], "equipment_bonuses": {"initiative": 1, "CHA_save": 1}}, 4: {"features": [("Focused Will", "Gain +1 channel strike checks.")], "feature_ids": ["focused_will"], "equipment_bonuses": {"spell_attack": 1}}},
     "Warlock": {2: {"features": [("Patron's Sting", "Your warlock offense gains +1 channel damage.")], "feature_ids": ["patrons_sting"], "equipment_bonuses": {"spell_damage": 1}}, 3: {"features": [("Unnerving Presence", "Gain +1 Intimidation and +1 Wisdom resists.")], "feature_ids": ["unnerving_presence"], "equipment_bonuses": {"Intimidation": 1, "WIS_save": 1}}, 4: {"features": [("Void Precision", "Gain +1 channel strike checks.")], "feature_ids": ["eldritch_precision"], "equipment_bonuses": {"spell_attack": 1}}},
     "Wizard": {2: {"features": [("Sculpted Minor Channels", "Your scripted minor channels gain +1 damage.")], "feature_ids": ["sculpted_cantrips"], "equipment_bonuses": {"spell_damage": 1}}, 3: {"features": [("Scriptguard", "Gain +1 to Intelligence resists and initiative.")], "feature_ids": ["spellguard"], "equipment_bonuses": {"INT_save": 1, "initiative": 1}}, 4: {"features": [("Channel Focus", "Gain +1 channel strike checks.")], "feature_ids": ["arcane_focus"], "equipment_bonuses": {"spell_attack": 1}}},
+    "Warrior": {2: {"features": [("Hard Lesson", "The first wound or glancing hit of a fight teaches fast. Your Grit maximum follows Endurance and training.")], "feature_ids": ["hard_lesson"]}, 3: {"features": [("Line Fighter", "Gain +1 Stability while conscious and guarding space for the party.")], "feature_ids": ["line_fighter"], "equipment_bonuses": {"stability": 1}}, 4: {"features": [("Weapon Familiarity", "Gain +1 to weapon strike checks and weapon damage.")], "feature_ids": ["weapon_familiarity"], "equipment_bonuses": {"attack": 1, "damage": 1}}},
 }
 
 

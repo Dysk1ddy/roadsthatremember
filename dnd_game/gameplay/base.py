@@ -1886,7 +1886,17 @@ class GameBase:
             off_hand_item = ITEMS[off_hand_id]
             if off_hand_item.shield_bonus and member.weapon.hands_required == 1:
                 member.shield = True
-                member.gear_bonuses["AC"] = member.gear_bonuses.get("AC", 0) + max(0, off_hand_item.shield_bonus - 2)
+                shield_defense = int(getattr(off_hand_item, "shield_defense_percent", 0))
+                if shield_defense <= 0:
+                    shield_defense = 5 + max(0, off_hand_item.shield_bonus - 2) * 5
+                member.gear_bonuses["shield_defense_percent"] = (
+                    member.gear_bonuses.get("shield_defense_percent", 0) + shield_defense
+                )
+                raised_shield = int(getattr(off_hand_item, "raised_shield_defense_percent", 0))
+                if raised_shield > 0:
+                    member.gear_bonuses["raised_shield_defense_percent"] = (
+                        member.gear_bonuses.get("raised_shield_defense_percent", 0) + raised_shield
+                    )
             elif off_hand_item.weapon is not None and member.weapon.hands_required == 1 and off_hand_item.weapon.hands_required == 1:
                 pass
             else:
@@ -1901,8 +1911,15 @@ class GameBase:
                 member.gear_bonuses[skill] = member.gear_bonuses.get(skill, 0) + bonus
             for save_key, bonus in (item.save_bonuses or {}).items():
                 member.gear_bonuses[save_key] = member.gear_bonuses.get(save_key, 0) + bonus
-            if item.ac_bonus:
-                member.gear_bonuses["AC"] = member.gear_bonuses.get("AC", 0) + item.ac_bonus
+            if item.defense_percent:
+                member.gear_bonuses["defense_percent"] = member.gear_bonuses.get("defense_percent", 0) + item.defense_percent
+            elif item.ac_bonus:
+                member.gear_bonuses["defense_percent"] = member.gear_bonuses.get("defense_percent", 0) + item.ac_bonus * 5
+            if item.defense_cap_percent:
+                member.gear_bonuses["defense_cap_percent"] = max(
+                    member.gear_bonuses.get("defense_cap_percent", 0),
+                    item.defense_cap_percent,
+                )
             if item.attack_bonus:
                 member.gear_bonuses["attack"] = member.gear_bonuses.get("attack", 0) + item.attack_bonus
             if item.damage_bonus:

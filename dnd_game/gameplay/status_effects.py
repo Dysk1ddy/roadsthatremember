@@ -3,6 +3,17 @@ from __future__ import annotations
 from ..dice import roll
 
 
+STANCE_STATUS_BY_KEY = {
+    "guard": "stance_guard",
+    "brace": "stance_brace",
+    "mobile": "stance_mobile",
+    "aggressive": "stance_aggressive",
+    "aim": "stance_aim",
+    "press": "stance_press",
+}
+STANCE_STATUS_NAMES = tuple(STANCE_STATUS_BY_KEY.values())
+
+
 STATUS_DEFINITIONS: dict[str, dict[str, object]] = {
     "surprised": {"name": "Surprised", "combat_only": True},
     "blinded": {"name": "Blinded", "combat_only": True},
@@ -64,6 +75,67 @@ STATUS_DEFINITIONS: dict[str, dict[str, object]] = {
         "ac_bonus": 1,
         "defense_bonus_percent": 5,
         "avoidance_bonus": 1,
+    },
+    "guard_stance": {
+        "name": "Guard Stance",
+        "combat_only": True,
+        "defense_bonus_percent": 20,
+        "avoidance_bonus": 1,
+        "stability_bonus": 2,
+        "attack_penalty": 2,
+    },
+    "stance_guard": {
+        "name": "Guard Stance",
+        "combat_only": True,
+        "defense_bonus_percent": 20,
+        "avoidance_bonus": 1,
+        "stability_bonus": 2,
+        "attack_penalty": 2,
+    },
+    "stance_brace": {
+        "name": "Brace Stance",
+        "combat_only": True,
+        "defense_bonus_percent": 10,
+        "stability_bonus": 4,
+        "avoidance_penalty": 1,
+        "attack_penalty": 1,
+    },
+    "stance_mobile": {
+        "name": "Mobile Stance",
+        "combat_only": True,
+        "defense_bonus_percent": -5,
+        "avoidance_bonus": 2,
+        "stability_penalty": 1,
+        "flee_bonus": 2,
+    },
+    "stance_aggressive": {
+        "name": "Aggressive Stance",
+        "combat_only": True,
+        "attack_bonus": 2,
+        "damage_bonus": 2,
+        "defense_bonus_percent": -10,
+        "avoidance_penalty": 1,
+    },
+    "stance_aim": {
+        "name": "Aim Stance",
+        "combat_only": True,
+        "attack_bonus": 2,
+        "defense_bonus_percent": -5,
+        "avoidance_penalty": 2,
+        "stability_penalty": 1,
+    },
+    "stance_press": {
+        "name": "Press Stance",
+        "combat_only": True,
+        "attack_bonus": 1,
+        "outgoing_armor_break_percent": 10,
+        "defense_bonus_percent": -5,
+        "avoidance_penalty": 1,
+        "stability_bonus": 1,
+    },
+    "raised_shield": {
+        "name": "Raised Shield",
+        "combat_only": True,
     },
     "attack_pressure": {
         "name": "Attack Pressure",
@@ -133,6 +205,10 @@ class StatusEffectMixin:
 
     def apply_status(self, actor, status: str, duration: int, *, source: str = "") -> None:
         definition = self.status_definition(status)
+        if status in STANCE_STATUS_NAMES:
+            for stance_status in (*STANCE_STATUS_NAMES, "guard_stance"):
+                if stance_status != status:
+                    actor.conditions.pop(stance_status, None)
         if status in {"charmed", "frightened"} and "dark_devotion" in getattr(actor, "features", []):
             if not actor.bond_flags.get("dark_devotion_used"):
                 actor.bond_flags["dark_devotion_used"] = True
@@ -175,6 +251,9 @@ class StatusEffectMixin:
     def clear_after_encounter(self, actors) -> None:
         for actor in actors:
             self.clear_temporary_statuses(actor)
+            clear_class_combat_resources = getattr(self, "clear_class_combat_resources", None)
+            if callable(clear_class_combat_resources):
+                clear_class_combat_resources(actor)
 
     def is_incapacitated(self, actor) -> bool:
         return any(

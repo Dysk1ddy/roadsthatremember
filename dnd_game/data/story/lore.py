@@ -741,6 +741,7 @@ CLASS_PRIMARY_STATS = {
     "Sorcerer": ["CHA", "CON"],
     "Warlock": ["CHA", "CON"],
     "Wizard": ["INT", "DEX"],
+    "Warrior": ["STR", "CON"],
 }
 
 

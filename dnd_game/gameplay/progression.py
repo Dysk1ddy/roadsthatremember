@@ -155,6 +155,9 @@ class ProgressionMixin:
             actor.max_resources["ki"] = max(actor.max_resources.get("ki", actor.level), actor.level)
             if refill:
                 actor.resources["ki"] = actor.max_resources["ki"]
+        synchronize_class_resources = getattr(self, "synchronize_class_resources", None)
+        if callable(synchronize_class_resources):
+            synchronize_class_resources(actor, refill=refill)
 
     def choose_level_up_skill(self, actor: Character) -> None:
         available = [skill for skill in CLASSES[actor.class_name]["skill_choices"] if skill not in actor.skill_proficiencies]

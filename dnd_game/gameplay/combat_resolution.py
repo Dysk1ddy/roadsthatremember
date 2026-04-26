@@ -3,16 +3,39 @@ from __future__ import annotations
 from contextlib import contextmanager
 from dataclasses import dataclass
 
-from ..data.story.public_terms import ability_label, spell_label, target_guard_label
+from ..data.story.public_terms import ability_label, spell_label
 from ..dice import D20Outcome, roll, roll_d20
 from ..items import ITEMS
 from ..ui.colors import rich_style_name, strip_ansi
 from ..ui.rich_render import Group, Panel, box
+from .class_framework import CLASS_RESOURCE_COLORS, CLASS_RESOURCE_LABELS, CLASS_RESOURCE_ORDER
+from .class_framework import actor_uses_class_resource, class_resource_cap, clear_class_combat_state
+from .class_framework import synchronize_class_resources
 from .difficulty_policy import ACT_DIFFICULTY_BANDS, clamp_dc_to_band
 from .magic_points import current_magic_points, magic_point_cost, spend_magic_points
+from .status_effects import STANCE_STATUS_BY_KEY, STANCE_STATUS_NAMES
 
 
 PHYSICAL_DEFENSE_DAMAGE_TYPES = {"", "slashing", "piercing", "bludgeoning"}
+STANCE_LABELS = {
+    "neutral": "Neutral",
+    "guard": "Guard",
+    "brace": "Brace",
+    "mobile": "Mobile",
+    "aggressive": "Aggressive",
+    "aim": "Aim",
+    "press": "Press",
+}
+STANCE_SUMMARIES = {
+    "neutral": "No stance modifiers.",
+    "guard": "+20% Defense, +1 Avoidance, +2 Stability, -2 Accuracy.",
+    "brace": "+10% Defense, +4 Stability, -1 Avoidance, -1 Accuracy.",
+    "mobile": "+2 Avoidance, +2 retreat checks, -5% Defense, -1 Stability.",
+    "aggressive": "+2 Accuracy, +2 weapon damage, -10% Defense, -1 Avoidance.",
+    "aim": "+2 Accuracy, -5% Defense, -2 Avoidance, -1 Stability.",
+    "press": "+1 Accuracy, +10% Armor Break, +1 Stability, -5% Defense, -1 Avoidance.",
+}
+STANCE_ORDER = ("neutral", "guard", "brace", "mobile", "aggressive", "aim", "press")
 
 
 @dataclass(slots=True)
@@ -22,6 +45,7 @@ class DamageResolution:
     defense_percent: int = 0
     armor_break_percent: int = 0
     mitigated_damage: int = 0
+    ward_absorbed: int = 0
     temp_hp_absorbed: int = 0
     hp_damage: int = 0
     glance: bool = False
@@ -146,6 +170,12 @@ class CombatResolutionMixin:
             + actor.relationship_bonuses.get("damage", 0)
         )
 
+    def status_accuracy_modifier(self, actor) -> int:
+        return self.status_value(actor, "attack_bonus") - self.status_value(actor, "attack_penalty")
+
+    def status_damage_modifier(self, actor) -> int:
+        return self.status_value(actor, "damage_bonus")
+
     def current_difficulty_act(self) -> int:
         if self.state is None:
             return 1
@@ -260,21 +290,44 @@ class CombatResolutionMixin:
             total += int(bonuses.get("defense_percent", 0))
             total += int(bonuses.get("defense", 0)) * 5
             total += int(bonuses.get("AC", 0)) * 5
+        if self.has_status(actor, "raised_shield") and getattr(actor, "shield", False):
+            total += self.raised_shield_defense_percent(actor)
         total += self.status_value(actor, "defense_bonus_percent")
         return total
 
     def defense_cap_percent(self, actor) -> int:
+        bonus_cap = 0
         for bonuses in (actor.equipment_bonuses, actor.gear_bonuses, actor.relationship_bonuses):
             cap = int(bonuses.get("defense_cap_percent", bonuses.get("defense_cap", 0)))
             if cap > 0:
-                return cap
+                bonus_cap = max(bonus_cap, cap)
         armor = getattr(actor, "armor", None)
+        armor_cap = int(getattr(armor, "defense_cap_percent", 0) or 0)
         armor_type = str(getattr(armor, "armor_type", "") or "").lower() if armor is not None else ""
+        if armor_cap <= 0:
+            if armor is None or (armor_type in {"clothing", "light"} and not getattr(armor, "heavy", False)):
+                armor_cap = 45
+            else:
+                armor_cap = 75
         if "heavy_armor_specialist" in getattr(actor, "features", []):
-            return 80
-        if armor is None or armor_type in {"clothing", "light"}:
-            return 45
-        return 75
+            armor_cap = max(armor_cap, 80)
+        return bonus_cap or armor_cap
+
+    def shield_defense_percent(self, actor) -> int:
+        if not getattr(actor, "shield", False):
+            return 0
+        total = 0
+        for bonuses in (actor.equipment_bonuses, actor.gear_bonuses, actor.relationship_bonuses):
+            total += int(bonuses.get("shield_defense_percent", 0))
+            total += int(bonuses.get("shield_defense", 0)) * 5
+        return total if total > 0 else 5
+
+    def raised_shield_defense_percent(self, actor) -> int:
+        total = 0
+        for bonuses in (actor.equipment_bonuses, actor.gear_bonuses, actor.relationship_bonuses):
+            total += int(bonuses.get("raised_shield_defense_percent", 0))
+            total += int(bonuses.get("raised_shield_defense", 0)) * 5
+        return total if total > 0 else 10
 
     def total_armor_break_percent(self, target, *, source_actor=None, incoming_percent: int = 0, incoming_steps: int = 0) -> int:
         total = max(0, int(incoming_percent)) + max(0, int(incoming_steps)) * 10
@@ -284,6 +337,9 @@ class CombatResolutionMixin:
             for bonuses in (source_actor.equipment_bonuses, source_actor.gear_bonuses, source_actor.relationship_bonuses):
                 total += int(bonuses.get("armor_break_percent", 0))
                 total += int(bonuses.get("armor_break", 0)) * 10
+            total += self.status_value(source_actor, "outgoing_armor_break_percent")
+            total += self.status_value(source_actor, "armor_break_percent")
+            total += self.status_value(source_actor, "armor_break") * 10
         return max(0, total)
 
     def effective_defense_percent(
@@ -296,8 +352,7 @@ class CombatResolutionMixin:
         if not self.damage_type_uses_defense(damage_type):
             return 0
         defense = self.armor_defense_percent(getattr(actor, "armor", None))
-        if getattr(actor, "shield", False):
-            defense += 5
+        defense += self.shield_defense_percent(actor)
         defense += self.defense_bonus_percent(actor)
         defense -= max(0, int(armor_break_percent))
         return max(0, min(defense, self.defense_cap_percent(actor)))
@@ -334,6 +389,340 @@ class CombatResolutionMixin:
     def last_damage_caused_wound(self) -> bool:
         return self.last_damage_resolution().wound
 
+    def actor_uses_class_resource(self, actor, resource: str) -> bool:
+        return actor_uses_class_resource(actor, resource)
+
+    def class_resource_label(self, resource: str) -> str:
+        return CLASS_RESOURCE_LABELS.get(resource, resource.replace("_", " ").title())
+
+    def class_resource_max(self, actor, resource: str) -> int:
+        return class_resource_cap(actor, resource)
+
+    def synchronize_class_resources(self, actor, *, refill: bool = False, encounter_start: bool = False) -> None:
+        synchronize_class_resources(actor, refill=refill, encounter_start=encounter_start)
+
+    def prepare_class_resources_for_combat(self, actor) -> None:
+        self.synchronize_class_resources(actor, encounter_start=True)
+
+    def grant_class_resource(self, actor, resource: str, amount: int = 1, *, source: str = "") -> int:
+        if amount <= 0 or not self.actor_uses_class_resource(actor, resource):
+            return 0
+        if resource in {"grit", "edge", "toxin", "focus"} and not getattr(self, "_in_combat", False):
+            return 0
+        maximum = self.class_resource_max(actor, resource)
+        if maximum <= 0:
+            return 0
+        actor.max_resources[resource] = maximum
+        previous = max(0, int(actor.resources.get(resource, 0)))
+        actor.resources[resource] = min(maximum, previous + amount)
+        gained = actor.resources[resource] - previous
+        if gained > 0:
+            label = self.class_resource_label(resource)
+            source_text = f" from {source}" if source else ""
+            self.say(f"{self.style_name(actor)} gains {gained} {label}{source_text}.")
+        return gained
+
+    def spend_class_resource(self, actor, resource: str, amount: int = 1) -> bool:
+        if amount <= 0:
+            return True
+        if not self.actor_uses_class_resource(actor, resource):
+            return False
+        self.synchronize_class_resources(actor)
+        current = max(0, int(actor.resources.get(resource, 0)))
+        if current < amount:
+            return False
+        actor.resources[resource] = current - amount
+        return True
+
+    def grant_ward(self, actor, amount: int, *, source: str = "") -> int:
+        return self.grant_class_resource(actor, "ward", amount, source=source)
+
+    def absorb_ward_damage(self, actor, amount: int, *, source_actor=None, damage_type: str = "") -> int:
+        if amount <= 0 or not self.actor_uses_class_resource(actor, "ward"):
+            return 0
+        current = max(0, int(actor.resources.get("ward", 0)))
+        if current <= 0:
+            return 0
+        absorbed = min(current, amount)
+        actor.resources["ward"] = current - absorbed
+        if absorbed > 0:
+            self.on_ward_absorbed(actor, source_actor, absorbed=absorbed, damage_type=damage_type)
+        return absorbed
+
+    def on_ward_absorbed(self, actor, source_actor, *, absorbed: int, damage_type: str) -> None:
+        if absorbed <= 0:
+            return
+        actor.bond_flags["last_ward_absorbed"] = absorbed
+        if actor.resources.get("ward", 0) == 0:
+            actor.bond_flags["ward_broken"] = True
+
+    def clear_class_combat_resources(self, actor) -> None:
+        clear_class_combat_state(actor)
+
+    def is_warrior_actor(self, actor) -> bool:
+        return "warrior_grit" in getattr(actor, "features", [])
+
+    def warrior_grit_max(self, actor) -> int:
+        return self.class_resource_max(actor, "grit")
+
+    def prepare_warrior_grit_for_combat(self, actor) -> None:
+        self.prepare_class_resources_for_combat(actor)
+
+    def grant_warrior_grit(self, actor, amount: int = 1, *, source: str = "") -> int:
+        return self.grant_class_resource(actor, "grit", amount, source=source)
+
+    def maybe_gain_grit_from_strong_hit(self, attacker, margin: int) -> None:
+        if margin >= 5:
+            self.grant_warrior_grit(attacker, source="a strong hit")
+
+    def effective_stability(self, actor) -> int:
+        total = actor.ability_mod("STR")
+        for bonuses in (actor.equipment_bonuses, actor.gear_bonuses, actor.relationship_bonuses):
+            total += int(bonuses.get("stability", 0))
+            total += int(bonuses.get("stability_bonus", 0))
+        total += self.status_value(actor, "stability_bonus")
+        total -= self.status_value(actor, "stability_penalty")
+        if self.has_status(actor, "prone"):
+            total -= 2
+        if self.has_status(actor, "restrained") or self.has_status(actor, "grappled"):
+            total -= 2
+        if self.has_status(actor, "stunned") or self.has_status(actor, "paralyzed") or self.has_status(actor, "unconscious"):
+            total -= 5
+        return total
+
+    def stability_target_number(self, actor) -> int:
+        return max(1, 10 + self.effective_stability(actor))
+
+    def stability_target_label(self, target_number: int) -> str:
+        return f"Stability {target_number}"
+
+    def combat_defense_summary(self, actor) -> str:
+        defense = self.effective_defense_percent(actor, damage_type="slashing")
+        avoidance = self.effective_avoidance(actor)
+        stability = self.effective_stability(actor)
+        return f"Defense {defense}%, Avoidance {avoidance:+d}, Stability {stability:+d}"
+
+    def combat_resource_summary_line(self, actor, *, width: int | None = None) -> str | None:
+        resource_lines: list[str] = []
+        for resource in CLASS_RESOURCE_ORDER:
+            if not self.actor_uses_class_resource(actor, resource):
+                continue
+            maximum = max(0, int(actor.max_resources.get(resource, self.class_resource_max(actor, resource))))
+            current = max(0, int(actor.resources.get(resource, 0)))
+            if maximum <= 0 and current <= 0:
+                continue
+            label = self.class_resource_label(resource)
+            color = CLASS_RESOURCE_COLORS.get(resource, "white")
+            resource_lines.append(self.format_resource_bar(label, current, maximum, width=width, fill_color=color))
+        if not resource_lines:
+            return None
+        return " | ".join(resource_lines)
+
+    def clear_combat_stance(self, actor) -> None:
+        for status in (*STANCE_STATUS_NAMES, "guard_stance"):
+            actor.conditions.pop(status, None)
+
+    def current_combat_stance_key(self, actor) -> str:
+        for key, status in STANCE_STATUS_BY_KEY.items():
+            if self.has_status(actor, status):
+                return key
+        if self.has_status(actor, "guard_stance"):
+            return "guard"
+        return "neutral"
+
+    def combat_stance_label(self, actor) -> str:
+        return STANCE_LABELS[self.current_combat_stance_key(actor)]
+
+    def combat_stance_option(self, stance_key: str, actor) -> str:
+        label = STANCE_LABELS[stance_key]
+        active = "active" if self.current_combat_stance_key(actor) == stance_key else STANCE_SUMMARIES[stance_key]
+        return f"{label} ({active})"
+
+    def set_combat_stance(self, actor, stance_key: str, *, announce: bool = True) -> bool:
+        stance_key = stance_key.lower().strip()
+        if stance_key not in STANCE_LABELS:
+            return False
+        previous = self.current_combat_stance_key(actor)
+        if stance_key == previous:
+            if announce:
+                self.say(f"{self.style_name(actor)} keeps {STANCE_LABELS[stance_key]} Stance.")
+            return False
+        self.clear_combat_stance(actor)
+        if stance_key != "neutral":
+            actor.conditions[STANCE_STATUS_BY_KEY[stance_key]] = 99
+        if announce:
+            self.say(f"{self.style_name(actor)} shifts into {STANCE_LABELS[stance_key]} Stance: {STANCE_SUMMARIES[stance_key]}")
+        self.apply_stance_upgrade_hooks(actor, stance_key)
+        return True
+
+    def use_guard_stance(self, actor) -> None:
+        self.set_combat_stance(actor, "guard", announce=False)
+        self.say(
+            f"{self.style_name(actor)} sets a guarded lane: +20% Defense, +1 Avoidance, +2 Stability, and -2 Accuracy while the stance holds."
+        )
+
+    def can_raise_shield(self, actor) -> bool:
+        return bool(getattr(actor, "shield", False)) and not self.has_status(actor, "raised_shield")
+
+    def use_raise_shield(self, actor) -> None:
+        self.apply_status(actor, "raised_shield", 2, source=f"{actor.name}'s raised shield")
+        defense = self.raised_shield_defense_percent(actor)
+        self.say(f"{self.style_name(actor)} raises a shield and gains +{defense}% Defense until their next turn.")
+
+    def use_weapon_read(self, actor, target) -> None:
+        defense = self.effective_defense_percent(target, damage_type="slashing")
+        avoidance = self.effective_avoidance(target)
+        stability = self.effective_stability(target)
+        armor_break = self.total_armor_break_percent(target)
+        defense_band = "high" if defense >= 35 else "low" if defense <= 10 else "moderate"
+        avoidance_band = "high" if avoidance >= 4 else "low" if avoidance <= 0 else "moderate"
+        stability_band = "high" if stability >= 4 else "low" if stability <= 0 else "moderate"
+        answer = "Armor Break or save pressure"
+        if avoidance_band == "high" and defense_band != "high":
+            answer = "accuracy pressure, marks, or forced saves"
+        elif defense_band == "low":
+            answer = "plain weapon wounds"
+        elif stability_band == "low":
+            answer = "shove, prone, or pin pressure"
+        break_text = f", Armor Break {armor_break}%" if armor_break else ""
+        self.say(
+            f"Weapon Read: {self.style_name(target)} has {defense_band} Defense ({defense}%), "
+            f"{avoidance_band} Avoidance ({avoidance:+d}), and {stability_band} Stability ({stability:+d}){break_text}. "
+            f"Best answer: {answer}."
+        )
+
+    def class_stance_upgrade_payload(self, actor, stance_key: str) -> dict[str, object]:
+        upgrades = getattr(actor, "bond_flags", {}).get("stance_upgrades", {})
+        if not isinstance(upgrades, dict):
+            return {}
+        payload = upgrades.get(stance_key) or upgrades.get("*") or {}
+        return dict(payload) if isinstance(payload, dict) else {}
+
+    def apply_stance_upgrade_hooks(self, actor, stance_key: str) -> None:
+        payload = self.class_stance_upgrade_payload(actor, stance_key)
+        if not payload:
+            return
+        for status, duration in dict(payload.get("statuses", {})).items():
+            self.apply_status(actor, str(status), int(duration), source=f"{STANCE_LABELS[stance_key]} upgrade")
+        for resource, amount in dict(payload.get("resources", {})).items():
+            self.grant_class_resource(actor, str(resource), int(amount), source=f"{STANCE_LABELS[stance_key]} upgrade")
+
+    def mark_class_target(self, actor, target, *, mark_key: str = "rogue_mark", duration: int = 2) -> None:
+        target.bond_flags[f"{mark_key}_by"] = actor.name
+        self.apply_status(target, "marked", duration, source=f"{actor.name}'s mark")
+
+    def target_is_marked_by(self, actor, target, *, mark_key: str = "rogue_mark") -> bool:
+        return target.bond_flags.get(f"{mark_key}_by") == actor.name
+
+    def add_rogue_poison_stack(self, actor, target, amount: int = 1, *, duration: int = 2) -> int:
+        stacks_by_actor = target.bond_flags.setdefault("rogue_poison_stacks", {})
+        if not isinstance(stacks_by_actor, dict):
+            stacks_by_actor = {}
+            target.bond_flags["rogue_poison_stacks"] = stacks_by_actor
+        previous = max(0, int(stacks_by_actor.get(actor.name, 0)))
+        stacks_by_actor[actor.name] = min(9, previous + max(0, amount))
+        self.apply_status(target, "poisoned", duration, source=f"{actor.name}'s poison")
+        return int(stacks_by_actor[actor.name])
+
+    def rogue_poison_stacks(self, actor, target) -> int:
+        stacks_by_actor = target.bond_flags.get("rogue_poison_stacks", {})
+        if not isinstance(stacks_by_actor, dict):
+            return 0
+        return max(0, int(stacks_by_actor.get(actor.name, 0)))
+
+    def spend_rogue_satchel(self, actor, amount: int = 1) -> bool:
+        return self.spend_class_resource(actor, "satchel", amount)
+
+    def rogue_target_is_exposed(self, actor, target, allies: list | None = None) -> bool:
+        if self.has_status(actor, "invisible"):
+            return True
+        if self.target_is_marked_by(actor, target):
+            return True
+        exposed_statuses = ("marked", "prone", "restrained", "reeling", "blinded", "poisoned", "armor_broken")
+        if any(self.has_status(target, status) for status in exposed_statuses):
+            return True
+        if allies is not None and any(ally is not actor and ally.is_conscious() for ally in allies):
+            return True
+        return False
+
+    def can_use_class_reaction(self, actor) -> bool:
+        current_round = int(getattr(self, "_active_round_number", 0) or 0)
+        return int(actor.bond_flags.get("class_reaction_used_round", -1)) != current_round
+
+    def spend_class_reaction(self, actor, *, source: str = "") -> bool:
+        if not self.can_use_class_reaction(actor):
+            return False
+        actor.bond_flags["class_reaction_used_round"] = int(getattr(self, "_active_round_number", 0) or 0)
+        if source:
+            actor.bond_flags["class_reaction_source"] = source
+        return True
+
+    def trigger_on_hit_hooks(
+        self,
+        attacker,
+        target,
+        *,
+        actual_damage: int,
+        margin: int,
+        critical_hit: bool,
+        heroes: list | None = None,
+        enemies: list | None = None,
+    ) -> None:
+        if self.actor_uses_class_resource(attacker, "edge") and self.rogue_target_is_exposed(attacker, target, heroes):
+            self.grant_class_resource(attacker, "edge", source="an exposed hit")
+        if self.target_is_marked_by(attacker, target):
+            target.bond_flags["class_mark_last_hit_by"] = attacker.name
+
+    def trigger_on_wound_hooks(self, attacker, target, result: DamageResolution) -> None:
+        if self.target_is_marked_by(attacker, target):
+            target.bond_flags["class_mark_last_wounded_by"] = attacker.name
+            self.grant_class_resource(attacker, "edge", source="a marked Wound")
+        if self.actor_uses_class_resource(attacker, "toxin") and self.has_status(target, "poisoned"):
+            self.grant_class_resource(attacker, "toxin", source="poison riding a Wound")
+
+    def trigger_damage_resolution_hooks(self, target, source_actor, *, damage_type: str) -> None:
+        result = self.last_damage_resolution()
+        if result.glance:
+            self.grant_warrior_grit(target, source="turning a hit into a Glance")
+        elif result.wound:
+            self.grant_warrior_grit(target, source="taking a Wound")
+        if source_actor is not None and result.wound:
+            self.trigger_on_wound_hooks(source_actor, target, result)
+
+    def use_warrior_shove(self, actor, target) -> None:
+        if not self.can_make_hostile_action(actor):
+            self.say(f"{self.style_name(actor)} can't force the issue while Charmed.")
+            return
+        target_number = self.stability_target_number(target)
+        total_modifier = (
+                actor.ability_mod("STR")
+                + actor.proficiency_bonus
+                + actor.equipment_bonuses.get("attack", 0)
+                + actor.gear_bonuses.get("attack", 0)
+                + actor.relationship_bonuses.get("attack", 0)
+                + self.status_accuracy_modifier(actor)
+            )
+        d20 = self.roll_check_d20(
+            actor,
+            self.d20_disadvantage_state(actor, attack=True),
+            target_number=target_number,
+            target_label=self.stability_target_label(target_number),
+            modifier=total_modifier,
+            style="attack",
+            outcome_kind="attack",
+            context_label=f"{actor.name} shoves {target.name}",
+        )
+        total = d20.kept + total_modifier
+        if d20.kept == 1 or (d20.kept != 20 and total < target_number):
+            self.say(f"{self.style_name(actor)} shoves into {self.style_name(target)}, but the footing holds.")
+            return
+        margin = total - target_number
+        self.apply_status(target, "prone", 1, source=f"{actor.name}'s shove")
+        self.say(f"{self.style_name(actor)} breaks {self.style_name(target)}'s footing with a shove.")
+        if margin >= 5 and target.is_conscious():
+            self.apply_status(target, "reeling", 1, source=f"{actor.name}'s shove")
+            self.grant_warrior_grit(actor, source="a strong shove")
+
     def perform_weapon_attack(self, attacker, target, heroes, enemies, dodging, *, use_smite: bool = False) -> None:
         if not self.can_make_hostile_action(attacker):
             self.say(f"{self.style_name(attacker)} can't bring themselves to make a hostile move while Charmed.")
@@ -348,8 +737,7 @@ class CombatResolutionMixin:
             total_modifier = (
                 attacker.attack_bonus()
                 + self.ally_pressure_bonus(attacker, heroes, ranged=attacker.weapon.ranged)
-                + self.status_value(attacker, "attack_bonus")
-                - self.status_value(attacker, "attack_penalty")
+                + self.status_accuracy_modifier(attacker)
             )
             d20 = self.roll_check_d20(
                 attacker,
@@ -372,15 +760,17 @@ class CombatResolutionMixin:
             if not critical_hit and total < target_number:
                 self.say(f"{self.style_name(attacker)} attacks {self.style_name(target)} but misses {self.attack_target_label(target_number)}.")
                 return
+            self.maybe_gain_grit_from_strong_hit(attacker, total - target_number)
+            damage_bonus = attacker.damage_bonus() + self.status_damage_modifier(attacker)
             damage_roll = self.roll_with_display_bonus(
                 attacker.weapon.damage,
-                bonus=attacker.damage_bonus(),
+                bonus=damage_bonus,
                 critical=critical_hit,
                 style="damage",
                 context_label=f"{attacker.name} weapon damage",
                 outcome_kind="damage",
             )
-            weapon_damage = damage_roll.total + attacker.damage_bonus()
+            weapon_damage = damage_roll.total + damage_bonus
             weapon_damage_type = weapon_item.damage_type if weapon_item is not None else ""
             if attacker.class_name == "Rogue" and advantage >= 0 and self.can_sneak_attack(attacker, heroes, target):
                 sneak = self.roll_with_animation_context(
@@ -453,6 +843,15 @@ class CombatResolutionMixin:
             else:
                 self.say(f"{self.style_name(attacker)} hits {self.style_name(target)} for {self.style_damage(total_actual)} damage.")
             self.announce_downed_target(target)
+            self.trigger_on_hit_hooks(
+                attacker,
+                target,
+                actual_damage=total_actual,
+                margin=total - target_number,
+                critical_hit=critical_hit,
+                heroes=heroes,
+                enemies=enemies,
+            )
             if total_actual > 0 and attacker.archetype in {"rukhar", "varyn"}:
                 self.apply_poison_on_hit(attacker, target)
             if attacker.weapon.ranged or "bow" in attacker.weapon.name.lower():
@@ -475,8 +874,7 @@ class CombatResolutionMixin:
         total_modifier = (
             attacker.attack_bonus()
             + self.ally_pressure_bonus(attacker, enemies, ranged=attacker.weapon.ranged)
-            + self.status_value(attacker, "attack_bonus")
-            - self.status_value(attacker, "attack_penalty")
+            + self.status_accuracy_modifier(attacker)
         )
         d20 = self.roll_check_d20(
             attacker,
@@ -495,15 +893,16 @@ class CombatResolutionMixin:
             return False
         if d20.kept == 20 and not critical_hit:
             self.say(f"{self.style_name(target)}'s armor blunts what would have been a critical strike.")
+        damage_bonus = attacker.damage_bonus() + self.status_damage_modifier(attacker)
         damage_roll = self.roll_with_display_bonus(
             attacker.weapon.damage,
-            bonus=attacker.damage_bonus(),
+            bonus=damage_bonus,
             critical=critical_hit,
             style="damage",
             context_label=f"{attacker.name} weapon damage",
             outcome_kind="damage",
         )
-        damage = max(1, damage_roll.total + attacker.damage_bonus())
+        damage = max(1, damage_roll.total + damage_bonus)
         if self.has_status(target, "marked"):
             damage += 2
             self.say(f"The ember mark on {target.name} flares and gives {attacker.name} a cleaner wound to drive into.")
@@ -519,6 +918,15 @@ class CombatResolutionMixin:
         else:
             self.say(f"{self.style_name(attacker)} hits {self.style_name(target)} for {self.style_damage(actual)} damage.")
         self.announce_downed_target(target)
+        self.trigger_on_hit_hooks(
+            attacker,
+            target,
+            actual_damage=actual,
+            margin=total - target_number,
+            critical_hit=critical_hit,
+            heroes=enemies,
+            enemies=heroes,
+        )
         if attacker.archetype == "resonance_leech" and target.is_conscious():
             if any(self.has_status(target, status) for status in ("frightened", "reeling", "deafened")):
                 extra = self.apply_damage(
@@ -807,8 +1215,7 @@ class CombatResolutionMixin:
             total_modifier = (
                 attack_bonus
                 + self.ally_pressure_bonus(caster, self.state.party_members(), ranged=True)
-                + self.status_value(caster, "attack_bonus")
-                - self.status_value(caster, "attack_penalty")
+                + self.status_accuracy_modifier(caster)
             )
             d20 = self.roll_check_d20(
                 caster,
@@ -862,8 +1269,7 @@ class CombatResolutionMixin:
             total_modifier = (
                 attack_bonus
                 + self.ally_pressure_bonus(caster, self.state.party_members(), ranged=True)
-                + self.status_value(caster, "attack_bonus")
-                - self.status_value(caster, "attack_penalty")
+                + self.status_accuracy_modifier(caster)
             )
             d20 = self.roll_check_d20(
                 caster,
@@ -983,8 +1389,7 @@ class CombatResolutionMixin:
             total_modifier = (
                 attack_bonus
                 + self.ally_pressure_bonus(caster, self.state.party_members(), ranged=True)
-                + self.status_value(caster, "attack_bonus")
-                - self.status_value(caster, "attack_penalty")
+                + self.status_accuracy_modifier(caster)
             )
             d20 = self.roll_check_d20(
                 caster,
@@ -1050,8 +1455,7 @@ class CombatResolutionMixin:
             total_modifier = (
                 self.weapon_attack_bonus_for(attacker, attacker.weapon)
                 + self.ally_pressure_bonus(attacker, heroes, ranged=False)
-                + self.status_value(attacker, "attack_bonus")
-                - self.status_value(attacker, "attack_penalty")
+                + self.status_accuracy_modifier(attacker)
             )
             d20 = self.roll_check_d20(
                 attacker,
@@ -1068,9 +1472,11 @@ class CombatResolutionMixin:
             if d20.kept == 1 or (not critical_hit and d20.kept != 20 and total < target_number):
                 self.say(f"{self.style_name(attacker)}'s Close Form strike misses {self.style_name(target)}.")
                 return
+            self.maybe_gain_grit_from_strong_hit(attacker, total - target_number)
+            damage_bonus = self.weapon_damage_bonus_for(attacker, attacker.weapon) + self.status_damage_modifier(attacker)
             damage_roll = self.roll_with_display_bonus(
                 "1d4",
-                bonus=self.weapon_damage_bonus_for(attacker, attacker.weapon),
+                bonus=damage_bonus,
                 critical=critical_hit,
                 style="damage",
                 context_label=f"{attacker.name} Close Form damage",
@@ -1078,7 +1484,7 @@ class CombatResolutionMixin:
             )
             actual = self.apply_damage(
                 target,
-                max(1, damage_roll.total + self.weapon_damage_bonus_for(attacker, attacker.weapon)),
+                max(1, damage_roll.total + damage_bonus),
                 damage_type="bludgeoning",
                 source_actor=attacker,
                 apply_defense=True,
@@ -1117,8 +1523,7 @@ class CombatResolutionMixin:
             total_modifier = (
                 self.weapon_attack_bonus_for(attacker, weapon)
                 + self.ally_pressure_bonus(attacker, heroes, ranged=weapon.ranged)
-                + self.status_value(attacker, "attack_bonus")
-                - self.status_value(attacker, "attack_penalty")
+                + self.status_accuracy_modifier(attacker)
             )
             d20 = self.roll_check_d20(
                 attacker,
@@ -1135,19 +1540,21 @@ class CombatResolutionMixin:
             if d20.kept == 1 or (not critical_hit and d20.kept != 20 and total < target_number):
                 self.say(f"{self.style_name(attacker)}'s off-hand attack misses {self.style_name(target)}.")
                 return
+            self.maybe_gain_grit_from_strong_hit(attacker, total - target_number)
+            damage_bonus = self.weapon_damage_bonus_for(attacker, weapon, include_ability_mod=False) + self.status_damage_modifier(attacker)
             actual = self.apply_damage(
                 target,
                 max(
                     1,
                     self.roll_with_display_bonus(
                         weapon.damage,
-                        bonus=self.weapon_damage_bonus_for(attacker, weapon, include_ability_mod=False),
+                        bonus=damage_bonus,
                         critical=critical_hit,
                         style="damage",
                         context_label=f"{attacker.name} off-hand damage",
                         outcome_kind="damage",
                     ).total
-                    + self.weapon_damage_bonus_for(attacker, weapon, include_ability_mod=False),
+                    + damage_bonus,
                 ),
                 damage_type=off_hand_item.damage_type,
                 source_actor=attacker,
@@ -1439,6 +1846,8 @@ class CombatResolutionMixin:
             )
             damage = damage * (100 - defense_percent) // 100
         mitigated_damage = damage
+        ward_absorbed = self.absorb_ward_damage(target, damage, source_actor=source_actor, damage_type=damage_type)
+        damage -= ward_absorbed
         temp_hp_absorbed = 0
         if target.temp_hp > 0:
             absorbed = min(target.temp_hp, damage)
@@ -1451,11 +1860,13 @@ class CombatResolutionMixin:
             defense_percent=defense_percent,
             armor_break_percent=total_armor_break_percent,
             mitigated_damage=mitigated_damage,
+            ward_absorbed=ward_absorbed,
             temp_hp_absorbed=temp_hp_absorbed,
             hp_damage=max(0, damage),
             glance=apply_defense and raw_damage > 0 and resisted_damage > 0 and mitigated_damage <= 0,
             wound=damage > 0,
         )
+        self.trigger_damage_resolution_hooks(target, source_actor, damage_type=damage_type)
         if damage <= 0:
             return 0
         if target.current_hp == 0 and "enemy" not in target.tags:
@@ -1782,13 +2193,20 @@ class CombatResolutionMixin:
             return f"{prefix}{self.format_health_bar(0, creature.max_hp)} (down){conditions}"
         line = (
             f"{prefix}{self.format_health_bar(creature.current_hp, creature.max_hp)}, "
-            f"{target_guard_label(self.effective_armor_class(creature))}{temp}{conditions}"
+            f"{self.combat_defense_summary(creature)}{temp}{conditions}"
         )
-        magic_bar = self.format_member_magic_bar(creature)
-        if magic_bar is None:
+        resource_lines = [
+            line
+            for line in (
+                self.format_member_magic_bar(creature),
+                self.combat_resource_summary_line(creature),
+            )
+            if line is not None
+        ]
+        if not resource_lines:
             return line
         indent = " " * indent_width
-        return f"{line}\n{indent}{magic_bar}"
+        return f"{line}\n" + "\n".join(f"{indent}{resource_line}" for resource_line in resource_lines)
 
     def handle_defeat(self, reason: str) -> None:
         play_sound_effect = getattr(self, "play_sound_effect", None)

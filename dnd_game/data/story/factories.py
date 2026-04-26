@@ -3,11 +3,67 @@ from __future__ import annotations
 from dataclasses import replace
 
 from ...dice import ability_modifier
+from ...gameplay.class_framework import synchronize_class_resources
 from ...gameplay.magic_points import synchronize_magic_points
 from ...gameplay.spell_slots import synchronize_spell_slots
 from ...models import Armor, Character, Weapon
 from .companions import apply_companion_profile
 from .options import BACKGROUNDS, CLASSES, RACES
+
+
+LOW_LEVEL_ENEMY_COMBAT_PROFILES: dict[str, dict[str, int]] = {
+    "goblin_skirmisher": {"avoidance": 3, "defense_percent": 5},
+    "wolf": {"avoidance": 2, "defense_percent": 10},
+    "bandit": {"avoidance": 1, "defense_percent": 10},
+    "bandit_archer": {"avoidance": 2, "defense_percent": 5},
+    "brand_saboteur": {"avoidance": 2, "defense_percent": 5},
+    "skeletal_sentry": {"avoidance": 0, "defense_percent": 15},
+    "worg": {"avoidance": 1, "defense_percent": 15},
+    "orc_raider": {"avoidance": 0, "defense_percent": 20},
+    "cinder_kobold": {"avoidance": 3, "defense_percent": 5},
+    "briar_twig": {"avoidance": 1, "defense_percent": 15},
+    "mireweb_spider": {"avoidance": 2, "defense_percent": 20},
+    "gutter_zealot": {"avoidance": 1, "defense_percent": 5},
+    "rust_shell_scuttler": {"avoidance": 1, "defense_percent": 20},
+    "sereth_vane": {"avoidance": 3, "defense_percent": 15},
+    "ash_brand_enforcer": {"avoidance": 0, "defense_percent": 25},
+    "ember_channeler": {"avoidance": 1, "defense_percent": 5},
+    "carrion_stalker": {"avoidance": 3, "defense_percent": 15},
+    "orc_bloodchief": {"avoidance": 1, "defense_percent": 25},
+    "ogre_brute": {"avoidance": -1, "defense_percent": 15},
+    "gravecaller": {"avoidance": 1, "defense_percent": 10},
+    "expedition_reaver": {"avoidance": 2, "defense_percent": 10},
+    "cult_lookout": {"avoidance": 3, "defense_percent": 10},
+    "grimlock_tunneler": {"avoidance": 1, "defense_percent": 20},
+    "stirge_swarm": {"avoidance": 4, "defense_percent": 5},
+    "ochre_slime": {"avoidance": -2, "defense_percent": 5},
+    "animated_armor": {"avoidance": -1, "defense_percent": 35},
+    "lantern_fen_wisp": {"avoidance": 5, "defense_percent": 0},
+    "ashstone_percher": {"avoidance": 2, "defense_percent": 25},
+    "acidmaw_burrower": {"avoidance": 0, "defense_percent": 25},
+    "bugbear_reaver": {"avoidance": 1, "defense_percent": 20},
+    "nothic": {"avoidance": 1, "defense_percent": 20},
+    "rukhar": {"avoidance": 1, "defense_percent": 30},
+    "choir_adept": {"avoidance": 1, "defense_percent": 10},
+    "spectral_foreman": {"avoidance": 2, "defense_percent": 15},
+    "starblighted_miner": {"avoidance": 1, "defense_percent": 10},
+    "ettervine_webherd": {"avoidance": 2, "defense_percent": 20},
+    "carrion_lash_crawler": {"avoidance": 2, "defense_percent": 20},
+    "cache_mimic": {"avoidance": 0, "defense_percent": 25},
+    "stonegaze_skulker": {"avoidance": 0, "defense_percent": 30},
+    "cliff_harpy": {"avoidance": 3, "defense_percent": 10},
+    "whispermaw_blob": {"avoidance": -2, "defense_percent": 5},
+    "vaelith_marr": {"avoidance": 3, "defense_percent": 15},
+    "false_map_skirmisher": {"avoidance": 4, "defense_percent": 10},
+    "claimbinder_notary": {"avoidance": 1, "defense_percent": 20},
+    "echo_sapper": {"avoidance": 0, "defense_percent": 30},
+    "pact_archive_warden": {"avoidance": 0, "defense_percent": 45},
+    "blackglass_listener": {"avoidance": 4, "defense_percent": 10},
+    "blacklake_pincerling": {"avoidance": 0, "defense_percent": 40},
+    "graveblade_wight": {"avoidance": 1, "defense_percent": 40},
+    "cinderflame_skull": {"avoidance": 4, "defense_percent": 10},
+    "obelisk_eye": {"avoidance": 4, "defense_percent": 15},
+}
 
 
 def apply_racial_bonuses(race: str, ability_scores: dict[str, int]) -> dict[str, int]:
@@ -67,6 +123,7 @@ def build_character(
     )
     synchronize_spell_slots(character, refill=True)
     synchronize_magic_points(character, refill=True)
+    synchronize_class_resources(character, refill=True)
     return character
 
 
@@ -169,6 +226,41 @@ def create_irielle_ashwake() -> Character:
         inventory={"Healing Potion": 1},
         tags=["hero", "companion"],
     ), "irielle_ashwake")
+
+
+def enemy_base_avoidance(enemy: Character) -> int:
+    dex_mod = ability_modifier(enemy.ability_scores["DEX"])
+    armor = enemy.armor
+    if armor is not None:
+        cap = 0 if armor.heavy else armor.dex_cap
+        if cap is not None:
+            dex_mod = min(dex_mod, int(cap))
+    return dex_mod
+
+
+def apply_enemy_combat_profile(enemy: Character, template: str) -> None:
+    profile = LOW_LEVEL_ENEMY_COMBAT_PROFILES.get(template)
+    if profile is None:
+        return
+    target_defense = max(0, int(profile["defense_percent"]))
+    target_avoidance = int(profile["avoidance"])
+    cap = int(profile.get("defense_cap_percent", 75 if target_defense >= 25 else 45))
+    shield_defense = 5 if enemy.shield else 0
+    armor_defense = max(0, target_defense - shield_defense)
+    if enemy.armor is not None:
+        enemy.armor.defense_percent = armor_defense
+        enemy.armor.defense_cap_percent = max(cap, target_defense)
+    elif target_defense:
+        enemy.gear_bonuses["defense_percent"] = enemy.gear_bonuses.get("defense_percent", 0) + target_defense
+        enemy.gear_bonuses["defense_cap_percent"] = max(enemy.gear_bonuses.get("defense_cap_percent", 0), cap)
+    avoidance_delta = target_avoidance - enemy_base_avoidance(enemy)
+    if avoidance_delta:
+        enemy.gear_bonuses["avoidance"] = enemy.gear_bonuses.get("avoidance", 0) + avoidance_delta
+    enemy.bond_flags["combat_profile"] = {
+        "template": template,
+        "avoidance": target_avoidance,
+        "defense_percent": target_defense,
+    }
 
 
 def create_enemy(template: str, *, name: str | None = None) -> Character:
@@ -1800,6 +1892,7 @@ def create_enemy(template: str, *, name: str | None = None) -> Character:
     }
     template_character = templates[template]
     enemy = Character.from_dict(template_character.to_dict())
+    apply_enemy_combat_profile(enemy, template)
     if name is not None:
         enemy.name = name
     return enemy

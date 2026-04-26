@@ -101,6 +101,14 @@ PRESET_CHARACTERS: dict[str, dict[str, object]] = {
         "class_skill_choices": ["Intimidation", "Investigation"],
         "description": "A force-damage occultist built for strong Charisma pressure, unsettling dialogue, and repeatable ranged offense.",
     },
+    "Warrior": {
+        "name": "Mara Gatehand",
+        "race": "Human",
+        "background": "Soldier",
+        "base_ability_scores": {"STR": 15, "DEX": 12, "CON": 14, "INT": 8, "WIS": 13, "CHA": 10},
+        "class_skill_choices": ["Athletics", "Perception"],
+        "description": "A line-holder built for Grit, Guard Stance, shoves, and reading armored enemies.",
+    },
 }
 
 

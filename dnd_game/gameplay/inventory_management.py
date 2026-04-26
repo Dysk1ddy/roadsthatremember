@@ -257,21 +257,26 @@ class InventoryManagementMixin:
         self.sync_equipment(preview)
         return preview
 
-    def format_delta(self, label: str, delta: int) -> str:
+    def format_delta(self, label: str, delta: int, *, suffix: str = "") -> str:
         color = "light_green" if delta > 0 else "light_red"
-        return f"{label} {self.style_text(f'{delta:+d}', color)}"
+        return f"{label} {self.style_text(f'{delta:+d}{suffix}', color)}"
 
     def equipment_comparison_summary(self, before: Character, after: Character) -> str:
         parts: list[str] = []
         core_stats = [
-            ("Defense", after.armor_class - before.armor_class),
+            (
+                "Defense",
+                self.effective_defense_percent(after, damage_type="slashing")
+                - self.effective_defense_percent(before, damage_type="slashing"),
+            ),
             ("strike", after.attack_bonus() - before.attack_bonus()),
             ("damage", after.damage_bonus() - before.damage_bonus()),
             ("initiative", self.initiative_bonus(after) - self.initiative_bonus(before)),
         ]
         for label, delta in core_stats:
             if delta:
-                parts.append(self.format_delta(label, delta))
+                suffix = "%" if label == "Defense" else ""
+                parts.append(self.format_delta(label, delta, suffix=suffix))
         if before.weapon.name != after.weapon.name:
             parts.append(f"weapon: {before.weapon.name} -> {after.weapon.name}")
         before_spell_ability = before.spellcasting_ability

@@ -63,7 +63,11 @@ class Item:
     skill_bonuses: dict[str, int] | None = None
     save_bonuses: dict[str, int] | None = None
     ac_bonus: int = 0
+    defense_percent: int = 0
+    defense_cap_percent: int = 0
     shield_bonus: int = 0
+    shield_defense_percent: int = 0
+    raised_shield_defense_percent: int = 0
     attack_bonus: int = 0
     damage_bonus: int = 0
     initiative_bonus: int = 0
@@ -187,6 +191,8 @@ RARITY_ARMOR_BONUS = {
     "epic": 2,
     "legendary": 3,
 }
+RARITY_ARMOR_DEFENSE_BONUS = {rarity: bonus * 5 for rarity, bonus in RARITY_ARMOR_BONUS.items()}
+RARITY_SHIELD_DEFENSE_BONUS = RARITY_ARMOR_DEFENSE_BONUS
 RARITY_PREFIX = {
     "common": "Roadworn",
     "uncommon": "Ash-Kissed",
@@ -382,6 +388,8 @@ ARMOR_BASES = [
         "armor_type": "clothing",
         "dex_cap": None,
         "heavy": False,
+        "defense_percent": 0,
+        "defense_cap_percent": 45,
         "weight": 4.0,
         "value": 1,
         "description": "Layered clothes and a padded coat with no real armor plates.",
@@ -393,6 +401,8 @@ ARMOR_BASES = [
         "armor_type": "light",
         "dex_cap": None,
         "heavy": False,
+        "defense_percent": 10,
+        "defense_cap_percent": 45,
         "weight": 8.0,
         "value": 5,
         "description": "Quilted layers that protect better than plain clothes.",
@@ -404,6 +414,8 @@ ARMOR_BASES = [
         "armor_type": "light",
         "dex_cap": None,
         "heavy": False,
+        "defense_percent": 10,
+        "defense_cap_percent": 45,
         "weight": 10.0,
         "value": 10,
         "description": "Tough boiled leather worn by scouts and rogues.",
@@ -415,6 +427,8 @@ ARMOR_BASES = [
         "armor_type": "light",
         "dex_cap": None,
         "heavy": False,
+        "defense_percent": 15,
+        "defense_cap_percent": 45,
         "weight": 13.0,
         "value": 45,
         "description": "Leather reinforced with rivets and hidden plates.",
@@ -426,6 +440,8 @@ ARMOR_BASES = [
         "armor_type": "medium",
         "dex_cap": 2,
         "heavy": False,
+        "defense_percent": 20,
+        "defense_cap_percent": 75,
         "weight": 20.0,
         "value": 50,
         "description": "Close-fitting mail that balances defense and mobility.",
@@ -437,6 +453,8 @@ ARMOR_BASES = [
         "armor_type": "medium",
         "dex_cap": 2,
         "heavy": False,
+        "defense_percent": 25,
+        "defense_cap_percent": 75,
         "stealth_disadvantage": True,
         "weight": 45.0,
         "value": 50,
@@ -449,6 +467,8 @@ ARMOR_BASES = [
         "armor_type": "medium",
         "dex_cap": 2,
         "heavy": False,
+        "defense_percent": 30,
+        "defense_cap_percent": 75,
         "weight": 20.0,
         "value": 400,
         "description": "A polished cuirass that protects without slowing the wearer much.",
@@ -460,6 +480,8 @@ ARMOR_BASES = [
         "armor_type": "heavy",
         "dex_cap": 0,
         "heavy": True,
+        "defense_percent": 35,
+        "defense_cap_percent": 75,
         "stealth_disadvantage": True,
         "weight": 55.0,
         "value": 75,
@@ -472,6 +494,8 @@ ARMOR_BASES = [
         "armor_type": "heavy",
         "dex_cap": 0,
         "heavy": True,
+        "defense_percent": 45,
+        "defense_cap_percent": 75,
         "stealth_disadvantage": True,
         "weight": 60.0,
         "value": 200,
@@ -487,8 +511,10 @@ SHIELD_BASES = [
         "item_type": "shield",
         "weight": 6.0,
         "value": 10,
-        "description": "A standard shield that adds 2 Defense when your other hand is free.",
+        "description": "A standard shield that catches the first bite of a weapon when your other hand is free.",
         "shield_bonus": 2,
+        "shield_defense_percent": 5,
+        "raised_shield_defense_percent": 10,
         "properties": ["shield"],
     }
 ]
@@ -1455,15 +1481,17 @@ def build_weapon_item(base: dict[str, object], rarity: str) -> Item:
 
 
 def build_armor_item(base: dict[str, object], rarity: str) -> Item:
-    armor_bonus = RARITY_ARMOR_BONUS[rarity]
+    defense_bonus = RARITY_ARMOR_DEFENSE_BONUS[rarity]
     magic = armor_enchantment_for(base, rarity)
     armor = Armor(
         name=f"{RARITY_PREFIX[rarity]} {base['name']}",
-        base_ac=int(base["base_ac"]) + armor_bonus,
+        base_ac=int(base["base_ac"]),
         armor_type=str(base.get("armor_type", "light")),
         dex_cap=base["dex_cap"],
         heavy=bool(base["heavy"]),
         stealth_disadvantage=bool(magic.get("stealth_disadvantage", base.get("stealth_disadvantage", False))),
+        defense_percent=int(base.get("defense_percent", 0)) + defense_bonus,
+        defense_cap_percent=int(base.get("defense_cap_percent", 75 if base.get("armor_type") in {"medium", "heavy"} else 45)),
     )
     return Item(
         item_id=f"{base['slug']}_{rarity}",
@@ -1488,6 +1516,7 @@ def build_armor_item(base: dict[str, object], rarity: str) -> Item:
 
 def build_shield_item(base: dict[str, object], rarity: str) -> Item:
     ac_bonus = 0 if rarity == "common" else 1 if rarity in {"uncommon", "rare"} else 2 if rarity == "epic" else 3
+    defense_bonus = RARITY_SHIELD_DEFENSE_BONUS[rarity]
     magic = shield_enchantment_for(rarity)
     return Item(
         item_id=f"{base['slug']}_{rarity}",
@@ -1502,6 +1531,8 @@ def build_shield_item(base: dict[str, object], rarity: str) -> Item:
         slot=str(base["slot"]),
         properties=list(base.get("properties", [])),
         shield_bonus=int(base["shield_bonus"]) + ac_bonus,
+        shield_defense_percent=int(base.get("shield_defense_percent", 5)) + defense_bonus,
+        raised_shield_defense_percent=int(base.get("raised_shield_defense_percent", 10)),
         enchantment=magic.get("enchantment"),
         initiative_bonus=int(magic.get("initiative_bonus", 0)),
         skill_bonuses=dict(magic.get("skill_bonuses") or {}) or None,
@@ -1524,6 +1555,7 @@ def build_gear_item(base: dict[str, object], rarity: str) -> Item:
         save_bonuses[first_key] += 1
     if rarity_scale >= 4:
         ac_bonus += 1
+    defense_percent = int(base.get("defense_percent", 0)) + ac_bonus * 5
     for key, bonus in dict(magic.get("skill_bonuses") or {}).items():
         skill_bonuses[key] = skill_bonuses.get(key, 0) + bonus
     for key, bonus in dict(magic.get("save_bonuses") or {}).items():
@@ -1543,6 +1575,8 @@ def build_gear_item(base: dict[str, object], rarity: str) -> Item:
         skill_bonuses=skill_bonuses or None,
         save_bonuses=save_bonuses or None,
         ac_bonus=ac_bonus,
+        defense_percent=defense_percent,
+        defense_cap_percent=int(base.get("defense_cap_percent", 0)),
         initiative_bonus=int(magic.get("initiative_bonus", 0)),
         healing_bonus=int(magic.get("healing_bonus", 0)),
         enchantment=magic.get("enchantment"),
@@ -2204,7 +2238,12 @@ def item_rules_text(item: Item) -> str:
         if item.weapon.to_hit_bonus or item.weapon.damage_bonus:
             rules.append(f"tuned +{item.weapon.to_hit_bonus} strike / +{item.weapon.damage_bonus} damage")
     if item.armor is not None:
-        armor_bits = [f"Defense {item.armor.base_ac}"]
+        defense = item.armor.defense_percent
+        if defense is None:
+            defense = max(0, (item.armor.base_ac - 10) * 5)
+        armor_bits = [f"Defense {defense}%"]
+        if item.armor.defense_cap_percent:
+            armor_bits.append(f"cap {item.armor.defense_cap_percent}%")
         if item.armor.dex_cap is None and item.item_type != "clothing":
             armor_bits.append("full Dex")
         elif item.armor.dex_cap is not None:
@@ -2212,10 +2251,17 @@ def item_rules_text(item: Item) -> str:
         if item.armor.stealth_disadvantage:
             armor_bits.append("Stealth strain")
         rules.append(", ".join(armor_bits))
-    if item.shield_bonus:
-        rules.append(f"+{item.shield_bonus} Defense")
-    if item.ac_bonus:
-        rules.append(f"Defense +{item.ac_bonus}")
+    if item.shield_defense_percent:
+        shield_text = f"shield Defense +{item.shield_defense_percent}%"
+        if item.raised_shield_defense_percent:
+            shield_text += f", raised +{item.raised_shield_defense_percent}%"
+        rules.append(shield_text)
+    if item.shield_bonus and not item.shield_defense_percent:
+        rules.append(f"legacy shield AC +{item.shield_bonus}")
+    if item.defense_percent:
+        rules.append(f"Defense +{item.defense_percent}%")
+    elif item.ac_bonus:
+        rules.append(f"Defense +{item.ac_bonus * 5}%")
     if item.heal_dice is not None:
         rules.append(f"restores {item.heal_dice}+{item.heal_bonus}")
     if item.revive_hp:

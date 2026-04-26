@@ -55,6 +55,7 @@ class Armor:
     heavy: bool = False
     stealth_disadvantage: bool = False
     defense_percent: int | None = None
+    defense_cap_percent: int | None = None
 
 
 @dataclass(slots=True)

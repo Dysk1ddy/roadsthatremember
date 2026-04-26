@@ -132,6 +132,10 @@ FEATURE_PUBLIC_LABELS = {
     "skirmisher_eye": "Skirmisher's Eye",
     "fieldcraft": "Fieldcraft",
     "cunning_action": "Veil Step",
+    "rogue_edge": "Edge",
+    "rogue_mark": "Mark Work",
+    "rogue_satchel": "Satchel Kit",
+    "rogue_poison": "Poison Work",
     "improved_sneak_attack": "Deadly Veilstrike",
     "evasion": "Evasion",
     "arcane_overflow": "Flux Overflow",
@@ -143,6 +147,15 @@ FEATURE_PUBLIC_LABELS = {
     "sculpted_cantrips": "Sculpted Minor Channels",
     "spellguard": "Scriptguard",
     "arcane_focus": "Channel Focus",
+    "warrior_grit": "Grit",
+    "warrior_guard": "Guard Stance",
+    "warrior_shove": "Shove",
+    "weapon_read": "Weapon Read",
+    "mage_ward": "Ward",
+    "mage_focus": "Focus",
+    "hard_lesson": "Hard Lesson",
+    "line_fighter": "Line Fighter",
+    "weapon_familiarity": "Weapon Familiarity",
 }
 
 
@@ -155,6 +168,12 @@ RESOURCE_PUBLIC_LABELS = {
     "action_surge": "battle surge",
     "ki": "focus",
     "second_wind": "second breath",
+    "grit": "grit",
+    "ward": "ward",
+    "edge": "edge",
+    "satchel": "satchel",
+    "toxin": "toxin",
+    "focus": "focus",
 }
 
 

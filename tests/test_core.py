@@ -10259,7 +10259,7 @@ class CoreTests(unittest.TestCase):
         ally.current_hp = max(1, ally.current_hp - 5)
         enemy = create_enemy("bandit")
 
-        self_answers = iter(["4", "1", "1"])
+        self_answers = iter(["3", "1", "1"])
         self_game = TextDnDGame(input_fn=lambda _: next(self_answers), output_fn=lambda _: None, rng=random.Random(8152))
         self_game.state = GameState(player=player, companions=[ally], current_scene="road_ambush", inventory={"potion_healing": 1})
         player.current_hp = max(1, player.current_hp - 4)
@@ -10269,7 +10269,7 @@ class CoreTests(unittest.TestCase):
         self.assertGreater(player.current_hp, player_before)
         self.assertLess(enemy.current_hp, enemy.max_hp)
 
-        feed_answers = iter(["3", "1"])
+        feed_answers = iter(["5", "1", "2"])
         feed_game = TextDnDGame(input_fn=lambda _: next(feed_answers), output_fn=lambda _: None, rng=random.Random(8153))
         feed_player = build_character(
             name="Velkor",
@@ -14632,7 +14632,7 @@ class CoreTests(unittest.TestCase):
         rendered = self.plain_output(log)
         self.assertIn("Current Head: Roadworn Iron Cap", rendered)
         self.assertIn("Roadworn Traveler's Hood", rendered)
-        self.assertIn("Defense -1", rendered)
+        self.assertIn("Defense -5%", rendered)
         self.assertIn("Perception +1", rendered)
 
     def test_map_command_opens_map_menu_each_time_it_is_requested(self) -> None:
@@ -15106,7 +15106,7 @@ class CoreTests(unittest.TestCase):
             class_skill_choices=["Athletics", "Survival"],
         )
         enemy = create_enemy("goblin_skirmisher")
-        answers = iter(["1", "2", "4"])
+        answers = iter(["1", "2", "6"])
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=lambda _: None, rng=random.Random(42))
         game.state = GameState(player=player, current_scene="road_ambush")
         called: list[str] = []

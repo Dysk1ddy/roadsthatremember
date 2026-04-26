@@ -46,7 +46,8 @@
       "dex_cap": 0,
       "heavy": true,
       "stealth_disadvantage": true,
-      "defense_percent": null
+      "defense_percent": 35,
+      "defense_cap_percent": 75
     },
     "hit_die": 10,
     "current_hp": 12,
@@ -71,7 +72,8 @@
       "Intimidation": 1
     },
     "gear_bonuses": {
-      "AC": 0
+      "shield_defense_percent": 5,
+      "raised_shield_defense_percent": 10
     },
     "notes": [
       "Veteran's kit: +1 to Athletics and Intimidation checks."
@@ -159,7 +161,8 @@
         "dex_cap": 0,
         "heavy": true,
         "stealth_disadvantage": true,
-        "defense_percent": null
+        "defense_percent": 35,
+        "defense_cap_percent": 75
       },
       "hit_die": 10,
       "current_hp": 13,
@@ -184,7 +187,8 @@
         "Intimidation": 1
       },
       "gear_bonuses": {
-        "AC": 0
+        "shield_defense_percent": 5,
+        "raised_shield_defense_percent": 10
       },
       "notes": [
         "Veteran's kit: +1 to Athletics and Intimidation checks.",
@@ -275,7 +279,8 @@
         "dex_cap": 2,
         "heavy": false,
         "stealth_disadvantage": true,
-        "defense_percent": null
+        "defense_percent": 25,
+        "defense_cap_percent": 75
       },
       "hit_die": 8,
       "current_hp": 10,
@@ -302,7 +307,8 @@
         "Religion": 1
       },
       "gear_bonuses": {
-        "AC": 0
+        "shield_defense_percent": 5,
+        "raised_shield_defense_percent": 10
       },
       "notes": [
         "Healer's satchel: +1 to Medicine and Religion checks.",
@@ -400,7 +406,8 @@
         "dex_cap": null,
         "heavy": false,
         "stealth_disadvantage": false,
-        "defense_percent": null
+        "defense_percent": 15,
+        "defense_cap_percent": 45
       },
       "hit_die": 10,
       "current_hp": 11,
@@ -534,10 +541,10 @@
     "E0093": 1
   },
   "short_rests_remaining": 2,
-  "playtime_seconds": 0.004554400002234615,
+  "playtime_seconds": 0.003791900002397597,
   "save_metadata": {
     "kind": "manual",
-    "saved_at": "2026-04-26T18:39:17",
+    "saved_at": "2026-04-26T19:35:53",
     "act": 1,
     "act_label": "Act I",
     "scene": "act1_complete",

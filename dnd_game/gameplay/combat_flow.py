@@ -10,6 +10,7 @@ from ..ui.colors import rich_style_name, strip_ansi
 from ..ui.rich_render import Group, Live, Panel, Table, Text, box
 from .encounter import Encounter
 from .magic_points import has_magic_points, magic_point_cost
+from .combat_resolution import STANCE_ORDER
 
 
 HEALING_POTION_NAME = get_item("potion_healing").name
@@ -86,6 +87,8 @@ class CombatFlowMixin:
                 play_encounter_music(encounter)
             self.pause_for_combat_transition()
             self.introduce_encounter_characters(enemies)
+            for actor in [*heroes, *enemies]:
+                self.prepare_class_resources_for_combat(actor)
             self.apply_companion_combat_openers(heroes, enemies, encounter)
             for enemy in enemies:
                 if enemy.is_conscious() and enemy.archetype == "carrion_stalker" and not self.has_status(enemy, "invisible"):
@@ -938,6 +941,32 @@ class CombatFlowMixin:
                 self.use_second_wind(actor)
                 turn_state.bonus_action_available = False
                 continue
+            if action == "Take Guard Stance":
+                self.use_guard_stance(actor)
+                turn_state.actions_remaining -= 1
+                continue
+            if action == "Raise Shield":
+                self.use_raise_shield(actor)
+                turn_state.bonus_action_available = False
+                continue
+            if action == "Change Stance":
+                if self.choose_combat_stance(actor):
+                    turn_state.bonus_action_available = False
+                continue
+            if action == "Shove":
+                target = self.choose_target(conscious_enemies, prompt="Choose a target to shove.", allow_back=True)
+                if target is None:
+                    continue
+                self.use_warrior_shove(actor, target)
+                turn_state.actions_remaining -= 1
+                continue
+            if action == "Weapon Read":
+                target = self.choose_target(conscious_enemies, prompt="Choose a target to read.", allow_back=True)
+                if target is None:
+                    continue
+                self.use_weapon_read(actor, target)
+                turn_state.bonus_action_available = False
+                continue
             if action == "Use Bardic Inspiration":
                 target = self.choose_ally(heroes, prompt="Choose an ally for a Rally Note.", allow_back=True)
                 if target is None:
@@ -1060,7 +1089,8 @@ class CombatFlowMixin:
                     self.say("You use the ground you bought yourself and lead the party clear of the fight.")
                     self.pause_for_combat_transition()
                     return "fled"
-                success = self.skill_check(actor, "Stealth", 13, context="to break from the fight")
+                flee_dc = max(8, 13 - self.status_value(actor, "flee_bonus"))
+                success = self.skill_check(actor, "Stealth", flee_dc, context="to break from the fight")
                 turn_state.actions_remaining -= 1
                 if success:
                     self.apply_status(actor, "emboldened", 1, source="finding a clean escape lane")
@@ -1074,6 +1104,30 @@ class CombatFlowMixin:
     def turn_prompt(self, actor: Character, turn_state: TurnState) -> str:
         bonus_text = "ready" if turn_state.bonus_action_available else "spent"
         return f"Your turn, {self.style_name(actor)}. Actions left: {turn_state.actions_remaining}. Bonus action: {bonus_text}."
+
+    def maybe_apply_enemy_stance(
+        self,
+        actor: Character,
+        target: Character,
+        conscious_heroes: list[Character],
+        conscious_allies: list[Character],
+    ) -> None:
+        current = self.current_combat_stance_key(actor)
+        target_defense = self.effective_defense_percent(target, damage_type="slashing")
+        actor_defense = self.effective_defense_percent(actor, damage_type="slashing")
+        preferred = current
+        if actor.current_hp <= max(1, actor.max_hp // 3):
+            preferred = "guard" if actor_defense >= 25 or getattr(actor, "shield", False) else "mobile"
+        elif target_defense >= 35 and not actor.weapon.ranged:
+            preferred = "press"
+        elif actor.weapon.ranged or "bow" in actor.weapon.name.lower():
+            preferred = "aim"
+        elif actor_defense >= 35:
+            preferred = "brace"
+        elif conscious_allies and actor.current_hp >= actor.max_hp // 2:
+            preferred = "aggressive"
+        if preferred != current:
+            self.set_combat_stance(actor, preferred)
 
     def combat_action_key(self, option: str) -> str:
         action = self.choice_text(option)
@@ -1101,11 +1155,23 @@ class CombatFlowMixin:
             suffix = f"{suffix}, {note}"
         return f"{display_label} ({suffix})"
 
+    def choose_combat_stance(self, actor: Character) -> bool:
+        options = [self.combat_stance_option(stance_key, actor) for stance_key in STANCE_ORDER] + ["Back"]
+        choice = self.choose(
+            "Choose a combat stance.",
+            options,
+            allow_meta=False,
+            show_hud=False,
+        )
+        if choice == len(options):
+            return False
+        return self.set_combat_stance(actor, STANCE_ORDER[choice - 1])
+
     def combat_option_group(self, option: str) -> str:
         action = self.combat_action_key(option)
         if action == "End Turn":
             return "End Turn"
-        if action in {"Use an Item", "Drink a Healing Potion"}:
+        if action == "Use an Item":
             return "Item"
         if action == "Attempt Parley":
             return "Social"
@@ -1120,8 +1186,12 @@ class CombatFlowMixin:
             "Enter Rage",
             "Use Second Wind",
             "Use Bardic Inspiration",
+            "Weapon Read",
+            "Raise Shield",
+            "Change Stance",
             "Cast Healing Word",
             "Make Off-Hand Attack",
+            "Drink a Healing Potion",
         }:
             return "Bonus Action"
         return "Action"
@@ -2200,6 +2270,7 @@ class CombatFlowMixin:
             target = max(conscious_heroes, key=lambda hero: (hero.attack_bonus(), hero.current_hp))
         else:
             target = min(conscious_heroes, key=lambda hero: hero.current_hp)
+        self.maybe_apply_enemy_stance(actor, target, conscious_heroes, conscious_allies)
         self.perform_enemy_attack(actor, target, heroes, enemies, dodging)
 
     def get_player_combat_options(
@@ -2221,6 +2292,10 @@ class CombatFlowMixin:
                 options.append(self.combat_spell_option("Attack with Divine Smite", "divine_smite", note="on hit"))
             if actor.class_name == "Paladin" and actor.resources.get("lay_on_hands", 0) > 0:
                 options.append("Use Oath Mend")
+            if "warrior_guard" in actor.features:
+                options.append("Take Guard Stance")
+            if "warrior_shove" in actor.features:
+                options.append("Shove")
             if actor.class_name == "Cleric":
                 if actor.resources.get("channel_divinity", 0) > 0:
                     options.append("Invoke Lantern Surge")
@@ -2276,12 +2351,17 @@ class CombatFlowMixin:
                 options.append("Use Rally Note")
             if actor.class_name == "Fighter" and actor.resources.get("second_wind", 0) > 0:
                 options.append("Use Second Breath")
+            if "weapon_read" in actor.features:
+                options.append("Weapon Read")
             if actor.class_name in {"Bard", "Cleric", "Druid"} and self.can_afford_spell(actor, "healing_word") and not turn_state.non_cantrip_action_spell_cast:
                 options.append(self.combat_spell_option("Cast Healing Word", "healing_word", note="Bonus Action"))
+            if self.can_raise_shield(actor):
+                options.append("Raise Shield")
             if turn_state.attack_action_taken and self.can_make_off_hand_attack(actor):
                 options.append("Make Off-Hand Strike")
             if self.inventory_dict().get("potion_healing", 0) > 0:
                 options.append(DRINK_HEALING_POTION_ACTION)
+            options.append("Change Stance")
         options.append("End Turn")
         return options
 
