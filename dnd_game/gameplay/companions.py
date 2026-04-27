@@ -193,14 +193,19 @@ class CompanionSystemMixin:
         self.say(f"{companion.name} decides they can no longer trust you and leaves the company.")
         self.add_journal(f"{companion.name} left the party after trust collapsed ({reason}).")
 
-    def sync_companion_to_active_party_level(self, companion) -> bool:
+    def sync_companion_to_active_party_level(self, companion, *, allow_subclass_choice: bool = False) -> bool:
         assert self.state is not None
         target_level = self.highest_active_party_level()
         if companion.level >= target_level:
             return False
         previous_level = companion.level
         for next_level in range(companion.level + 1, target_level + 1):
-            self.level_up_character_automatically(companion, next_level, announce=False)
+            self.level_up_character_automatically(
+                companion,
+                next_level,
+                announce=False,
+                allow_companion_subclass_choice=allow_subclass_choice,
+            )
         self.say(f"{companion.name} catches up from level {previous_level} to level {target_level} to match the active party.")
         return True
 
@@ -209,6 +214,9 @@ class CompanionSystemMixin:
         if self.has_companion(companion.name):
             return
         self.introduce_character(companion)
+        mark_subclass_recruitment = getattr(self, "mark_companion_subclass_recruitment", None)
+        if callable(mark_subclass_recruitment):
+            mark_subclass_recruitment(companion)
         if not companion.equipment_slots:
             companion.equipment_slots = {slot: None for slot in EQUIPMENT_SLOTS}
             for slot, item_id in starter_item_ids_for_character(companion).items():
@@ -227,7 +235,7 @@ class CompanionSystemMixin:
             self.say(f"{companion.name} joins your wider company, but the active party is full. They head to camp for now.")
         else:
             self.state.companions.append(companion)
-            self.sync_companion_to_active_party_level(companion)
+            self.sync_companion_to_active_party_level(companion, allow_subclass_choice=True)
             self.add_journal(f"{companion.name} joined the active party.")
         self.sync_equipment(companion)
 
@@ -257,7 +265,7 @@ class CompanionSystemMixin:
             return False
         self.state.camp_companions.remove(companion)
         self.state.companions.append(companion)
-        self.sync_companion_to_active_party_level(companion)
+        self.sync_companion_to_active_party_level(companion, allow_subclass_choice=True)
         tutorial_tracker = getattr(self, "record_opening_tutorial_companion_event", None)
         if callable(tutorial_tracker):
             tutorial_tracker("moved_to_party", companion_name=companion.name)

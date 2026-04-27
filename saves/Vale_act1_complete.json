@@ -114,7 +114,7 @@
     {
       "name": "Tolan Ironshield",
       "race": "Dwarf",
-      "class_name": "Fighter",
+      "class_name": "Warrior",
       "background": "Soldier",
       "level": 1,
       "ability_scores": {
@@ -138,7 +138,12 @@
       "features": [
         "darkvision",
         "dwarven_resilience",
-        "second_wind"
+        "warrior_grit",
+        "warrior_guard",
+        "warrior_pin",
+        "warrior_rally",
+        "warrior_shove",
+        "weapon_read"
       ],
       "weapon": {
         "name": "Roadworn Longsword",
@@ -175,10 +180,10 @@
         "Gaming Set"
       ],
       "resources": {
-        "second_wind": 1
+        "grit": 1
       },
       "max_resources": {
-        "second_wind": 1
+        "grit": 7
       },
       "inventory": {},
       "conditions": {},
@@ -211,7 +216,7 @@
         "off_hand": "shield_common",
         "cape": null
       },
-      "archetype": "fighter",
+      "archetype": "warrior",
       "companion_id": "tolan_ironshield",
       "disposition": 0,
       "lore": [
@@ -221,6 +226,9 @@
       ],
       "bond_flags": {
         "talked_topics": [],
+        "retcon_class": "Warrior",
+        "default_subclass": "juggernaut",
+        "secondary_subclass": "weapon_master",
         "story_skill_modifiers": {}
       },
       "relationship_bonuses": {},
@@ -236,7 +244,7 @@
     {
       "name": "Elira Dawnmantle",
       "race": "Human",
-      "class_name": "Cleric",
+      "class_name": "Mage",
       "background": "Acolyte",
       "level": 1,
       "ability_scores": {
@@ -254,38 +262,36 @@
         "Religion"
       ],
       "saving_throw_proficiencies": [
-        "WIS",
-        "CHA"
+        "INT",
+        "WIS"
       ],
       "features": [
-        "cleric_spellcasting"
+        "focused_eye",
+        "ground",
+        "mage_charge",
+        "mage_focus",
+        "minor_channel",
+        "pattern_read"
       ],
       "weapon": {
-        "name": "Roadworn Mace",
+        "name": "Roadworn Quarterstaff",
         "damage": "1d6",
         "ability": "STR",
-        "weapon_type": "mace",
+        "weapon_type": "quarterstaff",
         "to_hit_bonus": 0,
         "damage_bonus": 0,
         "finesse": false,
         "ranged": false,
         "hands_required": 1,
-        "properties": []
+        "properties": [
+          "versatile"
+        ]
       },
-      "armor": {
-        "name": "Roadworn Scale Mail",
-        "base_ac": 14,
-        "armor_type": "medium",
-        "dex_cap": 2,
-        "heavy": false,
-        "stealth_disadvantage": true,
-        "defense_percent": 25,
-        "defense_cap_percent": 75
-      },
-      "hit_die": 8,
-      "current_hp": 10,
-      "max_hp": 10,
-      "shield": true,
+      "armor": null,
+      "hit_die": 6,
+      "current_hp": 8,
+      "max_hp": 8,
+      "shield": false,
       "spellcasting_ability": "WIS",
       "skill_expertise": [],
       "bonus_proficiencies": [
@@ -294,11 +300,13 @@
       ],
       "resources": {
         "spell_slots_1": 2,
-        "mp": 13
+        "mp": 13,
+        "focus": 0
       },
       "max_resources": {
         "spell_slots_1": 2,
-        "mp": 13
+        "mp": 13,
+        "focus": 5
       },
       "inventory": {},
       "conditions": {},
@@ -306,10 +314,7 @@
         "Medicine": 1,
         "Religion": 1
       },
-      "gear_bonuses": {
-        "shield_defense_percent": 5,
-        "raised_shield_defense_percent": 10
-      },
+      "gear_bonuses": {},
       "notes": [
         "Healer's satchel: +1 to Medicine and Religion checks.",
         "A Lantern priestess tending the frontier faithful in Iron Hollow.",
@@ -324,14 +329,14 @@
         "ring_1": null,
         "ring_2": null,
         "neck": null,
-        "chest": "scale_mail_common",
+        "chest": null,
         "gloves": null,
         "boots": null,
-        "main_hand": "mace_common",
-        "off_hand": "shield_common",
+        "main_hand": "quarterstaff_common",
+        "off_hand": null,
         "cape": null
       },
-      "archetype": "cleric",
+      "archetype": "mage",
       "companion_id": "elira_dawnmantle",
       "disposition": 0,
       "lore": [
@@ -341,6 +346,9 @@
       ],
       "bond_flags": {
         "talked_topics": [],
+        "retcon_class": "Mage",
+        "default_subclass": "aethermancer",
+        "secondary_subclass": "spellguard",
         "story_skill_modifiers": {}
       },
       "relationship_bonuses": {},
@@ -356,7 +364,7 @@
     {
       "name": "Kaelis Starling",
       "race": "Half-Elf",
-      "class_name": "Ranger",
+      "class_name": "Rogue",
       "background": "Criminal",
       "level": 1,
       "ability_scores": {
@@ -370,18 +378,24 @@
       "skill_proficiencies": [
         "Deception",
         "Insight",
+        "Investigation",
         "Perception",
         "Persuasion",
         "Stealth",
         "Survival"
       ],
       "saving_throw_proficiencies": [
-        "STR",
-        "DEX"
+        "DEX",
+        "INT"
       ],
       "features": [
+        "expertise",
         "fey_ancestry",
-        "natural_explorer"
+        "rogue_edge",
+        "rogue_mark",
+        "rogue_poison",
+        "rogue_satchel",
+        "sneak_attack"
       ],
       "weapon": {
         "name": "Roadworn Longbow",
@@ -400,27 +414,38 @@
         ]
       },
       "armor": {
-        "name": "Roadworn Studded Leather",
-        "base_ac": 12,
+        "name": "Roadworn Leather Armor",
+        "base_ac": 11,
         "armor_type": "light",
         "dex_cap": null,
         "heavy": false,
         "stealth_disadvantage": false,
-        "defense_percent": 15,
+        "defense_percent": 10,
         "defense_cap_percent": 45
       },
-      "hit_die": 10,
-      "current_hp": 11,
-      "max_hp": 11,
+      "hit_die": 8,
+      "current_hp": 9,
+      "max_hp": 9,
       "shield": false,
-      "spellcasting_ability": "WIS",
-      "skill_expertise": [],
+      "spellcasting_ability": null,
+      "skill_expertise": [
+        "Perception",
+        "Stealth"
+      ],
       "bonus_proficiencies": [
         "Thieves' Tools",
         "Disguise Kit"
       ],
-      "resources": {},
-      "max_resources": {},
+      "resources": {
+        "edge": 1,
+        "satchel": 4,
+        "toxin": 0
+      },
+      "max_resources": {
+        "edge": 5,
+        "satchel": 4,
+        "toxin": 5
+      },
       "inventory": {},
       "conditions": {},
       "equipment_bonuses": {
@@ -431,7 +456,7 @@
       "notes": [
         "Thieves' tools: +1 to Stealth and Sleight of Hand checks.",
         "A Greywake scout who knows how to read an ambush before it closes.",
-        "A sharp-eyed ranger scout who learned to trust patterns before promises."
+        "A sharp-eyed scout-rogue with Assassin patience, trained to trust patterns before promises."
       ],
       "tags": [
         "hero",
@@ -442,14 +467,14 @@
         "ring_1": null,
         "ring_2": null,
         "neck": null,
-        "chest": "studded_leather_common",
+        "chest": "leather_armor_common",
         "gloves": null,
         "boots": null,
         "main_hand": "longbow_common",
         "off_hand": null,
         "cape": null
       },
-      "archetype": "ranger",
+      "archetype": "rogue",
       "companion_id": "kaelis_starling",
       "disposition": 0,
       "lore": [
@@ -459,6 +484,9 @@
       ],
       "bond_flags": {
         "talked_topics": [],
+        "retcon_class": "Rogue",
+        "default_subclass": "assassin",
+        "secondary_subclass": "shadowguard",
         "story_skill_modifiers": {}
       },
       "relationship_bonuses": {},
@@ -533,18 +561,17 @@
   "inventory": {
     "E0004": 2,
     "E0097": 2,
-    "E0060": 3,
+    "E0060": 2,
     "C0011": 4,
-    "E0012": 1,
-    "E0102": 1,
-    "E0018": 1,
+    "E0104": 1,
+    "E0009": 1,
     "E0093": 1
   },
   "short_rests_remaining": 2,
-  "playtime_seconds": 0.00658949999979086,
+  "playtime_seconds": 0.00485529999997425,
   "save_metadata": {
     "kind": "manual",
-    "saved_at": "2026-04-26T22:23:04",
+    "saved_at": "2026-04-26T23:18:18",
     "act": 1,
     "act_label": "Act I",
     "scene": "act1_complete",

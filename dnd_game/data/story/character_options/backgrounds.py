@@ -24,7 +24,7 @@ BACKGROUNDS = {
         "notes": ["Thieves' tools: +1 to Stealth and Sleight of Hand checks."],
     },
     "Sage": {
-        "description": "A scholar of histories, magic, and old tales carried across Faerun.",
+        "description": "A scholar of histories, magic, and old tales carried across Aethrune.",
         "skills": ["Arcana", "History"],
         "proficiencies": ["Calligrapher's Supplies", "Draconic"],
         "equipment_bonuses": {"Arcana": 1, "History": 1},

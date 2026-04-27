@@ -404,7 +404,7 @@ DIALOGUE_INPUTS: list[dict[str, object]] = [
         "lines": [
             (
                 "elira_dawnmantle",
-                "Agatha is not a shortcut. Go as if a grief is giving testimony, not as if a ghost owes you answers.",
+                "The Pale Witness is no shortcut. Go as if a grief is giving testimony, not as if a ghost owes you answers.",
             )
         ],
     },

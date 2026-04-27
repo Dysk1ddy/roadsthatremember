@@ -620,13 +620,13 @@ class StoryIntroMixin:
         player = self.state.player
         background = player.background
         class_name = player.class_name
-        if background == "Acolyte" or class_name in {"Cleric", "Paladin"}:
+        if background == "Acolyte":
             self.state.flags["elira_first_read"] = "faith_action"
             self.speaker(
                 "Elira Lanternward",
                 "If your faith can move your hands, I need both. If it only names the pain, pray after.",
             )
-        elif background == "Soldier" or class_name == "Fighter":
+        elif background == "Soldier" or class_name in {"Fighter", "Warrior"}:
             self.state.flags["elira_first_read"] = "triage_competence"
             self.speaker(
                 "Elira Lanternward",
@@ -638,7 +638,7 @@ class StoryIntroMixin:
                 "Elira Lanternward",
                 "No one important is watching this shrine. That makes what you do next more honest, not less.",
             )
-        elif background == "Sage" or class_name == "Wizard":
+        elif background == "Sage" or class_name in {"Wizard", "Mage"}:
             self.state.flags["elira_first_read"] = "knowledge_vs_saving"
             self.speaker(
                 "Elira Lanternward",
@@ -2946,8 +2946,8 @@ class StoryIntroMixin:
             "You are not riding into this alone. Choose the road-shield you want beside you: Kaelis for eyes in the brush, or Rhogar for a sworn lineholder.",
         )
         options = [
-            self.action_option("Send Kaelis Starling, a ranger scout, with me."),
-            self.action_option("Rhogar Valeguard, a paladin caravan-guard, sounds right for this road."),
+            self.action_option("Send Kaelis Starling, a scout-rogue with Assassin training, with me."),
+            self.action_option("Rhogar Valeguard, an oathsworn Warrior lineholder, sounds right for this road."),
         ]
         choice = self.scenario_choice(
             "Mira glances across the tavern and taps two names on the contract roster.",

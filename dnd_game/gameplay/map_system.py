@@ -3973,7 +3973,7 @@ class MapSystemMixin:
         if sponsor == "exchange":
             self.say("Exchange chits sit in the shallow drawer, arranged so a fast search would find them first.")
         elif sponsor == "lionshield":
-            self.say("Lionshield crate seals hang from a nail beside the till, clean enough to look planted and useful enough to hurt.")
+            self.say("Ironbound crate seals hang from a nail beside the till, clean enough to look planted and useful enough to hurt.")
         else:
             self.say("Council signatures have been scraped thin on three receipts, leaving the paper soft where names should be.")
         choice = self.scenario_choice(
@@ -6607,7 +6607,7 @@ class MapSystemMixin:
             if success:
                 self.say("The prospector steadies enough to point out the same payment trail running through Ashfall Watch.")
                 self.add_clue("The prospector confirms the dig ring was part of Ashfall Watch's wider salvage route.")
-                self.reward_party(xp=10, reason="steadying the Old Owl prospector")
+                self.reward_party(xp=10, reason="steadying the Blackglass prospector")
             else:
                 self.say("The prospector survives, but the answers stay ragged.")
         else:

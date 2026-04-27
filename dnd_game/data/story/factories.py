@@ -131,7 +131,7 @@ def create_tolan_ironshield() -> Character:
     return apply_companion_profile(build_character(
         name="Tolan Ironshield",
         race="Dwarf",
-        class_name="Fighter",
+        class_name="Warrior",
         background="Soldier",
         base_ability_scores={"STR": 15, "DEX": 10, "CON": 14, "INT": 8, "WIS": 12, "CHA": 13},
         class_skill_choices=["Perception", "Survival"],
@@ -159,38 +159,44 @@ def create_bryn_underbough() -> Character:
 
 
 def create_elira_dawnmantle() -> Character:
-    return apply_companion_profile(build_character(
+    character = build_character(
         name="Elira Dawnmantle",
         race="Human",
-        class_name="Cleric",
+        class_name="Mage",
         background="Acolyte",
         base_ability_scores={"STR": 10, "DEX": 12, "CON": 13, "INT": 10, "WIS": 15, "CHA": 14},
-        class_skill_choices=["Medicine", "Persuasion"],
+        class_skill_choices=["Insight", "Medicine", "Persuasion"],
         notes=["A Lantern priestess tending the frontier faithful in Iron Hollow."],
         inventory={"Healing Potion": 1},
         tags=["hero", "companion"],
-    ), "elira_dawnmantle")
+    )
+    character.spellcasting_ability = "WIS"
+    synchronize_magic_points(character, refill=True)
+    return apply_companion_profile(character, "elira_dawnmantle")
 
 
 def create_kaelis_starling() -> Character:
-    return apply_companion_profile(build_character(
+    character = build_character(
         name="Kaelis Starling",
         race="Half-Elf",
-        class_name="Ranger",
+        class_name="Rogue",
         background="Criminal",
         base_ability_scores={"STR": 10, "DEX": 15, "CON": 13, "INT": 11, "WIS": 14, "CHA": 12},
-        class_skill_choices=["Perception", "Stealth", "Survival"],
+        class_skill_choices=["Investigation", "Perception", "Stealth", "Survival"],
+        expertise_choices=["Perception", "Stealth"],
         notes=["A Greywake scout who knows how to read an ambush before it closes."],
         inventory={"Healing Potion": 1},
         tags=["hero", "companion"],
-    ), "kaelis_starling")
+    )
+    character.weapon = Weapon(name="Longbow", damage="1d8", ability="DEX", ranged=True, to_hit_bonus=1, hands_required=2)
+    return apply_companion_profile(character, "kaelis_starling")
 
 
 def create_rhogar_valeguard() -> Character:
     return apply_companion_profile(build_character(
         name="Rhogar Valeguard",
         race="Dragonborn",
-        class_name="Paladin",
+        class_name="Warrior",
         background="Soldier",
         base_ability_scores={"STR": 15, "DEX": 10, "CON": 13, "INT": 8, "WIS": 12, "CHA": 14},
         class_skill_choices=["Athletics", "Persuasion"],
@@ -204,10 +210,10 @@ def create_nim_ardentglass() -> Character:
     return apply_companion_profile(build_character(
         name="Nim Ardentglass",
         race="Gnome",
-        class_name="Wizard",
+        class_name="Mage",
         background="Sage",
         base_ability_scores={"STR": 8, "DEX": 13, "CON": 12, "INT": 15, "WIS": 14, "CHA": 10},
-        class_skill_choices=["Arcana", "Investigation"],
+        class_skill_choices=["Arcana", "History", "Investigation"],
         notes=["A pact cartographer who reads ruins like arguments left unfinished."],
         inventory={"Healing Potion": 1},
         tags=["hero", "companion"],
@@ -215,17 +221,20 @@ def create_nim_ardentglass() -> Character:
 
 
 def create_irielle_ashwake() -> Character:
-    return apply_companion_profile(build_character(
+    character = build_character(
         name="Irielle Ashwake",
         race="Tiefling",
-        class_name="Warlock",
+        class_name="Mage",
         background="Hermit",
         base_ability_scores={"STR": 8, "DEX": 13, "CON": 12, "INT": 10, "WIS": 14, "CHA": 15},
-        class_skill_choices=["Arcana", "Insight"],
+        class_skill_choices=["Arcana", "Insight", "Religion"],
         notes=["An escaped cult augur trying to stay ahead of the voices that once claimed to know her better than she did."],
         inventory={"Healing Potion": 1},
         tags=["hero", "companion"],
-    ), "irielle_ashwake")
+    )
+    character.spellcasting_ability = "CHA"
+    synchronize_magic_points(character, refill=True)
+    return apply_companion_profile(character, "irielle_ashwake")
 
 
 def enemy_base_avoidance(enemy: Character) -> int:

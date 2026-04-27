@@ -9466,7 +9466,7 @@ class CoreTests(unittest.TestCase):
             class_skill_choices=["Athletics", "Survival"],
         )
         game = TextDnDGame(
-            input_fn=lambda _: (_ for _ in ()).throw(AssertionError("companion catch-up should not prompt")),
+            input_fn=lambda _: "2",
             output_fn=lambda _: None,
             rng=random.Random(331),
         )
@@ -9477,6 +9477,8 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(companion.level, 1)
         game.recruit_companion(companion)
         self.assertEqual(companion.level, 3)
+        self.assertEqual(companion.bond_flags["companion_subclass"], "weapon_master")
+        self.assertTrue(companion.bond_flags["companion_subclass_player_chosen"])
         self.assertIs(game.state.companions[0], companion)
 
     def test_companion_from_camp_catches_up_when_joining_active_party(self) -> None:
@@ -9489,7 +9491,7 @@ class CoreTests(unittest.TestCase):
             class_skill_choices=["Athletics", "Survival"],
         )
         game = TextDnDGame(
-            input_fn=lambda _: (_ for _ in ()).throw(AssertionError("companion catch-up should not prompt")),
+            input_fn=lambda _: "4",
             output_fn=lambda _: None,
             rng=random.Random(332),
         )
@@ -9505,7 +9507,79 @@ class CoreTests(unittest.TestCase):
         game.move_companion_to_camp(game.state.companions[0])
         self.assertTrue(game.move_companion_to_party(rhogar))
         self.assertEqual(rhogar.level, 4)
+        self.assertEqual(rhogar.bond_flags["companion_subclass"], "bloodreaver")
+        self.assertTrue(rhogar.bond_flags["companion_subclass_player_chosen"])
         self.assertIn(rhogar, game.state.companions)
+
+    def test_companion_factories_use_retcon_classes_and_defaults(self) -> None:
+        expectations = [
+            (create_tolan_ironshield, "Warrior", "juggernaut", None),
+            (create_bryn_underbough, "Rogue", "shadowguard", None),
+            (create_elira_dawnmantle, "Mage", "aethermancer", "WIS"),
+            (create_kaelis_starling, "Rogue", "assassin", None),
+            (create_rhogar_valeguard, "Warrior", "bloodreaver", None),
+            (create_nim_ardentglass, "Mage", "arcanist", "INT"),
+            (create_irielle_ashwake, "Mage", "elementalist", "CHA"),
+        ]
+        for factory, class_name, subclass, casting_ability in expectations:
+            companion = factory()
+            self.assertEqual(companion.class_name, class_name)
+            self.assertEqual(companion.bond_flags["default_subclass"], subclass)
+            if casting_ability is not None:
+                self.assertEqual(companion.spellcasting_ability, casting_ability)
+
+    def test_companion_subclass_choice_at_level_three_filters_later_features(self) -> None:
+        player = build_character(
+            name="Velkor",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        answers = iter(["2"])
+        game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=lambda _: None, rng=random.Random(333))
+        game.state = GameState(player=player, current_scene="phandalin_hub")
+        companion = create_bryn_underbough()
+        game.recruit_companion(companion)
+
+        game.level_up_character(companion, 2)
+        game.level_up_character(companion, 3)
+        game.level_up_character(companion, 4)
+
+        self.assertEqual(companion.bond_flags["companion_subclass"], "assassin")
+        self.assertTrue(companion.bond_flags["companion_subclass_player_chosen"])
+        self.assertIn("death_mark", companion.features)
+        self.assertIn("quiet_knife", companion.features)
+        self.assertIn("sudden_end", companion.features)
+        self.assertNotIn("shadowguard_shadow", companion.features)
+        self.assertNotIn("poisoner_toxin", companion.features)
+
+    def test_late_level_companion_subclass_is_prepicked(self) -> None:
+        player = build_character(
+            name="Velkor",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        game = TextDnDGame(
+            input_fn=lambda _: (_ for _ in ()).throw(AssertionError("late companion subclass should not prompt")),
+            output_fn=lambda _: None,
+            rng=random.Random(334),
+        )
+        game.state = GameState(player=player, current_scene="phandalin_hub")
+        for next_level in (2, 3):
+            game.level_up_character_automatically(player, next_level, announce=False)
+        companion = create_nim_ardentglass()
+        companion.level = 3
+
+        game.recruit_companion(companion)
+
+        self.assertEqual(companion.bond_flags["companion_subclass"], "arcanist")
+        self.assertFalse(companion.bond_flags["companion_subclass_player_chosen"])
+        self.assertTrue(companion.bond_flags["companion_subclass_prepicked"])
 
     def test_talking_to_companion_improves_disposition(self) -> None:
         player = build_character(
@@ -13030,8 +13104,8 @@ class CoreTests(unittest.TestCase):
         game.state = GameState(player=player, current_scene="neverwinter_briefing")
         game.offer_early_companion()
         rendered = self.plain_output(log)
-        self.assertIn("Kaelis Starling, a ranger scout", rendered)
-        self.assertIn("Rhogar Valeguard, a paladin caravan-guard", rendered)
+        self.assertIn("Kaelis Starling, a scout-rogue with Assassin training", rendered)
+        self.assertIn("Rhogar Valeguard, an oathsworn Warrior lineholder", rendered)
         self.assertNotIn("Handle the road alone for now.", rendered)
 
     def test_neverwinter_tymora_shrine_can_recruit_elira_before_phandalin(self) -> None:
@@ -13124,10 +13198,10 @@ class CoreTests(unittest.TestCase):
 
     def test_wayside_elira_first_read_reflects_background_or_class(self) -> None:
         cases = [
-            ("Acolyte", "Cleric", ["Medicine", "Religion"], "faith_action", "faith can move your hands"),
-            ("Soldier", "Fighter", ["Athletics", "Survival"], "triage_competence", "You have seen triage before"),
+            ("Acolyte", "Mage", ["Medicine", "Religion", "Insight"], "faith_action", "faith can move your hands"),
+            ("Soldier", "Warrior", ["Athletics", "Survival"], "triage_competence", "You have seen triage before"),
             ("Criminal", "Rogue", ["Stealth", "Persuasion"], "unwatched_mercy", "No one important is watching"),
-            ("Sage", "Wizard", ["Arcana", "Investigation"], "knowledge_vs_saving", "do not mistake knowing it for saving him"),
+            ("Sage", "Mage", ["Arcana", "Investigation", "History"], "knowledge_vs_saving", "do not mistake knowing it for saving him"),
         ]
         for background, class_name, skills, expected_read, expected_text in cases:
             with self.subTest(background=background, class_name=class_name):

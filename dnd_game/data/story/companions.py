@@ -6,6 +6,59 @@ from ...models import Character
 PARTY_LIMIT = 4
 ACTIVE_COMPANION_LIMIT = PARTY_LIMIT - 1
 
+COMPANION_CLASS_RETCONS: dict[str, dict[str, str]] = {
+    "tolan_ironshield": {
+        "class_name": "Warrior",
+        "default_subclass": "juggernaut",
+        "secondary_subclass": "weapon_master",
+    },
+    "bryn_underbough": {
+        "class_name": "Rogue",
+        "default_subclass": "shadowguard",
+        "secondary_subclass": "assassin",
+    },
+    "elira_dawnmantle": {
+        "class_name": "Mage",
+        "default_subclass": "aethermancer",
+        "secondary_subclass": "spellguard",
+        "spellcasting_ability": "WIS",
+    },
+    "kaelis_starling": {
+        "class_name": "Rogue",
+        "default_subclass": "assassin",
+        "secondary_subclass": "shadowguard",
+    },
+    "rhogar_valeguard": {
+        "class_name": "Warrior",
+        "default_subclass": "bloodreaver",
+        "secondary_subclass": "juggernaut",
+    },
+    "nim_ardentglass": {
+        "class_name": "Mage",
+        "default_subclass": "arcanist",
+        "secondary_subclass": "spellguard",
+        "spellcasting_ability": "INT",
+    },
+    "irielle_ashwake": {
+        "class_name": "Mage",
+        "default_subclass": "elementalist",
+        "secondary_subclass": "arcanist",
+        "spellcasting_ability": "CHA",
+    },
+}
+
+
+def companion_class_retcon(companion_id: str) -> dict[str, str]:
+    return dict(COMPANION_CLASS_RETCONS.get(companion_id, {}))
+
+
+def companion_retcon_class(companion_id: str) -> str:
+    return str(COMPANION_CLASS_RETCONS.get(companion_id, {}).get("class_name", ""))
+
+
+def companion_default_subclass(companion_id: str) -> str:
+    return str(COMPANION_CLASS_RETCONS.get(companion_id, {}).get("default_subclass", ""))
+
 COMPANION_PROFILES: dict[str, dict[str, object]] = {
     "tolan_ironshield": {
         "name": "Tolan Ironshield",
@@ -206,7 +259,7 @@ COMPANION_PROFILES: dict[str, dict[str, object]] = {
     },
     "kaelis_starling": {
         "name": "Kaelis Starling",
-        "summary": "A sharp-eyed ranger scout who learned to trust patterns before promises.",
+        "summary": "A sharp-eyed scout-rogue with Assassin patience, trained to trust patterns before promises.",
         "lore": [
             "Kaelis spent years guiding outriders and woodsfolk through the northern edges of Greywake Wood, where bad judgment kills faster than steel does.",
             "He keeps private sketches of trails, ridges, and blind corners because memory alone has betrayed him once already.",
@@ -456,9 +509,15 @@ COMPANION_PROFILES: dict[str, dict[str, object]] = {
 
 def apply_companion_profile(character: Character, companion_id: str) -> Character:
     profile = COMPANION_PROFILES[companion_id]
+    retcon = companion_class_retcon(companion_id)
     character.companion_id = companion_id
     character.lore = list(profile["lore"])
-    character.bond_flags = {"talked_topics": []}
+    character.bond_flags = {
+        "talked_topics": [],
+        "retcon_class": retcon.get("class_name", ""),
+        "default_subclass": retcon.get("default_subclass", ""),
+        "secondary_subclass": retcon.get("secondary_subclass", ""),
+    }
     character.disposition = 0
     character.relationship_bonuses = {}
     character.notes.extend([profile["summary"]])
