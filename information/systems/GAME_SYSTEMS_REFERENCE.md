@@ -146,8 +146,6 @@ This file is a source-oriented reference for reading and debugging the current g
 - Starting HP: `hit die + CON modifier`, minimum `1`
 - Unarmored AC:
   - default: `10 + DEX`
-  - Barbarian: `10 + DEX + CON`
-  - Monk: `10 + DEX + WIS`
 - Weapon attack bonus: attack ability modifier + proficiency + weapon bonus + bonuses from features, gear, and relationships
 - Weapon damage bonus: attack ability modifier + weapon bonus + bonuses from features, gear, and relationships
 - Spell attack bonus: proficiency + spellcasting ability modifier + spell attack bonuses
@@ -158,10 +156,8 @@ This file is a source-oriented reference for reading and debugging the current g
 Combat spellcasting now uses Magic Points (`MP`) as the player-facing resource. Spell-slot resources still synchronize as compatibility data, but combat menus, party sheets, combatant summaries, rest recovery, and spell-refresh consumables all speak in MP.
 
 - MP is stored as `resources["mp"]` with the maximum in `max_resources["mp"]`
-- Full casters: `6 + 4 * level + max(0, spellcasting modifier)`
-- Pact casters: `4 + 3 * level + max(0, spellcasting modifier)`
-- Half casters from level 2 onward: `4 + 2 * level + max(0, spellcasting modifier)`
-- Feature casters, including level-1 Paladins with `divine_smite`, use `3 + max(0, spellcasting modifier)`
+- Mages: `6 + 4 * level + max(0, spellcasting modifier)`
+- Feature-based channelers use `3 + max(0, spellcasting modifier)` when a future feature grants `magic_initiate` or `racial_magic`
 - Characters without spellcasting or feature-caster access have no MP row
 - Creation, level reconciliation, and old-save integrity checks call `synchronize_magic_points`
 - Combat options only show spells the actor can currently afford; direct cast attempts with too little MP print the required cost and current MP
@@ -170,18 +166,9 @@ Combat spellcasting now uses Magic Points (`MP`) as the player-facing resource. 
 
 | Class | HD | Saves | Level 1 features | Starting resources | Spell stat |
 | --- | ---: | --- | --- | --- | --- |
-| Barbarian | d12 | STR, CON | Rage, Unarmored Defense | rage 2 | none |
-| Bard | d8 | DEX, CHA | Bard Spellcasting, Bardic Inspiration | MP by formula, bardic_inspiration 3 | CHA |
-| Cleric | d8 | WIS, CHA | Cleric Spellcasting | MP by formula | WIS |
-| Druid | d8 | INT, WIS | Druid Spellcasting | MP by formula | WIS |
-| Fighter | d10 | STR, CON | Second Wind | second_wind 1 | none |
-| Monk | d8 | STR, DEX | Martial Arts, Unarmored Defense | none | none |
-| Paladin | d10 | WIS, CHA | Lay on Hands, Divine Smite | lay_on_hands 5, MP from Divine Smite access | CHA |
-| Ranger | d10 | STR, DEX | Natural Explorer | none | none |
-| Rogue | d8 | DEX, INT | Sneak Attack, Expertise | none | none |
-| Sorcerer | d6 | CON, CHA | Sorcerer Spellcasting | MP by formula | CHA |
-| Warlock | d8 | WIS, CHA | Warlock Spellcasting | MP by pact formula | CHA |
-| Wizard | d6 | INT, WIS | Wizard Spellcasting, Arcane Recovery | MP by formula | INT |
+| Warrior | d10 | STR, CON | Grit, Guard Stance, Shove, Pin, Rally, Weapon Read | grit 1 | none |
+| Mage | d6 | INT, WIS | Charge, Focus, Minor Channel, Pattern Read, Ground, Focused Eye | MP by formula | INT |
+| Rogue | d8 | DEX, INT | Veilstrike, Deep Practice, Edge, Mark Work, Satchel Kit, Poison Work | none | none |
 
 ## Leveling
 
@@ -201,83 +188,27 @@ Combat spellcasting now uses Magic Points (`MP`) as the player-facing resource. 
 - HP gain on level-up: `max(1, hit_die // 2 + 1 + CON modifier)`
 - The player picks one new class skill at each level-up if one remains available
 - Companions auto-pick the first available class skill
-- Spellcasting characters resynchronize MP on level-up and save reconciliation; spell-slot values still synchronize as hidden compatibility data
-- Paladin Lay on Hands pool becomes `level * 5`
-- Monk ki scales to current level once ki has been unlocked
+- Mages resynchronize MP on level-up and save reconciliation; spell-slot values still synchronize as hidden compatibility data
 
 ### Class progression by level
 
-#### Barbarian
+#### Warrior
 
-- Level 2: Reckless Pressure, `+1 damage`, `+1 initiative`
-- Level 3: Primal Tenacity, `+1 AC while unarmored`
-- Level 4: Ferocious Presence, `+1 Intimidation`, `+1 CON saves`
+- Level 2: Hard Lesson; Grit maximum follows Endurance and training
+- Level 3: Juggernaut Training, Line Holder, `+1 Stability`
+- Level 4: Weapon Familiarity, Style Wheel, Berserker Training, Bloodreaver Training, `+1 attack`, `+1 damage`
 
-#### Bard
+#### Mage
 
-- Level 2: Cutting Wit, `+1 spell damage`
-- Level 3: Silver Tongue, `+1 Persuasion`, `+1 Deception`
-- Level 4: Stage Courage, `+1 initiative`, `+1 WIS saves`
-
-#### Cleric
-
-- Level 2: Channel Divinity, `channel_divinity 1`
-- Level 3: Disciple of Life, `+2 healing`
-- Level 4: Radiant Potency, `+1 spell damage`
-
-#### Druid
-
-- Level 2: Natural Recovery, short rests restore spellcasting stamina under the MP recovery rules
-- Level 3: Wildfire Adept, `+1 spell damage`, `+1 healing`
-- Level 4: Land's Embrace, `+1 AC`, `+1 WIS saves`
-
-#### Fighter
-
-- Level 2: Action Surge, `action_surge 1`
-- Level 3: Improved Critical, criticals on `19-20`
-- Level 4: Martial Mastery, `+1 attack`, `+1 damage`
-
-#### Monk
-
-- Level 2: Ki, Flurry of Blows, Patient Defense, Step of the Wind, Unarmored Focus, `ki 2`, `+1 AC`, `+1 initiative`
-- Level 3: Open Hand Timing, `+1 damage`
-- Level 4: Centered Spirit, `+1 WIS saves`, `+1 Insight`
-
-#### Paladin
-
-- Level 2: Divine Health, `+1 CON saves`, `+1 WIS saves`
-- Level 3: Aura of Resolve, `+1 AC`
-- Level 4: Radiant Strikes, `+1 damage`
-
-#### Ranger
-
-- Level 2: Hunter's Quarry, `+1 damage`
-- Level 3: Skirmisher's Eye, `+2 initiative`, `+1 Perception`
-- Level 4: Fieldcraft, `+1 Nature`, `+1 Survival`
+- Level 2: Field Sense, Steady Hands, `+1 CON saves`
+- Level 3: Counter-Cadence, `+1 WIS saves`
+- Level 4: Channel Focus, Spellguard Training, Arcanist Training, Elementalist Training, Aethermancer Training, `+1 channel strike`
 
 #### Rogue
 
 - Level 2: Cunning Action, `+2 Stealth`, `+2 initiative`
 - Level 3: Deadly Sneak Attack, Sneak Attack becomes `2d6`
 - Level 4: Evasion, `+2 DEX saves`
-
-#### Sorcerer
-
-- Level 2: Arcane Overflow, `+1 spell damage`
-- Level 3: Warped Grace, `+1 initiative`, `+1 CHA saves`
-- Level 4: Focused Will, `+1 spell attack`
-
-#### Warlock
-
-- Level 2: Patron's Sting, `+1 spell damage`
-- Level 3: Unnerving Presence, `+1 Intimidation`, `+1 WIS saves`
-- Level 4: Eldritch Precision, `+1 spell attack`
-
-#### Wizard
-
-- Level 2: Sculpted Cantrips, `+1 spell damage`
-- Level 3: Spellguard, `+1 INT saves`, `+1 initiative`
-- Level 4: Arcane Focus, `+1 spell attack`
 
 ## Races
 
@@ -302,8 +233,6 @@ Implemented directly in mechanics:
 - `lucky`: rerolls natural 1s on d20 rolls
 - `dwarven_resilience`: poison save advantage and poison resistance
 - `hellish_resistance`: fire resistance
-- `unarmored_defense_barbarian` and `unarmored_defense_monk`: AC formulas
-
 Present as tags and lore, but not given dedicated runtime logic yet:
 
 - `darkvision`
@@ -338,13 +267,13 @@ Present as tags and lore, but not given dedicated runtime logic yet:
 - Player combat options are grouped by `Action`, `Bonus Action`, `Item`, `Social`, `Escape`, and `End Turn`
 - Display numbers remain sequential from top to bottom across the grouped menu
 - Some abilities add or trade on top of that:
-  - Fighter Action Surge grants one extra action
-  - Monk Flurry of Blows, Patient Defense, and Step of the Wind use bonus action and ki
+  - Warrior Rally uses a bonus action and Grit
+  - Mage Pattern Read, Ground, Pulse Restore, and several ward tools use bonus actions
   - Rogue Cunning Action uses bonus action
   - Off-hand attack requires the Attack action first
 - Dodge is a full action
 - Trying to flee usually costs an action and uses Stealth vs DC `13`
-- Free flee can be created by Step of the Wind or Cunning Action dash/disengage
+- Free flee can be created by Cunning Action dash/disengage
 
 ### Initiative
 
@@ -370,7 +299,6 @@ Present as tags and lore, but not given dedicated runtime logic yet:
 ### Criticals
 
 - Normal critical threshold: `20`
-- Fighter with Improved Critical: `19-20`
 - Criticals double the dice count in the rolled expression
 
 ### Sneak Attack
@@ -392,33 +320,21 @@ Present as tags and lore, but not given dedicated runtime logic yet:
 
 | Spell or ability | Users | Cost | Effect |
 | --- | --- | --- | --- |
-| Sacred Flame | Cleric | action, 1 MP | DEX save vs WIS DC, `1d8` radiant, applies Reeling 1 |
-| Cure Wounds | Bard, Cleric, Druid, Paladin | action, 3 MP | `1d8 + casting mod + healing bonuses` |
-| Healing Word | Bard, Cleric, Druid | bonus action, 4 MP | `1d4 + casting mod + healing bonuses` |
-| Fire Bolt | Sorcerer, Wizard | action, 1 MP | spell attack, `1d10` fire, applies Burning 2 |
-| Produce Flame | Druid | action, 1 MP | spell attack, `1d8` fire, applies Burning 2 |
-| Magic Missile | Sorcerer, Wizard | action, 5 MP | auto-hit style implementation, `3d4+3` force |
-| Vicious Mockery | Bard | action, 1 MP | WIS save vs CHA DC, `1d6` psychic, applies Reeling 2 |
-| Eldritch Blast | Warlock | action, 1 MP | spell attack, `1d10` force, applies Reeling 1 |
-| Rage | Barbarian | bonus action, 1 rage | gains temp HP `4 + level`, applies Emboldened 3 |
-| Bardic Inspiration | Bard | bonus action, 1 inspiration | applies Blessed 2 to ally |
-| Second Wind | Fighter | bonus action, 1 use | heal `1d10 + level` |
-| Action Surge | Fighter | special, 1 use | adds 1 action |
-| Martial Arts | Monk | bonus action after attack | attack for `1d4 + normal monk damage bonus`, applies Reeling 1 |
-| Flurry of Blows | Monk | bonus action, 1 ki | two Martial Arts strikes |
-| Patient Defense | Monk | bonus action, 1 ki | applies dodge state until next turn |
-| Step of the Wind | Monk | bonus action, 1 ki | grants clean escape setup, may apply Emboldened 1 |
-| Lay on Hands | Paladin | action | heal up to 5 HP per use from remaining pool |
-| Divine Smite | Paladin | attack rider, 4 MP on hit | adds `2d8` radiant on a weapon hit |
-| Channel Divinity | Cleric level 2+ | action, 1 use | `2d8` radiant, applies Stunned 1 |
-| Cunning Action | Rogue level 2+ | bonus action | hide for Invisible 2 on success, or create flee opening |
+| Minor Channel | Mage | action, 1 MP | INT channel strike, `1d8` force, builds Focus on pressure |
+| Arc Pulse | Mage | action, 1 MP | resist check for `1d8` force, adds Pattern Charge on a clean hit |
+| Ember Lance | Mage | action, 1 MP | channel strike for fire damage and burning pressure |
+| Frost Shard | Mage | action, 1 MP | channel strike for cold damage and slowing pressure |
+| Volt Grasp | Mage | action, 1 MP | close channel strike with shock pressure |
+| Field Mend | Mage | action, 3 MP | field healing using the Mage channel DC lane |
+| Pulse Restore | Mage | bonus action, 4 MP | fast ally healing that leaves the action free |
+| Warrior Rally | Warrior | bonus action, 1 Grit | clears Reeling or grants Guarded 1 |
+| Cunning Action | Rogue level 2+ | bonus action | hide for Invisible 2 on success, or create a flee opening |
 | Help a Downed Ally | any hero | action | Medicine check DC `10`; on success target returns at 1 HP, on failure target stabilizes |
 
 ### Spell timing rule
 
-- If a bonus-action spell is cast, the turn blocks non-cantrip action spells
-- If a leveled action spell is cast, the turn blocks bonus-action spellcasting
-- Cantrip-style attacks like Fire Bolt, Sacred Flame, Produce Flame, Vicious Mockery, and Eldritch Blast remain available as actions
+- Bonus-action channeling spends the bonus action; action channels remain available if the actor still has an action
+- Expensive Mage channels are gated by MP and feature training
 
 ## Status Effects
 
@@ -486,7 +402,7 @@ Present as tags and lore, but not given dedicated runtime logic yet:
 - Short rest:
   - heals each living party member for half maximum HP, rounded up
   - restores short-rest resources like Second Wind, Action Surge, Channel Divinity, and ki
-  - restores half maximum MP, rounded up, for non-warlock MP users
+  - restores half maximum MP, rounded up, for Mage MP users
   - restores all MP for Warlocks
   - Arcane Recovery and Natural Recovery still restore one hidden compatibility spell slot while combat casting uses MP
 - Long rest:

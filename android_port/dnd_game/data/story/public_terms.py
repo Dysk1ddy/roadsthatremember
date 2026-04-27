@@ -46,15 +46,6 @@ SKILL_PUBLIC_LABELS: dict[str, str] = {}
 
 
 SPELL_PUBLIC_LABELS = {
-    "sacred_flame": "Lantern Flare",
-    "produce_flame": "Embercall",
-    "vicious_mockery": "Cutting Cadence",
-    "fire_bolt": "Ember Lance",
-    "eldritch_blast": "Void Surge",
-    "cure_wounds": "Field Mend",
-    "healing_word": "Pulse Restore",
-    "magic_missile": "Arc Pulse",
-    "divine_smite": "Oathflare Strike",
     "minor_channel": "Minor Channel",
     "arc_pulse": "Arc Pulse",
     "marked_angle": "Marked Angle",
@@ -75,15 +66,6 @@ SPELL_PUBLIC_LABELS = {
 
 
 SPELL_NAME_TO_ID = {
-    "Sacred Flame": "sacred_flame",
-    "Produce Flame": "produce_flame",
-    "Vicious Mockery": "vicious_mockery",
-    "Fire Bolt": "fire_bolt",
-    "Eldritch Blast": "eldritch_blast",
-    "Cure Wounds": "cure_wounds",
-    "Healing Word": "healing_word",
-    "Magic Missile": "magic_missile",
-    "Divine Smite": "divine_smite",
     "Arc Pulse": "arc_pulse",
     "Marked Angle": "marked_angle",
     "Ember Lance": "ember_lance",
@@ -103,24 +85,8 @@ SPELL_NAME_TO_ID = {
 
 
 FEATURE_PUBLIC_LABELS = {
-    "rage": "Battle Surge",
-    "unarmored_defense_barbarian": "Scar Guard",
-    "bard_spellcasting": "Bard Channeling",
-    "bardic_inspiration": "Rally Note",
-    "cleric_spellcasting": "Cleric Channeling",
-    "druid_spellcasting": "Druid Channeling",
-    "second_wind": "Second Breath",
-    "martial_arts": "Close Form",
-    "unarmored_defense_monk": "Empty-Hand Guard",
-    "lay_on_hands": "Oath Mend",
-    "divine_smite": "Oathflare Strike",
-    "natural_explorer": "Route Sense",
     "sneak_attack": "Veilstrike",
     "expertise": "Deep Practice",
-    "sorcerer_spellcasting": "Sorcerer Channeling",
-    "warlock_spellcasting": "Warlock Channeling",
-    "wizard_spellcasting": "Wizard Channeling",
-    "arcane_recovery": "Pattern Recovery",
     "mage_charge": "Charge",
     "mage_focus": "Focus",
     "minor_channel": "Minor Channel",
@@ -143,34 +109,6 @@ FEATURE_PUBLIC_LABELS = {
     "hellish_resistance": "Fire-Blooded Resistance",
     "stone_endurance": "Riverfolk Endurance",
     "adrenaline_rush": "Orc Rush",
-    "reckless_pressure": "Reckless Pressure",
-    "primal_tenacity": "Primal Tenacity",
-    "ferocious_presence": "Ferocious Presence",
-    "cutting_wit": "Cutting Wit",
-    "silver_tongue_bard": "Silver Tongue",
-    "stage_courage": "Stage Courage",
-    "channel_divinity": "Lantern Surge",
-    "disciple_of_life": "Field Medic Doctrine",
-    "radiant_potency": "Lantern Potency",
-    "natural_recovery": "Natural Recovery",
-    "wildfire_adept": "Wildfire Adept",
-    "lands_embrace": "Land's Embrace",
-    "action_surge": "Battle Surge",
-    "improved_critical": "Keen Critical",
-    "martial_mastery": "Martial Mastery",
-    "ki": "Focus",
-    "flurry_of_blows": "Twinflow Strikes",
-    "patient_defense": "Still Guard",
-    "step_of_the_wind": "Wind Step",
-    "unarmored_focus": "Unarmored Focus",
-    "open_hand_timing": "Open-Hand Timing",
-    "centered_spirit": "Centered Spirit",
-    "divine_health": "Oath Health",
-    "aura_of_resolve": "Resolve Aura",
-    "radiant_strikes": "Oathlit Strikes",
-    "hunters_quarry": "Marked Quarry",
-    "skirmisher_eye": "Skirmisher's Eye",
-    "fieldcraft": "Fieldcraft",
     "cunning_action": "Veil Step",
     "rogue_edge": "Edge",
     "rogue_mark": "Mark Work",
@@ -202,14 +140,6 @@ FEATURE_PUBLIC_LABELS = {
     "field_stitch": "Field Stitch",
     "improved_sneak_attack": "Deadly Veilstrike",
     "evasion": "Evasion",
-    "arcane_overflow": "Flux Overflow",
-    "warped_grace": "Warped Grace",
-    "focused_will": "Focused Will",
-    "patrons_sting": "Patron's Sting",
-    "unnerving_presence": "Unnerving Presence",
-    "eldritch_precision": "Void Precision",
-    "sculpted_cantrips": "Sculpted Minor Channels",
-    "spellguard": "Scriptguard",
     "arcane_focus": "Channel Focus",
     "warrior_grit": "Grit",
     "warrior_guard": "Guard Stance",
@@ -264,20 +194,13 @@ FEATURE_PUBLIC_LABELS = {
     "blue_glass_palm": "Blue Glass Palm",
     "lockstep_field": "Lockstep Field",
     "hard_lesson": "Hard Lesson",
-    "line_fighter": "Line Fighter",
+    "line_holder": "Line Holder",
     "weapon_familiarity": "Weapon Familiarity",
 }
 
 
 RESOURCE_PUBLIC_LABELS = {
     "mp": "MP",
-    "rage": "battle surge",
-    "bardic_inspiration": "rally note",
-    "lay_on_hands": "oath mend",
-    "channel_divinity": "lantern surge",
-    "action_surge": "battle surge",
-    "ki": "focus",
-    "second_wind": "second breath",
     "grit": "grit",
     "momentum": "momentum",
     "combo": "combo",
@@ -370,8 +293,7 @@ def skill_option_label(skill_name: str) -> str:
 def feature_label(feature_id: str) -> str:
     if feature_id in FEATURE_PUBLIC_LABELS:
         return FEATURE_PUBLIC_LABELS[feature_id]
-    label = feature_id.replace("_barbarian", "").replace("_monk", "")
-    return label.replace("_", " ").title()
+    return feature_id.replace("_", " ").title()
 
 
 def resource_label(resource_name: str) -> str:

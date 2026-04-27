@@ -5,25 +5,11 @@ from math import ceil
 MAGIC_POINT_RESOURCE = "mp"
 SPELL_SLOT_RESTORE_MP = 4
 
-FULL_CASTER_CLASSES = {"Bard", "Cleric", "Druid", "Mage", "Sorcerer", "Wizard"}
-HALF_CASTER_CLASSES = {"Paladin", "Ranger"}
-PACT_CASTER_CLASSES = {"Warlock"}
+FULL_CASTER_CLASSES = {"Mage"}
 
-FEATURE_CASTER_IDS = {
-    "divine_smite",
-    "magic_initiate",
-    "racial_magic",
-}
+FEATURE_CASTER_IDS = {"magic_initiate", "racial_magic"}
 
 SPELL_MP_COSTS: dict[str, int] = {
-    "sacred_flame": 1,
-    "produce_flame": 1,
-    "vicious_mockery": 1,
-    "fire_bolt": 1,
-    "eldritch_blast": 1,
-    "cure_wounds": 3,
-    "healing_word": 3,
-    "magic_missile": 5,
     "minor_channel": 1,
     "arc_pulse": 1,
     "marked_angle": 1,
@@ -40,7 +26,6 @@ SPELL_MP_COSTS: dict[str, int] = {
     "ward_shell": 2,
     "blue_glass_palm": 1,
     "lockstep_field": 3,
-    "divine_smite": 4,
 }
 
 
@@ -66,12 +51,6 @@ def max_magic_points(actor) -> int:
     class_name = getattr(actor, "class_name", "")
     if class_name in FULL_CASTER_CLASSES:
         return 6 + (4 * level) + spell_mod
-    if class_name in HALF_CASTER_CLASSES:
-        if level < 2:
-            return 3 + spell_mod if has_feature_caster_access(actor) else 0
-        return 4 + (2 * level) + spell_mod
-    if class_name in PACT_CASTER_CLASSES:
-        return 4 + (3 * level) + spell_mod
     if has_feature_caster_access(actor):
         return 3 + spell_mod
     return 0

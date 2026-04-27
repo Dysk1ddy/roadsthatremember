@@ -2,9 +2,7 @@ from __future__ import annotations
 
 SPELL_SLOT_LEVELS = (1, 2, 3, 4)
 
-FULL_CASTER_CLASSES = {"Bard", "Cleric", "Druid", "Mage", "Sorcerer", "Wizard"}
-HALF_CASTER_CLASSES = {"Paladin", "Ranger"}
-WARLOCK_CLASSES = {"Warlock"}
+FULL_CASTER_CLASSES = {"Mage"}
 
 FULL_CASTER_SLOT_TABLE: dict[int, dict[int, int]] = {
     1: {1: 2},
@@ -16,29 +14,6 @@ FULL_CASTER_SLOT_TABLE: dict[int, dict[int, int]] = {
     7: {1: 4, 2: 3, 3: 3, 4: 1},
     8: {1: 4, 2: 3, 3: 3, 4: 2},
 }
-
-HALF_CASTER_SLOT_TABLE: dict[int, dict[int, int]] = {
-    1: {},
-    2: {1: 2},
-    3: {1: 3},
-    4: {1: 3},
-    5: {1: 4, 2: 2},
-    6: {1: 4, 2: 2},
-    7: {1: 4, 2: 3},
-    8: {1: 4, 2: 3},
-}
-
-WARLOCK_PACT_SLOT_TABLE: dict[int, dict[int, int]] = {
-    1: {1: 1},
-    2: {1: 2},
-    3: {2: 2},
-    4: {2: 2},
-    5: {3: 2},
-    6: {3: 2},
-    7: {4: 2},
-    8: {4: 2},
-}
-
 
 def spell_slot_resource_name(slot_level: int) -> str:
     return f"spell_slots_{slot_level}"
@@ -56,10 +31,6 @@ def spell_slot_capacity_for(class_name: str, level: int) -> dict[int, int]:
     bounded_level = max(1, min(8, int(level)))
     if class_name in FULL_CASTER_CLASSES:
         return dict(FULL_CASTER_SLOT_TABLE.get(bounded_level, {}))
-    if class_name in HALF_CASTER_CLASSES:
-        return dict(HALF_CASTER_SLOT_TABLE.get(bounded_level, {}))
-    if class_name in WARLOCK_CLASSES:
-        return dict(WARLOCK_PACT_SLOT_TABLE.get(bounded_level, {}))
     return {}
 
 

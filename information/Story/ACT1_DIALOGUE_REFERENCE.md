@@ -143,18 +143,9 @@ Condition: player has the class and has not used the one-shot class identity act
 
 | Class | Dialogue option | Result |
 | --- | --- | --- |
-| Barbarian | `[INTIMIDATION] Rest a hand on your weapon and promise to break the gang's spine at the watchtower.` | DC 12. Success rewards 10 XP and clue about fear/shock tactics; failure cools Mira's trust. |
-| Bard | `[PERSUASION] "If they're spreading fear, I can answer with a better story and a sharper tongue."` | DC 11. Success rewards 10 XP, 6 gp, and teamster prayer/route clue. |
-| Cleric | `[INSIGHT] "Tell me who is suffering first. That's where the road really begins."` | DC 11. Success rewards 10 XP and clue about exhausted families choosing fear over wages. |
-| Druid | `[NATURE] "Has the land changed where they strike? Smoke in the brush, foul water, ash on the roots?"` | DC 12. Success rewards 10 XP and clue about blackened scrub/runoff. |
-| Fighter | `Lean over the map and ask for approach lanes, numbers, fallback ground, and discipline.` | No check. Rewards 10 XP and scout-perch/timing clue. |
-| Monk | `[INSIGHT] "Slow down. Give me only what someone actually saw, not what fear made louder afterward."` | DC 12. Success rewards 10 XP and witness-pattern clue. |
-| Paladin | `"Then I give you my word: this road will not stay in their hands."` | No check. Rewards 10 XP, 8 gp, and disciplined-leadership warning. |
-| Ranger | `[SURVIVAL] Ask for ridge lines, blind turns, and places scouts vanish.` | DC 11. Success rewards 10 XP and clue about observer/retreat terrain. |
+| Warrior | `Lean over the map and ask for approach lanes, numbers, fallback ground, and who has held discipline under pressure.` | No check. Rewards 10 XP and scout-perch/timing clue. |
+| Mage | `[INVESTIGATION] Ask for the original reports instead of the polished summary and compare repeats.` | DC 11. Success rewards 10 XP and repeated route/timing clue. |
 | Rogue | `[DECEPTION] "Smug little operation, then. The sort of crew that mistakes being organized for being untouchable."` | DC 12. Success rewards 10 XP, 4 gp, and stolen-ore clue. |
-| Sorcerer | `[ARCANA] "If they're nesting in old ruins, show me the places where old stone and bad ambition start talking to each other."` | DC 12. Success rewards 10 XP and old-site/hidden-chamber clue. |
-| Warlock | `[INTIMIDATION] "Fear leaves a shape behind. So does greed. Which one do these people kneel to first?"` | DC 12. Success rewards 6 XP and clue that profit comes first, fear protects it. |
-| Wizard | `[INVESTIGATION] Ask for the original reports instead of the polished summary and compare repeats.` | DC 11. Success rewards 10 XP and repeated route/timing clue. |
 
 ### Greywake Preparation
 

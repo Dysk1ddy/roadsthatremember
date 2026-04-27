@@ -192,7 +192,7 @@ Player-facing framing:
 
 - The Ashen Brand is beaten.
 - Phandalin is genuinely safer.
-- Varyn did not teleport away like a normal wizard.
+- Varyn did not teleport away like a normal mage.
 - He exited the version of the route the player was standing in.
 
 Gameplay changes:
@@ -613,4 +613,3 @@ After Act 3 midpoint:
 - Act 2 must still belong to Caldra and the Quiet Choir on the surface.
 - The hidden villain reveal should make earlier clues click without making the player feel lied to.
 - Gameplay must preserve agency: prediction mechanics can pressure choices, but they should not remove meaningful choice.
-

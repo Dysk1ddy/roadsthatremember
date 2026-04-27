@@ -18,7 +18,7 @@ This version expands each companion with:
 
 ---
 
-## Kaelis Starling (Astral Elf Ranger)
+## Kaelis Starling (Astral Elf Rogue)
 
 ### Early Life
 Kaelis grew up on the edge of cultivated land, where farms turned into wilderness without warning. His mother taught him survival; his father—absent but mythologized—left him with stories of precision, patience, and detachment. Kaelis internalized both, but never fully trusted either worldview.
@@ -48,7 +48,7 @@ The failed caravan wasn’t just a job—it was his first independent contract. 
 
 ---
 
-## Rhogar Valeguard (Forged Paladin)
+## Rhogar Valeguard (Forged Warrior)
 
 ### Early Life
 Raised within a structured order tied to caravan protection, Rhogar was taught that order prevents chaos. His entire identity was built around discipline, hierarchy, and oathkeeping.
@@ -81,7 +81,7 @@ He discovered his order was selectively protecting caravans—prioritizing profi
 
 ---
 
-## Tolan Ironshield (Dwarf Fighter)
+## Tolan Ironshield (Dwarf Warrior)
 
 ### Early Life
 Born into a clan that prized formation combat, Tolan trained his entire life to fight as part of a unit—not as an individual.
@@ -147,7 +147,7 @@ Realized her routes enabled violent raids. She didn’t *see* the consequences u
 
 ---
 
-## Elira Dawnmantle (Human Cleric)
+## Elira Dawnmantle (Human Mage)
 
 ### Early Life
 Raised in a temple that emphasized hope, but stationed in harsh frontier regions where hope often failed.
@@ -220,7 +220,7 @@ Design intent:
 
 ---
 
-## Nim Ardentglass (Unrecorded Wizard) [ADDED TO V2]
+## Nim Ardentglass (Unrecorded Mage) [ADDED TO V2]
 
 ### Early Life
 Nim was raised among Pact archivists who treated maps like sacred objects. From a young age, he learned that knowledge wasn’t just power—it was responsibility.
@@ -249,7 +249,7 @@ During a deep survey beneath the Sword Mountains, his entire team vanished witho
 
 ---
 
-## Irielle Ashwake (Fire-Blooded Warlock) [ADDED TO V2]
+## Irielle Ashwake (Fire-Blooded Mage) [ADDED TO V2]
 
 ### Early Life
 Irielle was raised within a Quiet Choir-adjacent community where certain individuals were trained to “listen” to something deeper beneath reality.

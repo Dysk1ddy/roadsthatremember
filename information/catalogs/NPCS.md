@@ -155,7 +155,7 @@ These entries are unique names or aliases used in scenes, intros, or reference m
 | Ashen Brand Runner | `bandit` or `ash_brand_enforcer` depending on scene | Soldier prologue, Cinderfall relay | Courier / runner label for Ashen Brand field agents. |
 | Ashen Brand Collector | `bandit` | Blacklake Warehouse, Duskmere Cellars | Dockside broker-enforcer variant. |
 | Archive Cutout | `bandit_archer` | Sage prologue, Duskmere Cellars | Hired bow-hand connected to archive theft. |
-| Ashen Brand Fixer | `bandit` | Market prologue, Blackglass Well, Emberhall | Broker-like knife fighter and problem solver. |
+| Ashen Brand Fixer | `bandit` | Market prologue, Blackglass Well, Emberhall | Broker-like knife-hand and problem solver. |
 | Ashen Brand Teamster | `bandit_archer` | Guild Artisan prologue | Wagon hand gone bad. |
 | Ashen Brand Barracks Archer | `bandit_archer` | Ashfall lower barracks | Barracks archer variant. |
 | Ashen Brand Enforcer | `ash_brand_enforcer`; in one support placement may be a renamed `bandit` | Ashfall, Varyn support, Emberhall reserve | Use the enemy's `archetype` to determine exact behavior. |

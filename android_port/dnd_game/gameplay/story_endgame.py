@@ -120,7 +120,7 @@ class StoryEndgameMixin:
 
         boss_encounter = Encounter(
             title="Miniboss: Rukhar Cinderfang",
-            description="The Ashen Brand sergeant rallies his last loyal fighters.",
+            description="The Ashen Brand sergeant rallies his last loyal blades.",
             enemies=boss_enemies,
             allow_flee=True,
             allow_parley=True,

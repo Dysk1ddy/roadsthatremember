@@ -90,7 +90,7 @@ CLASS_SUBCLASS_OPTIONS: dict[str, tuple[dict[str, str], ...]] = {
 CLASS_SUBCLASS_FEATURE_IDS: dict[str, dict[int, dict[str, list[str]]]] = {
     "Warrior": {
         3: {
-            "juggernaut": ["juggernaut_momentum", "iron_draw", "shoulder_in", "line_fighter"],
+            "juggernaut": ["juggernaut_momentum", "iron_draw", "shoulder_in", "line_holder"],
             "weapon_master": ["weapon_master_combo", "style_wheel", "measure_twice"],
             "berserker": ["berserker_fury", "redline", "reckless_cut"],
             "bloodreaver": ["bloodreaver_blood_debt", "red_mark", "blood_price"],
@@ -424,18 +424,6 @@ class ProgressionMixin:
     def scale_level_resources(self, actor: Character, *, refill: bool = True) -> None:
         synchronize_spell_slots(actor, refill=refill)
         synchronize_magic_points(actor, refill=refill)
-        if actor.class_name == "Paladin":
-            actor.max_resources["lay_on_hands"] = actor.level * 5
-            if refill:
-                actor.resources["lay_on_hands"] = actor.max_resources["lay_on_hands"]
-        if actor.class_name == "Fighter":
-            actor.max_resources["second_wind"] = max(actor.max_resources.get("second_wind", 1), 1)
-            if refill:
-                actor.resources["second_wind"] = actor.max_resources["second_wind"]
-        if actor.class_name == "Monk" and actor.level >= 2:
-            actor.max_resources["ki"] = max(actor.max_resources.get("ki", actor.level), actor.level)
-            if refill:
-                actor.resources["ki"] = actor.max_resources["ki"]
         synchronize_class_resources = getattr(self, "synchronize_class_resources", None)
         if callable(synchronize_class_resources):
             synchronize_class_resources(actor, refill=refill)

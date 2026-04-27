@@ -7240,16 +7240,9 @@ class MapSystemMixin:
 
     def combat_damage_pressure_score(self, hero) -> tuple[int, int, int]:
         class_pressure = {
-            "Barbarian": 4,
-            "Cleric": 2,
-            "Fighter": 3,
-            "Paladin": 3,
+            "Warrior": 3,
             "Rogue": 3,
-            "Ranger": 2,
-            "Monk": 2,
-            "Warlock": 2,
-            "Sorcerer": 2,
-            "Wizard": 2,
+            "Mage": 2,
         }.get(getattr(hero, "class_name", ""), 0)
         return (hero.attack_bonus() + hero.damage_bonus() + class_pressure, hero.level, hero.current_hp)
 
@@ -7988,7 +7981,7 @@ class MapSystemMixin:
             )
             if success:
                 self.state.flags["ashfall_orders_read"] = True
-                self.add_clue("Rukhar rotates his strongest fighters through the lower barracks before taking the courtyard himself.")
+                self.add_clue("Rukhar rotates his strongest blades through the lower barracks before taking the courtyard himself.")
                 self.reward_party(xp=15, reason="reading Rukhar's order board under pressure")
                 self.say("You catch enough of the rotation to know exactly which door the inner response will use.")
             else:
@@ -8029,7 +8022,7 @@ class MapSystemMixin:
             )
             if success:
                 self.state.flags["ashfall_orders_read"] = True
-                self.add_clue("Rukhar rotates his strongest fighters through the lower barracks before taking the courtyard himself.")
+                self.add_clue("Rukhar rotates his strongest blades through the lower barracks before taking the courtyard himself.")
                 self.reward_party(xp=15, reason="reading Rukhar's order board under pressure")
                 self.say("You catch enough of the rotation to know exactly which door the inner response will use.")
             else:

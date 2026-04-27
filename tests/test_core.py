@@ -117,7 +117,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -323,7 +323,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -339,7 +339,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -358,7 +358,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -448,7 +448,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -874,7 +874,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -1017,7 +1017,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -1033,7 +1033,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -1051,7 +1051,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -1187,7 +1187,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -1487,7 +1487,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -1505,7 +1505,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -1527,7 +1527,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -1600,7 +1600,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -1620,7 +1620,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -1643,7 +1643,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -1676,7 +1676,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -1709,7 +1709,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -1759,7 +1759,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -1799,7 +1799,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -1842,7 +1842,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -1858,7 +1858,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -1879,7 +1879,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -1896,7 +1896,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -1926,7 +1926,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -1958,7 +1958,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -2046,7 +2046,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -2074,7 +2074,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 16, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -2102,7 +2102,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -2119,7 +2119,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -2152,7 +2152,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -2172,7 +2172,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -2196,7 +2196,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -2459,7 +2459,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -2501,7 +2501,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -2598,7 +2598,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -2643,7 +2643,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -2687,7 +2687,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -2822,7 +2822,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -2860,7 +2860,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -2897,7 +2897,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -2940,7 +2940,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -3157,7 +3157,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -3182,7 +3182,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -3220,7 +3220,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -3262,7 +3262,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -3285,7 +3285,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -3313,7 +3313,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -3343,7 +3343,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -3369,7 +3369,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -3395,7 +3395,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -3414,7 +3414,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -3440,7 +3440,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -3468,7 +3468,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -3499,7 +3499,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -3529,7 +3529,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -3543,7 +3543,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -3571,7 +3571,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -3597,7 +3597,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Charlatan",
             base_ability_scores={"STR": 14, "DEX": 14, "CON": 13, "INT": 10, "WIS": 10, "CHA": 15},
             class_skill_choices=["Athletics", "Survival"],
@@ -3624,7 +3624,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Cleric",
+            class_name="Mage",
             background="Acolyte",
             base_ability_scores={"STR": 10, "DEX": 12, "CON": 13, "INT": 10, "WIS": 15, "CHA": 14},
             class_skill_choices=["Insight", "Medicine"],
@@ -3664,7 +3664,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Wizard",
+            class_name="Mage",
             background="Sage",
             base_ability_scores={"STR": 8, "DEX": 13, "CON": 12, "INT": 15, "WIS": 14, "CHA": 10},
             class_skill_choices=["Arcana", "History"],
@@ -3701,7 +3701,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -3738,7 +3738,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -3774,7 +3774,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Outlander",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -3824,7 +3824,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -3903,7 +3903,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 8, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -3925,7 +3925,7 @@ class CoreTests(unittest.TestCase):
         protected_player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 8, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -3952,7 +3952,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -3975,7 +3975,7 @@ class CoreTests(unittest.TestCase):
         protected_player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -4003,7 +4003,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -4030,7 +4030,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -4068,7 +4068,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -4093,7 +4093,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -4132,7 +4132,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -4162,7 +4162,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -4190,7 +4190,7 @@ class CoreTests(unittest.TestCase):
             player=build_character(
                 name="Vale",
                 race="Human",
-                class_name="Fighter",
+                class_name="Warrior",
                 background="Soldier",
                 base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
                 class_skill_choices=["Athletics", "Survival"],
@@ -4220,7 +4220,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -4283,7 +4283,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -4320,7 +4320,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -4344,7 +4344,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -4376,7 +4376,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -4404,7 +4404,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -4425,7 +4425,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -4458,7 +4458,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -4557,7 +4557,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -4591,7 +4591,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -4614,7 +4614,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -4640,7 +4640,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -4671,7 +4671,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -4702,7 +4702,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -4733,7 +4733,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -4757,7 +4757,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -4784,7 +4784,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -4810,7 +4810,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -4844,7 +4844,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -4868,7 +4868,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -4915,7 +4915,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -4955,7 +4955,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -4987,7 +4987,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -5025,7 +5025,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -5061,7 +5061,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -5115,7 +5115,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -5141,7 +5141,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -5167,7 +5167,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -5200,7 +5200,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -5251,7 +5251,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -5313,7 +5313,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -5377,7 +5377,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -5432,7 +5432,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -5484,7 +5484,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -5529,7 +5529,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -5585,7 +5585,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -5649,7 +5649,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -5714,7 +5714,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -5783,7 +5783,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -5824,7 +5824,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -5863,7 +5863,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -5908,7 +5908,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -5947,7 +5947,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -5987,7 +5987,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -6033,7 +6033,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -6071,7 +6071,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -6118,7 +6118,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -6153,7 +6153,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -6203,7 +6203,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -6246,7 +6246,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -6303,7 +6303,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -6359,7 +6359,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -6418,7 +6418,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -6508,7 +6508,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Iri",
             race="Human",
-            class_name="Wizard",
+            class_name="Mage",
             background="Sage",
             base_ability_scores={"STR": 8, "DEX": 14, "CON": 12, "INT": 15, "WIS": 13, "CHA": 10},
             class_skill_choices=["Arcana", "Investigation"],
@@ -6554,7 +6554,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -6584,7 +6584,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -6612,7 +6612,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -6662,7 +6662,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -6700,7 +6700,7 @@ class CoreTests(unittest.TestCase):
                 player = build_character(
                     name="Vale",
                     race="Human",
-                    class_name="Fighter",
+                    class_name="Warrior",
                     background="Soldier",
                     base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
                     class_skill_choices=["Athletics", "Survival"],
@@ -6735,7 +6735,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -6767,7 +6767,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -6802,7 +6802,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -6851,7 +6851,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -6877,7 +6877,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -6929,7 +6929,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -6963,7 +6963,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -6988,7 +6988,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -7026,7 +7026,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Iri",
             race="Human",
-            class_name="Wizard",
+            class_name="Mage",
             background="Sage",
             base_ability_scores={"STR": 8, "DEX": 14, "CON": 12, "INT": 15, "WIS": 13, "CHA": 10},
             class_skill_choices=["Arcana", "Investigation"],
@@ -7076,7 +7076,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Iri",
             race="Human",
-            class_name="Wizard",
+            class_name="Mage",
             background="Sage",
             base_ability_scores={"STR": 8, "DEX": 14, "CON": 12, "INT": 15, "WIS": 13, "CHA": 10},
             class_skill_choices=["Arcana", "Investigation"],
@@ -7131,7 +7131,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Iri",
             race="Human",
-            class_name="Wizard",
+            class_name="Mage",
             background="Sage",
             base_ability_scores={"STR": 8, "DEX": 14, "CON": 12, "INT": 15, "WIS": 13, "CHA": 10},
             class_skill_choices=["Arcana", "Investigation"],
@@ -7164,7 +7164,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Iri",
             race="Human",
-            class_name="Wizard",
+            class_name="Mage",
             background="Sage",
             base_ability_scores={"STR": 8, "DEX": 14, "CON": 12, "INT": 15, "WIS": 13, "CHA": 10},
             class_skill_choices=["Arcana", "Investigation"],
@@ -7194,7 +7194,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Iri",
             race="Human",
-            class_name="Wizard",
+            class_name="Mage",
             background="Sage",
             base_ability_scores={"STR": 8, "DEX": 14, "CON": 12, "INT": 15, "WIS": 13, "CHA": 10},
             class_skill_choices=["Arcana", "Investigation"],
@@ -7224,7 +7224,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Iri",
             race="Human",
-            class_name="Wizard",
+            class_name="Mage",
             background="Sage",
             base_ability_scores={"STR": 8, "DEX": 14, "CON": 12, "INT": 15, "WIS": 13, "CHA": 10},
             class_skill_choices=["Arcana", "Investigation"],
@@ -7254,7 +7254,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Iri",
             race="Human",
-            class_name="Wizard",
+            class_name="Mage",
             background="Sage",
             base_ability_scores={"STR": 8, "DEX": 14, "CON": 12, "INT": 15, "WIS": 13, "CHA": 10},
             class_skill_choices=["Arcana", "Investigation"],
@@ -7275,7 +7275,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Iri",
             race="Human",
-            class_name="Wizard",
+            class_name="Mage",
             background="Sage",
             base_ability_scores={"STR": 8, "DEX": 14, "CON": 12, "INT": 15, "WIS": 13, "CHA": 10},
             class_skill_choices=["Arcana", "Investigation"],
@@ -7308,7 +7308,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Iri",
             race="Human",
-            class_name="Wizard",
+            class_name="Mage",
             background="Sage",
             base_ability_scores={"STR": 8, "DEX": 14, "CON": 12, "INT": 15, "WIS": 13, "CHA": 10},
             class_skill_choices=["Arcana", "Investigation"],
@@ -7360,7 +7360,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -7379,7 +7379,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -7411,7 +7411,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -7433,7 +7433,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -7491,7 +7491,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -7508,7 +7508,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -7527,7 +7527,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -7549,7 +7549,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -7571,7 +7571,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -7629,7 +7629,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -7652,7 +7652,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -7682,7 +7682,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -7703,7 +7703,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -7724,7 +7724,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -7745,7 +7745,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -7762,7 +7762,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -7787,7 +7787,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -7818,7 +7818,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -7842,7 +7842,7 @@ class CoreTests(unittest.TestCase):
             player=build_character(
                 name="Vale",
                 race="Human",
-                class_name="Fighter",
+                class_name="Warrior",
                 background="Soldier",
                 base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
                 class_skill_choices=["Athletics", "Survival"],
@@ -7861,7 +7861,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -7883,7 +7883,7 @@ class CoreTests(unittest.TestCase):
             player=build_character(
                 name="Vale",
                 race="Human",
-                class_name="Fighter",
+                class_name="Warrior",
                 background="Soldier",
                 base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
                 class_skill_choices=["Athletics", "Survival"],
@@ -7900,7 +7900,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -7927,7 +7927,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -7962,7 +7962,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -8046,7 +8046,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -8074,7 +8074,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -8094,7 +8094,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -8122,7 +8122,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -8146,7 +8146,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -8229,7 +8229,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -8274,13 +8274,7 @@ class CoreTests(unittest.TestCase):
         self.assertIn("Goliath", RACES)
         self.assertIn("Orc", RACES)
         self.assertIn("Half-Orc", RACES)
-        self.assertIn("Barbarian", CLASSES)
-        self.assertIn("Bard", CLASSES)
-        self.assertIn("Monk", CLASSES)
-        self.assertIn("Paladin", CLASSES)
-        self.assertIn("Druid", CLASSES)
-        self.assertIn("Sorcerer", CLASSES)
-        self.assertIn("Warlock", CLASSES)
+        self.assertEqual(list(CLASSES), ["Warrior", "Mage", "Rogue"])
         self.assertIn("Outlander", BACKGROUNDS)
         self.assertIn("Guild Artisan", BACKGROUNDS)
 
@@ -8305,7 +8299,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -8325,7 +8319,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -8372,7 +8366,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -8395,7 +8389,7 @@ class CoreTests(unittest.TestCase):
                 "1", "1",  # background select + confirm
                 "1",  # standard array
                 "1", "1", "1", "1", "1", "1",  # assign array
-                "1", "1",  # fighter skills
+                "1", "1",  # Warrior skills
                 "1",  # confirm character
                 "2",  # skip tutorial
                 "1",  # soldier prologue choice
@@ -8479,7 +8473,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -8510,7 +8504,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -8541,7 +8535,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -8563,7 +8557,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -8586,7 +8580,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -8627,7 +8621,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -8658,7 +8652,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -8685,7 +8679,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 14},
             class_skill_choices=["Athletics", "Survival"],
@@ -8715,7 +8709,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 14},
             class_skill_choices=["Athletics", "Survival"],
@@ -8743,7 +8737,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 14},
             class_skill_choices=["Athletics", "Survival"],
@@ -8769,7 +8763,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 14},
             class_skill_choices=["Athletics", "Survival"],
@@ -8793,7 +8787,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 14},
             class_skill_choices=["Athletics", "Survival"],
@@ -8813,7 +8807,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 14},
             class_skill_choices=["Athletics", "Survival"],
@@ -8843,7 +8837,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 14},
             class_skill_choices=["Athletics", "Survival"],
@@ -8878,7 +8872,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -8909,7 +8903,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 12},
             class_skill_choices=["Athletics", "Survival"],
@@ -8956,7 +8950,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 12},
             class_skill_choices=["Athletics", "Survival"],
@@ -9020,7 +9014,7 @@ class CoreTests(unittest.TestCase):
         answers = iter(
             [
                 "1",  # preset character
-                "3",  # Fighter preset
+                "1",  # Warrior preset
                 "1",  # lock preset
                 "1",  # begin adventure
             ]
@@ -9029,17 +9023,16 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=log.append, rng=random.Random(44))
         game.start_new_game()
         self.assertIsNotNone(game.state)
-        self.assertEqual(game.state.player.class_name, "Fighter")
-        self.assertEqual(game.state.player.name, PRESET_CHARACTERS["Fighter"]["name"])
-        self.assertEqual(game.state.player.race, "Orc")
+        self.assertEqual(game.state.player.class_name, "Warrior")
+        self.assertEqual(game.state.player.name, PRESET_CHARACTERS["Warrior"]["name"])
+        self.assertEqual(game.state.player.race, "Human")
         rendered = self.plain_output(log)
-        self.assertIn("3. Fighter", rendered)
-        self.assertIn("Fighter preset selected:", rendered)
-        self.assertNotIn("Elven Variant Bard", rendered)
-        self.assertIn("Riven Ashguard, Orc Fighter", rendered)
-        self.assertNotIn("Half-Orc Fighter", rendered)
-        self.assertNotIn(f"3. Fighter: {PRESET_CHARACTERS['Fighter']['description']}", rendered)
-        self.assertIn(PRESET_CHARACTERS["Fighter"]["name"], rendered)
+        self.assertIn("1. Warrior", rendered)
+        self.assertIn("Warrior preset selected:", rendered)
+        self.assertIn("Mara Gatehand, Human Warrior", rendered)
+        self.assertNotIn("Half-Orc Warrior", rendered)
+        self.assertNotIn(f"1. Warrior: {PRESET_CHARACTERS['Warrior']['description']}", rendered)
+        self.assertIn(PRESET_CHARACTERS["Warrior"]["name"], rendered)
         self.assertIn("Preset abilities:", rendered)
         self.assertIn("Starting point:", rendered)
 
@@ -9051,22 +9044,22 @@ class CoreTests(unittest.TestCase):
         game.emit_rich = lambda renderable, **kwargs: captured.append(renderable) or True  # type: ignore[method-assign]
         game.say = lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("Plain-text fallback should not run"))  # type: ignore[method-assign]
 
-        game.describe_preset_character("Fighter")
+        game.describe_preset_character("Warrior")
 
         self.assertTrue(captured)
         rendered = "\n".join(strip_ansi(line) for line in render_rich_lines(captured[0], width=108))
-        self.assertIn("Fighter Preset", rendered)
-        self.assertIn("Riven Ashguard", rendered)
+        self.assertIn("Warrior Preset", rendered)
+        self.assertIn("Mara Gatehand", rendered)
         self.assertIn("Preset Abilities", rendered)
         self.assertIn("Preset Training", rendered)
-        self.assertIn("Perception, Survival", rendered)
+        self.assertIn("Athletics, Perception", rendered)
 
     @unittest.skipUnless(RICH_AVAILABLE, "Rich rendering is optional")
     def test_preview_character_uses_rich_rendering_when_available(self) -> None:
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -9091,7 +9084,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -9109,7 +9102,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -9455,7 +9448,7 @@ class CoreTests(unittest.TestCase):
                 player = build_character(
                     name="Vale",
                     race="Human",
-                    class_name="Fighter",
+                    class_name="Warrior",
                     background=background,
                     base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
                     class_skill_choices=["Athletics", "Survival"],
@@ -9473,7 +9466,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Ash",
             race="Human",
-            class_name="Cleric",
+            class_name="Mage",
             background="Acolyte",
             base_ability_scores={"STR": 10, "DEX": 12, "CON": 13, "INT": 10, "WIS": 15, "CHA": 14},
             class_skill_choices=["Medicine", "Persuasion"],
@@ -9515,7 +9508,7 @@ class CoreTests(unittest.TestCase):
         game.show_lore_notes()
         rendered = self.plain_output(log).replace("\n", " ")
         self.assertIn("Main stats: Strength, Endurance (Constitution)", rendered)
-        self.assertIn("Hit die: d12", rendered)
+        self.assertIn("Hit die: d10", rendered)
         self.assertIn("Starting abilities:", rendered)
         self.assertIn("Level 2:", rendered)
 
@@ -9545,16 +9538,16 @@ class CoreTests(unittest.TestCase):
         log: list[str] = []
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=log.append, rng=random.Random(441))
         selected = game.choose_named_option("Choose a class", CLASSES)
-        self.assertEqual(selected, "Bard")
+        self.assertEqual(selected, "Mage")
         rendered = self.plain_output(log).replace("\n", " ")
-        self.assertIn("patterns: songs, signals, ledgers", rendered)
-        self.assertIn("read a room", rendered)
+        self.assertIn("A cracked sigil", rendered)
+        self.assertIn("old stone", rendered)
 
     def test_class_identity_option_appears_in_briefing(self) -> None:
         player = build_character(
             name="Mira",
             race="Human",
-            class_name="Bard",
+            class_name="Mage",
             background="Charlatan",
             base_ability_scores={"STR": 8, "DEX": 14, "CON": 13, "INT": 10, "WIS": 12, "CHA": 15},
             class_skill_choices=["Insight", "Performance", "Persuasion"],
@@ -9574,14 +9567,14 @@ class CoreTests(unittest.TestCase):
         )
         game.scene_greywake_briefing()
         rendered = self.plain_output(log)
-        self.assertIn("better story and a sharper tongue", rendered)
-        self.assertIn("Reward gained for Bard identity choice: 20 XP, 6 gold.", rendered)
+        self.assertIn("original reports instead of the polished summary", rendered)
+        self.assertIn("Reward gained for Mage identity choice: 20 XP.", rendered)
 
     def test_greywake_briefing_routes_response_menu_through_keyboard_choice_menu(self) -> None:
         player = build_character(
             name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -9612,7 +9605,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Cairn",
             race="Tiefling",
-            class_name="Warlock",
+            class_name="Mage",
             background="Charlatan",
             base_ability_scores={"STR": 8, "DEX": 14, "CON": 13, "INT": 10, "WIS": 12, "CHA": 15},
             class_skill_choices=["Intimidation", "Investigation"],
@@ -9681,7 +9674,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -9701,7 +9694,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -9726,7 +9719,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -9773,7 +9766,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -9800,7 +9793,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -9826,7 +9819,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -9843,7 +9836,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -9867,7 +9860,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -9887,7 +9880,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -9909,7 +9902,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -9930,7 +9923,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -9963,7 +9956,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -10013,7 +10006,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -10043,7 +10036,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -10075,7 +10068,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -10105,7 +10098,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -10130,7 +10123,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -10154,7 +10147,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -10204,7 +10197,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -10220,7 +10213,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -10230,12 +10223,12 @@ class CoreTests(unittest.TestCase):
             [
                 "1",  # confirm respec
                 "3", "1",  # Elf
-                "1", "1",  # Fighter
+                "1", "1",  # Warrior
                 "4", "1",  # Sage
                 "2",  # point buy
                 "15", "14", "13", "10", "10", "8",
                 "1",  # keep scores
-                "1", "1",  # fighter skills
+                "1", "1",  # Warrior skills
                 "1",  # level-up skill at level 2
             ]
         )
@@ -10268,7 +10261,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Nyra",
             race="Elf",
-            class_name="Wizard",
+            class_name="Mage",
             background="Sage",
             base_ability_scores={"STR": 8, "DEX": 14, "CON": 12, "INT": 15, "WIS": 13, "CHA": 10},
             class_skill_choices=["Arcana", "Investigation"],
@@ -10300,7 +10293,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Nyra",
             race="Elf",
-            class_name="Wizard",
+            class_name="Mage",
             background="Sage",
             base_ability_scores={"STR": 8, "DEX": 14, "CON": 12, "INT": 15, "WIS": 13, "CHA": 10},
             class_skill_choices=["Arcana", "Investigation"],
@@ -10325,7 +10318,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Half-Orc",
-            class_name="Paladin",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 10, "CON": 13, "INT": 8, "WIS": 12, "CHA": 14},
             class_skill_choices=["Athletics", "Intimidation"],
@@ -10341,7 +10334,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -10365,7 +10358,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -10386,9 +10379,9 @@ class CoreTests(unittest.TestCase):
 
     def test_road_ambush_intimidation_choice_renders_as_action(self) -> None:
         player = build_character(
-            name="Riven Ashguard",
+            name="Vale",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -10403,13 +10396,13 @@ class CoreTests(unittest.TestCase):
         game.scene_road_ambush()
         rendered = self.plain_output(log)
         self.assertIn("*Break their nerve with a warning shout.", rendered)
-        self.assertNotIn('Riven Ashguard: "Break their nerve with a warning shout."', rendered)
+        self.assertNotIn('Vale: "Break their nerve with a warning shout."', rendered)
 
     def test_all_heroes_use_player_controlled_turns(self) -> None:
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -10417,7 +10410,7 @@ class CoreTests(unittest.TestCase):
         companion = build_character(
             name="Kaelis",
             race="Half-Elf",
-            class_name="Ranger",
+            class_name="Rogue",
             background="Criminal",
             base_ability_scores={"STR": 10, "DEX": 15, "CON": 13, "INT": 11, "WIS": 14, "CHA": 12},
             class_skill_choices=["Perception", "Stealth", "Survival"],
@@ -10439,7 +10432,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -10447,7 +10440,7 @@ class CoreTests(unittest.TestCase):
         companion = build_character(
             name="Kaelis",
             race="Half-Elf",
-            class_name="Ranger",
+            class_name="Rogue",
             background="Criminal",
             base_ability_scores={"STR": 10, "DEX": 15, "CON": 13, "INT": 11, "WIS": 14, "CHA": 12},
             class_skill_choices=["Perception", "Stealth", "Survival"],
@@ -10468,7 +10461,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -10479,14 +10472,14 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(game.state.xp, 310)
         self.assertEqual(game.state.gold, 12)
         self.assertEqual(game.state.player.level, 2)
-        self.assertIn("action_surge", game.state.player.features)
-        self.assertEqual(game.state.player.resources.get("action_surge"), 1)
+        self.assertIn("hard_lesson", game.state.player.features)
+        self.assertIn("grit", game.state.player.max_resources)
 
     def test_scaled_check_reward_xp_uses_party_level_floor(self) -> None:
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -10507,7 +10500,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -10527,7 +10520,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Dragonborn",
-            class_name="Paladin",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 10, "CON": 13, "INT": 8, "WIS": 12, "CHA": 14},
             class_skill_choices=["Athletics", "Intimidation"],
@@ -10535,29 +10528,29 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(15))
         game.state = GameState(player=player, inventory={"potion_healing": 1}, current_scene="road_ambush")
         options = game.get_player_combat_options(player, SimpleNamespace(allow_parley=True, allow_flee=True))
-        self.assertIn("Strike with Oathflare Strike (4 MP, on hit)", options)
+        self.assertIn("Strike with Longsword", options)
+        self.assertIn("Take Guard Stance", options)
         self.assertIn("[PERSUASION / INTIMIDATION] Attempt Parley", options)
         self.assertIn("[STEALTH] Try to Flee", options)
         self.assertIn("Drink a Potion of Healing", options)
         self.assertFalse(options[0].startswith("["))
 
-    def test_second_wind_is_a_bonus_action_and_still_allows_attack(self) -> None:
+    def test_warrior_rally_is_a_bonus_action_and_still_allows_attack(self) -> None:
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
         )
         enemy = create_enemy("bandit")
-        player.current_hp = max(1, player.current_hp - 5)
-        answers = iter(["3", "1", "1"])
+        answers = iter(["6", "1", "1", "1"])
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=lambda _: None, rng=random.Random(8151))
         game.state = GameState(player=player, current_scene="road_ambush")
-        game.perform_weapon_attack = lambda attacker, target, heroes, enemies, dodging, use_smite=False: setattr(target, "current_hp", target.current_hp - 1)
+        game.perform_weapon_attack = lambda attacker, target, heroes, enemies, dodging: setattr(target, "current_hp", target.current_hp - 1)
         game.player_turn(player, [player], [enemy], Encounter(title="Test", description="", enemies=[enemy], allow_flee=False), set())
-        self.assertGreater(player.current_hp, 5)
+        self.assertTrue(game.has_status(player, "guarded"))
         self.assertLess(enemy.current_hp, enemy.max_hp)
 
     def test_drinking_healing_potion_is_bonus_action_and_feeding_one_is_action(self) -> None:
@@ -10579,7 +10572,7 @@ class CoreTests(unittest.TestCase):
         self_game.state = GameState(player=player, companions=[ally], current_scene="road_ambush", inventory={"potion_healing": 1})
         player.current_hp = max(1, player.current_hp - 4)
         player_before = player.current_hp
-        self_game.perform_weapon_attack = lambda attacker, target, heroes, enemies, dodging, use_smite=False: setattr(target, "current_hp", target.current_hp - 1)
+        self_game.perform_weapon_attack = lambda attacker, target, heroes, enemies, dodging: setattr(target, "current_hp", target.current_hp - 1)
         self_game.player_turn(player, [player, ally], [enemy], Encounter(title="Test", description="", enemies=[enemy], allow_flee=False), set())
         self.assertGreater(player.current_hp, player_before)
         self.assertLess(enemy.current_hp, enemy.max_hp)
@@ -10604,14 +10597,14 @@ class CoreTests(unittest.TestCase):
         self.assertGreater(feed_ally.current_hp, ally_before)
         self.assertEqual(feed_enemy.current_hp, feed_enemy.max_hp)
 
-    def test_bonus_action_spell_allows_cantrip_but_blocks_leveled_action_spell(self) -> None:
+    def test_bonus_action_spell_flag_still_allows_minor_channel(self) -> None:
         player = build_character(
             name="Ash",
             race="Human",
-            class_name="Cleric",
+            class_name="Mage",
             background="Acolyte",
             base_ability_scores={"STR": 10, "DEX": 12, "CON": 13, "INT": 10, "WIS": 15, "CHA": 14},
-            class_skill_choices=["Medicine", "Persuasion"],
+            class_skill_choices=["Arcana", "Investigation", "Medicine"],
         )
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(8154))
         game.state = GameState(player=player, current_scene="road_ambush")
@@ -10621,18 +10614,19 @@ class CoreTests(unittest.TestCase):
             turn_state=TurnState(bonus_action_spell_cast=True),
             heroes=[player],
         )
-        self.assertIn("Channel Lantern Flare (1 MP)", options)
-        self.assertNotIn("Channel Field Mend (3 MP)", options)
+        self.assertIn("Minor Channel (1 MP)", options)
+        self.assertNotIn("Field Mend (3 MP)", options)
 
-    def test_healing_word_cost_matches_cure_wounds_and_stays_bonus_action(self) -> None:
+    def test_pulse_restore_cost_and_group_stay_bonus_action(self) -> None:
         player = build_character(
             name="Ash",
             race="Human",
-            class_name="Cleric",
+            class_name="Mage",
             background="Acolyte",
             base_ability_scores={"STR": 10, "DEX": 12, "CON": 13, "INT": 10, "WIS": 15, "CHA": 14},
-            class_skill_choices=["Medicine", "Persuasion"],
+            class_skill_choices=["Arcana", "Investigation", "Medicine"],
         )
+        player.features.extend(["field_mend", "pulse_restore"])
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(81541))
         game.state = GameState(player=player, current_scene="road_ambush")
         options = game.get_player_combat_options(
@@ -10641,17 +10635,18 @@ class CoreTests(unittest.TestCase):
             turn_state=TurnState(),
             heroes=[player],
         )
-        self.assertEqual(magic_point_cost("healing_word"), magic_point_cost("cure_wounds"))
-        self.assertIn("Channel Field Mend (3 MP)", options)
-        self.assertIn("Channel Pulse Restore (3 MP, Bonus Action)", options)
-        self.assertEqual(game.combat_option_group("Channel Field Mend (3 MP)"), "Action")
-        self.assertEqual(game.combat_option_group("Channel Pulse Restore (3 MP, Bonus Action)"), "Bonus Action")
+        self.assertEqual(magic_point_cost("field_mend"), 3)
+        self.assertEqual(magic_point_cost("pulse_restore"), 4)
+        self.assertIn("Field Mend (3 MP)", options)
+        self.assertIn("Pulse Restore (4 MP)", options)
+        self.assertEqual(game.combat_option_group("Field Mend (3 MP)"), "Action")
+        self.assertEqual(game.combat_option_group("Pulse Restore (4 MP)"), "Bonus Action")
 
     def test_combat_options_group_by_action_model(self) -> None:
         player = build_character(
             name="Ash",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -10666,14 +10661,14 @@ class CoreTests(unittest.TestCase):
                 game.skill_tag("PERSUASION / INTIMIDATION", "Attempt Parley"),
                 game.skill_tag("STEALTH", "Try to Flee"),
                 "Take Guarded Stance",
-                "Channel Pulse Restore (3 MP, Bonus Action)",
+                "Pulse Restore (4 MP)",
                 "End Turn",
             ]
         )
 
         self.assertEqual(indexed[1], f"Strike with {player.weapon.name}")
         self.assertEqual(indexed[2], "Take Guarded Stance")
-        self.assertEqual(indexed[3], "Channel Pulse Restore (3 MP, Bonus Action)")
+        self.assertEqual(indexed[3], "Pulse Restore (4 MP)")
         self.assertEqual(indexed[4], "Use an Item")
         self.assertEqual(indexed[5], game.skill_tag("PERSUASION / INTIMIDATION", "Attempt Parley"))
         self.assertEqual(indexed[6], game.skill_tag("STEALTH", "Try to Flee"))
@@ -10695,19 +10690,20 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(game.combat_option_group(game.skill_tag("STEALTH", "Try to Flee")), "Escape")
         self.assertEqual(game.combat_option_group("End Turn"), "End Turn")
 
-    def test_healing_word_is_bonus_action_and_still_allows_action_cantrip(self) -> None:
+    def test_pulse_restore_is_bonus_action_and_still_allows_minor_channel(self) -> None:
         player = build_character(
             name="Ash",
             race="Human",
-            class_name="Cleric",
+            class_name="Mage",
             background="Acolyte",
             base_ability_scores={"STR": 10, "DEX": 12, "CON": 13, "INT": 10, "WIS": 15, "CHA": 14},
-            class_skill_choices=["Medicine", "Persuasion"],
+            class_skill_choices=["Arcana", "Investigation", "Medicine"],
         )
+        player.features.append("pulse_restore")
         ally = create_tolan_ironshield()
         ally.current_hp = max(1, ally.current_hp - 5)
         enemy = create_enemy("bandit")
-        answers = iter(["5", "2", "2", "1"])
+        answers = iter(["6", "2", "2", "1"])
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=lambda _: None, rng=random.Random(8155))
         game.state = GameState(player=player, companions=[ally], current_scene="road_ambush")
         game.saving_throw = lambda actor, ability, dc, context, against_poison=False: False
@@ -10716,23 +10712,7 @@ class CoreTests(unittest.TestCase):
         game.player_turn(player, [player, ally], [enemy], Encounter(title="Test", description="", enemies=[enemy], allow_flee=False), set())
         self.assertGreater(ally.current_hp, ally_before)
         self.assertLess(enemy.current_hp, enemy.max_hp)
-        self.assertEqual(current_magic_points(player), mp_before - 4)
-
-    def test_monk_attack_can_chain_into_martial_arts_bonus_strike(self) -> None:
-        player = build_character(
-            name="Velkor",
-            race="Human",
-            class_name="Monk",
-            background="Hermit",
-            base_ability_scores={"STR": 10, "DEX": 15, "CON": 13, "INT": 10, "WIS": 14, "CHA": 8},
-            class_skill_choices=["Acrobatics", "Insight"],
-        )
-        enemy = create_enemy("bandit")
-        answers = iter(["1", "1", "1", "1"])
-        game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=lambda _: None, rng=random.Random(8156))
-        game.state = GameState(player=player, current_scene="road_ambush")
-        game.player_turn(player, [player], [enemy], Encounter(title="Test", description="", enemies=[enemy], allow_flee=False), set())
-        self.assertLessEqual(enemy.current_hp, enemy.max_hp - 2)
+        self.assertEqual(current_magic_points(player), mp_before - 5)
 
     def test_dual_wield_off_hand_attack_unlocks_after_attack_action(self) -> None:
         player = build_character(
@@ -10779,14 +10759,14 @@ class CoreTests(unittest.TestCase):
         )
         self.assertIn("Use Veil Step", options)
 
-    def test_level_two_monk_gets_ki_bonus_action_options(self) -> None:
+    def test_warrior_keeps_rally_bonus_action_after_level_two(self) -> None:
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Monk",
-            background="Hermit",
-            base_ability_scores={"STR": 10, "DEX": 15, "CON": 13, "INT": 10, "WIS": 14, "CHA": 8},
-            class_skill_choices=["Acrobatics", "Insight"],
+            class_name="Warrior",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
         )
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(8159))
         game.state = GameState(player=player, current_scene="road_ambush")
@@ -10797,15 +10777,14 @@ class CoreTests(unittest.TestCase):
             turn_state=TurnState(attack_action_taken=True),
             heroes=[player],
         )
-        self.assertIn("Use Twinflow Strikes", options)
-        self.assertIn("Use Still Guard", options)
-        self.assertIn("Use Wind Step", options)
+        self.assertIn("Warrior Rally", options)
+        self.assertIn("hard_lesson", player.features)
 
     def test_help_downed_ally_can_restore_them_to_one_hp(self) -> None:
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -10813,7 +10792,7 @@ class CoreTests(unittest.TestCase):
         ally = build_character(
             name="Tolan",
             race="Dwarf",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 10, "CON": 14, "INT": 8, "WIS": 12, "CHA": 13},
             class_skill_choices=["Perception", "Survival"],
@@ -10828,7 +10807,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -10846,7 +10825,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -10866,7 +10845,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -10886,7 +10865,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -10905,7 +10884,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -10923,7 +10902,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -10942,7 +10921,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -10965,7 +10944,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -10987,7 +10966,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -11016,7 +10995,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -11036,109 +11015,99 @@ class CoreTests(unittest.TestCase):
         )
         self.assertTrue(all(member.level == 4 for member in game.state.party_members()))
 
-    def test_spell_slots_start_with_bg3_style_class_tables(self) -> None:
-        wizard = build_character(
+    def test_spell_slots_start_with_mage_only_table(self) -> None:
+        mage = build_character(
             name="Nyra",
             race="Elf",
-            class_name="Wizard",
+            class_name="Mage",
             background="Sage",
             base_ability_scores={"STR": 8, "DEX": 14, "CON": 12, "INT": 15, "WIS": 13, "CHA": 10},
             class_skill_choices=["Arcana", "Investigation"],
         )
-        warlock = build_character(
-            name="Cairn",
-            race="Tiefling",
-            class_name="Warlock",
-            background="Charlatan",
-            base_ability_scores={"STR": 8, "DEX": 14, "CON": 13, "INT": 10, "WIS": 12, "CHA": 15},
-            class_skill_choices=["Intimidation", "Investigation"],
-        )
-        paladin = build_character(
+        warrior = build_character(
             name="Velkor",
             race="Half-Orc",
-            class_name="Paladin",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 10, "CON": 13, "INT": 8, "WIS": 12, "CHA": 14},
             class_skill_choices=["Athletics", "Intimidation"],
         )
-        self.assertEqual(spell_slot_counts(wizard, maximum=True), {1: 2})
-        self.assertEqual(spell_slot_counts(warlock, maximum=True), {1: 1})
-        self.assertEqual(spell_slot_counts(paladin, maximum=True), {})
-        self.assertEqual(magic_point_summary(wizard), "12/12")
-        self.assertEqual(magic_point_summary(warlock), "10/10")
-        self.assertEqual(magic_point_summary(paladin), "5/5")
-        self.assertNotIn("spell_slots", wizard.resources)
-        self.assertNotIn("spell_slots", warlock.resources)
+        self.assertEqual(spell_slot_counts(mage, maximum=True), {1: 2})
+        self.assertEqual(spell_slot_counts(warrior, maximum=True), {})
+        self.assertEqual(magic_point_summary(mage), "12/12")
+        self.assertEqual(magic_point_summary(warrior), "None")
+        self.assertNotIn("spell_slots", mage.resources)
 
     def test_scale_level_resources_grows_spell_slots_by_level(self) -> None:
-        wizard = build_character(
+        mage = build_character(
             name="Nyra",
             race="Elf",
-            class_name="Wizard",
+            class_name="Mage",
             background="Sage",
             base_ability_scores={"STR": 8, "DEX": 14, "CON": 12, "INT": 15, "WIS": 13, "CHA": 10},
             class_skill_choices=["Arcana", "Investigation"],
         )
-        paladin = build_character(
+        warrior = build_character(
             name="Velkor",
             race="Half-Orc",
-            class_name="Paladin",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 10, "CON": 13, "INT": 8, "WIS": 12, "CHA": 14},
             class_skill_choices=["Athletics", "Intimidation"],
         )
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(1601))
-        wizard.level = 3
-        paladin.level = 5
-        game.scale_level_resources(wizard)
-        game.scale_level_resources(paladin)
-        self.assertEqual(spell_slot_counts(wizard, maximum=True), {1: 4, 2: 2})
-        self.assertEqual(spell_slot_counts(paladin, maximum=True), {1: 4, 2: 2})
-        self.assertEqual(magic_point_summary(wizard), "20/20")
-        self.assertEqual(magic_point_summary(paladin), "16/16")
+        mage.level = 3
+        warrior.level = 5
+        game.scale_level_resources(mage)
+        game.scale_level_resources(warrior)
+        self.assertEqual(spell_slot_counts(mage, maximum=True), {1: 4, 2: 2})
+        self.assertEqual(spell_slot_counts(warrior, maximum=True), {})
+        self.assertEqual(magic_point_summary(mage), "20/20")
+        self.assertEqual(magic_point_summary(warrior), "None")
 
     def test_state_integrity_adds_missing_mp_to_old_spellcaster_save(self) -> None:
-        wizard = build_character(
+        Mage = build_character(
             name="Nyra",
             race="Elf",
-            class_name="Wizard",
+            class_name="Mage",
             background="Sage",
             base_ability_scores={"STR": 8, "DEX": 14, "CON": 12, "INT": 15, "WIS": 13, "CHA": 10},
             class_skill_choices=["Arcana", "Investigation"],
         )
-        wizard.resources.pop("mp", None)
-        wizard.max_resources.pop("mp", None)
+        Mage.resources.pop("mp", None)
+        Mage.max_resources.pop("mp", None)
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(16011))
-        game.state = GameState(player=wizard, current_scene="iron_hollow_hub")
+        game.state = GameState(player=Mage, current_scene="iron_hollow_hub")
         game.ensure_state_integrity()
-        self.assertEqual(magic_point_summary(wizard), "12/12")
+        self.assertEqual(magic_point_summary(Mage), "12/12")
 
     def test_describe_combatant_shows_blue_mp_bar_for_spellcasters(self) -> None:
-        wizard = build_character(
+        Mage = build_character(
             name="Nyra",
             race="Elf",
-            class_name="Wizard",
+            class_name="Mage",
             background="Sage",
             base_ability_scores={"STR": 8, "DEX": 14, "CON": 12, "INT": 15, "WIS": 13, "CHA": 10},
             class_skill_choices=["Arcana", "Investigation"],
         )
-        wizard.resources["mp"] = 7
+        Mage.resources["mp"] = 7
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(16012))
-        rendered = game.describe_combatant(wizard)
+        rendered = game.describe_combatant(Mage)
         lines = strip_ansi(rendered).splitlines()
-        self.assertEqual(len(lines), 2)
+        self.assertEqual(len(lines), 3)
         self.assertIn("Nyra: HP", lines[0])
         self.assertIn("Defense", lines[0])
         self.assertNotIn("MP", lines[0])
         self.assertTrue(lines[1].startswith(" " * len("Nyra: ") + "MP ["))
         self.assertIn("MP [███████     ]  7/12", strip_ansi(rendered))
+        self.assertIn("Focus [            ] 0/5", lines[2])
         self.assertIn(colorize("███████", "blue"), rendered)
 
     def test_describe_living_combatants_aligns_mp_bars_for_spellcasters(self) -> None:
         elira = build_character(
             name="Elira Lanternward",
             race="Human",
-            class_name="Cleric",
+            class_name="Mage",
             background="Acolyte",
             base_ability_scores={"STR": 10, "DEX": 12, "CON": 13, "INT": 10, "WIS": 15, "CHA": 14},
             class_skill_choices=["Medicine", "Persuasion"],
@@ -11146,40 +11115,38 @@ class CoreTests(unittest.TestCase):
         rhogar = build_character(
             name="Rhogar Valeguard",
             race="Dragonborn",
-            class_name="Paladin",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 10, "CON": 13, "INT": 8, "WIS": 12, "CHA": 14},
             class_skill_choices=["Athletics", "Intimidation"],
         )
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(1206))
         rendered = [strip_ansi(line).splitlines() for line in game.describe_living_combatants([elira, rhogar])]
-        self.assertEqual(rendered[0][1].index("MP ["), rendered[1][1].index("MP ["))
+        self.assertEqual(rendered[0][1].index("MP ["), rendered[1][1].index("Grit ["))
 
-    def test_warlock_short_rest_restores_pact_slots(self) -> None:
-        warlock = build_character(
+    def test_mage_short_rest_restores_magic_points(self) -> None:
+        mage = build_character(
             name="Cairn",
             race="Tiefling",
-            class_name="Warlock",
+            class_name="Mage",
             background="Charlatan",
             base_ability_scores={"STR": 8, "DEX": 14, "CON": 13, "INT": 10, "WIS": 12, "CHA": 15},
-            class_skill_choices=["Intimidation", "Investigation"],
+            class_skill_choices=["Arcana", "Investigation", "Perception"],
         )
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(1602))
-        warlock.level = 3
-        game.scale_level_resources(warlock)
-        warlock.resources["spell_slots_2"] = 0
-        warlock.resources["mp"] = 0
-        game.state = GameState(player=warlock, current_scene="iron_hollow_hub", short_rests_remaining=2)
+        mage.level = 3
+        game.scale_level_resources(mage)
+        mage.resources["mp"] = 0
+        game.state = GameState(player=mage, current_scene="iron_hollow_hub", short_rests_remaining=2)
         game.short_rest()
-        self.assertEqual(warlock.resources["spell_slots_2"], warlock.max_resources["spell_slots_2"])
-        self.assertEqual(warlock.resources["mp"], warlock.max_resources["mp"])
+        self.assertEqual(mage.resources["mp"], max(1, mage.max_resources["mp"] // 2))
         self.assertEqual(game.state.short_rests_remaining, 1)
 
     def test_long_rest_consumes_supply_points_and_resets_short_rests(self) -> None:
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -11201,7 +11168,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -11235,7 +11202,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -11267,7 +11234,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -11286,7 +11253,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -11306,7 +11273,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Ash",
             race="Human",
-            class_name="Cleric",
+            class_name="Mage",
             background="Acolyte",
             base_ability_scores={"STR": 10, "DEX": 12, "CON": 13, "INT": 10, "WIS": 15, "CHA": 14},
             class_skill_choices=["Medicine", "Persuasion"],
@@ -11322,7 +11289,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Nyra",
             race="Elf",
-            class_name="Wizard",
+            class_name="Mage",
             background="Sage",
             base_ability_scores={"STR": 8, "DEX": 14, "CON": 12, "INT": 15, "WIS": 13, "CHA": 10},
             class_skill_choices=["Arcana", "Investigation"],
@@ -11340,7 +11307,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Nyra",
             race="Elf",
-            class_name="Wizard",
+            class_name="Mage",
             background="Sage",
             base_ability_scores={"STR": 8, "DEX": 14, "CON": 12, "INT": 15, "WIS": 13, "CHA": 10},
             class_skill_choices=["Arcana", "Investigation"],
@@ -11348,7 +11315,7 @@ class CoreTests(unittest.TestCase):
         companion = build_character(
             name="Elira",
             race="Human",
-            class_name="Cleric",
+            class_name="Mage",
             background="Acolyte",
             base_ability_scores={"STR": 10, "DEX": 12, "CON": 13, "INT": 10, "WIS": 15, "CHA": 14},
             class_skill_choices=["Insight", "Medicine"],
@@ -11380,7 +11347,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -11399,55 +11366,58 @@ class CoreTests(unittest.TestCase):
         self.assertTrue(companion.dead)
         self.assertEqual(companion.current_hp, 0)
 
-    def test_magic_missile_spends_mp_without_spending_spell_slots(self) -> None:
-        wizard = build_character(
+    def test_arc_pulse_spends_mp_without_spending_charge_bands(self) -> None:
+        mage = build_character(
             name="Nyra",
             race="Elf",
-            class_name="Wizard",
+            class_name="Mage",
             background="Sage",
             base_ability_scores={"STR": 8, "DEX": 14, "CON": 12, "INT": 15, "WIS": 13, "CHA": 10},
-            class_skill_choices=["Arcana", "Investigation"],
+            class_skill_choices=["Arcana", "History", "Investigation"],
         )
+        mage.features.append("arc_pulse")
         target = create_enemy("goblin_skirmisher")
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(1604))
-        wizard.level = 3
-        game.scale_level_resources(wizard)
-        wizard.resources["spell_slots_1"] = 0
-        wizard.resources["spell_slots_2"] = 2
-        mp_before = current_magic_points(wizard)
+        mage.level = 3
+        game.scale_level_resources(mage)
+        mage.resources["spell_slots_1"] = 0
+        mage.resources["spell_slots_2"] = 2
+        mp_before = current_magic_points(mage)
         expressions: list[str] = []
         game.roll_with_display_bonus = lambda expression, **kwargs: expressions.append(expression) or SimpleNamespace(total=10)
-        game.cast_magic_missile(wizard, target)
-        self.assertEqual(expressions, ["3d4+3"])
-        self.assertEqual(current_magic_points(wizard), mp_before - 5)
-        self.assertEqual(wizard.resources["spell_slots_2"], 2)
+        game.saving_throw = lambda actor, ability, dc, context, against_poison=False: False
+        game.use_arc_pulse(mage, target)
+        self.assertEqual(expressions, ["1d8"])
+        self.assertEqual(current_magic_points(mage), mp_before - 1)
+        self.assertEqual(mage.resources["spell_slots_2"], 2)
 
     def test_spell_with_insufficient_mp_does_not_resolve(self) -> None:
-        wizard = build_character(
+        mage = build_character(
             name="Nyra",
             race="Elf",
-            class_name="Wizard",
+            class_name="Mage",
             background="Sage",
             base_ability_scores={"STR": 8, "DEX": 14, "CON": 12, "INT": 15, "WIS": 13, "CHA": 10},
-            class_skill_choices=["Arcana", "Investigation"],
+            class_skill_choices=["Arcana", "History", "Investigation"],
         )
+        mage.features.append("arc_pulse")
         target = create_enemy("goblin_skirmisher")
         log: list[str] = []
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(1605))
-        wizard.resources["mp"] = 4
+        mage.resources["mp"] = 0
         expressions: list[str] = []
         game.roll_with_display_bonus = lambda expression, **kwargs: expressions.append(expression) or SimpleNamespace(total=10)
-        game.cast_magic_missile(wizard, target)
+        game.use_arc_pulse(mage, target)
         self.assertEqual(expressions, [])
         self.assertEqual(target.current_hp, target.max_hp)
-        self.assertEqual(current_magic_points(wizard), 4)
-        self.assertIn("needs 5 MP to use Arc Pulse", self.plain_output(log))
+        self.assertEqual(current_magic_points(mage), 0)
+        self.assertIn("needs 1 MP to use Arc Pulse", self.plain_output(log))
 
     def test_camp_menu_shows_revivify_option_for_dead_companion(self) -> None:
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -11474,7 +11444,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -11518,7 +11488,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -11553,7 +11523,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -11584,7 +11554,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -11625,7 +11595,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -11643,7 +11613,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -11674,7 +11644,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -11699,7 +11669,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -11716,7 +11686,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -11732,7 +11702,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -11749,7 +11719,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -11766,7 +11736,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -11785,7 +11755,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -11809,7 +11779,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -11835,7 +11805,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -11859,7 +11829,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Mira",
             race="Human",
-            class_name="Bard",
+            class_name="Mage",
             background="Charlatan",
             base_ability_scores={"STR": 8, "DEX": 14, "CON": 13, "INT": 10, "WIS": 12, "CHA": 16},
             class_skill_choices=["Insight", "Performance", "Persuasion"],
@@ -11875,7 +11845,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -11900,7 +11870,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -11920,7 +11890,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -11935,7 +11905,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -11957,7 +11927,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -11974,7 +11944,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -11992,7 +11962,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -12022,7 +11992,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -12055,7 +12025,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -12117,7 +12087,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -12333,7 +12303,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -12493,7 +12463,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -12510,7 +12480,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -12543,7 +12513,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -12582,7 +12552,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -12622,7 +12592,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Charlatan",
             base_ability_scores={"STR": 10, "DEX": 15, "CON": 13, "INT": 10, "WIS": 12, "CHA": 14},
             class_skill_choices=["Deception", "Insight", "Stealth"],
@@ -12645,7 +12615,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -12719,7 +12689,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -12778,7 +12748,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -12878,7 +12848,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -12909,7 +12879,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -13033,7 +13003,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -13068,7 +13038,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -13104,7 +13074,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -13143,7 +13113,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -13178,7 +13148,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -13228,7 +13198,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Bard",
+            class_name="Mage",
             background="Charlatan",
             base_ability_scores={"STR": 8, "DEX": 14, "CON": 13, "INT": 10, "WIS": 12, "CHA": 16},
             class_skill_choices=["Insight", "Performance", "Persuasion"],
@@ -13264,7 +13234,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -13291,7 +13261,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -13310,7 +13280,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -13318,7 +13288,7 @@ class CoreTests(unittest.TestCase):
         companion = build_character(
             name="Kaelis",
             race="Half-Elf",
-            class_name="Ranger",
+            class_name="Rogue",
             background="Criminal",
             base_ability_scores={"STR": 10, "DEX": 15, "CON": 13, "INT": 11, "WIS": 14, "CHA": 12},
             class_skill_choices=["Perception", "Stealth", "Survival"],
@@ -13335,7 +13305,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -13353,7 +13323,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -13378,7 +13348,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -13415,7 +13385,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -13475,7 +13445,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -13523,7 +13493,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -13554,7 +13524,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -13592,7 +13562,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -13622,7 +13592,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -13663,7 +13633,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Cleric",
+            class_name="Mage",
             background="Acolyte",
             base_ability_scores={"STR": 10, "DEX": 12, "CON": 13, "INT": 11, "WIS": 15, "CHA": 14},
             class_skill_choices=["Medicine", "Persuasion"],
@@ -13702,7 +13672,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -13743,7 +13713,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -13785,7 +13755,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -13826,7 +13796,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -13870,7 +13840,7 @@ class CoreTests(unittest.TestCase):
                 player = build_character(
                     name="Velkor",
                     race="Human",
-                    class_name="Fighter",
+                    class_name="Warrior",
                     background="Soldier",
                     base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
                     class_skill_choices=["Athletics", "Survival"],
@@ -13894,7 +13864,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -13925,7 +13895,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -13952,7 +13922,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -13979,7 +13949,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -14004,7 +13974,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -14028,7 +13998,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -14048,7 +14018,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -14132,7 +14102,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -14154,7 +14124,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -14172,7 +14142,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -14189,7 +14159,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -14211,7 +14181,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -14229,7 +14199,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -14260,7 +14230,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -14280,7 +14250,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -14299,7 +14269,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -14320,7 +14290,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -14338,7 +14308,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -14356,7 +14326,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -14377,7 +14347,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -14410,7 +14380,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -14434,32 +14404,32 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
         )
-        cleric = build_character(
+        Mage = build_character(
             name="Ash",
             race="Human",
-            class_name="Cleric",
+            class_name="Mage",
             background="Acolyte",
             base_ability_scores={"STR": 10, "DEX": 12, "CON": 13, "INT": 10, "WIS": 15, "CHA": 14},
             class_skill_choices=["Medicine", "Persuasion"],
         )
-        cleric.resources["mp"] = 6
+        Mage.resources["mp"] = 6
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(400101))
-        game.state = GameState(player=player, companions=[cleric], current_scene="iron_hollow_hub")
+        game.state = GameState(player=player, companions=[Mage], current_scene="iron_hollow_hub")
         rendered = game.hud_party_summary()
         self.assertIn("Ash", strip_ansi(rendered))
-        self.assertIn("MP [███   ]  6/13", strip_ansi(rendered))
-        self.assertIn(colorize("███", "blue"), rendered)
+        self.assertIn("MP [████  ]  6/10", strip_ansi(rendered))
+        self.assertIn(colorize("████", "blue"), rendered)
 
     def test_map_command_opens_map_menu_and_can_show_travel_ledger(self) -> None:
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -14484,7 +14454,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -14504,7 +14474,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -14524,7 +14494,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -14553,7 +14523,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -14594,7 +14564,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -14628,7 +14598,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -14669,7 +14639,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -14713,7 +14683,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -14776,7 +14746,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -14812,7 +14782,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -14839,7 +14809,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -14884,7 +14854,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -14927,7 +14897,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -14954,7 +14924,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -14974,7 +14944,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -14994,7 +14964,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -15016,7 +14986,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -15031,7 +15001,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -15053,7 +15023,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -15199,7 +15169,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Iri",
             race="Human",
-            class_name="Wizard",
+            class_name="Mage",
             background="Sage",
             base_ability_scores={"STR": 8, "DEX": 14, "CON": 12, "INT": 15, "WIS": 13, "CHA": 10},
             class_skill_choices=["Arcana", "Investigation"],
@@ -15301,7 +15271,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Iri",
             race="Human",
-            class_name="Wizard",
+            class_name="Mage",
             background="Sage",
             base_ability_scores={"STR": 8, "DEX": 14, "CON": 12, "INT": 15, "WIS": 13, "CHA": 10},
             class_skill_choices=["Arcana", "Investigation"],
@@ -15318,7 +15288,7 @@ class CoreTests(unittest.TestCase):
         other_player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -15346,7 +15316,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -15373,7 +15343,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -15395,7 +15365,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -15415,18 +15385,18 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
         )
         enemy = create_enemy("goblin_skirmisher")
-        answers = iter(["1", "2", "6"])
+        answers = iter(["1", "2", "10"])
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=lambda _: None, rng=random.Random(42))
         game.state = GameState(player=player, current_scene="road_ambush")
         called: list[str] = []
 
-        def fake_attack(actor, target, heroes, enemies, dodging, use_smite=False):
+        def fake_attack(actor, target, heroes, enemies, dodging):
             called.append(target.name)
 
         game.perform_weapon_attack = fake_attack
@@ -15437,7 +15407,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -15455,7 +15425,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -15471,7 +15441,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -15496,7 +15466,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -15540,7 +15510,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -15561,7 +15531,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
@@ -15585,7 +15555,7 @@ class CoreTests(unittest.TestCase):
         player = build_character(
             name="Velkor",
             race="Human",
-            class_name="Fighter",
+            class_name="Warrior",
             background="Soldier",
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],

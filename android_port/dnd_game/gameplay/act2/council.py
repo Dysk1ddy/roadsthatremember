@@ -567,7 +567,7 @@ class StoryAct2CouncilMixin:
                 )
         elif companion.companion_id == "kaelis_starling":
             self.say(
-                "Kaelis walks you through old ranger cuts around Greywake Survey Camp. One hidden trail could make the expedition faster. "
+                "Kaelis walks you through old scout cuts around Greywake Survey Camp. One hidden trail could make the expedition faster. "
                 "Burning it would deny the same edge to everyone else."
             )
             sidetrack = self.scenario_choice(
@@ -584,7 +584,7 @@ class StoryAct2CouncilMixin:
                 self.act2_shift_metric(
                     "act2_route_control",
                     1,
-                    "Kaelis preserves a ranger-grade bypass that only your side really understands",
+                    "Kaelis preserves a scout-grade bypass that only your side really understands",
                 )
             else:
                 self.player_action("Collapse the approach and make sure nobody gets to use it cleanly again.")

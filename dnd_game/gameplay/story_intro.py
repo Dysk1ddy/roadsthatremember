@@ -626,7 +626,7 @@ class StoryIntroMixin:
                 "Elira Lanternward",
                 "If your faith can move your hands, I need both. If it only names the pain, pray after.",
             )
-        elif background == "Soldier" or class_name in {"Fighter", "Warrior"}:
+        elif background == "Soldier" or class_name == "Warrior":
             self.state.flags["elira_first_read"] = "triage_competence"
             self.speaker(
                 "Elira Lanternward",
@@ -638,7 +638,7 @@ class StoryIntroMixin:
                 "Elira Lanternward",
                 "No one important is watching this shrine. That makes what you do next more honest, not less.",
             )
-        elif background == "Sage" or class_name in {"Wizard", "Mage"}:
+        elif background == "Sage" or class_name == "Mage":
             self.state.flags["elira_first_read"] = "knowledge_vs_saving"
             self.speaker(
                 "Elira Lanternward",

@@ -26,7 +26,7 @@ def make_act2_player():
     return build_character(
         name="Vale",
         race="Human",
-        class_name="Fighter",
+        class_name="Warrior",
         background="Soldier",
         base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
         class_skill_choices=["Athletics", "Survival"],

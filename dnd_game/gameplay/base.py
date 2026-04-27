@@ -245,7 +245,7 @@ class GameBase:
         "Ashen Brand Runner": "The Ashen Brand Runner is a wiry courier with road dust on their boots and the twitchy focus of someone used to escaping before blades can reach them.",
         "Ashen Brand Collector": "The Ashen Brand Collector looks like a dockside broker turned enforcer, weighed down by stolen papers, quiet greed, and a hand never far from steel.",
         "Archive Cutout": "The Archive Cutout is a hired bow-hand with ink-smudged fingers and a scavenger's posture, more accustomed to theft and flight than a fair fight.",
-        "Ashen Brand Fixer": "The Ashen Brand Fixer dresses like a market broker but scans the crowd like a knife fighter, always measuring who can be bought, fooled, or buried.",
+        "Ashen Brand Fixer": "The Ashen Brand Fixer dresses like a market broker but scans the crowd like a knife-hand, always measuring who can be bought, fooled, or buried.",
         "Ashen Brand Teamster": "The Ashen Brand Teamster looks like a wagon hand gone bad, all road calluses, hidden tension, and the hunted eyes of someone already planning an escape.",
         "Goblin Cutthroat": "The Goblin Cutthroat is smaller than the others but moves with nasty confidence, grinning around a blade nicked by too much eager use.",
         "Ashen Brand Enforcer": "The Ashen Brand Enforcer is a thick-shouldered bruiser in scavenged gear, built to hold a doorway and make fear do half the work.",

@@ -167,87 +167,24 @@ LOCATION_LORE: dict[str, LoreEntry] = {
 
 
 CLASS_LORE: dict[str, LoreEntry] = {
-    "Barbarian": {
-        "label": "Barbarian",
-        "menu": "Front-line survivors who turn pressure into momentum.",
+    "Warrior": {
+        "label": "Warrior",
+        "menu": "Line-holders who turn pressure, grit, and leverage into control.",
         "text": (
-            "In Aethrune, the Barbarian is the person who reaches the breach first and refuses to let it widen. "
-            "Their fury is a practiced survival state built from pain tolerance, field instinct, and the hard "
-            "knowledge that hesitation can kill a whole caravan.\n\n"
-            "Barbarians fit the Shatterbelt as convoy breakers, tunnel guardians, militia shock troops, or people "
-            "who learned to survive when the road stopped being fair."
+            "Warriors are the people who know where to put a shield, when to shove, and how long a road can survive "
+            "with one tired guard holding the narrow place. They carry discipline in their hands: buckles checked, "
+            "boots braced, blade kept low until the opening is worth spending.\n\n"
+            "A Warrior belongs anywhere Aethrune asks someone to stand between frightened people and the next bad order."
         ),
     },
-    "Bard": {
-        "label": "Bard",
-        "menu": "Voice, rhythm, and social timing turned into battlefield force.",
+    "Mage": {
+        "label": "Mage",
+        "menu": "Field channelers who read pressure, charge, and old systems.",
         "text": (
-            "Bards understand that Aethrune is built from patterns: songs, signals, ledgers, rumors, prayers, "
-            "and names repeated until people obey them. A Bard can read a room, bend morale, expose a lie, and "
-            "make a crowd remember courage at exactly the right second.\n\n"
-            "The current class fantasy is a field performer, signal-reader, "
-            "and morale architect who can turn attention itself into a tool."
-        ),
-    },
-    "Cleric": {
-        "label": "Cleric",
-        "menu": "Lantern faith and disciplined channeling made practical.",
-        "text": (
-            "Clerics carry faith into places where faith has to do work: triage yards, flooded claims, frightened "
-            "milehouses, and rooms where nobody wants to say how many names are missing. Their power is framed as "
-            "lantern discipline, oath, doctrine, and practiced channeling rather than borrowed setting theology.\n\n"
-            "A Cleric in Aethrune can be healer, witness, judge, exorcist, or road-priest. The common "
-            "thread is responsibility under pressure."
-        ),
-    },
-    "Druid": {
-        "label": "Druid",
-        "menu": "Land-sense, weathercraft, and living systems in one tradition.",
-        "text": (
-            "Druids know that Aethrune's wilderness is not separate from its ruins. Roots break culverts, water "
-            "finds old channels, beasts nest in signal towers, and the land remembers every system that tried to "
-            "discipline it.\n\n"
-            "They make excellent frontier protagonists because they can tell when a road is merely damaged and when "
-            "the world around it is rejecting the lie someone built into it."
-        ),
-    },
-    "Fighter": {
-        "label": "Fighter",
-        "menu": "Disciplined arms, armor, and judgment without theatrics.",
-        "text": (
-            "Fighters are professional fighters in the broadest sense: caravan guards, militia captains, duelists, "
-            "retired soldiers, bodyguards, and people who know where to stand when everyone else starts panicking.\n\n"
-            "A Fighter is valuable in Aethrune because most crises are practical before they are dramatic. Hold the "
-            "door. Keep the line. Choose the right target. Get everyone home."
-        ),
-    },
-    "Monk": {
-        "label": "Monk",
-        "menu": "Body, breath, and attention trained until motion becomes answer.",
-        "text": (
-            "Monks come from orders, schools, shrine paths, and hard private disciplines that teach the body to "
-            "become a reliable instrument. Their calm is not softness. It is compression.\n\n"
-            "On the frontier, a Monk brings control into places ruled by mud, fear, crowd noise, and bad footing. "
-            "That makes restraint feel dangerous in the best possible way."
-        ),
-    },
-    "Paladin": {
-        "label": "Paladin",
-        "menu": "Sworn conviction made visible in shield, voice, and light.",
-        "text": (
-            "Paladins are people whose promises have become load-bearing structures. They walk into corruption, "
-            "extortion, and despair carrying an oath that does not bend just because the road got expensive.\n\n"
-            "They are defined by what they have sworn to protect when the old systems offer easier answers."
-        ),
-    },
-    "Ranger": {
-        "label": "Ranger",
-        "menu": "Trackers, scouts, and route-keepers who know what roads hide.",
-        "text": (
-            "Rangers read the world before it explains itself. A wrong silence, a bent weed, a fresh wheel cut, "
-            "a frightened horse, or a missing lantern tells them what a witness might not know how to say.\n\n"
-            "The Emberway needs Rangers because maps are too clean. Roads are lived things, and somebody has to "
-            "notice when the route starts lying."
+            "Mages work by reading patterns before they become wounds. A cracked sigil, a wrong hum in a pipe, a "
+            "lamp-flutter over old stone, or a trembling ward can tell them where force wants to go next.\n\n"
+            "A Mage fits the campaign because Aethrune keeps leaving live systems under ordinary rooms. Someone has "
+            "to understand the charge before the room spends it."
         ),
     },
     "Rogue": {
@@ -258,37 +195,6 @@ CLASS_LORE: dict[str, LoreEntry] = {
             "crowd flow, and bad assumptions are all part of their toolkit.\n\n"
             "That makes Rogues useful wherever a route is under control. A Rogue is often the only person who can "
             "move through a controlled line without becoming part of the control."
-        ),
-    },
-    "Sorcerer": {
-        "label": "Sorcerer",
-        "menu": "Innate channeling shaped by unstable power in the blood or body.",
-        "text": (
-            "Sorcerers carry power that arrived before permission. Some inherit it from exposure to energy cores, "
-            "signal accidents, lineage scars, or a moment when the world pushed too much force through one life.\n\n"
-            "Their story question is control: not whether power exists, but what it costs to make that power answer "
-            "without burning the person who carries it."
-        ),
-    },
-    "Warlock": {
-        "label": "Warlock",
-        "menu": "Borrowed force, dangerous bargains, and obligations with teeth.",
-        "text": (
-            "Warlocks are channelers whose power comes through a bargain, imprint, patron system, hidden voice, or "
-            "other obligation that does not vanish when combat ends. In Aethrune, the old world left many things "
-            "capable of answering desire.\n\n"
-            "That makes Warlocks compelling because every useful gift raises a second question: who else heard the "
-            "promise being made?"
-        ),
-    },
-    "Wizard": {
-        "label": "Wizard",
-        "menu": "Studied channeling, pattern logic, and field scholarship.",
-        "text": (
-            "Wizards treat power as something that can be notated, tested, corrected, and improved. They read ruin "
-            "marks, copy channel patterns, compare field journals, and turn old symbols into present leverage.\n\n"
-            "A Wizard belongs naturally in the Resonant Vaults arc because the world keeps leaving instructions, "
-            "and not all instructions deserve obedience."
         ),
     },
 }
@@ -533,24 +439,8 @@ SKILL_LORE: dict[str, LoreEntry] = {
 
 
 FEATURE_LORE: dict[str, LoreEntry] = {
-    "rage": {"label": "Battle Surge", "menu": "A Barbarian's focused state of pressure and pain tolerance.", "text": "Battle Surge turns fear and injury into forward motion, hardening the body while the Barbarian forces the fight to answer them."},
-    "unarmored_defense_barbarian": {"label": "Scar Guard", "menu": "Defense from instinct, endurance, and refusal to yield.", "text": "Scar Guard represents survival reflexes so practiced that armor is no longer the only way to stay standing."},
-    "bard_spellcasting": {"label": "Bard Channeling", "menu": "Patterned voice and rhythm that shape reality.", "text": "Bard Channeling uses tone, cadence, memory, and attention as tools for support and disruption."},
-    "bardic_inspiration": {"label": "Rally Note", "menu": "A timed word or phrase that helps an ally exceed themselves.", "text": "A Rally Note gives someone the exact push they need before doubt can settle into their hands."},
-    "cleric_spellcasting": {"label": "Cleric Channeling", "menu": "Disciplined faith turned into healing, protection, and judgment.", "text": "Cleric Channeling frames power as service under pressure: mend the wounded, steady the frightened, and push back the dark."},
-    "druid_spellcasting": {"label": "Druid Channeling", "menu": "Living systems, weather, and land-sense shaped into force.", "text": "Druid Channeling listens to the land's older intelligence and answers with growth, flame, water, and endurance."},
-    "second_wind": {"label": "Second Breath", "menu": "A Fighter's practiced recovery in the middle of danger.", "text": "Second Breath is the moment training takes over and a wounded fighter finds enough air for one more push."},
-    "martial_arts": {"label": "Close Form", "menu": "Disciplined strikes built from posture and timing.", "text": "Close Form turns movement into offense without needing heavy arms or armor to define the fighter."},
-    "unarmored_defense_monk": {"label": "Empty-Hand Guard", "menu": "Defense through balance, breath, and disciplined motion.", "text": "Empty-Hand Guard keeps a Monk alive by making stillness, angle, and timing do the work of a shield."},
-    "lay_on_hands": {"label": "Oath Mend", "menu": "A Paladin's sworn reserve of restorative force.", "text": "Oath Mend is care made immediate: a promise to protect translated through steady hands."},
-    "divine_smite": {"label": "Vowstrike", "menu": "A close strike charged by conviction.", "text": "Vowstrike spends inner reserve to make a weapon blow carry the weight of an oath."},
-    "natural_explorer": {"label": "Route Sense", "menu": "A Ranger's practiced edge in wild and broken routes.", "text": "Route Sense means terrain is never just scenery; it is evidence, warning, and opportunity."},
     "sneak_attack": {"label": "Veilstrike", "menu": "Precision damage when an opening appears.", "text": "Veilstrike rewards the Rogue for choosing the exact moment when defense becomes assumption."},
     "expertise": {"label": "Deep Practice", "menu": "A skill refined past ordinary competence.", "text": "Deep Practice marks the difference between knowing a trick and building a life around it."},
-    "sorcerer_spellcasting": {"label": "Sorcerer Channeling", "menu": "Innate power shaped by instinct and control.", "text": "Sorcerer Channeling is volatile force made useful before it burns through the person carrying it."},
-    "warlock_spellcasting": {"label": "Warlock Channeling", "menu": "Power drawn through bargain, imprint, or obligation.", "text": "Warlock Channeling is useful because something answered; it is dangerous because something may still be listening."},
-    "wizard_spellcasting": {"label": "Wizard Channeling", "menu": "Studied patterns, notation, and repeatable power.", "text": "Wizard Channeling turns field notes and old symbols into controlled effects."},
-    "arcane_recovery": {"label": "Pattern Recovery", "menu": "A Wizard's ability to restore channeling focus through review.", "text": "Pattern Recovery represents the scholar's habit of fixing the mind by returning to first principles."},
     "darkvision": {"label": "Lowlight Sight", "menu": "Eyes adapted to dim routes, tunnels, and old chambers.", "text": "Lowlight Sight marks people whose bodies learned to treat darkness as information rather than absence."},
     "dwarven_resilience": {"label": "Dwarven Resilience", "menu": "Deep-born resistance to poison, fatigue, and bad air.", "text": "Dwarven Resilience comes from generations shaped by tunnels, minerals, pressure, and stubborn survival."},
     "keen_senses": {"label": "Keen Senses", "menu": "Long-trained perception and memory working together.", "text": "Keen Senses catch small details because the mind has learned to wait for them."},
@@ -729,19 +619,9 @@ ABILITY_LABELS = {
 
 
 CLASS_PRIMARY_STATS = {
-    "Barbarian": ["STR", "CON"],
-    "Bard": ["CHA", "DEX"],
-    "Cleric": ["WIS", "CON"],
-    "Druid": ["WIS", "CON"],
-    "Fighter": ["STR", "CON"],
-    "Monk": ["DEX", "WIS"],
-    "Paladin": ["STR", "CHA"],
-    "Ranger": ["DEX", "WIS"],
-    "Rogue": ["DEX", "WIS"],
-    "Sorcerer": ["CHA", "CON"],
-    "Warlock": ["CHA", "CON"],
-    "Wizard": ["INT", "DEX"],
     "Warrior": ["STR", "CON"],
+    "Mage": ["INT", "WIS"],
+    "Rogue": ["DEX", "WIS"],
 }
 
 
@@ -749,9 +629,9 @@ ABILITY_GAMEPLAY_NOTES = {
     "STR": "Used for melee force, Athletics, and physical contests.",
     "DEX": "Used for initiative, stealth, finesse or ranged accuracy, and many reflex-based resist checks.",
     "CON": "Adds to hit points and helps endure poison, fatigue, and punishment.",
-    "INT": "Used for learned knowledge, investigation, and Wizard channeling.",
-    "WIS": "Used for perception, intuition, wayfinding, medicine, and Cleric or Druid channeling.",
-    "CHA": "Used for social pressure, presence, deception, and Bard, Sorcerer, Paladin, or Warlock channeling.",
+    "INT": "Used for learned knowledge, investigation, and studied Mage channeling.",
+    "WIS": "Used for perception, intuition, wayfinding, medicine, and steady Mage channeling.",
+    "CHA": "Used for social pressure, presence, deception, and forceful Mage channeling.",
 }
 
 
@@ -776,8 +656,7 @@ def format_bonus_list(bonuses: Mapping[str, int]) -> str:
 def format_feature_label(feature_id: str) -> str:
     if feature_id in FEATURE_LORE and FEATURE_LORE[feature_id].get("label"):
         return FEATURE_LORE[feature_id]["label"]
-    label = feature_id.replace("_barbarian", "").replace("_monk", "")
-    return label.replace("_", " ").title()
+    return feature_id.replace("_", " ").title()
 
 
 def format_feature_entry(feature_id: str, index: int) -> str:

@@ -589,7 +589,7 @@ SUPPLY_ITEMS = [
     ("honey_cake", "Honey Cake", "A compact sweet cake with surprisingly good shelf life.", 0.4, 5, 1, "Sanctum kitchens and holiday markets."),
     ("root_vegetables", "Root Vegetable Bundle", "A tied bundle of onions, carrots, and turnips.", 1.2, 4, 2, "Farm plots and kitchen cellars."),
     ("black_tea", "Black Tea Tin", "A small tin of bitter black tea leaves.", 0.2, 6, 1, "Merchant caravans and refined provisions."),
-    ("herbal_tea", "Herbal Tea Satchel", "Calming herbs brewed to steady nerves at camp.", 0.2, 5, 1, "Lantern sanctums, apothecaries, and ranger packs."),
+    ("herbal_tea", "Herbal Tea Satchel", "Calming herbs brewed to steady nerves at camp.", 0.2, 5, 1, "Lantern sanctums, apothecaries, and trail packs."),
     ("river_clams", "River Clam Basket", "Fresh clams packed in damp reeds.", 1.5, 7, 2, "Fishers and riverbank stalls."),
     ("spirit_bottle", "Strong Spirit Bottle", "Clear grain spirit used for drink, trade, and sterilizing wounds.", 1.0, 7, 2, "Raider stores, surgeons, and caravan packs."),
 ]
@@ -819,7 +819,7 @@ SCROLL_EFFECTS = [
     ("scroll_surge_of_life", "Life-Surge Script", "epic", "A difficult script that can haul a fallen ally back with a gasp.", "Later-act relic troves and named boss caches.", None, 0, 0, 0, False),
     ("scroll_clarity", "Focus Script", "common", "A script of calm focus and measured breathing.", "Libraries, sages, and reward satchels.", "1d4", 1, 0, 0, False),
     ("scroll_battle_psalm", "Battle Cadence Script", "uncommon", "A cadence script that hardens the spirit before battle.", "Lantern vaults, marshal halls, and support caches.", None, 0, 4, 0, False),
-    ("scroll_starlit_rest", "Starlit Rest Script", "rare", "A rare script of restful sigils used by experienced camp leaders.", "Secret ranger caches and rare restful rewards.", "2d6", 3, 0, 0, False),
+    ("scroll_starlit_rest", "Starlit Rest Script", "rare", "A rare script of restful sigils used by experienced camp leaders.", "Secret trail caches and rare restful rewards.", "2d6", 3, 0, 0, False),
     ("scroll_resurgent_flame", "Resurgent Flame Script", "epic", "A blazing script said to rekindle nearly spent life.", "Future acts and mythic relic bundles.", None, 0, 12, 0, False),
 ]
 

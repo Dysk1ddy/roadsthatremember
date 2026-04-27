@@ -216,21 +216,7 @@ class InventoryCoreMixin:
                 self.pause_for_loot_reveal()
 
     def restore_short_rest_resources(self, member) -> None:
-        if "second_wind" in member.max_resources:
-            member.resources["second_wind"] = member.max_resources["second_wind"]
-        if "action_surge" in member.max_resources:
-            member.resources["action_surge"] = member.max_resources["action_surge"]
-        if "channel_divinity" in member.max_resources:
-            member.resources["channel_divinity"] = member.max_resources["channel_divinity"]
-        if "ki" in member.max_resources:
-            member.resources["ki"] = member.max_resources["ki"]
-        if member.class_name == "Warlock":
-            restore_all_spell_slots(member)
-            restore_all_magic_points(member)
-        else:
-            restore_half_magic_points(member)
-        if member.spellcasting_ability is not None and ("arcane_recovery" in member.features or "natural_recovery" in member.features):
-            restore_spell_slots(member, 1)
+        restore_half_magic_points(member)
 
     def short_rest(self) -> None:
         assert self.state is not None

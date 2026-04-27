@@ -155,11 +155,7 @@ class Character:
     @property
     def armor_class(self) -> int:
         dex_mod = self.ability_mod("DEX")
-        if self.armor is None and "unarmored_defense_barbarian" in self.features:
-            base = 10 + dex_mod + self.ability_mod("CON")
-        elif self.armor is None and "unarmored_defense_monk" in self.features:
-            base = 10 + dex_mod + self.ability_mod("WIS")
-        elif self.armor is None:
+        if self.armor is None:
             base = 10 + dex_mod
         elif self.armor.dex_cap is None:
             base = self.armor.base_ac + dex_mod

@@ -1186,7 +1186,7 @@ class StoryAct1ExpandedMixin:
                 context="to read Rukhar's order board in the middle of the assault",
             )
             if success:
-                self.add_clue("Rukhar rotates his strongest fighters through the lower barracks before taking the courtyard himself.")
+                self.add_clue("Rukhar rotates his strongest blades through the lower barracks before taking the courtyard himself.")
                 second_bonus += 1
                 self.reward_party(xp=15, reason="reading Rukhar's order board under pressure")
                 self.say("You catch enough of the rotation to know exactly which door the inner response will use.")

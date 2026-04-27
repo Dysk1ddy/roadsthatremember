@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from ..content import create_enemy
-from ..data.story.public_terms import spell_label
 from ..items import get_item
 from ..models import Character
 from ..ui.colors import rich_style_name, strip_ansi
@@ -28,27 +27,8 @@ class TurnState:
 
 
 PUBLIC_COMBAT_ACTION_KEYS = {
-    f"Strike with {spell_label('divine_smite')}": "Attack with Divine Smite",
-    f"Channel {spell_label('sacred_flame')}": "Cast Sacred Flame",
-    f"Channel {spell_label('cure_wounds')}": "Cast Cure Wounds",
-    f"Channel {spell_label('healing_word')}": "Cast Healing Word",
-    f"Channel {spell_label('produce_flame')}": "Cast Produce Flame",
-    f"Channel {spell_label('vicious_mockery')}": "Cast Vicious Mockery",
-    f"Channel {spell_label('fire_bolt')}": "Cast Fire Bolt",
-    f"Channel {spell_label('eldritch_blast')}": "Cast Eldritch Blast",
-    f"Channel {spell_label('magic_missile')}": "Cast Magic Missile",
-    "Use Battle Surge": "Use Action Surge",
     "Make Off-Hand Strike": "Make Off-Hand Attack",
-    "Use Close Form": "Use Martial Arts",
-    "Use Twinflow Strikes": "Use Flurry of Blows",
-    "Use Still Guard": "Use Patient Defense",
-    "Use Wind Step": "Use Step of the Wind",
     "Use Veil Step": "Use Cunning Action",
-    "Enter Battle Surge": "Enter Rage",
-    "Use Second Breath": "Use Second Wind",
-    "Use Rally Note": "Use Bardic Inspiration",
-    "Use Oath Mend": "Use Lay on Hands",
-    "Invoke Lantern Surge": "Invoke Channel Divinity",
     "Take Guarded Stance": "Take the Dodge action",
     DRINK_HEALING_POTION_ACTION: "Drink a Healing Potion",
 }
@@ -461,7 +441,7 @@ class CombatFlowMixin:
                 conscious_heroes,
                 key=lambda hero: (
                     1 if self.hero_has_positive_combat_status(hero) else 0,
-                    1 if hero.class_name in {"Bard", "Cleric", "Paladin", "Sorcerer", "Warlock", "Wizard"} else 0,
+                    1 if hero.class_name == "Mage" else 0,
                     hero.attack_bonus(),
                     hero.current_hp,
                 ),
@@ -479,7 +459,7 @@ class CombatFlowMixin:
                 conscious_heroes,
                 key=lambda hero: (
                     1 if self.hero_has_positive_combat_status(hero) else 0,
-                    1 if hero.class_name in {"Bard", "Cleric", "Paladin", "Sorcerer", "Warlock", "Wizard"} else 0,
+                    1 if hero.class_name == "Mage" else 0,
                     hero.attack_bonus(),
                     hero.current_hp,
                 ),
@@ -664,7 +644,7 @@ class CombatFlowMixin:
                 conscious_heroes,
                 key=lambda hero: (
                     1 if self.hero_has_positive_combat_status(hero) else 0,
-                    1 if hero.class_name in {"Bard", "Cleric", "Paladin", "Sorcerer", "Warlock", "Wizard"} else 0,
+                    1 if hero.class_name == "Mage" else 0,
                     hero.attack_bonus(),
                     hero.current_hp,
                 ),
@@ -720,7 +700,7 @@ class CombatFlowMixin:
                 conscious_heroes,
                 key=lambda hero: (
                     1 if self.hero_has_positive_combat_status(hero) else 0,
-                    1 if hero.class_name in {"Bard", "Cleric", "Paladin", "Sorcerer", "Warlock", "Wizard"} else 0,
+                    1 if hero.class_name == "Mage" else 0,
                     hero.attack_bonus(),
                     hero.current_hp,
                 ),
@@ -746,7 +726,7 @@ class CombatFlowMixin:
                 conscious_heroes,
                 key=lambda hero: (
                     1 if self.hero_has_positive_combat_status(hero) else 0,
-                    1 if hero.class_name in {"Bard", "Cleric", "Paladin", "Sorcerer", "Warlock", "Wizard"} else 0,
+                    1 if hero.class_name == "Mage" else 0,
                     hero.attack_bonus(),
                     hero.current_hp,
                 ),
@@ -825,18 +805,6 @@ class CombatFlowMixin:
             action = self.combat_action_key(selected_option)
             if action == "End Turn":
                 return None
-            if action == "Use Action Surge":
-                if self.activate_action_surge(actor, turn_state):
-                    continue
-                return None
-            if action == "Attack with Divine Smite":
-                target = self.choose_target(conscious_enemies, prompt=f"Choose a target for {spell_label('divine_smite')}.", allow_back=True)
-                if target is None:
-                    continue
-                self.perform_weapon_attack(actor, target, heroes, enemies, dodging, use_smite=True)
-                turn_state.actions_remaining -= 1
-                turn_state.attack_action_taken = True
-                continue
             if action.startswith("Attack"):
                 target = self.choose_target(conscious_enemies, prompt="Choose a target for your attack.", allow_back=True)
                 if target is None:
@@ -850,57 +818,6 @@ class CombatFlowMixin:
                 if target is None:
                     continue
                 self.perform_offhand_attack(actor, target, heroes, enemies, dodging)
-                turn_state.bonus_action_available = False
-                continue
-            if action == "Use Martial Arts":
-                target = self.choose_target(conscious_enemies, prompt="Choose a target for Close Form.", allow_back=True)
-                if target is None:
-                    continue
-                self.use_martial_arts(actor, target, heroes, enemies, dodging)
-                turn_state.bonus_action_available = False
-                continue
-            if action == "Use Flurry of Blows":
-                target = self.choose_target(conscious_enemies, prompt="Choose a target for Twinflow Strikes.", allow_back=True)
-                if target is None:
-                    continue
-                self.use_flurry_of_blows(actor, target, heroes, enemies, dodging)
-                turn_state.bonus_action_available = False
-                continue
-            if action == "Use Patient Defense":
-                if not actor.spend_resource("ki"):
-                    self.say(f"{self.style_name(actor)} has no focus left for Still Guard.")
-                    return None
-                dodging.add(actor.name)
-                self.say(
-                    f"{self.style_name(actor)} spends 1 focus and slips into Still Guard. "
-                    "Attack rolls against them have strain, and DEX resists have edge until their next turn."
-                )
-                turn_state.bonus_action_available = False
-                continue
-            if action == "Use Step of the Wind":
-                if not actor.spend_resource("ki"):
-                    self.say(f"{self.style_name(actor)} has no focus left for Wind Step.")
-                    return None
-                step_choice = self.choose(
-                    "Wind Step lets you move on sudden breath and balance.",
-                    [
-                        self.action_option("Dash through the fight and set up a clean escape."),
-                        self.action_option("Disengage and peel free of immediate pressure."),
-                        "Back",
-                    ],
-                    allow_meta=False,
-                    show_hud=False,
-                )
-                if step_choice == 3:
-                    actor.resources["ki"] += 1
-                    continue
-                if step_choice == 1:
-                    turn_state.free_flee = True
-                    self.apply_status(actor, "emboldened", 1, source="Wind Step")
-                    self.say(f"{self.style_name(actor)} bursts through the melee with impossible speed.")
-                else:
-                    turn_state.free_flee = True
-                    self.say(f"{self.style_name(actor)} flows clear of the immediate crush.")
                 turn_state.bonus_action_available = False
                 continue
             if action == "Use Cunning Action":
@@ -932,14 +849,6 @@ class CombatFlowMixin:
                 else:
                     turn_state.free_flee = True
                     self.say(f"{self.style_name(actor)} disengages cleanly and can flee without needing another opening this turn.")
-                turn_state.bonus_action_available = False
-                continue
-            if action == "Enter Rage":
-                self.use_rage(actor)
-                turn_state.bonus_action_available = False
-                continue
-            if action == "Use Second Wind":
-                self.use_second_wind(actor)
                 turn_state.bonus_action_available = False
                 continue
             if action == "Take Guard Stance":
@@ -1372,86 +1281,6 @@ class CombatFlowMixin:
                 if self.use_shoulder_in(actor):
                     turn_state.bonus_action_available = False
                 continue
-            if action == "Use Bardic Inspiration":
-                target = self.choose_ally(heroes, prompt="Choose an ally for a Rally Note.", allow_back=True)
-                if target is None:
-                    continue
-                self.use_bardic_inspiration(actor, target)
-                turn_state.bonus_action_available = False
-                continue
-            if action == "Use Lay on Hands":
-                target = self.choose_ally(heroes, prompt="Choose an ally to heal with Oath Mend.", allow_back=True)
-                if target is None:
-                    continue
-                self.use_lay_on_hands(actor, target)
-                turn_state.actions_remaining -= 1
-                continue
-            if action == "Invoke Channel Divinity":
-                target = self.choose_target(conscious_enemies, prompt="Choose a target for Lantern Surge.", allow_back=True)
-                if target is None:
-                    continue
-                self.use_channel_divinity(actor, target)
-                turn_state.actions_remaining -= 1
-                continue
-            if action == "Cast Sacred Flame":
-                target = self.choose_target(conscious_enemies, prompt=f"Choose a target for {spell_label('sacred_flame')}.", allow_back=True)
-                if target is None:
-                    continue
-                self.cast_sacred_flame(actor, target)
-                turn_state.actions_remaining -= 1
-                continue
-            if action == "Cast Cure Wounds":
-                target = self.choose_ally(heroes, prompt=f"Choose an ally to heal with {spell_label('cure_wounds')}.", allow_back=True)
-                if target is None:
-                    continue
-                self.cast_cure_wounds(actor, target)
-                turn_state.actions_remaining -= 1
-                turn_state.non_cantrip_action_spell_cast = True
-                continue
-            if action == "Cast Healing Word":
-                target = self.choose_ally(heroes, prompt=f"Choose an ally to heal with {spell_label('healing_word')}.", allow_back=True)
-                if target is None:
-                    continue
-                self.cast_healing_word(actor, target)
-                turn_state.bonus_action_available = False
-                turn_state.bonus_action_spell_cast = True
-                continue
-            if action == "Cast Produce Flame":
-                target = self.choose_target(conscious_enemies, prompt=f"Choose a target for {spell_label('produce_flame')}.", allow_back=True)
-                if target is None:
-                    continue
-                self.cast_produce_flame(actor, target, dodging)
-                turn_state.actions_remaining -= 1
-                continue
-            if action == "Cast Vicious Mockery":
-                target = self.choose_target(conscious_enemies, prompt=f"Choose a target for {spell_label('vicious_mockery')}.", allow_back=True)
-                if target is None:
-                    continue
-                self.cast_vicious_mockery(actor, target)
-                turn_state.actions_remaining -= 1
-                continue
-            if action == "Cast Fire Bolt":
-                target = self.choose_target(conscious_enemies, prompt=f"Choose a target for {spell_label('fire_bolt')}.", allow_back=True)
-                if target is None:
-                    continue
-                self.cast_fire_bolt(actor, target, dodging)
-                turn_state.actions_remaining -= 1
-                continue
-            if action == "Cast Eldritch Blast":
-                target = self.choose_target(conscious_enemies, prompt=f"Choose a target for {spell_label('eldritch_blast')}.", allow_back=True)
-                if target is None:
-                    continue
-                self.cast_eldritch_blast(actor, target, dodging)
-                turn_state.actions_remaining -= 1
-                continue
-            if action == "Cast Magic Missile":
-                target = self.choose_target(conscious_enemies, prompt=f"Choose a target for {spell_label('magic_missile')}.", allow_back=True)
-                if target is None:
-                    continue
-                self.cast_magic_missile(actor, target)
-                turn_state.actions_remaining -= 1
-                turn_state.non_cantrip_action_spell_cast = True
-                continue
             if action == "Help a Downed Ally":
                 target = self.choose_ally(
                     [hero for hero in heroes if hero.current_hp == 0 and not hero.dead],
@@ -1541,24 +1370,12 @@ class CombatFlowMixin:
             return PUBLIC_COMBAT_ACTION_KEYS[action]
         if action.startswith("Strike with "):
             return action.replace("Strike with ", "Attack with ", 1)
-        if action.startswith("Cast ") or action.startswith("Attack with Divine Smite"):
+        if action.startswith("Cast "):
             return action
         return action
 
     def can_afford_spell(self, actor: Character, spell_id: str) -> bool:
         return has_magic_points(actor, magic_point_cost(spell_id))
-
-    def combat_spell_option(self, label: str, spell_id: str, *, note: str | None = None) -> str:
-        if label.startswith("Cast "):
-            display_label = f"Channel {spell_label(spell_id)}"
-        elif label == "Attack with Divine Smite":
-            display_label = f"Strike with {spell_label(spell_id)}"
-        else:
-            display_label = label
-        suffix = f"{magic_point_cost(spell_id)} MP"
-        if note:
-            suffix = f"{suffix}, {note}"
-        return f"{display_label} ({suffix})"
 
     def choose_combat_stance(self, actor: Character) -> bool:
         options = [self.combat_stance_option(stance_key, actor) for stance_key in STANCE_ORDER] + ["Back"]
@@ -1595,14 +1412,7 @@ class CombatFlowMixin:
         if action == "Try to Flee":
             return "Escape"
         if action in {
-            "Use Martial Arts",
-            "Use Flurry of Blows",
-            "Use Patient Defense",
-            "Use Step of the Wind",
             "Use Cunning Action",
-            "Enter Rage",
-            "Use Second Wind",
-            "Use Bardic Inspiration",
             "Weapon Read",
             "Measure Twice",
             "Style Wheel",
@@ -1863,14 +1673,6 @@ class CombatFlowMixin:
                     return indexed[value]
             self.say("Please enter a listed number.")
 
-    def activate_action_surge(self, actor: Character, turn_state: TurnState) -> bool:
-        if not actor.spend_resource("action_surge"):
-            self.say(f"{self.style_name(actor)} has already spent Battle Surge this rest.")
-            return False
-        turn_state.actions_remaining += 1
-        self.say(f"{self.style_name(actor)} digs deep and surges into another action.")
-        return True
-
     def can_make_off_hand_attack(self, actor: Character) -> bool:
         main_hand = self.equipped_weapon_item(actor)
         off_hand = self.equipped_off_hand_weapon_item(actor)
@@ -1905,62 +1707,25 @@ class CombatFlowMixin:
         conscious_enemies = [enemy for enemy in enemies if enemy.is_conscious()]
         if not conscious_enemies:
             return
-        if actor.class_name == "Fighter" and actor.resources.get("second_wind", 0) > 0 and actor.current_hp <= actor.max_hp // 2:
-            self.use_second_wind(actor)
-            return
-        if actor.class_name == "Barbarian" and actor.resources.get("rage", 0) > 0 and not self.has_status(actor, "emboldened"):
-            self.use_rage(actor)
-            return
-        if actor.class_name == "Bard" and actor.resources.get("bardic_inspiration", 0) > 0:
-            target = min([ally for ally in heroes if ally.is_conscious()], key=lambda ally: ally.current_hp)
-            if not self.has_status(target, "blessed"):
-                self.use_bardic_inspiration(actor, target)
-                return
-        if actor.class_name == "Cleric" and self.can_afford_spell(actor, "cure_wounds"):
+        if "field_mend" in actor.features and self.can_afford_spell(actor, "field_mend"):
             wounded = [ally for ally in heroes if not ally.dead and ally.current_hp < ally.max_hp]
             if wounded:
                 target = min(wounded, key=lambda ally: ally.current_hp)
                 if target.current_hp <= max(1, target.max_hp // 2):
-                    self.cast_cure_wounds(actor, target)
+                    self.use_field_mend(actor, target)
                     return
-        if actor.class_name == "Paladin":
-            leaders = [enemy for enemy in conscious_enemies if "leader" in enemy.tags]
-            if actor.resources.get("channel_divinity", 0) > 0 and leaders:
-                self.use_channel_divinity(actor, leaders[0])
+        leaders = [enemy for enemy in conscious_enemies if "leader" in enemy.tags]
+        if "arc_pulse" in actor.features and self.can_afford_spell(actor, "arc_pulse") and leaders:
+            self.use_arc_pulse(actor, leaders[0])
+            return
+        if "minor_channel" in actor.features and self.can_afford_spell(actor, "minor_channel"):
+            self.use_minor_channel(actor, conscious_enemies[0])
+            return
+        if "warrior_guard" in actor.features and not self.has_status(actor, "guarding"):
+            if self.use_guard_stance(actor):
                 return
-            wounded = [ally for ally in heroes if ally.is_conscious() and ally.current_hp < max(1, ally.max_hp // 2)]
-            if actor.resources.get("lay_on_hands", 0) > 0 and wounded:
-                self.use_lay_on_hands(actor, min(wounded, key=lambda ally: ally.current_hp))
-                return
-        if actor.class_name == "Wizard":
-            leaders = [enemy for enemy in conscious_enemies if "leader" in enemy.tags]
-            if self.can_afford_spell(actor, "magic_missile") and leaders:
-                self.cast_magic_missile(actor, leaders[0])
-                return
-            if self.can_afford_spell(actor, "fire_bolt"):
-                self.cast_fire_bolt(actor, conscious_enemies[0], dodging)
-                return
-        if actor.class_name == "Bard":
-            if self.can_afford_spell(actor, "vicious_mockery"):
-                self.cast_vicious_mockery(actor, conscious_enemies[0])
-                return
-        if actor.class_name == "Cleric":
-            if self.can_afford_spell(actor, "sacred_flame"):
-                self.cast_sacred_flame(actor, conscious_enemies[0])
-                return
-        if actor.class_name == "Warlock":
-            if self.can_afford_spell(actor, "eldritch_blast"):
-                self.cast_eldritch_blast(actor, conscious_enemies[0], dodging)
-                return
-        if actor.class_name == "Sorcerer":
-            if self.can_afford_spell(actor, "magic_missile"):
-                self.cast_magic_missile(actor, conscious_enemies[0])
-                return
-            if self.can_afford_spell(actor, "fire_bolt"):
-                self.cast_fire_bolt(actor, conscious_enemies[0], dodging)
-                return
-        if actor.class_name == "Monk":
-            self.use_martial_arts(actor, conscious_enemies[0], heroes, enemies, dodging)
+        if "rogue_feint" in actor.features and not self.has_status(conscious_enemies[0], "off_balance"):
+            self.use_rogue_feint(actor, conscious_enemies[0])
             return
         target = min(conscious_enemies, key=lambda enemy: enemy.current_hp)
         self.perform_weapon_attack(actor, target, heroes, enemies, dodging)
@@ -2724,14 +2489,8 @@ class CombatFlowMixin:
         turn_state = turn_state or TurnState()
         heroes = heroes or (self.state.party_members() if self.state is not None else [actor])
         options: list[str] = []
-        if "action_surge" in actor.features and actor.resources.get("action_surge", 0) > 0:
-            options.append("Use Battle Surge")
         if turn_state.actions_remaining > 0:
             options.append(f"Strike with {actor.weapon.name}")
-            if actor.class_name == "Paladin" and "divine_smite" in actor.features and self.can_afford_spell(actor, "divine_smite"):
-                options.append(self.combat_spell_option("Attack with Divine Smite", "divine_smite", note="on hit"))
-            if actor.class_name == "Paladin" and actor.resources.get("lay_on_hands", 0) > 0:
-                options.append("Use Oath Mend")
             if "warrior_guard" in actor.features:
                 options.append("Take Guard Stance")
             if "warrior_shove" in actor.features:
@@ -2803,36 +2562,6 @@ class CombatFlowMixin:
                     options.append("Bitter Acid")
                 if "field_stitch" in actor.features:
                     options.append("Field Stitch")
-            if actor.class_name == "Cleric":
-                if actor.resources.get("channel_divinity", 0) > 0:
-                    options.append("Invoke Lantern Surge")
-                if self.can_afford_spell(actor, "sacred_flame"):
-                    options.append(self.combat_spell_option("Cast Sacred Flame", "sacred_flame"))
-                if self.can_afford_spell(actor, "cure_wounds") and not turn_state.bonus_action_spell_cast:
-                    options.append(self.combat_spell_option("Cast Cure Wounds", "cure_wounds"))
-            if actor.class_name == "Druid":
-                if self.can_afford_spell(actor, "produce_flame"):
-                    options.append(self.combat_spell_option("Cast Produce Flame", "produce_flame"))
-                if self.can_afford_spell(actor, "cure_wounds") and not turn_state.bonus_action_spell_cast:
-                    options.append(self.combat_spell_option("Cast Cure Wounds", "cure_wounds"))
-            if actor.class_name == "Bard":
-                if self.can_afford_spell(actor, "vicious_mockery"):
-                    options.append(self.combat_spell_option("Cast Vicious Mockery", "vicious_mockery"))
-                if self.can_afford_spell(actor, "cure_wounds") and not turn_state.bonus_action_spell_cast:
-                    options.append(self.combat_spell_option("Cast Cure Wounds", "cure_wounds"))
-            if actor.class_name == "Sorcerer":
-                if self.can_afford_spell(actor, "fire_bolt"):
-                    options.append(self.combat_spell_option("Cast Fire Bolt", "fire_bolt"))
-                if self.can_afford_spell(actor, "magic_missile") and not turn_state.bonus_action_spell_cast:
-                    options.append(self.combat_spell_option("Cast Magic Missile", "magic_missile"))
-            if actor.class_name == "Warlock":
-                if self.can_afford_spell(actor, "eldritch_blast"):
-                    options.append(self.combat_spell_option("Cast Eldritch Blast", "eldritch_blast"))
-            if actor.class_name == "Wizard":
-                if self.can_afford_spell(actor, "fire_bolt"):
-                    options.append(self.combat_spell_option("Cast Fire Bolt", "fire_bolt"))
-                if self.can_afford_spell(actor, "magic_missile") and not turn_state.bonus_action_spell_cast:
-                    options.append(self.combat_spell_option("Cast Magic Missile", "magic_missile"))
             if any(hero.current_hp == 0 and not hero.dead for hero in heroes if hero is not actor):
                 options.append(self.skill_tag("MEDICINE", "Help a Downed Ally"))
             if self.has_action_item_option(actor, heroes):
@@ -2843,21 +2572,8 @@ class CombatFlowMixin:
                 options.append(self.skill_tag("STEALTH", "Try to Flee"))
             options.append("Take Guarded Stance")
         if turn_state.bonus_action_available:
-            if actor.class_name == "Monk" and turn_state.attack_action_taken:
-                options.append("Use Close Form")
-                if actor.resources.get("ki", 0) > 0:
-                    options.append("Use Twinflow Strikes")
-            if actor.class_name == "Monk" and actor.resources.get("ki", 0) > 0:
-                options.append("Use Still Guard")
-                options.append("Use Wind Step")
             if "cunning_action" in actor.features:
                 options.append("Use Veil Step")
-            if actor.class_name == "Barbarian" and actor.resources.get("rage", 0) > 0 and not self.has_status(actor, "emboldened"):
-                options.append("Enter Battle Surge")
-            if actor.class_name == "Bard" and actor.resources.get("bardic_inspiration", 0) > 0:
-                options.append("Use Rally Note")
-            if actor.class_name == "Fighter" and actor.resources.get("second_wind", 0) > 0:
-                options.append("Use Second Breath")
             if "warrior_rally" in actor.features and actor.resources.get("grit", 0) > 0:
                 options.append("Warrior Rally")
             if "iron_draw" in actor.features:
@@ -2910,8 +2626,6 @@ class CombatFlowMixin:
                 options.append("Overflow Shell (1 Flow)")
             if "alchemist_quick_mix" in actor.features and not self.has_status(actor, "quick_mix"):
                 options.append("Quick Mix")
-            if actor.class_name in {"Bard", "Cleric", "Druid"} and self.can_afford_spell(actor, "healing_word") and not turn_state.non_cantrip_action_spell_cast:
-                options.append(self.combat_spell_option("Cast Healing Word", "healing_word", note="Bonus Action"))
             if self.can_raise_shield(actor):
                 options.append("Raise Shield")
             if turn_state.attack_action_taken and self.can_make_off_hand_attack(actor):

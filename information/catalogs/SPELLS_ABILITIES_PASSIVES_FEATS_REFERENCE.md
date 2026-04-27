@@ -18,7 +18,7 @@ This file replaces the old long spell, feature, passive, and feat draft that par
 
 - The game still uses a compact SRD-derived d20 math chassis internally.
 - Player-facing text should prefer Aethrune terms: `Guard`, `resist check`, `strike check`, `edge`, `strain`, `channeling`, `MP`, `draught`, `script`, `relic`, and `marks`.
-- Internal class, spell, feature, and item ids may remain legacy-shaped until save migration and display-name adapters are finished.
+- Internal item ids may remain legacy-shaped until save migration and display-name adapters are finished.
 - Do not re-add external spell descriptions, feat catalogs, subclass prose, borrowed setting lore, or comparison notes here.
 
 ## Implemented Channel Labels
@@ -27,15 +27,22 @@ The authoritative mapping is `SPELL_PUBLIC_LABELS` in `public_terms.py`.
 
 | Internal id | Public label |
 | --- | --- |
-| `sacred_flame` | Lantern Flare |
-| `produce_flame` | Embercall |
-| `vicious_mockery` | Cutting Cadence |
-| `fire_bolt` | Ember Lance |
-| `eldritch_blast` | Void Surge |
-| `cure_wounds` | Field Mend |
-| `healing_word` | Pulse Restore |
-| `magic_missile` | Arc Pulse |
-| `divine_smite` | Oathflare Strike |
+| `minor_channel` | Minor Channel |
+| `arc_pulse` | Arc Pulse |
+| `marked_angle` | Marked Angle |
+| `ember_lance` | Ember Lance |
+| `frost_shard` | Frost Shard |
+| `volt_grasp` | Volt Grasp |
+| `burning_line` | Burning Line |
+| `lockfrost` | Lockfrost |
+| `field_mend` | Field Mend |
+| `pulse_restore` | Pulse Restore |
+| `triage_line` | Triage Line |
+| `clean_breath` | Clean Breath |
+| `anchor_shell` | Anchor Shell |
+| `ward_shell` | Ward Shell |
+| `blue_glass_palm` | Blue Glass Palm |
+| `lockstep_field` | Lockstep Field |
 
 ## Implemented Feature Labels
 
@@ -43,16 +50,15 @@ The authoritative mapping is `FEATURE_PUBLIC_LABELS` in `public_terms.py`. Keep 
 
 Important public labels already in place include:
 
-- Battle Surge
-- Rally Note
-- Lantern Surge
-- Field Medic Doctrine
-- Second Breath
-- Close Form
-- Oath Mend
-- Route Sense
+- Grit
+- Guard Stance
+- Warrior Rally
 - Veilstrike
-- Pattern Recovery
+- Minor Channel
+- Pattern Read
+- Ground
+- Field Mend
+- Pulse Restore
 - Lowlight Sight
 - Signal Distance
 - Forged Presence
