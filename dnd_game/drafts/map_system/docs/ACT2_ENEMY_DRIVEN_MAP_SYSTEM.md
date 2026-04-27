@@ -38,7 +38,7 @@ Act 2 should be mapped around enemy pressure packages rather than around locatio
 | `cave_predators` | `grimlock_tunneler`, `stirge_swarm`, `ochre_slime`, `acidmaw_burrower`, `carrion_lash_crawler`, `hookclaw_burrower` | makes the mine ecology hostile before the cult is fully visible |
 | `pact_haunting` | `animated_armor`, `spectral_foreman`, `graveblade_wight`, `iron_prayer_horror` | shows the old Meridian Compact defending itself badly or under corrupted orders |
 | `quiet_choir` | `cult_lookout`, `choir_adept`, `starblighted_miner`, `choir_executioner`, `obelisk_eye`, `caldra_voss` | turns Act 2 from claim dispute into cosmic listening-horror |
-| `black_lake` | `animated_armor`, `starblighted_miner`, `blacklake_pincerling`, `spectral_foreman`, `obelisk_eye` | makes the final threshold a tactical and spiritual crossing |
+| `blackglass` | `animated_armor`, `starblighted_miner`, `blacklake_pincerling`, `spectral_foreman`, `obelisk_eye` | makes the final threshold a tactical and spiritual crossing |
 
 ## Route Shape
 
@@ -308,7 +308,7 @@ This keeps the text-based map readable while making Act 2 feel wider and more re
      - `cave_predators`
      - `pact_haunting`
      - `quiet_choir`
-     - `black_lake`
+     - `blackglass`
   - Later, this can influence random encounters and room text.
   - The live game now also surfaces pressure through the Act II status panel and room text, even though the overlay model is still lighter than the full draft vision.
 

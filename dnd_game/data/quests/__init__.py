@@ -1,21 +1,13 @@
 from __future__ import annotations
 
+from ..id_aliases import QUEST_ID_ALIASES, canonical_quest_id
 from .act2 import ACT_2_QUESTS
 from .act1 import ACT_1_QUESTS
 from .schema import QuestDefinition, QuestLogEntry, QuestReward
 
-QUEST_ID_ALIASES = {
-    "seek_agathas_truth": "seek_pale_witness_truth",
-}
-
 
 def resolve_quest_id(quest_id: str | None) -> str | None:
-    if quest_id is None:
-        return None
-    token = str(quest_id).strip()
-    if not token:
-        return token
-    return QUEST_ID_ALIASES.get(token, token)
+    return canonical_quest_id(quest_id)
 
 
 class QuestCatalogDict(dict[str, QuestDefinition]):

@@ -187,7 +187,7 @@
       },
       "notes": [
         "Veteran's kit: +1 to Athletics and Intimidation checks.",
-        "A dragonborn sworn to protect caravans on the road south of Neverwinter.",
+        "A dragonborn sworn to protect caravans on the road south of Greywake.",
         "A dragonborn oathsworn who treats duty like a living thing that must be fed by action."
       ],
       "tags": [
@@ -304,7 +304,7 @@
       },
       "notes": [
         "Veteran's kit: +1 to Athletics and Intimidation checks.",
-        "A caravan guard from Neverwinter with a shield wall mindset.",
+        "A caravan guard from Greywake with a shield wall mindset.",
         "A dwarven shield veteran who measures people by whether they hold the line when it matters."
       ],
       "tags": [
@@ -327,7 +327,7 @@
       "companion_id": "tolan_ironshield",
       "disposition": 0,
       "lore": [
-        "Tolan served on caravan routes out of Neverwinter for two decades, long enough to see three trade leagues fail and two rise in their place.",
+        "Tolan served on caravan routes out of Greywake for two decades, long enough to see three trade leagues fail and two rise in their place.",
         "He still carries a notched tower-shield rivet from the ambush that killed his older brother near the Mere of Dead Men.",
         "He trusts steady action more than speeches, but remembers every promise anyone makes in his hearing."
       ],
@@ -346,15 +346,15 @@
   ],
   "camp_companions": [],
   "current_act": 1,
-  "current_scene": "phandalin_hub",
+  "current_scene": "iron_hollow_hub",
   "flags": {
     "act1_started": true,
     "map_state": {
-      "current_node_id": "phandalin_hub",
+      "current_node_id": "iron_hollow_hub",
       "current_dungeon_id": null,
       "current_room_id": null,
       "visited_nodes": [
-        "phandalin_hub"
+        "iron_hollow_hub"
       ],
       "cleared_rooms": [],
       "seen_story_beats": [],
@@ -368,62 +368,62 @@
     ],
     "background_prologue_completed": "Soldier",
     "briefing_seen": true,
-    "briefing_q_neverwinter": true,
-    "briefing_q_phandalin": true,
+    "briefing_q_greywake": true,
+    "briefing_q_iron_hollow": true,
     "briefing_q_brand": true,
     "early_companion_recruited": "Rhogar Valeguard",
     "road_approach_chosen": true,
     "act1_town_fear": 1,
     "act1_ashen_strength": 3,
     "act1_survivors_saved": 0,
-    "phandalin_arrived": true,
+    "iron_hollow_arrived": true,
     "hidden_route_unlocked": true
   },
   "clues": [
-    "A stolen dispatch confirms the attacks around Phandalin are organized enough to rattle Neverwinter's quartermasters.",
+    "A stolen dispatch confirms the attacks around Iron Hollow are organized enough to rattle Greywake's quartermasters.",
     "A scorched badge on the goblins marks the Ashen Brand.",
     "The raiders were working with a hobgoblin sergeant tied to Ashfall Watch.",
-    "Phandalin's fear points in three directions: the east road, the old manor hill, and the few locals still holding the place together.",
+    "Iron Hollow's fear points in three directions: the east road, the old manor hill, and the few locals still holding the place together.",
     "Old evacuation marks and nervous traffic patterns point toward Cinderfall Ruins, an abandoned relay east of Ashfall Watch."
   ],
   "journal": [
-    "Your soldier's opening leaves you with a live look at how hard Neverwinter is leaning on thin patrol lines and tired veterans to protect the road south.",
-    "Word reaches you that Mira Thann is quietly gathering capable hands in Neverwinter against a new bandit threat around Phandalin.",
+    "Your soldier's opening leaves you with a live look at how hard Greywake is leaning on thin patrol lines and tired veterans to protect the road south.",
+    "Word reaches you that Mira Thann is quietly gathering capable hands in Greywake against a new bandit threat around Iron Hollow.",
     "Reward from South Barracks Breakout: 50 XP, 8 gp.",
     "Looted Frontier Ale x1 from South Barracks Breakout.",
     "Reward from holding the barracks line: 15 XP, 6 gp.",
-    "Clue: A stolen dispatch confirms the attacks around Phandalin are organized enough to rattle Neverwinter's quartermasters.",
-    "Your soldier prologue ends with the trail leading toward Mira Thann's private briefing in Neverwinter.",
+    "Clue: A stolen dispatch confirms the attacks around Iron Hollow are organized enough to rattle Greywake's quartermasters.",
+    "Your soldier prologue ends with the trail leading toward Mira Thann's private briefing in Greywake.",
     "Rhogar Valeguard joined the active party.",
-    "Mira Thann sent you south with a writ for Phandalin's steward.",
+    "Mira Thann sent you south with a writ for Iron Hollow's steward.",
     "Reward from Roadside Ambush: 100 XP, 11 gp.",
     "Looted Dried Fish x1 from Roadside Ambush.",
     "Clue: A scorched badge on the goblins marks the Ashen Brand.",
     "Clue: The raiders were working with a hobgoblin sergeant tied to Ashfall Watch.",
-    "Reward from saving the caravan guard on the High Road: 25 XP, 15 gp.",
+    "Reward from saving the caravan guard on the Emberway: 25 XP, 15 gp.",
     "Tolan Ironshield joined the active party.",
-    "You reached Phandalin, a hard-bitten frontier town under growing Ashen Brand pressure.",
-    "Clue: Phandalin's fear points in three directions: the east road, the old manor hill, and the few locals still holding the place together.",
+    "You reached Iron Hollow, a hard-bitten frontier town under growing Ashen Brand pressure.",
+    "Clue: Iron Hollow's fear points in three directions: the east road, the old manor hill, and the few locals still holding the place together.",
     "Clue: Old evacuation marks and nervous traffic patterns point toward Cinderfall Ruins, an abandoned relay east of Ashfall Watch.",
     "A hidden route through Cinderfall Ruins can be used before the Ashfall assault.",
-    "Reward from reading Phandalin's mood on arrival: 10 XP."
+    "Reward from reading Iron Hollow's mood on arrival: 10 XP."
   ],
   "quests": {},
   "completed_acts": [],
   "xp": 200,
   "gold": 60,
   "inventory": {
-    "potion_healing": 4,
-    "bread_round": 4,
-    "travel_biscuits": 4,
-    "dried_fish": 4,
-    "goat_cheese": 2,
-    "frontier_ale": 3,
-    "root_vegetables": 2,
-    "antitoxin_vial": 1,
-    "chain_mail_common": 3,
-    "longsword_common": 3,
-    "shield_common": 3
+    "C0011": 4,
+    "S0002": 4,
+    "S0021": 4,
+    "S0005": 4,
+    "S0007": 2,
+    "S0006": 3,
+    "S0016": 2,
+    "C0000": 1,
+    "E0004": 3,
+    "E0097": 3,
+    "E0060": 3
   },
   "short_rests_remaining": 2
 }

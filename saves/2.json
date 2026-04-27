@@ -189,7 +189,7 @@
       },
       "notes": [
         "Veteran's kit: +1 to Athletics and Intimidation checks.",
-        "A dragonborn sworn to protect caravans on the road south of Neverwinter.",
+        "A dragonborn sworn to protect caravans on the road south of Greywake.",
         "A dragonborn oathsworn who treats duty like a living thing that must be fed by action."
       ],
       "tags": [
@@ -231,7 +231,7 @@
   ],
   "camp_companions": [],
   "current_act": 1,
-  "current_scene": "neverwinter_briefing",
+  "current_scene": "greywake_briefing",
   "flags": {
     "act1_started": true,
     "introduced_characters": [
@@ -242,21 +242,21 @@
     "background_prologue_completed": "Soldier",
     "briefing_seen": true,
     "early_companion_recruited": "Rhogar Valeguard",
-    "neverwinter_preparation_done": true
+    "greywake_preparation_done": true
   },
   "clues": [
-    "A stolen dispatch confirms the attacks around Phandalin are organized enough to rattle Neverwinter's quartermasters.",
+    "A stolen dispatch confirms the attacks around Iron Hollow are organized enough to rattle Greywake's quartermasters.",
     "Dockside rumors say the Ashen Brand sells stolen ore through quiet middlemen."
   ],
   "journal": [
-    "Your soldier's opening leaves you with a live look at how hard Neverwinter is leaning on thin patrol lines and tired veterans to protect the road south.",
-    "Word reaches you that Mira Thann is quietly gathering capable hands in Neverwinter against a new bandit threat around Phandalin.",
+    "Your soldier's opening leaves you with a live look at how hard Greywake is leaning on thin patrol lines and tired veterans to protect the road south.",
+    "Word reaches you that Mira Thann is quietly gathering capable hands in Greywake against a new bandit threat around Iron Hollow.",
     "Reward from South Barracks Breakout: 50 XP, 8 gp.",
     "Looted Roadworn Leather Armor x1 from South Barracks Breakout.",
     "Looted Potion of Healing x1 from South Barracks Breakout.",
     "Reward from holding the barracks line: 15 XP, 6 gp.",
-    "Clue: A stolen dispatch confirms the attacks around Phandalin are organized enough to rattle Neverwinter's quartermasters.",
-    "Your soldier prologue ends with the trail leading toward Mira Thann's private briefing in Neverwinter.",
+    "Clue: A stolen dispatch confirms the attacks around Iron Hollow are organized enough to rattle Greywake's quartermasters.",
+    "Your soldier prologue ends with the trail leading toward Mira Thann's private briefing in Greywake.",
     "Rhogar Valeguard joined the active party.",
     "Clue: Dockside rumors say the Ashen Brand sells stolen ore through quiet middlemen.",
     "Reward from working the rumor mill: 15 XP, 12 gp."
@@ -266,18 +266,18 @@
   "xp": 80,
   "gold": 46,
   "inventory": {
-    "potion_healing": 4,
-    "bread_round": 4,
-    "travel_biscuits": 4,
-    "dried_fish": 3,
-    "goat_cheese": 2,
-    "frontier_ale": 2,
-    "root_vegetables": 2,
-    "antitoxin_vial": 1,
-    "chain_mail_common": 2,
-    "longsword_common": 2,
-    "shield_common": 2,
-    "leather_armor_common": 1
+    "C0011": 4,
+    "S0002": 4,
+    "S0021": 4,
+    "S0005": 3,
+    "S0007": 2,
+    "S0006": 2,
+    "S0016": 2,
+    "C0000": 1,
+    "E0004": 2,
+    "E0097": 2,
+    "E0060": 2,
+    "E0009": 1
   },
   "short_rests_remaining": 2
 }

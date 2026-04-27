@@ -37,4 +37,4 @@ After drafting:
 
 ## Existing Model To Follow
 
-- When a scene needs voice, lead with concrete sensory detail in the style already present in `information/Story/ACT1_PRE_NEVERWINTER_ELIRA_DRAFT.md`, especially the opening text around line 65.
+- When a scene needs voice, lead with concrete sensory detail in the style already present in `information/Story/archive/legacy_drafts/ACT1_PRE_NEVERWINTER_ELIRA_DRAFT.md`, especially the opening text around line 65.

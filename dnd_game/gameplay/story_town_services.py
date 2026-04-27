@@ -6,7 +6,7 @@ from ..content import create_elira_dawnmantle
 class StoryTownServicesMixin:
     def has_shrine_interactions(self) -> bool:
         assert self.state is not None
-        if self.has_companion("Elira Dawnmantle") and self.state.flags.get("elira_neverwinter_recruited"):
+        if self.has_companion("Elira Dawnmantle") and self.state.flags.get("elira_greywake_recruited"):
             return not self.state.flags.get("shrine_seen")
         return bool(
             not self.state.flags.get("shrine_seen")
@@ -19,7 +19,7 @@ class StoryTownServicesMixin:
     def visit_shrine(self) -> None:
         assert self.state is not None
         self.banner("Lantern Shrine")
-        if self.has_companion("Elira Dawnmantle") and self.state.flags.get("elira_neverwinter_recruited"):
+        if self.has_companion("Elira Dawnmantle") and self.state.flags.get("elira_greywake_recruited"):
             if not self.state.flags.get("shrine_seen"):
                 bell_echo = (
                     " A green road-ribbon hangs from the altar bell, bright as the promise Elira tied to the cracked luck bell "
@@ -42,7 +42,7 @@ class StoryTownServicesMixin:
                 self.say("The shrine bells move in the wind while Elira stays with the company, where the next wound is likeliest to happen.")
             return
         if not self.state.flags.get("shrine_seen"):
-            if self.state.flags.get("elira_phandalin_fallback_pending"):
+            if self.state.flags.get("elira_iron_hollow_fallback_pending"):
                 bell_echo = (
                     " A rain-stiff green road-ribbon from the cracked luck bell is tied beside her field kit."
                     if self.state.flags.get("wayside_luck_bell_seen")
@@ -54,7 +54,7 @@ class StoryTownServicesMixin:
                     + bell_echo,
                     typed=True,
                 )
-            elif self.state.flags.get("neverwinter_elira_met"):
+            elif self.state.flags.get("greywake_elira_met"):
                 bell_echo = (
                     " A green road-ribbon from the cracked luck bell has been knotted beside the votive flame."
                     if self.state.flags.get("wayside_luck_bell_seen")
@@ -87,7 +87,7 @@ class StoryTownServicesMixin:
                     (
                         "recruit",
                         "\"Come with me. Iron Hollow needs you in the field.\""
-                        if self.state.flags.get("elira_helped") or self.state.flags.get("elira_phandalin_fallback_pending")
+                        if self.state.flags.get("elira_helped") or self.state.flags.get("elira_iron_hollow_fallback_pending")
                         else self.quoted_option("PERSUASION", "Come with me. Iron Hollow needs you in the field."),
                     )
                 )
@@ -131,10 +131,10 @@ class StoryTownServicesMixin:
             elif selection_key == "recruit":
                 self.state.flags["shrine_recruit_attempted"] = True
                 self.player_speaker("Come with me. Iron Hollow needs you in the field.")
-                if self.state.flags.get("elira_helped") or self.state.flags.get("elira_phandalin_fallback_pending"):
+                if self.state.flags.get("elira_helped") or self.state.flags.get("elira_iron_hollow_fallback_pending"):
                     self.recruit_companion(create_elira_dawnmantle())
-                    self.state.flags["elira_phandalin_recruited"] = True
-                    self.state.flags.pop("elira_phandalin_fallback_pending", None)
+                    self.state.flags["elira_iron_hollow_recruited"] = True
+                    self.state.flags.pop("elira_iron_hollow_fallback_pending", None)
                     self.speaker("Elira Lanternward", "Then I will walk with you. The road needs more than prayers.")
                 else:
                     success = self.skill_check(self.state.player, "Persuasion", 8, context="to ask Elira into danger")
@@ -163,7 +163,7 @@ class StoryTownServicesMixin:
             self.state.flags["barthen_seen"] = True
         while True:
             options: list[tuple[str, str]] = []
-            if self.quest_is_ready("restore_barthen_supplies"):
+            if self.quest_is_ready("restore_hadrik_supplies"):
                 options.append(("turn_in", self.action_option("Tell Hadrik the watchtower road is open again.")))
             if not self.state.flags.get("barthen_shortage_asked"):
                 options.append(("shortage", "\"What does Iron Hollow run short on first when the road turns bad?\""))
@@ -177,7 +177,7 @@ class StoryTownServicesMixin:
                     "Hadrik",
                     "Then I can stop deciding which family hears 'maybe tomorrow' when the bread runs thin. That's worth more than a strongbox to me.",
                 )
-                self.turn_in_quest("restore_barthen_supplies", giver="Hadrik")
+                self.turn_in_quest("restore_hadrik_supplies", giver="Hadrik")
             elif selection_key == "shortage":
                 self.state.flags["barthen_shortage_asked"] = True
                 self.player_speaker("What does Iron Hollow run short on first when the road turns bad?")
@@ -186,7 +186,7 @@ class StoryTownServicesMixin:
                     "Food that keeps, bandages, lamp oil, and anything light enough to move fast. Every raid turns simple bread into strategy, because sooner or later somebody's child asks why supper got smaller again.",
                 )
                 if self.grant_quest(
-                    "restore_barthen_supplies",
+                    "restore_hadrik_supplies",
                     note="Hadrik says the raiders are turning everyday provisions into rationed hope.",
                 ):
                     self.speaker(

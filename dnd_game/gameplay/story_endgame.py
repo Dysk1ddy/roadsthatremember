@@ -76,7 +76,7 @@ class StoryEndgameMixin:
             self.handle_defeat("Ashfall Watch remains in enemy hands.")
             return
         if outcome == "fled":
-            self.state.current_scene = "phandalin_hub"
+            self.state.current_scene = "iron_hollow_hub"
             self.say("You fall back to Iron Hollow to rethink the assault.")
             return
 
@@ -133,7 +133,7 @@ class StoryEndgameMixin:
             self.handle_defeat("Rukhar drives the party from the tower in blood and smoke.")
             return
         if outcome == "fled":
-            self.state.current_scene = "phandalin_hub"
+            self.state.current_scene = "iron_hollow_hub"
             self.say("You escape the watchtower and retreat to Iron Hollow to regroup.")
             return
 
@@ -149,7 +149,7 @@ class StoryEndgameMixin:
             "older ruins. The Ashen Brand's true captain is waiting below the town, but now you have time to carry "
             "that news back through Iron Hollow before the final descent."
         )
-        self.state.current_scene = "phandalin_hub"
+        self.state.current_scene = "iron_hollow_hub"
 
     def scene_emberhall_cellars(self) -> None:
         assert self.state is not None
@@ -221,7 +221,7 @@ class StoryEndgameMixin:
             self.handle_defeat("The cellar banners remain standing above a fallen company.")
             return
         if outcome == "fled":
-            self.state.current_scene = "phandalin_hub"
+            self.state.current_scene = "iron_hollow_hub"
             self.say("You escape the cellars and return to the surface to recover.")
             return
 

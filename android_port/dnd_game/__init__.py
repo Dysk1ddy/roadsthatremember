@@ -1,1 +1,1 @@
-"""Aethrune Android text-adventure package."""
+"""Aethrune text-adventure package."""

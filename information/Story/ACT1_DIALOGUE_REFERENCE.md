@@ -6,13 +6,13 @@ Last compiled: 2026-04-21.
 
 This file consolidates implemented Act 1 dialogue options, their required conditions, and their gameplay or story results. It supersedes the Act 1 portions of the older conversation drafts:
 
-- `ACT1_PRE_NEVERWINTER_ELIRA_DRAFT.md`
-- `MIRA_NEVERWINTER_DIALOGUE_DRAFT.md`
-- `INN_EXPANSION_DRAFT.md`
-- `HIGH_ROAD_LIARS_CIRCLE_PUZZLE_DRAFT.md`
-- `COMPANION_DIALOGUE_INPUTS_DRAFT.md`
-- `COMPANION_CAMP_BANTER_DRAFT.md`
-- `BLACKWAKE_IMPLEMENTATION_CHECKLIST.md`
+- `archive/legacy_drafts/ACT1_PRE_NEVERWINTER_ELIRA_DRAFT.md`
+- `archive/legacy_drafts/MIRA_NEVERWINTER_DIALOGUE_DRAFT.md`
+- `archive/legacy_drafts/INN_EXPANSION_DRAFT.md`
+- `archive/legacy_drafts/HIGH_ROAD_LIARS_CIRCLE_PUZZLE_DRAFT.md`
+- `archive/legacy_drafts/COMPANION_DIALOGUE_INPUTS_DRAFT.md`
+- `archive/legacy_drafts/COMPANION_CAMP_BANTER_DRAFT.md`
+- `archive/legacy_drafts/BLACKWAKE_IMPLEMENTATION_CHECKLIST.md`
 
 Primary runtime sources:
 
@@ -40,8 +40,8 @@ All background prologues require the matching player background and end at `ways
 
 | Background | Condition and scenario | Dialogue options | Results |
 | --- | --- | --- | --- |
-| Soldier | Player background is `Soldier`; South Barracks runner with stolen dispatches. | `[ATHLETICS] Hit the gate hard before the runner clears the yard.` | DC 11. Success gives player `emboldened` 2 and hero bonus 2 for `South Barracks Breakout`; failure applies `reeling` 1. Victory rewards 15 XP, 6 gp, and a clue that Phandalin attacks are organized. |
-| Soldier | Same. | `[INSIGHT] Read the panic and pick the real escape lane.` | DC 11. Success weakens the runner and gives hero bonus 1; victory rewards as above. |
+| Soldier | Player background is `Soldier`; South Barracks runner with stolen dispatches. | `[ATHLETICS] Hit the gate hard before the runner clears the yard.` | DC 11. Success gives player `emboldened` 2 and hero bonus 2 for `South Barracks Breakout`; failure applies `reeling` 1. Victory rewards 15 XP, 6 gp, and a clue that Iron Hollow attacks are organized. |
+| Soldier | Same. | `[INSIGHT] Read the panic and pick the clean escape lane.` | DC 11. Success weakens the runner and gives hero bonus 1; victory rewards as above. |
 | Soldier | Same. | `[INTIMIDATION] Lock the teamsters in line and make the thief choose fear over speed.` | DC 11. Success frightens the runner 2; victory rewards as above. |
 | Acolyte | Player background is `Acolyte`; hospice receives poisoned pilgrim wagon. | `[MEDICINE] Stabilize the poisoned teamster before the details vanish with them.` | DC 11. Success grants `blessed_salve`; combat at `Hospice Gate`; victory rewards 15 XP and a poison/discipline clue. |
 | Acolyte | Same. | `[RELIGION] Lead the room in a sharp, steady prayer instead of letting fear set the pace.` | DC 11. Success blesses player 3; victory rewards as above. |
@@ -70,7 +70,7 @@ All background prologues require the matching player background and end at `ways
 
 ### Wayside Luck Shrine
 
-Condition: first shared post-prologue scene; `wayside_luck_shrine_seen` is false. Sets `wayside_luck_shrine_seen`, `wayside_luck_bell_seen`, `elira_first_contact`, and `neverwinter_elira_met`.
+Condition: first shared post-prologue scene; `wayside_luck_shrine_seen` is false. Sets `wayside_luck_shrine_seen`, `wayside_luck_bell_seen`, `elira_first_contact`, and `greywake_elira_met`.
 
 | Dialogue option | Required condition | Result |
 | --- | --- | --- |
@@ -78,8 +78,8 @@ Condition: first shared post-prologue scene; `wayside_luck_shrine_seen` is false
 | `[RELIGION] Lead Tymora's road-prayer so Elira can keep working.` | Always available. | DC 8. Sets trust reason `spiritual_kinship`. On success sets `elira_helped`, `wayside_prayer_steadied`, rewards 10 XP. Always grants `blessed_salve`. |
 | `[INVESTIGATION] Inspect the harness marks and false authority signs.` | Always available. | DC 8. Success sets `elira_helped`, `wayside_false_road_marks_found`, `blackwake_millers_ford_lead`, trust reason `wary_respect`, adds false-roadwarden clue, and rewards 10 XP. Failure sets trust reason `reserved_kindness`. |
 | `Keep the shrine moving and save your strength for the road.` | Always available. | Sets trust reason `reserved_kindness`, grants `potion_healing`, no check. |
-| `"Come with me. The next wound will be on the road, not at this shrine."` | Appears after the aid choice if Elira is not already a companion. | If `elira_helped` is true, recruitment succeeds. Otherwise requires Persuasion DC 8. Success recruits Elira, sets `elira_pre_neverwinter_recruited`, `elira_neverwinter_recruited`, `elira_first_companion`, and `wayside_luck_bell_promised`; trust can raise Elira disposition. Failure sets `elira_wayside_recruit_failed` and `elira_phandalin_fallback_pending`. |
-| `"Stay with them. I will carry your warning to Neverwinter."` | Same recruitment prompt. | Does not recruit Elira; sets `elira_phandalin_fallback_pending`. |
+| `"Come with me. The next wound will be on the road, not at this shrine."` | Appears after the aid choice if Elira is not already a companion. | If `elira_helped` is true, recruitment succeeds. Otherwise requires Persuasion DC 8. Success recruits Elira, sets `elira_pre_greywake_recruited`, `elira_greywake_recruited`, `elira_first_companion`, and `wayside_luck_bell_promised`; trust can raise Elira disposition. Failure sets `elira_wayside_recruit_failed` and `elira_iron_hollow_fallback_pending`. |
+| `"Stay with them. I will carry your warning to Greywake."` | Same recruitment prompt. | Does not recruit Elira; sets `elira_iron_hollow_fallback_pending`. |
 
 ### Greywake Triage Yard
 
@@ -90,12 +90,12 @@ Condition: after Wayside; `greywake_triage_yard_seen` is false. Sets `greywake_t
 | `[INSIGHT] Challenge the outcome-marked manifest before the clerk can bury it.` | Always available. | DC 9. Success preserves manifest, sets `greywake_outcome_manifest_read`, `greywake_mira_evidence_kind=marked_manifest`, `system_profile_seeded`, `varyn_route_pattern_seen`, and adds pre-sorted-casualty clue. Failure records unverified board. |
 | `[MEDICINE] Match the prewritten triage tags against the wounded with Elira.` | Always available. | DC 9. Success sets `greywake_wounded_stabilized`, `greywake_outcome_tags_matched_wounds`, evidence kind `matched_triage_tags`, `system_profile_seeded`, `elira_helped`, rewards 10 XP, and adds tag clue. Failure records unverified board. |
 | `[PERSUASION] Make the clerks read the outcome marks aloud before panic swallows them.` | Always available. | DC 9. Success sets `greywake_yard_steadied`, `greywake_sorting_publicly_exposed`, evidence kind `yard_witnesses`, rewards 10 XP, and adds witness clue. Failure records unverified board. |
-| `"Then walk with me now. We stop the wound before it reaches the shrine."` | Appears if Elira is not a companion after the yard choice. | Persuasion DC 6 if `elira_helped` or `greywake_wounded_stabilized`, otherwise DC 8. Success recruits Elira and sets `elira_greywake_recruited`, `elira_neverwinter_recruited`, `elira_first_companion`. Failure sets `elira_greywake_recruit_failed` and fallback. |
-| `"Stay. If the road brings me back alive, I will find you again."` | Same recruitment prompt. | Does not recruit Elira; sets `elira_phandalin_fallback_pending`. |
+| `"Then walk with me now. We stop the wound before it reaches the shrine."` | Appears if Elira is not a companion after the yard choice. | Persuasion DC 6 if `elira_helped` or `greywake_wounded_stabilized`, otherwise DC 8. Success recruits Elira and sets `elira_greywake_recruited`, `elira_first_companion`. Failure sets `elira_greywake_recruit_failed` and fallback. |
+| `"Stay. If the road brings me back alive, I will find you again."` | Same recruitment prompt. | Does not recruit Elira; sets `elira_iron_hollow_fallback_pending`. |
 
 ### Greywake Road Breakout
 
-Condition: after Greywake Yard. Combat scene against Ashen Brand cutters; routes to `neverwinter_briefing`.
+Condition: after Greywake Yard. Combat scene against Ashen Brand cutters; routes to `greywake_briefing`.
 
 | Dialogue option | Required condition | Result |
 | --- | --- | --- |
@@ -103,43 +103,43 @@ Condition: after Greywake Yard. Combat scene against Ashen Brand cutters; routes
 | `[INVESTIGATION] Seize the manifest runner before the proof disappears.` | Always available. | DC 10. Success sets `greywake_manifest_preserved`, `system_profile_seeded`, `varyn_route_pattern_seen`, adds hero bonus 1, and adds manifest clue. |
 | `[INTIMIDATION] Break the attackers' nerve loudly enough for the yard to hear.` | Always available. | DC 10. Success adds hero bonus 2 and frightens first enemy. |
 | Flee from combat. | Encounter allows flee. | Sets `greywake_manifest_destroyed`, evidence kind `burned_manifest_corner`, possibly Elira fallback, adds burned-manifest clue, and routes to Mira with weaker proof. |
-| Win combat. | Encounter victory. | Sets `greywake_breakout_resolved`, finalizes Mira evidence kind, rewards 25 XP and 8 gp, adds journal note, routes to `neverwinter_briefing`. |
+| Win combat. | Encounter victory. | Sets `greywake_breakout_resolved`, finalizes Mira evidence kind, rewards 25 XP and 8 gp, adds journal note, routes to `greywake_briefing`. |
 
-## Mira And Neverwinter
+## Mira And Greywake
 
 ### Mira Briefing Stages
 
-`scene_neverwinter_briefing` uses a dialogue stage:
+`scene_greywake_briefing` uses a dialogue stage:
 
 | Stage | Condition | Return options |
 | --- | --- | --- |
-| `initial_briefing` | Default before Phandalin arrival and before Blackwake report. | Initial briefing questions, prep stop, contract house, departure. |
-| `blackwake_return` | `blackwake_completed` and `blackwake_return_destination == neverwinter`. | `"Blackwake was worse than a side road."`, city-beneficiary question if available, leave south. |
-| `phandalin_return` | `phandalin_arrived` and no outer site cleared. | `"Phandalin is worse than your reports."`, city-beneficiary question if available, leave to Phandalin. |
-| `mid_act1_return` | `old_owl_well_cleared` or `wyvern_tor_cleared`. | `"The outer sites are not random."`, city-beneficiary question if available, leave. |
+| `initial_briefing` | Default before Iron Hollow arrival and before Blackwake report. | Initial briefing questions, prep stop, contract house, departure. |
+| `blackwake_return` | `blackwake_completed` and `blackwake_return_destination == greywake`. | `"Blackwake was worse than a side road."`, city-beneficiary question if available, leave south. |
+| `iron_hollow_return` | `iron_hollow_arrived` and no outer site cleared. | `"Iron Hollow is worse than your reports."`, city-beneficiary question if available, leave to Iron Hollow. |
+| `mid_act1_return` | `blackglass_well_cleared` or `red_mesa_hold_cleared`. | `"The outer sites are not random."`, city-beneficiary question if available, leave. |
 | `post_ashfall_return` | `ashfall_watch_cleared`. | `"Ashfall Watch is broken."`, city-beneficiary question if available, leave. |
-| `late_act1_return` | `tresendar_cleared` or `emberhall_revealed`. | `"The manor is not just a ruin."`, city-beneficiary question if available, leave. |
+| `late_act1_return` | `duskmere_cleared` or `emberhall_revealed`. | `"The manor is built over something active."`, city-beneficiary question if available, leave. |
 | `post_act1_return` | `varyn_body_defeated_act1` or `act1_victory_tier`. | `"Varyn is beaten."`, city-beneficiary question if available, leave. |
 
 ### Initial Mira Menu
 
 | Dialogue option | Required condition | Result |
 | --- | --- | --- |
-| `"How is Neverwinter holding together these days?"` | Initial stage; not `briefing_q_neverwinter`. | Sets asked flag, provides city/road stakes, and reacts to Greywake/Blackwake flags. |
-| `"Tell me what matters most about Phandalin before I ride."` | Initial stage; not `briefing_q_phandalin`. | Sets asked flag, explains town pressure, stewards, suppliers, shrine, and Stonehill value. |
-| `"How dangerous is this Ashen Brand, really?"` | Initial stage; not `briefing_q_brand`. | Sets asked flag, frames Brand as organized logistics rather than raiders; reacts to Wayside, Greywake, Old Owl, Wyvern, and Cinderfall flags. |
+| `"How is Greywake holding together these days?"` | Initial stage; not `briefing_q_greywake`. | Sets asked flag, provides city/road stakes, and reacts to Greywake/Blackwake flags. |
+| `"Tell me what matters most about Iron Hollow before I ride."` | Initial stage; not `briefing_q_iron_hollow`. | Sets asked flag, explains town pressure, stewards, suppliers, shrine, and Ashlamp value. |
+| `"How dangerous is this Ashen Brand, really?"` | Initial stage; not `briefing_q_brand`. | Sets asked flag, frames Brand as organized logistics rather than raiders; reacts to Wayside, Greywake, Blackglass, Red Mesa, and Cinderfall flags. |
 | `"What do you make of Greywake?"` | `greywake_outcome_sorting_seen` and not asked. | Sets `mira_q_greywake_initial`, explains Greywake as system proof, reacts to manifest/witness/wounded-line outcomes, adds political pressure context. |
 | `"You know Elira Dawnmantle?"` | `elira_first_contact` or Elira companion and not asked. | Sets `mira_q_elira_initial`, gives Elira trust read, reacts to recruitment/fallback/trust reason. |
-| `"Who inside the city benefits from this?"` | `neverwinter_private_room_intel`, `neverwinter_contract_house_political_callback`, `false_manifest_circuit` active, or quest completed. | Sets city-beneficiary asked flag, points to corrupt paperwork and officials who normalize wrong paper. |
+| `"Who inside the city benefits from this?"` | `greywake_private_room_intel`, `greywake_contract_house_political_callback`, `false_manifest_circuit` active, or quest completed. | Sets city-beneficiary asked flag, points to corrupt paperwork and officials who normalize wrong paper. |
 | `"What do you need from me before I leave?"` | Greywake proof, Blackwake completion, Elira early recruitment, or Elira companion, and not asked. | Sets need asked flag, advises visible/hidden writ use and facts clean enough to pressure officials. |
-| `Make one more stop in Neverwinter before riding out.` | Initial stage and not `neverwinter_preparation_done`. | Opens Neverwinter prep choices. |
+| `Make one more stop in Greywake before riding out.` | Initial stage and not `greywake_preparation_done`. | Opens Greywake prep choices. |
 | `Stop by Oren Vale's contract house.` | Initial stage. | Opens Contract House social hub. |
-| `Take the writ and head for the High Road.` | Initial stage. | Opens departure fork. |
-| `Return to Phandalin.` / `Take the road south.` | Return stages. | Routes back to Phandalin if arrived, otherwise to the south-road departure. |
+| `Take the writ and head for the Emberway.` | Initial stage. | Opens departure fork. |
+| `Return to Iron Hollow.` / `Take the road south.` | Return stages. | Routes back to Iron Hollow if arrived, otherwise to the south-road departure. |
 
-### Neverwinter Class Identity Options
+### Greywake Class Identity Options
 
-Condition: player has the class and has not used the one-shot class identity action in `neverwinter_briefing`.
+Condition: player has the class and has not used the one-shot class identity action in `greywake_briefing`.
 
 | Class | Dialogue option | Result |
 | --- | --- | --- |
@@ -156,9 +156,9 @@ Condition: player has the class and has not used the one-shot class identity act
 | Warlock | `[INTIMIDATION] "Fear leaves a shape behind. So does greed. Which one do these people kneel to first?"` | DC 12. Success rewards 6 XP and clue that profit comes first, fear protects it. |
 | Wizard | `[INVESTIGATION] Ask for the original reports instead of the polished summary and compare repeats.` | DC 11. Success rewards 10 XP and repeated route/timing clue. |
 
-### Neverwinter Preparation
+### Greywake Preparation
 
-Condition: player chooses a prep stop and `neverwinter_preparation_done` is false. All options set `neverwinter_preparation_done`.
+Condition: player chooses a prep stop and `greywake_preparation_done` is false. All options set `greywake_preparation_done`.
 
 | Dialogue option | Result |
 | --- | --- |
@@ -175,20 +175,20 @@ Condition: player chooses Oren Vale's contract house from Mira's initial menu or
 | --- | --- | --- | --- |
 | Oren Vale | Ask about the false manifest detail. | Quest/context active and not `false_manifest_oren_detail`. | Insight DC 12. Success sets `false_manifest_oren_detail` and adds contract-house proof. |
 | Oren Vale | Ask about the private room. | Private room quest/reward available. | Points toward the private room scene. |
-| Oren Vale | Ask about Mira. | Always while in Oren loop. | Gives Neverwinter liaison context. |
+| Oren Vale | Ask about Mira. | Always while in Oren loop. | Gives Greywake liaison context. |
 | Sabra Kestrel | Turn in or discuss the false-manifest circuit. | Quest ready/active. | Advances or completes `false_manifest_circuit`; can add corrected manifest proof. |
 | Sabra Kestrel | Ask which ledger line is wrong. | Quest not granted. | Grants `false_manifest_circuit`. |
 | Sabra Kestrel | Ask what she fears. | Not already asked. | Adds clue about paperwork being weaponized. |
-| Vessa | Ask for the buyer phrase or card-table read. | Not already resolved. | Sleight of Hand DC 12. Success sets `neverwinter_smuggler_phrase_known`, rewards 10 XP and 8 gp, or primes `neverwinter_ash_in_the_ale_ready`. |
+| Vessa | Ask for the buyer phrase or card-table read. | Not already resolved. | Sleight of Hand DC 12. Success sets `greywake_smuggler_phrase_known`, rewards 10 XP and 8 gp, or primes `greywake_ash_in_the_ale_ready`. |
 | Vessa | Use Liar's Blessing at the table. | `liars_blessing_active`. | Auto gains phrase/proof, rewards 10 XP and 4 gp. |
 | Vessa | Ask about smoke near the river cut. | Not already asked. | Sets `blackwake_millers_ford_lead`. |
 | Garren Flint | Ask for roadwarden cadence detail. | Not `false_manifest_garren_detail`. | Persuasion DC 12. Success sets `false_manifest_garren_detail`, `road_patrol_writ`, and route proof. |
 | Garren Flint | Ask about route pressure. | Not already asked. | Sets `blackwake_gallows_copse_lead`. |
 | Garren Flint | Pressure him hard. | Not already resolved. | Intimidation DC 12. Success gives Gallows lead; failure can trigger `Ash In The Ale`. |
-| Ash In The Ale | Persuasion, Insight, Sleight of Hand, Intimidation, or Athletics. | `neverwinter_ash_in_the_ale_ready`. | DC 12. Success raises `neverwinter_oren_trust`, sets `blackwake_neverwinter_rumor`, rewards 15 XP and 6 gp. Failure applies `reeling` 1. |
+| Ash In The Ale | Persuasion, Insight, Sleight of Hand, Intimidation, or Athletics. | `greywake_ash_in_the_ale_ready`. | DC 12. Success raises `greywake_oren_trust`, sets `blackwake_greywake_rumor`, rewards 15 XP and 6 gp. Failure applies `reeling` 1. |
 | Ash In The Ale | Let the room settle. | Same. | Resolves without the stronger success reward. |
 | Private room | `[INVESTIGATION]` review route papers. | Private room access. | DC 12. Success sets private-room intel and Blackwake leads. |
-| Private room | `[INSIGHT]` read booking/cadence mismatch. | Private room access. | DC 12. Success sets `neverwinter_private_room_intel`, adds proof, rewards 10-15 XP. |
+| Private room | `[INSIGHT]` read booking/cadence mismatch. | Private room access. | DC 12. Success sets `greywake_private_room_intel`, adds proof, rewards 10-15 XP. |
 | Private room | `[PERSUASION]` press a witness. | Private room access. | DC 12. Success sets lead/proof flags. |
 | Private room | Liar's Blessing route. | `liars_blessing_active`. | Auto success; sets private-room intel and route clue. |
 
@@ -200,13 +200,13 @@ Condition: player chooses to take the writ and leave.
 | --- | --- | --- |
 | Recruit Kaelis Starling. | `early_companion_recruited` is false. | Recruits Kaelis and sets early companion flag. |
 | Recruit Rhogar Valeguard. | `early_companion_recruited` is false. | Recruits Rhogar and sets early companion flag. |
-| Ride south on the High Road. | Always after companion prompt. | Routes to `road_ambush`. |
+| Ride south on the Emberway. | Always after companion prompt. | Routes to `road_ambush`. |
 | Investigate smoke near Blackwake Crossing. | Always from fork. | Sets `blackwake_started`, `blackwake_return_destination=undecided`, grants `trace_blackwake_cell`, routes to `blackwake_crossing`. |
-| Circle back for one more rumor. | Available from fork. | If prep not done, opens prep; otherwise sets/uses `blackwake_neverwinter_rumor` and returns to the fork. |
+| Circle back for one more rumor. | Available from fork. | If prep not done, opens prep; otherwise sets/uses `blackwake_greywake_rumor` and returns to the fork. |
 
 ## Blackwake Crossing
 
-Condition: chosen from departure fork before Phandalin. `scene_blackwake_crossing` runs the Blackwake dungeon map; completion returns to `road_decision_post_blackwake`.
+Condition: chosen from departure fork before Iron Hollow. `scene_blackwake_crossing` runs the Blackwake dungeon map; completion returns to `road_decision_post_blackwake`.
 
 ### Tollhouse And Mid-Routes
 
@@ -223,7 +223,7 @@ Condition: chosen from departure fork before Phandalin. `scene_blackwake_crossin
 | Wagon Snarl | `Secure the cargo before the smugglers can move it.` | Ford cluster. | Sets `blackwake_cargo_secured`, rewards 8 gp. |
 | Wagon Snarl | `Overturn carts for cover and prepare an ambush.` | Ford cluster. | Sets `blackwake_ford_ambush_prepared`, improves later fight. |
 | Reedbank Camp | `[STEALTH] Steal the seal kit and papers quietly.` | Ford cluster. | DC 12. Success sets `blackwake_route_permits_found`, `blackwake_forged_papers_found`, adds forged-route clue, Bryn +1. |
-| Reedbank Camp | `[INTIMIDATION] Drag the lookout behind the reeds and make them talk.` | Ford cluster. | DC 12. Success sets `blackwake_lookout_interrogated`, adds Neverwinter-side corruption clue. |
+| Reedbank Camp | `[INTIMIDATION] Drag the lookout behind the reeds and make them talk.` | Ford cluster. | DC 12. Success sets `blackwake_lookout_interrogated`, adds Greywake-side corruption clue. |
 | Reedbank Camp | `[INVESTIGATION] Copy the names and route marks before disturbing anything.` | Ford cluster. | DC 12. Success sets `blackwake_route_names_copied`, `blackwake_forged_papers_found`, adds paymaster mark clue. |
 | Ford Ledger Post | `[DECEPTION] Pose as higher authority and order the seizure halted.` | Ford finale. | DC 13. Success avoids fight, sets forged papers, Bryn +1. |
 | Ford Ledger Post | `[PERSUASION] Split the hired guards from the true loyalists.` | Ford finale. | DC 13. Success reduces enemies and adds hero bonus. |
@@ -255,14 +255,14 @@ Condition: chosen from departure fork before Phandalin. `scene_blackwake_crossin
 | Seal Workshop | `Seize the forgeries as evidence.` | Workshop reached. | Sets `blackwake_evidence_secured`, `blackwake_forged_papers_found`, adds seal-workshop clue. |
 | Seal Workshop | `Destroy the workshop.` | Workshop. | Sets `blackwake_workshop_destroyed`, reduces `act1_ashen_strength` by 1. |
 | Seal Workshop | `[INVESTIGATION] Copy names and route marks before sabotage.` | Workshop. | DC 13. Success sets copied names and evidence; always destroys workshop afterward. |
-| Ash Office | `Trace the Phandalin pressure sites.` | Office reached. | Sets `blackwake_phandalin_pressure_clue`, adds Phandalin supply-timing clue. |
+| Ash Office | `Trace the Iron Hollow pressure sites.` | Office reached. | Sets `blackwake_iron_hollow_pressure_clue`, adds Iron Hollow supply-timing clue. |
 | Ash Office | `Read the caravan hijack summaries.` | Office. | Sets `blackwake_caravan_hijack_clue`, adds selective-theft clue. |
-| Ash Office | `Search for the southern supervisor note.` | Office. | Sets `blackwake_hobgoblin_supervision_clue`, foreshadows High Road/Ashfall chain. |
+| Ash Office | `Search for the southern supervisor note.` | Office. | Sets `blackwake_hobgoblin_supervision_clue`, foreshadows Emberway/Ashfall chain. |
 | Floodgate Chamber | `[PERSUASION] Offer prisoners for Sereth's safe withdrawal.` | Sereth finale. | DC 14. Success sets `blackwake_partial_prisoner_surrender`, reels Sereth, hero bonus +1. Failure burns evidence. |
 | Floodgate Chamber | `[INTIMIDATION] Threaten full exposure and a slaughtered supply line.` | Finale. | DC 14. Success frightens Sereth and hero bonus +2. Failure sets floodgate hazard. |
 | Floodgate Chamber | `[INVESTIGATION] Confront Sereth with specific ledger facts.` | `blackwake_forged_papers_found` or `blackwake_transfer_list_found`. | DC 13. Success sets Sereth fate `captured`, reels Sereth 2, hero bonus +2. Failure burns evidence. |
 | Floodgate Chamber | `[DECEPTION] Pretend to represent higher Ashen Brand authority.` | `blackwake_forged_papers_found`. | DC 14. Success removes a guard if present, hero bonus +1, Bryn +1. Failure sets enemy ambush advantage. |
-| Floodgate Chamber | `[CONTRACT HOUSE INTEL] Name the booking, manifest, and false cadence at once.` | `neverwinter_private_room_intel`. | Auto success. Sets Sereth fate `captured`, reels Sereth 2, surprises guard, adds Oren/Sabra/Garren proof clue, hero bonus +2. |
+| Floodgate Chamber | `[CONTRACT HOUSE INTEL] Name the booking, manifest, and false cadence at once.` | `greywake_private_room_intel`. | Auto success. Sets Sereth fate `captured`, reels Sereth 2, surprises guard, adds Oren/Sabra/Garren proof clue, hero bonus +2. |
 | Floodgate Chamber | `Strike immediately before Sereth can spoil the room.` | Finale. | No check. Hero bonus +1. |
 | Final collapse choice | `Save the prisoners and survivors first.` | After Sereth victory. | Sets `blackwake_resolution=rescue`, saves 3 more survivors, Elira +2, Rhogar +1, grants `potion_healing`, rewards 35 XP and 8 gp. |
 | Final collapse choice | `Secure the ledgers and seal workshop.` | After Sereth victory. | Sets `blackwake_resolution=evidence`, `blackwake_evidence_secured`, `blackwake_ledgers_secured`, Bryn +1, Elira -1, rewards 35 XP and 22 gp, adds route-corruption proof. |
@@ -274,20 +274,20 @@ Condition: `blackwake_completed`.
 
 | Dialogue option | Result |
 | --- | --- |
-| Report to Neverwinter. | Sets `blackwake_return_destination=neverwinter`, returns to Mira's Blackwake report stage. |
-| Press south toward Phandalin. | Sets return destination south and routes to `road_ambush`. |
+| Report to Greywake. | Sets `blackwake_return_destination=greywake`, returns to Mira's Blackwake report stage. |
+| Press south toward Iron Hollow. | Sets return destination south and routes to `road_ambush`. |
 | Camp first. | Opens camp, then returns to the Blackwake decision. |
 
-## High Road
+## Emberway
 
-### High Road Milehouse
+### Emberway Milehouse
 
 | Dialogue option | Required condition | Result |
 | --- | --- | --- |
-| `[INVESTIGATION] Expose the false writs.` | Milehouse/road approach. | DC 12. Success sets `neverwinter_false_writs_spotted`, `blackwake_millers_ford_lead`, `road_patrol_writ`, weakens enemies, hero bonus +1, clue. |
-| `[SURVIVAL] Read the woodline path.` | Same. | DC 12. Success sets `neverwinter_woodline_path`, `road_ambush_scouted`, surprises enemy, hero bonus +1. |
-| `[PERSUASION] Guard the pilgrims.` | Same. | DC 12. Success sets `neverwinter_pilgrims_guarded`, `blackwake_gallows_copse_lead`, hero bonus +1, Elira +1. |
-| Flee/skip. | Encounter allows flee. | Sets `neverwinter_milehouse_bypassed`. |
+| `[INVESTIGATION] Expose the false writs.` | Milehouse/road approach. | DC 12. Success sets `greywake_false_writs_spotted`, `blackwake_millers_ford_lead`, `road_patrol_writ`, weakens enemies, hero bonus +1, clue. |
+| `[SURVIVAL] Read the woodline path.` | Same. | DC 12. Success sets `greywake_woodline_path`, `road_ambush_scouted`, surprises enemy, hero bonus +1. |
+| `[PERSUASION] Guard the pilgrims.` | Same. | DC 12. Success sets `greywake_pilgrims_guarded`, `blackwake_gallows_copse_lead`, hero bonus +1, Elira +1. |
+| Flee/skip. | Encounter allows flee. | Sets `greywake_milehouse_bypassed`. |
 | Win. | Encounter victory. | Rewards 20 XP and 5 gp. |
 
 ### Signal Cairn
@@ -297,12 +297,12 @@ Condition: `blackwake_completed`.
 | `[STEALTH] Cut the firekeeper off quietly.` | DC 12. Success sets `road_reinforcement_signal_cut`, surprises enemy, hero bonus +1. |
 | `[SURVIVAL] Read fuel and trail.` | DC 12. Success sets signal cut and `road_second_wave_trail_read`, adds clue, hero bonus +1. |
 | `[ARCANA] Read the ash-cloth signal.` | DC 12. Success sets signal cut and `road_ash_signal_understood`, weakens enemy, hero bonus +1. |
-| Flee/skip. | Sets `neverwinter_signal_cairn_bypassed`. |
+| Flee/skip. | Sets `greywake_signal_cairn_bypassed`. |
 | Win. | Rewards 15 XP and 4 gp. |
 
 ### Road Ambush
 
-Condition: party rides south from Neverwinter or post-Blackwake decision.
+Condition: party rides south from Greywake or post-Blackwake decision.
 
 | Dialogue option | Required condition | Result |
 | --- | --- | --- |
@@ -310,18 +310,18 @@ Condition: party rides south from Neverwinter or post-Blackwake decision.
 | `[STEALTH] Flank through the brush.` | First wave not cleared. | DC 12. Success weakens/surprises enemy, hero bonus +2; failure applies `reeling`. |
 | `[INTIMIDATION] Warn them off loudly.` | First wave not cleared. | DC 12. Success weakens/frightens enemy; failure emboldens enemies. |
 | `"If you can stand, stand with us."` | After wave one, Tolan rescue prompt. | Recruits Tolan and clears waiting flag. |
-| `"Get to the inn. If we live, I will find you there."` | Same prompt. | Sets `tolan_waiting_at_inn`; Tolan can be recruited at Stonehill. |
+| `"Get to the inn. If we live, I will find you there."` | Same prompt. | Sets `tolan_waiting_at_inn`; Tolan can be recruited at Ashlamp. |
 | Second wave combat. | After wave one. | Signal/route flags affect difficulty. Victory sets `road_ambush_wave_two_cleared`, then `road_ambush_cleared`, adds hobgoblin/Ashfall clue, rewards 20 XP and 7 gp, and unlocks side branches. |
 
-### Cleared High Road Travel Menu
+### Cleared Emberway Travel Menu
 
 Condition: `road_ambush_cleared`.
 
 | Dialogue option | Required condition | Result |
 | --- | --- | --- |
-| Follow the High Road to Phandalin. | Always. | Routes to `phandalin_hub`. |
+| Follow the Emberway to Iron Hollow. | Always. | Routes to `iron_hollow_hub`. |
 | Backtrack to the previous route node. | Backtrack history exists. | Returns to previous meaningful route node. |
-| Follow the overgrown statue trail into the wilderness. | `liars_circle_branch_available` and puzzle not solved/failed/locked. | Routes to `high_road_liars_circle`. |
+| Follow the overgrown statue trail into the wilderness. | `liars_circle_branch_available` and puzzle not solved/failed/locked. | Routes to `emberway_liars_circle`. |
 | Investigate the broken roadwarden milemarker. | False checkpoint branch available. | Routes to false checkpoint. |
 | Challenge the false tollstones. | False tollstones branch available. | Routes to false tollstones. |
 
@@ -350,7 +350,7 @@ Condition: branch available and not resolved. Contract proof appears if private-
 | `[CONTRACT HOUSE PROOF] Use contract-house proof.` | Contract proof available. | Auto success. Exposes checkpoint, sets Blackwake leads, rewards 30 XP and 14 gp, adds proof clue/journal. |
 | `[DECEPTION] Bluff through the false authority.` | Always. | DC 13. Success resolves, rewards 20 XP and 10 gp. |
 | `[INSIGHT] Read who knows the writ is false.` | Always. | DC 12. Success resolves, rewards 20 XP and 8 gp. |
-| `[PERSUASION] Split frightened hands from guilty ones.` | Always. | DC 13. Success sets `high_road_false_checkpoint_hands_spared`, rewards 20 XP and 6 gp. |
+| `[PERSUASION] Split frightened hands from guilty ones.` | Always. | DC 13. Success sets `emberway_false_checkpoint_hands_spared`, rewards 20 XP and 6 gp. |
 | `[INTIMIDATION] Break the checkpoint's nerve.` | Always. | DC 13. Success resolves, rewards 20 XP and 8 gp. |
 | Comply or fail. | On failed/soft route. | Pays up to 6 gp, applies `reeling`, leaves journal pressure. |
 
@@ -366,22 +366,22 @@ Condition: branch available and not resolved.
 | Leave. | Always. | Branch remains unresolved. |
 | Fail. | Failed check. | Spotters scatter, player gains `reeling`, journal notes the missed branch. |
 
-## Phandalin Hub
+## Iron Hollow Hub
 
 ### First Arrival
 
-Condition: first time in `phandalin_hub`; `phandalin_arrived` is false.
+Condition: first time in `iron_hollow_hub`; `iron_hollow_arrived` is false.
 
 | Dialogue option | Required condition | Result |
 | --- | --- | --- |
 | `[INSIGHT] "I want to read the mood of the town before I speak."` | Always on arrival. | DC 12. Success adds town-fear direction clue and rewards 10 XP. |
-| `[PERSUASION] "Let them know Neverwinter sent help."` | Always. | DC 12. Success steadies crowd, rewards 10 XP and 6 gp. |
+| `[PERSUASION] "Let them know Greywake sent help."` | Always. | DC 12. Success steadies crowd, rewards 10 XP and 6 gp. |
 | `[INVESTIGATION] Survey the tracks, barricades, and weak points first.` | Always. | DC 12. Success adds wagon-ruts/weak-points clue and rewards 10 XP. |
-| Race identity option. | Player race has a one-shot Phandalin arrival option. | See race identity table below. |
+| Race identity option. | Player race has a one-shot Iron Hollow arrival option. | See race identity table below. |
 
-### Phandalin Race Identity Options
+### Iron Hollow Race Identity Options
 
-Condition: player has the race and has not used the one-shot race identity action in `phandalin_arrival`.
+Condition: player has the race and has not used the one-shot race identity action in `iron_hollow_arrival`.
 
 | Race | Dialogue option | Result |
 | --- | --- | --- |
@@ -397,41 +397,41 @@ Condition: player has the race and has not used the one-shot race identity actio
 | Orc | `[INTIMIDATION] Bark at the nearest knot of onlookers to stop gawking and start naming where the road is bleeding.` | DC 12. Success rewards 8 XP and manor/foundation clue. |
 | Fire-Blooded | `[DECEPTION] "If we're done deciding whether I look ominous enough to trust, tell me where your real trouble starts."` | DC 11. Success rewards 10 XP and watched-lane clue. |
 
-### Phandalin Travel Menu
+### Iron Hollow Travel Menu
 
 Condition: after arrival or on return to town.
 
 | Dialogue option | Required condition | Result |
 | --- | --- | --- |
 | `Report to Steward Tessa Harrow` | Steward interactions remain. | Opens steward loop. |
-| `Visit the Stonehill Inn` | Always. | Opens Stonehill loop. |
+| `Visit the Ashlamp Inn` | Always. | Opens Ashlamp loop. |
 | `Stop by the shrine of Tymora` | Shrine interactions remain. | Opens shrine loop. |
-| `[TRADE] Browse Barthen's Provisions` | Always. | Opens Barthen loop/shop. |
+| `[TRADE] Browse Hadrik's Provisions` | Always. | Opens Hadrik loop/shop. |
 | `[TRADE] Call on Linene Graywind at the Lionshield trading post` | Always. | Opens Linene loop/shop. |
 | `Walk the old walls of Edermath Orchard` | Orchard interactions remain. | Opens Daran/Edermath loop. |
 | `Step into the Miner's Exchange` | Exchange interactions remain. | Opens Halia loop. |
 | `Return to camp` | Always. | Opens camp menu. |
 | `Take a short rest` | Always. | Short rest. |
-| `Investigate Old Owl Well` | Lead available or already allowed. | Routes to Old Owl Well. |
-| `Investigate Old Owl Well (need a lead)` | No lead yet. | Disabled/informational style choice; town remains hub. |
-| `Hunt the raiders at Wyvern Tor` | Lead available or already allowed. | Routes to Wyvern Tor; if under recommended level, warning appears. |
-| `Hunt the raiders at Wyvern Tor (need a lead)` | No lead yet. | Disabled/informational style choice. |
-| `Ride for Ashfall Watch` | Old Owl and Wyvern cleared, or enough clues in legacy flow. | Routes to Ashfall Watch. |
-| `Ride for Ashfall Watch (clear Old Owl Well and Wyvern Tor first)` | Prereqs missing. | Disabled/informational style choice. |
-| `Descend beneath Tresendar Manor` | Revealed after Ashfall/lantern vigil. | Routes to Tresendar. |
-| `Descend beneath Tresendar Manor (wait for a firmer lead)` | Prereqs missing. | Disabled/informational style choice. |
+| `Investigate Blackglass Well` | Lead available or already allowed. | Routes to Blackglass Well. |
+| `Investigate Blackglass Well (need a lead)` | No lead yet. | Disabled/informational style choice; town remains hub. |
+| `Hunt the raiders at Red Mesa Hold` | Lead available or already allowed. | Routes to Red Mesa Hold; if under recommended level, warning appears. |
+| `Hunt the raiders at Red Mesa Hold (need a lead)` | No lead yet. | Disabled/informational style choice. |
+| `Ride for Ashfall Watch` | Blackglass and Red Mesa cleared, or enough clues in legacy flow. | Routes to Ashfall Watch. |
+| `Ride for Ashfall Watch (clear Blackglass Well and Red Mesa Hold first)` | Prereqs missing. | Disabled/informational style choice. |
+| `Descend beneath Duskmere Manor` | Revealed after Ashfall/lantern vigil. | Routes to Duskmere. |
+| `Descend beneath Duskmere Manor (wait for a firmer lead)` | Prereqs missing. | Disabled/informational style choice. |
 | `Descend into Emberhall Cellars` | `emberhall_revealed`. | Routes to finale. |
 
-### Wyvern Tor Level Warning
+### Red Mesa Hold Level Warning
 
-Condition: choosing Wyvern Tor while below recommended level.
+Condition: choosing Red Mesa Hold while below recommended level.
 
 | Dialogue option | Result |
 | --- | --- |
-| `Ride for Wyvern Tor anyway.` | Routes to Wyvern Tor despite warning. |
-| `Wait and come back at level N.` | Returns to Phandalin menu. |
+| `Ride for Red Mesa Hold anyway.` | Routes to Red Mesa Hold despite warning. |
+| `Wait and come back at level N.` | Returns to Iron Hollow menu. |
 
-## Phandalin Town NPCs
+## Iron Hollow Town NPCs
 
 ### Steward Tessa Harrow
 
@@ -441,29 +441,29 @@ Condition: choosing Wyvern Tor while below recommended level.
 | `"Where is the Ashen Brand hurting you the most?"` | Not asked. | Adds Ashfall/cellar-route clue, grants `secure_miners_road`. |
 | `"Tell me about the old ruins around town."` | Not asked. | Explains old foundations/cellar threat. |
 | `Share what happened at Blackwake Crossing.` | `blackwake_completed` and not asked. | Reacts by `blackwake_resolution`; evidence grants 8 gp and proof clue, rescue adds survivor journal, sabotage adds supply-pressure clue; escaped Sereth warning if relevant; fires `steward_blackwake` companion input. |
-| `"I'll break their grip on Phandalin."` | `secure_miners_road` active and vow not made. | Sets `steward_vow_made`, fires `steward_vow` companion input. |
+| `"I'll break their grip on Iron Hollow."` | `secure_miners_road` active and vow not made. | Sets `steward_vow_made`, fires `steward_vow` companion input. |
 | `Leave Tessa to her work and move on.` | Always. | Returns to town hub. |
 
 ### Shrine Of Tymora
 
 | Dialogue option | Required condition | Result |
 | --- | --- | --- |
-| `[MEDICINE] "Let me examine the poisoned miner."` | Elira not already active from Neverwinter; not attempted. | DC 8. Success sets `elira_helped`, rewards 10 XP; failure still leaves care with Elira. |
+| `[MEDICINE] "Let me examine the poisoned miner."` | Elira not already active from Greywake; not attempted. | DC 8. Success sets `elira_helped`, rewards 10 XP; failure still leaves care with Elira. |
 | `[RELIGION] "I'll offer a prayer with you."` | Same. | DC 8. Success sets `elira_helped`, rewards 10 XP. |
 | `"What have you learned about the raiders?"` | Not asked. | Adds clue that Brand uses ash-bitter poison and disciplined tactics. |
-| `"Come with me. Phandalin needs you in the field."` | Elira not a companion, recruitment not attempted. | Auto succeeds if `elira_helped` or fallback pending; otherwise Persuasion DC 8. Success recruits Elira and sets Phandalin recruitment/fallback flags. |
+| `"Come with me. Iron Hollow needs you in the field."` | Elira not a companion, recruitment not attempted. | Auto succeeds if `elira_helped` or fallback pending; otherwise Persuasion DC 8. Success recruits Elira and sets Iron Hollow recruitment/fallback flags. |
 | `Give Elira a moment to tend the shrine.` | Elira companion. | Return to hub. |
 | `Step back and leave Elira to her work.` | Elira not companion. | Return to hub. |
 
-If Elira was recruited before Neverwinter, the shrine has no menu on first visit; it adds a clue from Elira's triage notes and returns.
+If Elira was recruited before Greywake, the shrine has no menu on first visit; it adds a clue from Elira's triage notes and returns.
 
-### Barthen's Provisions
+### Hadrik's Provisions
 
 | Dialogue option | Required condition | Result |
 | --- | --- | --- |
-| `Tell Barthen the watchtower road is open again.` | `restore_barthen_supplies` ready. | Turns in quest. |
-| `"What does Phandalin run short on first when the road turns bad?"` | Not asked. | Grants `restore_barthen_supplies`, fires `barthen_shortage` companion input. |
-| `[TRADE] Check the shelves for provisions and trail gear.` | Always. | Opens Barthen shop. |
+| `Tell Hadrik the watchtower road is open again.` | `restore_hadrik_supplies` ready. | Turns in quest. |
+| `"What does Iron Hollow run short on first when the road turns bad?"` | Not asked. | Grants `restore_hadrik_supplies`, fires `barthen_shortage` companion input. |
+| `[TRADE] Check the shelves for provisions and trail gear.` | Always. | Opens Hadrik shop. |
 | `Leave the provision house.` | Always. | Returns to town hub. |
 
 ### Lionshield Coster
@@ -479,9 +479,9 @@ If Elira was recruited before Neverwinter, the shrine has no menu on first visit
 
 | Dialogue option | Required condition | Result |
 | --- | --- | --- |
-| `Tell Daran what happened at Wyvern Tor.` | `break_wyvern_tor_raiders` ready. | Turns in quest. |
+| `Tell Daran what happened at Red Mesa Hold.` | `break_red_mesa_raiders` ready. | Turns in quest. |
 | `[NATURE] "Something is wrong with these trees. Let me see what the ash is doing."` | Blight not checked. | DC 12. Success adds orchard sabotage clue, grants `moonmint_drops`, rewards 10 XP. |
-| `"You look like someone who knows the hills. What is happening at Wyvern Tor?"` | Not asked. | Sets orchard lead, adds Wyvern Tor clue, grants `break_wyvern_tor_raiders`. |
+| `"You look like someone who knows the hills. What is happening at Red Mesa Hold?"` | Not asked. | Sets orchard lead, adds Red Mesa Hold clue, grants `break_red_mesa_raiders`. |
 | `[ATHLETICS] "If you still drill, put me through a frontier warm-up."` | Training not done. | DC 12. Success rewards 10 XP and two `travel_biscuits`. |
 | `[STEALTH] "If your old cache is still buried, we can reach it quietly."` | Cache not recovered. | DC 12. Success quietly recovers cache; failure triggers orchard watcher fight. Reward is `edermath_cache_compass`, 35 XP, 12 gp, Daran trust, Act 2 route hook. |
 | `Leave the orchard and head back toward town.` | Always. | Returns to hub. |
@@ -490,13 +490,13 @@ If Elira was recruited before Neverwinter, the shrine has no menu on first visit
 
 | Dialogue option | Required condition | Result |
 | --- | --- | --- |
-| `Tell Halia the threat at Old Owl Well has been dealt with.` | `silence_old_owl_well` ready. | Turns in quest. |
-| `"Which crews are missing, and where did they vanish?"` | Not asked. | Sets exchange lead, adds Old Owl clue, grants `silence_old_owl_well`. |
-| `[INVESTIGATION] "Let me look at the tally books. Somebody is getting paid for this chaos."` | Ledgers not checked. | DC 12. Success adds Old Owl logistics clue and rewards 10 XP. |
+| `Tell Halia the threat at Blackglass Well has been dealt with.` | `silence_blackglass_well` ready. | Turns in quest. |
+| `"Which crews are missing, and where did they vanish?"` | Not asked. | Sets exchange lead, adds Blackglass clue, grants `silence_blackglass_well`. |
+| `[INVESTIGATION] "Let me look at the tally books. Somebody is getting paid for this chaos."` | Ledgers not checked. | DC 12. Success adds Blackglass logistics clue and rewards 10 XP. |
 | `[PERSUASION] "You two can stop shouting. Tell me what happened, and one of you gets to be right."` | Dispute not resolved. | DC 12. Success rewards 10 XP and 8 gp. |
 | `Leave the exchange and step back into town.` | Always. | Returns to hub. |
 
-## Stonehill Inn
+## Ashlamp Inn
 
 ### Common Room Menu
 
@@ -505,8 +505,8 @@ If Elira was recruited before Neverwinter, the shrine has no menu on first visit
 | `"Mind if I buy you a drink and ask a few questions?"` | Not asked. | Introduces Bryn and her role. |
 | `"Tell me what the roads are saying about the Ashen Brand."` | Not asked. | Adds clue that Ashfall Watch is the field base. |
 | `"What are people saying about Blackwake Crossing?"` | `blackwake_completed` and not asked. | Reacts by Blackwake resolution and escaped Sereth. |
-| `Tell Mara Stonehill what you found about the marked keg.` | `marked_keg_investigation` ready. | Opens Mara turn-in. |
-| `Talk to Mara Stonehill, who is keeping half the room from a fight.` | Mara interactions remain. | Opens Mara loop. |
+| `Tell Mara Ashlamp what you found about the marked keg.` | `marked_keg_investigation` ready. | Opens Mara turn-in. |
+| `Talk to Mara Ashlamp, who is keeping half the room from a fight.` | Mara interactions remain. | Opens Mara loop. |
 | `Sit with Jerek Harl and hear what anger has left him.` | Jerek interactions remain. | Opens Jerek loop. |
 | `Bring Sella Quill the three true details she asked for.` | `songs_for_the_missing` ready. | Opens Sella turn-in. |
 | `Listen to Sella Quill and the room she keeps half-honest.` | Sella interactions remain. | Opens Sella loop. |
@@ -522,7 +522,7 @@ If Elira was recruited before Neverwinter, the shrine has no menu on first visit
 | `Rent beds for a long rest (10 gp per active party member).` | Always. | Paid long rest. |
 | `Leave the common room for now.` | Always. | Returns to town hub. |
 
-### Mara Stonehill
+### Mara Ashlamp
 
 | Dialogue option | Required condition | Result |
 | --- | --- | --- |
@@ -546,8 +546,8 @@ Marked keg options:
 | Dialogue option | Required condition | Result |
 | --- | --- | --- |
 | `Tell Jerek what you found of Dain Harl.` | `find_dain_harl` ready. | Turns in quest; if first closure share, lowers town fear. |
-| `"If I go to Ashfall, what truth do you want carried back?"` | Quest not granted/completed. | Grants `find_dain_harl`; if Ashfall blue-scarf truth already found, immediately records Dain truth. |
-| `"Tell me what would let me know I found Dain, not just another dead road hand."` | Dain truth not found and route marks not shared. | Adds blue-scarf/low-scrape clue. |
+| `"If I go to Ashfall, what truth do you want carried back?"` | Quest not granted/completed. | Grants `find_dain_harl`; if Ashfall blue-scarf clue already exists, immediately records Dain's fate. |
+| `"Tell me what would let me know I found Dain instead of another dead road hand."` | Dain's fate not found and route marks not shared. | Adds blue-scarf/low-scrape clue. |
 | `"Who are you angry at, really?"` | Not asked. | Adds east-road vanishing clue. |
 | `[PERSUASION] "Tell me the missing man's name so the room stops calling him 'another crew'."` | Missing-song detail not recorded. | DC 12. Success sets `songs_for_missing_jerek_detail` and journal detail for Sella. |
 | `Leave Jerek to his drink and his thoughts.` | Always. | Returns to common room. |
@@ -592,12 +592,12 @@ Quiet-table options:
 | `[LIAR'S BLESSING] Repeat the lie the quiet table expects to hear and wait for the correction.` | Requires blessing. Auto success. |
 | `Leave the quiet table for another moment.` | No resolution. |
 
-### Stonehill Barfight
+### Ashlamp Barfight
 
 | Dialogue option | Result |
 | --- | --- |
 | `[PERSUASION] Pull the room back from the edge before the first chair flies.` | DC 13. Success resolves cleanly, rewards 15 XP, lowers town fear, Tolan +1 if active. |
-| `[INSIGHT] Name the real instigator and make the room turn the right way.` | DC 12. Same clean success. |
+| `[INSIGHT] Name the paid instigator and make the room turn the right way.` | DC 12. Same clean success. |
 | `[INTIMIDATION] Shut the whole room down with one harder threat.` | DC 13. Same clean success. |
 | `[ATHLETICS] Catch the first bench, shove the two worst fools apart, and own the middle.` | DC 12. Same clean success. |
 | `[PERFORMANCE] Break the tension with a loud toast sharp enough to steal the room.` | DC 12. Same clean success. |
@@ -610,16 +610,16 @@ Condition: `quest_reward_stonehill_quiet_room_access` and not `stonehill_quiet_r
 
 | Dialogue option | Result |
 | --- | --- |
-| `[INVESTIGATION] Lay the payment note beside the courier strip and find the real route hidden between them.` | DC 12. Success raises reward to 15 XP; sets `stonehill_quiet_room_intel_decoded`, adds Ashfall countersign/Emberhall courier clue. |
+| `[INVESTIGATION] Lay the payment note beside the courier strip and find the hidden route between them.` | DC 12. Success raises reward to 15 XP; sets `stonehill_quiet_room_intel_decoded`, adds Ashfall countersign/Emberhall courier clue. |
 | `[INSIGHT] Pick the lie out of the handoff and follow the correction instead.` | DC 12. Same result/reward structure. |
 | `Have Nera walk you through the courier habits and take the cleanest lead she can name.` | Auto decodes packet, rewards 10 XP. |
 | `[LIAR'S BLESSING] Speak the false countersign aloud and wait for the packet to correct you.` | Requires blessing. Auto success, rewards 15 XP. |
 
-## Phandalin Council And Vigil
+## Iron Hollow Council And Vigil
 
-### Stonehill War Room
+### Ashlamp War Room
 
-Condition: Old Owl Well and Wyvern Tor cleared; `phandalin_council_seen` is false.
+Condition: Blackglass Well and Red Mesa Hold cleared; `iron_hollow_council_seen` is false.
 
 | Dialogue option | Result |
 | --- | --- |
@@ -629,7 +629,7 @@ Condition: Old Owl Well and Wyvern Tor cleared; `phandalin_council_seen` is fals
 
 ### Lantern Vigil
 
-Condition: Ashfall Watch cleared; `phandalin_after_watch_seen` is false. The event reveals Tresendar/Emberhall route pressure.
+Condition: Ashfall Watch cleared; `iron_hollow_after_watch_seen` is false. The event reveals Duskmere/Emberhall route pressure.
 
 | Dialogue option | Result |
 | --- | --- |
@@ -639,16 +639,16 @@ Condition: Ashfall Watch cleared; `phandalin_after_watch_seen` is false. The eve
 
 ## Act 1 Field Sites
 
-### Old Owl Well
+### Blackglass Well
 
-Condition: lead from Halia/Phandalin or route unlock; usually before Ashfall.
+Condition: lead from Halia/Iron Hollow or route unlock; usually before Ashfall.
 
 | Room/scenario | Dialogue option | Result |
 | --- | --- | --- |
 | Dig Ring | `[STEALTH] Move along the broken irrigation trench and get inside the ring quietly.` | DC 13. Success surprises/weakens sentry, hero bonus +2, then opens follow-up: sabotage salt, pick sentry, or slip deeper. Failure applies `reeling`. |
-| Dig Ring follow-up | `Sabotage the ritual salt before the gravecaller feels the breach.` | Sets `old_owl_ritual_sabotaged`, reels enemies, hero bonus +1. |
-| Dig Ring follow-up | `Pick off the nearest sentry before it can join the line.` | Sets `old_owl_sentry_picked`, weakens/surprises sentry, hero bonus +1. |
-| Dig Ring follow-up | `Slip deeper toward the well mouth and keep the initiative for later.` | Sets `old_owl_deeper_infiltration`, player invisible 1, hero bonus +1. |
+| Dig Ring follow-up | `Sabotage the ritual salt before the gravecaller feels the breach.` | Sets `blackglass_well_ritual_sabotaged`, reels enemies, hero bonus +1. |
+| Dig Ring follow-up | `Pick off the nearest sentry before it can join the line.` | Sets `blackglass_well_sentry_picked`, weakens/surprises sentry, hero bonus +1. |
+| Dig Ring follow-up | `Slip deeper toward the well mouth and keep the initiative for later.` | Sets `blackglass_well_deeper_infiltration`, player invisible 1, hero bonus +1. |
 | Dig Ring | `[ARCANA] "Those sigils matter. Let me read what kind of wrongness is powering them."` | DC 13. Success gives player poison resistance 3, reels fixer, hero bonus +1. |
 | Dig Ring | `[DECEPTION] "Call out as hired salvage come to collect the next cart of bones."` | DC 13. Success weakens/surprises fixer, hero bonus +1; failure surprises player. |
 | Salt Cart | `[MEDICINE] "Cut them free and keep them steady long enough to speak."` | DC 12. Success adds payment/Ashfall/manor clue, rewards 10 XP. Always saves survivor and lowers town fear. |
@@ -662,9 +662,9 @@ Condition: lead from Halia/Phandalin or route unlock; usually before Ashfall.
 | Gravecaller Lip | `[RELIGION] "These dead are not yours to command. Let them go."` | DC 13. Success frightens support and reels Vaelith. |
 | Gravecaller Lip | `[INTIMIDATION] "You are finished here. Step away from the well and survive it."` | DC 13. Success damages/frightens Vaelith; failure emboldens Vaelith. |
 | Gravecaller Lip | `Rush the ritual line before another corpse can stand.` | Damages Vaelith and adds hero bonus +2. |
-| Site victory | Defeat Vaelith. | Reduces `act1_ashen_strength`, clears Old Owl, adds supply-chain clue/journal, grants `scroll_lesser_restoration`, returns to Phandalin. |
+| Site victory | Defeat Vaelith. | Reduces `act1_ashen_strength`, clears Blackglass, adds supply-chain clue/journal, grants `scroll_lesser_restoration`, returns to Iron Hollow. |
 
-### Wyvern Tor
+### Red Mesa Hold
 
 | Room/scenario | Dialogue option | Result |
 | --- | --- | --- |
@@ -675,21 +675,21 @@ Condition: lead from Halia/Phandalin or route unlock; usually before Ashfall.
 | Drover Hollow | `[INSIGHT] "Tell me what the chief values enough to guard this hard."` | DC 12. Success adds Brughor pride clue, rewards 10 XP. |
 | Drover Hollow | `Cut them loose, arm them, and send them downslope before the chief arrives.` | Saves drover. |
 | Drover follow-up | `Send them hard for town with the cleanest warning they can carry.` | Sends warning. |
-| Drover follow-up | `Keep them hidden below the shelf to signal when Brughor commits his line.` | Sets `wyvern_spotter_signal`. |
-| Drover follow-up | `Have them loose the remaining beasts uphill and turn the camp against itself.` | Sets `wyvern_beast_stampede`. |
+| Drover follow-up | `Keep them hidden below the shelf to signal when Brughor commits his line.` | Sets `red_mesa_spotter_signal`. |
+| Drover follow-up | `Have them loose the remaining beasts uphill and turn the camp against itself.` | Sets `red_mesa_beast_stampede`. |
 | Drover completion | Room clear. | Adds Cinderfall hidden-route clue, sets `varyn_detour_logic_seen`, unlocks hidden route. |
 | Shrine Ledge | `[RELIGION] "Set the cairn shrine right. I want the chief fighting under a bad sign."` | DC 12. Success blesses player 2, rewards 10 XP. |
 | Shrine Ledge | `Cut the pack tethers and send the remaining beasts into the upper camp.` | Distracts upper camp. |
 | Shrine Ledge | `Strip the tack, ruin the tethers, and leave the ledge empty.` | Denies staging point. |
-| Shrine Ledge | `Let Rhogar reset the cairn and call the hill to witness against Brughor.` | Requires active Rhogar disposition 6+. Blesses player 2, sets `wyvern_rhogar_omen`. |
+| Shrine Ledge | `Let Rhogar reset the cairn and call the hill to witness against Brughor.` | Requires active Rhogar disposition 6+. Blesses player 2, sets `red_mesa_rhogar_omen`. |
 | High Shelf | `[INTIMIDATION] "You picked the wrong town to stalk."` | DC 13. Success damages/frightens Brughor; failure emboldens him. |
 | High Shelf | `[ATHLETICS] "Then come down the rest of the way and see how long you stand."` | DC 13. Success emboldens player 2 and hero bonus +1. |
 | High Shelf | `Hit the chief before the ogre can settle into the fight.` | Damages Brughor, hero bonus +2. |
-| Site victory | Defeat Brughor. | Reduces `act1_ashen_strength`, clears Wyvern, adds Ashfall coordination clue/journal, grants `greater_healing_draught`, returns to Phandalin. |
+| Site victory | Defeat Brughor. | Reduces `act1_ashen_strength`, clears Wyvern, adds Ashfall coordination clue/journal, grants `greater_healing_draught`, returns to Iron Hollow. |
 
 ### Cinderfall Ruins
 
-Condition: hidden route unlocked from Old Owl notes or Wyvern drover.
+Condition: hidden route unlocked from Blackglass notes or Red Mesa drover.
 
 | Room/scenario | Dialogue option | Result |
 | --- | --- | --- |
@@ -709,7 +709,7 @@ Condition: hidden route unlocked from Old Owl notes or Wyvern drover.
 
 ### Ashfall Watch
 
-Condition: Old Owl and Wyvern cleared, or enough legacy clues. Cinderfall sabotage can weaken Ashfall.
+Condition: Blackglass and Red Mesa cleared, or enough legacy clues. Cinderfall sabotage can weaken Ashfall.
 
 | Room/scenario | Dialogue option | Result |
 | --- | --- | --- |
@@ -727,12 +727,12 @@ Condition: Old Owl and Wyvern cleared, or enough legacy clues. Cinderfall sabota
 | Signal Basin | `Kick the braziers apart and drown the whole thing in grit.` | Noisy but silences basin. |
 | Lower Barracks | Combat only. | Hero bonuses from signal/prison/order flags. Victory resolves Elira faith-under-ash hook if present. |
 | Rukhar Command | `[QUIET ROOM INTEL] Use the stolen countersign and make Rukhar's own line doubt the next order.` | Requires `stonehill_quiet_room_intel_decoded`. Auto success: damages/reels Rukhar, may remove ally, rewards 10 XP. |
-| Rukhar Command | `[INTIMIDATION] "Surrender the yard in Phandalin's name."` | Always. | DC 13. Success damages/frightens Rukhar; failure emboldens him. |
+| Rukhar Command | `[INTIMIDATION] "Surrender the yard in Iron Hollow's name."` | Always. | DC 13. Success damages/frightens Rukhar; failure emboldens him. |
 | Rukhar Command | `[PERSUASION] "Your paymaster is already losing. Walk away with the people who still can."` | Always. | DC 13. Success removes ally if present and reels Rukhar. |
 | Rukhar Command | `Strike before he can settle the shield line.` | Always. | Damages Rukhar and hero bonus +2. |
-| Site victory | Defeat Rukhar. | Clears Ashfall, records Dain/blue-scarf truth if needed, adds Tresendar key clue/journal, routes to Phandalin vigil. |
+| Site victory | Defeat Rukhar. | Clears Ashfall, records Dain/blue-scarf truth if needed, adds Duskmere key clue/journal, routes to Iron Hollow vigil. |
 
-### Tresendar Manor
+### Duskmere Manor
 
 Condition: revealed after Ashfall/vigil.
 
@@ -742,9 +742,9 @@ Condition: revealed after Ashfall/vigil.
 | Hidden Stair | `[STEALTH] Slip through the collapsed chapel side and into the cellars.` | DC 13. Success weakens/reels archer; failure applies `reeling`. |
 | Hidden Stair | `[ATHLETICS] Rip the old cistern grate open and take the straight drop.` | DC 13. Success emboldens player and knocks enemy prone; failure applies prone. |
 | Cellar Intake | Combat/parley. | Entry flags alter combat. Victory opens cistern and cage store. |
-| Cistern Walk | `[INSIGHT] "It is testing us. Let me read what it wants before it strikes."` | DC 13. Success sets `tresendar_eye_read`. |
-| Cistern Walk | `[ARCANA] "That is no simple cellar monster. I want its pattern before it gets mine."` | DC 13. Success sets `tresendar_eye_read` and blesses player 1. |
-| Cistern Walk | `Throw a ration sack into the dark and charge while it turns.` | Sets `tresendar_eye_ambushed`, hero bonus later. |
+| Cistern Walk | `[INSIGHT] "It is testing us. Let me read what it wants before it strikes."` | DC 13. Success sets `duskmere_eye_read`. |
+| Cistern Walk | `[ARCANA] "That is no simple cellar monster. I want its pattern before it gets mine."` | DC 13. Success sets `duskmere_eye_read` and blesses player 1. |
+| Cistern Walk | `Throw a ration sack into the dark and charge while it turns.` | Sets `duskmere_eye_ambushed`, hero bonus later. |
 | Cage Store | `[INVESTIGATION] "Give me the ledgers. I want the shape of Varyn's exits and lies."` | DC 13. Success adds Emberhall route clue and rewards 10 XP. |
 | Cage Store | `[SLEIGHT OF HAND] "Open the coffer quietly and take whatever matters before the hinges scream."` | DC 13. Grants `scroll_arcane_refresh`; success cleaner narration. |
 | Cage Store | `Take the whole coffer and drag it back the hard way.` | Grants `scroll_arcane_refresh`. |
@@ -754,13 +754,13 @@ Condition: revealed after Ashfall/vigil.
 | Trade price | `[TRUTH] "The truth I keep walking around is mine to speak."` | Sets self-truth flag, grants `Clear-Eyed Wound`: +1 Arcana, Insight, Persuasion through Act 1 finale. |
 | Trade price | `[BETRAY BRYN] "Bryn knows the old smuggler marks because she used to run them."` | Requires active Bryn. Exposes secret, Bryn disposition -2 or -3, records truth. |
 | Trade price | `[BETRAY RHOGAR] "Rhogar's oath has a crack in it. He knows the sound."` | Requires active Rhogar. Exposes secret, Rhogar -2, sets pending conflict. |
-| Cistern Eye | `Bargain for every secret it is willing to spit up.` | Starts deep bargain: first Emberhall truth, optional Cinderfall truth, optional Wave Echo warning; adds sanity/status costs and companion penalties if pushed. |
+| Cistern Eye | `Bargain for every secret it is willing to spit up.` | Starts deep bargain: first Emberhall truth, optional Cinderfall truth, optional Resonant Vault warning; adds sanity/status costs and companion penalties if pushed. |
 | Deep bargain | `Take the Emberhall truth and end the bargain.` | Stops after first truth. |
 | Deep bargain | `[BARGAIN AGAIN] "What did Cinderfall really feed?"` | Adds Cinderfall lore, applies frightened, companion -1, enemy bonus +1. |
 | Deep bargain | `Stop before the bargain takes anything else.` | Stops after second truth. |
-| Deep bargain | `[BARGAIN AGAIN] "What waits past the Ashen Brand?"` | Adds Wave Echo lore, applies `Whispered Through`: -1 Insight and Persuasion through finale, more status penalties, companion -1, enemy bonus +2. |
+| Deep bargain | `[BARGAIN AGAIN] "What waits past the Ashen Brand?"` | Adds Resonant Vault lore, applies `Whispered Through`: -1 Insight and Persuasion through finale, more status penalties, companion -1, enemy bonus +2. |
 | Cistern Eye | `[DECEPTION] "All right. I will give you a secret. A good one."` | DC 15. Success sets nothic deceived and records all three lore truths with hero bonus +2. Failure surprises/reels player and enemy bonus +2. |
-| Site victory | Defeat Cistern Eye. | Clears Tresendar, reveals Emberhall, adds route clue/journal, grants `scroll_arcane_refresh` if not already secured, returns to Phandalin. |
+| Site victory | Defeat Cistern Eye. | Clears Duskmere, reveals Emberhall, adds route clue/journal, grants `scroll_arcane_refresh` if not already secured, returns to Iron Hollow. |
 
 ### Emberhall Cellars
 
@@ -790,10 +790,10 @@ These are not player menu options. They are companion interjections fired by `ru
 
 | Topic | Fired by | Companion conditions | Result |
 | --- | --- | --- | --- |
-| `phandalin_arrival_insight` | Successful or attempted Phandalin arrival Insight route. | Bryn or Elira active; Act 1. | Companion frames town fear and witness value. |
-| `phandalin_arrival_persuasion` | Phandalin arrival Persuasion route. | Rhogar or Tolan active; Act 1. | Companion supports public steadiness. |
-| `phandalin_arrival_investigation` | Phandalin arrival Investigation route. | Kaelis or Bryn active; Act 1. | Companion points to tracks, lanes, and hidden pressure. |
-| `barthen_shortage` | Asking Barthen about shortages. | Tolan, Bryn, or Elira active. | Companion reacts to food/medicine scarcity; reinforces supply stakes. |
+| `iron_hollow_arrival_insight` | Successful or attempted Iron Hollow arrival Insight route. | Bryn or Elira active; Act 1. | Companion frames town fear and witness value. |
+| `iron_hollow_arrival_persuasion` | Iron Hollow arrival Persuasion route. | Rhogar or Tolan active; Act 1. | Companion supports public steadiness. |
+| `iron_hollow_arrival_investigation` | Iron Hollow arrival Investigation route. | Kaelis or Bryn active; Act 1. | Companion points to tracks, lanes, and hidden pressure. |
+| `barthen_shortage` | Asking Hadrik about shortages. | Tolan, Bryn, or Elira active. | Companion reacts to food/medicine scarcity; reinforces supply stakes. |
 | `lionshield_trade` | Asking Linene about trade pressure. | Kaelis, Rhogar, or Tolan active. | Companion reacts to route strangulation and trade fear. |
 | `steward_vow` | Making the vow to Tessa. | Elira or Rhogar active. | Companion reinforces moral weight of vow. |
 | `steward_blackwake` | Sharing Blackwake with Tessa. | Tolan if rescue, Kaelis if evidence, Bryn if sabotage. | Companion reacts to Blackwake resolution and its political meaning. |
@@ -813,8 +813,8 @@ Condition: player chooses the campfire/listen option in camp; required companion
 | Quiet Mercy | Bryn and Elira | Nera treated, Greywake protected, or Nera detail for Sella. | Sets `camp_quiet_mercy_named`, Bryn +1, Elira +1, can lower town fear if Nera was treated. |
 | Public Truth | Bryn and Rhogar | Cinderfall cleared or Bryn quest/route truth resolved. | Sets `camp_public_truth_tension_named`, adds clue/journal, adjusts dispositions by truth-vs-exposure stance. |
 | Half A Breath | Kaelis and Tolan | `road_ambush_cleared`. | Sets `camp_timing_drill`, Kaelis +1, Tolan +1, grants emboldened timing benefit. |
-| What Silence Means | Elira and Kaelis | Old Owl cleared, Greywake progress, or Agatha truth. | Sets silence/truth journal thread, Elira +1, Kaelis +1. |
-| Bad Wheels | Tolan and Bryn | Phandalin council/road pressure or Stonehill/route trouble. | Frames practical road repair and dirty logistics; relationship and journal benefits if available. |
+| What Silence Means | Elira and Kaelis | Blackglass cleared, Greywake progress, or Pale Witness truth. | Sets silence/truth journal thread, Elira +1, Kaelis +1. |
+| Bad Wheels | Tolan and Bryn | Iron Hollow council/road pressure or Ashlamp/route trouble. | Frames practical road repair and dirty logistics; relationship and journal benefits if available. |
 
 Later-act camp topics are intentionally excluded from this Act 1 reference.
 

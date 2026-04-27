@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
+from .data.id_aliases import runtime_scene_id
 from .data.quests import QuestLogEntry
 from .data.story.public_terms import class_label, race_label
 from .dice import ability_modifier
@@ -256,7 +257,7 @@ class GameState:
     companions: list[Character] = field(default_factory=list)
     camp_companions: list[Character] = field(default_factory=list)
     current_act: int = 1
-    current_scene: str = "neverwinter_briefing"
+    current_scene: str = "greywake_briefing"
     flags: dict[str, Any] = field(default_factory=dict)
     clues: list[str] = field(default_factory=list)
     journal: list[str] = field(default_factory=list)
@@ -295,12 +296,13 @@ class GameState:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "GameState":
+        current_scene = runtime_scene_id(data.get("current_scene", "greywake_briefing")) or "greywake_briefing"
         return cls(
             player=Character.from_dict(data["player"]),
             companions=[Character.from_dict(item) for item in data.get("companions", [])],
             camp_companions=[Character.from_dict(item) for item in data.get("camp_companions", [])],
             current_act=data.get("current_act", 1),
-            current_scene=data.get("current_scene", "neverwinter_briefing"),
+            current_scene=current_scene,
             flags=dict(data.get("flags", {})),
             clues=list(data.get("clues", [])),
             journal=list(data.get("journal", [])),

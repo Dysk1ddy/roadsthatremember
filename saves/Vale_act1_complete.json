@@ -512,13 +512,13 @@
         "wayside_luck_shrine",
         "greywake_triage_yard",
         "greywake_road_breakout",
-        "neverwinter_briefing",
-        "high_road_ambush",
-        "phandalin_hub",
-        "old_owl_well",
-        "wyvern_tor",
+        "greywake_briefing",
+        "emberway_ambush",
+        "iron_hollow_hub",
+        "blackglass_well",
+        "red_mesa_hold",
         "ashfall_watch",
-        "tresendar_manor",
+        "duskmere_manor",
         "emberhall_cellars"
       ],
       "cleared_rooms": [
@@ -568,10 +568,10 @@
     "E0093": 1
   },
   "short_rests_remaining": 2,
-  "playtime_seconds": 0.008928800001740456,
+  "playtime_seconds": 0.004375700002128724,
   "save_metadata": {
     "kind": "manual",
-    "saved_at": "2026-04-27T10:35:12",
+    "saved_at": "2026-04-27T11:45:15",
     "act": 1,
     "act_label": "Act I",
     "scene": "act1_complete",

@@ -6,13 +6,13 @@ from ..runtime import DraftMapState, render_screen_with_rich
 
 def main() -> None:
     state = DraftMapState(
-        current_node_id="phandalin_hub",
+        current_node_id="iron_hollow_hub",
         current_room_id="breach_gate",
         flags={
             "act1_started",
-            "phandalin_arrived",
-            "old_owl_well_cleared",
-            "wyvern_tor_cleared",
+            "iron_hollow_arrived",
+            "blackglass_well_cleared",
+            "red_mesa_hold_cleared",
             "ashfall_gate_breached",
         },
         active_quests={"secure_miners_road"},

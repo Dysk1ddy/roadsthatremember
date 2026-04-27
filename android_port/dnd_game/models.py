@@ -3,7 +3,9 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
+from .data.id_aliases import runtime_scene_id
 from .data.quests import QuestLogEntry
+from .data.story.public_terms import class_label, race_label
 from .dice import ability_modifier
 
 
@@ -53,6 +55,8 @@ class Armor:
     dex_cap: int | None = None
     heavy: bool = False
     stealth_disadvantage: bool = False
+    defense_percent: int | None = None
+    defense_cap_percent: int | None = None
 
 
 @dataclass(slots=True)
@@ -90,6 +94,7 @@ class Character:
     lore: list[str] = field(default_factory=list)
     bond_flags: dict[str, Any] = field(default_factory=dict)
     relationship_bonuses: dict[str, int] = field(default_factory=dict)
+    story_skill_bonuses: dict[str, int] = field(default_factory=dict)
     stable: bool = False
     dead: bool = False
     death_successes: int = 0
@@ -101,6 +106,18 @@ class Character:
     @property
     def proficiency_bonus(self) -> int:
         return 2 + max(0, (self.level - 1) // 4)
+
+    @property
+    def public_race(self) -> str:
+        return race_label(self.race)
+
+    @property
+    def public_class(self) -> str:
+        return class_label(self.class_name)
+
+    @property
+    def public_identity(self) -> str:
+        return f"{self.public_race} {self.public_class}"
 
     def ability_mod(self, ability: str) -> int:
         return ability_modifier(self.ability_scores[ability])
@@ -114,6 +131,7 @@ class Character:
         bonus += self.equipment_bonuses.get(skill, 0)
         bonus += self.gear_bonuses.get(skill, 0)
         bonus += self.relationship_bonuses.get(skill, 0)
+        bonus += self.story_skill_bonuses.get(skill, 0)
         return bonus
 
     def save_bonus(self, ability: str) -> int:
@@ -239,7 +257,7 @@ class GameState:
     companions: list[Character] = field(default_factory=list)
     camp_companions: list[Character] = field(default_factory=list)
     current_act: int = 1
-    current_scene: str = "neverwinter_briefing"
+    current_scene: str = "greywake_briefing"
     flags: dict[str, Any] = field(default_factory=dict)
     clues: list[str] = field(default_factory=list)
     journal: list[str] = field(default_factory=list)
@@ -278,12 +296,13 @@ class GameState:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "GameState":
+        current_scene = runtime_scene_id(data.get("current_scene", "greywake_briefing")) or "greywake_briefing"
         return cls(
             player=Character.from_dict(data["player"]),
             companions=[Character.from_dict(item) for item in data.get("companions", [])],
             camp_companions=[Character.from_dict(item) for item in data.get("camp_companions", [])],
             current_act=data.get("current_act", 1),
-            current_scene=data.get("current_scene", "neverwinter_briefing"),
+            current_scene=current_scene,
             flags=dict(data.get("flags", {})),
             clues=list(data.get("clues", [])),
             journal=list(data.get("journal", [])),

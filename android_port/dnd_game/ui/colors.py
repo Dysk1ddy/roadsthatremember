@@ -19,6 +19,19 @@ COLOR_CODES = {
     "light_yellow": "93",
 }
 
+RICH_STYLE_NAMES = {
+    "white": "bright_white",
+    "green": "green",
+    "blue": "bright_blue",
+    "purple": "magenta",
+    "yellow": "bright_yellow",
+    "light_red": "bright_red",
+    "aqua": "cyan",
+    "light_aqua": "bright_cyan",
+    "light_green": "bright_green",
+    "light_yellow": "bright_yellow",
+}
+
 RARITY_COLORS = {
     "common": "white",
     "uncommon": "green",
@@ -38,6 +51,10 @@ def colorize(text: object, color: str) -> str:
 
 def rarity_color(rarity: str) -> str:
     return RARITY_COLORS.get(rarity, "white")
+
+
+def rich_style_name(color: str) -> str:
+    return RICH_STYLE_NAMES.get(color, "default")
 
 
 def strip_ansi(text: str) -> str:

@@ -12,11 +12,11 @@ The structure combines three layers:
 
 That matches the current Act 1 shape already present in the project:
 
-- `phandalin_hub` is the central hub
-- `old_owl_well` and `wyvern_tor` are the branch sites
+- `iron_hollow_hub` is the central hub
+- `blackglass_well` and `red_mesa_hold` are the branch sites
 - `cinderfall_ruins` is the hidden optional mid-act route
 - `ashfall_watch` is the convergence assault
-- `tresendar_manor` and `emberhall_cellars` are late linear descents
+- `duskmere_manor` and `emberhall_cellars` are late linear descents
 - Act 1 also tracks `Town Fear`, `Ashen Strength`, and `Survivors Saved` for late-act reactivity
 
 ## Rich-Guided Visual Direction
@@ -94,7 +94,7 @@ This layer answers:
 
 - when Ashfall becomes available
 - when the hidden `Cinderfall` path becomes visible
-- when Tresendar is revealed
+- when Duskmere is revealed
 - when Emberhall becomes the final route
 - what kind of ending pressure gets handed into Act 2
 
@@ -104,15 +104,15 @@ This layer answers:
 
 | Node id | Scene key | Role | Unlock rule |
 | --- | --- | --- | --- |
-| `neverwinter_briefing` | `neverwinter_briefing` | story | `act1_started` |
-| `high_road_ambush` | `road_ambush` | story | `act1_started` |
-| `phandalin_hub` | `phandalin_hub` | hub | `phandalin_arrived` |
-| `old_owl_well` | `old_owl_well` | dungeon entry | `miners_exchange_lead` or quest `silence_old_owl_well` |
+| `greywake_briefing` | `greywake_briefing` | story | `act1_started` |
+| `emberway_ambush` | `road_ambush` | story | `act1_started` |
+| `iron_hollow_hub` | `iron_hollow_hub` | hub | `iron_hollow_arrived` |
+| `blackglass_well` | `blackglass_well` | dungeon entry | `miners_exchange_lead` or quest `silence_blackglass_well` |
 | `cinderfall_ruins` | `cinderfall_ruins` | dungeon entry | `hidden_route_unlocked` |
-| `wyvern_tor` | `wyvern_tor` | dungeon entry | `edermath_orchard_lead` or quest `break_wyvern_tor_raiders` |
-| `ashfall_watch` | `ashfall_watch` | dungeon entry | `old_owl_well_cleared` and `wyvern_tor_cleared` |
-| `tresendar_manor` | `tresendar_manor` | dungeon entry | `tresendar_revealed` |
-| `emberhall_cellars` | `emberhall_cellars` | dungeon entry | `tresendar_cleared` and `emberhall_revealed` |
+| `red_mesa_hold` | `red_mesa_hold` | dungeon entry | `edermath_orchard_lead` or quest `break_red_mesa_raiders` |
+| `ashfall_watch` | `ashfall_watch` | dungeon entry | `blackglass_well_cleared` and `red_mesa_hold_cleared` |
+| `duskmere_manor` | `duskmere_manor` | dungeon entry | `duskmere_revealed` |
+| `emberhall_cellars` | `emberhall_cellars` | dungeon entry | `duskmere_cleared` and `emberhall_revealed` |
 
 ### World-map draft feel
 
@@ -145,8 +145,8 @@ These are linear progress points hosted by the hub rather than separate travel n
 
 | Beat id | Host | Requirement | Grants |
 | --- | --- | --- | --- |
-| `stonehill_council` | `phandalin_hub` | `old_owl_well_cleared` and `wyvern_tor_cleared` | `phandalin_council_seen`, `ashfall_route_confirmed` |
-| `lantern_vigil` | `phandalin_hub` | `ashfall_watch_cleared` | `phandalin_after_watch_seen`, `tresendar_revealed` |
+| `stonehill_council` | `iron_hollow_hub` | `blackglass_well_cleared` and `red_mesa_hold_cleared` | `iron_hollow_council_seen`, `ashfall_route_confirmed` |
+| `lantern_vigil` | `iron_hollow_hub` | `ashfall_watch_cleared` | `iron_hollow_after_watch_seen`, `duskmere_revealed` |
 
 This keeps the map readable while still preserving strong authored pacing.
 
@@ -165,7 +165,7 @@ Recommended symbol meanings:
 - `#` no room
 - `.` cleared room
 
-## Old Owl Well
+## Blackglass Well
 
 ### Goal
 
@@ -184,13 +184,13 @@ Turn the site into a short branch-first dig map.
 
 - `well_ring`
   - opening fight
-  - grants `old_owl_ring_cleared`
+  - grants `blackglass_well_ring_cleared`
 - `salt_cart`
   - rescue branch
-  - grants `old_owl_prospector_rescued`
+  - grants `blackglass_well_prospector_rescued`
 - `supply_trench`
   - clue branch
-  - grants `old_owl_notes_found`
+  - grants `blackglass_well_notes_found`
 - `gravecaller_lip`
   - boss room
   - opens when either branch flag is complete
@@ -199,7 +199,7 @@ This is the first example of the hybrid rule you asked for:
 
 the boss room is structurally locked behind site progress instead of simply being the last scene in a line.
 
-## Wyvern Tor
+## Red Mesa Hold
 
 ### Goal
 
@@ -291,7 +291,7 @@ Make the assault feel like a defended fortress with meaningful objective sequenc
 
 This is the clearest Act 1 use of a linear unlock inside a grid site.
 
-## Tresendar Manor
+## Duskmere Manor
 
 ### Goal
 
@@ -319,7 +319,7 @@ This is the clearest Act 1 use of a linear unlock inside a grid site.
 - `nothic_lair`
   - roleplay boss room requiring the intake clear and at least one clue flag
   - the Cistern Eye reads the player's background before offering kill, trade, repeated bargain, or Deception routes
-  - repeated bargains escalate from Emberhall truth to Cinderfall relay lore to Wave Echo / Forge foreshadowing
+  - repeated bargains escalate from Emberhall truth to Cinderfall relay lore to Resonant Vault / Forge foreshadowing
   - greed costs include sanity-style combat debuffs, `Whispered Through`, and active companion distrust
   - Bryn and Rhogar can be betrayed for information, setting follow-up trust flags
 
@@ -409,27 +409,27 @@ That would fit very naturally into this draft because the room grid already dist
 ### Existing story-facing flags reused by the draft
 
 - `act1_started`
-- `phandalin_arrived`
+- `iron_hollow_arrived`
 - `miners_exchange_lead`
 - `edermath_orchard_lead`
 - `hidden_route_unlocked`
-- `old_owl_well_cleared`
-- `wyvern_tor_cleared`
+- `blackglass_well_cleared`
+- `red_mesa_hold_cleared`
 - `cinderfall_relay_destroyed`
 - `ashfall_watch_cleared`
-- `tresendar_revealed`
-- `tresendar_cleared`
+- `duskmere_revealed`
+- `duskmere_cleared`
 - `emberhall_revealed`
 - `act1_complete`
 
 ### Live room progression flags
 
-- `old_owl_ring_cleared`
-- `old_owl_prospector_rescued`
-- `old_owl_notes_found`
-- `wyvern_lower_path_cleared`
-- `wyvern_drover_rescued`
-- `wyvern_shrine_secured`
+- `blackglass_well_ring_cleared`
+- `blackglass_well_prospector_rescued`
+- `blackglass_well_notes_found`
+- `red_mesa_lower_path_cleared`
+- `red_mesa_drover_rescued`
+- `red_mesa_shrine_secured`
 - `cinderfall_gate_opened`
 - `cinderfall_chapel_secured`
 - `cinderfall_storehouse_searched`
@@ -437,10 +437,10 @@ That would fit very naturally into this draft because the room grid already dist
 - `ashfall_prisoners_freed`
 - `ashfall_signal_basin_silenced`
 - `ashfall_lower_barracks_cleared`
-- `tresendar_stair_found`
-- `tresendar_intake_cleared`
-- `tresendar_cistern_found`
-- `tresendar_records_secured`
+- `duskmere_stair_found`
+- `duskmere_intake_cleared`
+- `duskmere_cistern_found`
+- `duskmere_records_secured`
 - `emberhall_threshold_crossed`
 - `emberhall_chain_broken`
 - `emberhall_archive_searched`
@@ -474,7 +474,7 @@ The draft includes:
 
 These are the most useful choices to make next as you guide the draft:
 
-1. Whether Phandalin should remain one hub node or split into subnodes later.
+1. Whether Iron Hollow should remain one hub node or split into subnodes later.
 2. Whether dungeon maps should use full fog of war or simply locked-room markers.
 3. Whether side rooms should grant clues only or also mechanical bonuses.
 4. Whether backtracking inside a site should be free, limited, or scene-based.

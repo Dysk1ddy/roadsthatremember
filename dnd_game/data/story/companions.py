@@ -152,7 +152,7 @@ COMPANION_PROFILES: dict[str, dict[str, object]] = {
                 "delta": -2,
             },
             {
-                "id": "blackwake_neverwinter_cares",
+                "id": "blackwake_greywake_cares",
                 "prompt": "\"Do you think Greywake's offices even care?\"",
                 "response": "Greywake cares when caring has handles: names, seals, routes, someone to blame. Blackwake gave us handles. Now we see who grabs them.",
                 "delta": 1,
@@ -176,7 +176,7 @@ COMPANION_PROFILES: dict[str, dict[str, object]] = {
             "exceptional_ally_statuses": {"emboldened": 1},
         },
         "scene_support": {
-            "old_owl_well": {
+            "blackglass_well": {
                 "text": "Bryn quietly points out the blind angles in the dig ring and the one trench line nobody is properly watching.",
                 "hero_bonus": 1,
                 "ally_statuses": {"invisible": 1},
@@ -309,7 +309,7 @@ COMPANION_PROFILES: dict[str, dict[str, object]] = {
             "exceptional_ally_statuses": {"attack_pressure": 1},
         },
         "scene_support": {
-            "wyvern_tor": {
+            "red_mesa_hold": {
                 "text": "Kaelis reads the shelf wind and the worg tracks in one glance, giving you the cleaner first angle.",
                 "hero_bonus": 1,
                 "ally_statuses": {"emboldened": 1},
@@ -440,7 +440,7 @@ COMPANION_PROFILES: dict[str, dict[str, object]] = {
                 "hero_bonus": 1,
                 "ally_statuses": {"blessed": 1},
             },
-            "wave_echo_outer_galleries": {
+            "resonant_vault_outer_galleries": {
                 "text": "Nim calls the old survey marks before the echoes turn them misleading, and the enemy line loses a heartbeat.",
                 "hero_bonus": 1,
                 "ally_statuses": {},
@@ -497,7 +497,7 @@ COMPANION_PROFILES: dict[str, dict[str, object]] = {
                 "hero_bonus": 1,
                 "ally_statuses": {"invisible": 1},
             },
-            "forge_of_spells": {
+            "meridian_forge": {
                 "text": "Irielle names the Choir's cadence out loud, and the thing posing as certainty finally sounds afraid.",
                 "hero_bonus": 1,
                 "ally_statuses": {},

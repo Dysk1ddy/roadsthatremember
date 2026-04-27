@@ -75,11 +75,11 @@ This file is a source-oriented reference for reading and debugging the current g
 
 ### Act 1 route structure
 
-- Overworld travel is node-based around the save-safe `phandalin_hub` id, now presented as Iron Hollow.
+- Overworld travel is node-based around the save-safe `iron_hollow_hub` id, now presented as Iron Hollow.
 - Hostile sites use room-based dungeon progression from `dnd_game/drafts/map_system/data/act1_hybrid_map.py`
 - The live mid-Act route can now include Blackglass Well, Red Mesa Hold, and an optional hidden Cinderfall Ruins strike before Ashfall Watch.
 - The Emberway now has a post-ambush travel choice before Iron Hollow. Once both ambush waves are cleared, the scene reopens with the south road, a `BACKTRACK` option when history allows it, and any unlocked side branches: `Liar's Circle`, `False Roadwarden Checkpoint`, and `False Tollstones`.
-- Returning from those Emberway side branches travels to `phandalin_hub` without recording the side branch as the new backtrack target. From Iron Hollow, backtracking skips resolved Emberway side detours and points back to the meaningful route node.
+- Returning from those Emberway side branches travels to `iron_hollow_hub` without recording the side branch as the new backtrack target. From Iron Hollow, backtracking skips resolved Emberway side detours and points back to the meaningful route node.
 
 ### Act 1 metrics and carryover
 

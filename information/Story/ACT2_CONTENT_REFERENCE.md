@@ -41,11 +41,11 @@ Act 2 opens with Act 1 choices already pressing on the opening metrics and later
 | --- | --- | --- |
 | `act1_victory_tier`, `act2_starting_pressure` | Act 1 ending state after Varyn falls | changes how strained Iron Hollow feels at the start of the expedition and how much immediate pressure the claims war opens under |
 | `steward_vow_made`, `iron_hollow_claims_council_seen` | choosing to speak for the town and help shape its defenses | raises starting `Town Stability`; the town enters the claims war with more nerve |
-| `elira_helped` and whether Elira joined | shrine aid and recruitment | lowers starting `Whisper Pressure`; Pale Witness and Black Lake scenes become more grounded in mercy instead of panic |
+| `elira_helped` and whether Elira joined | shrine aid and recruitment | lowers starting `Whisper Pressure`; Pale Witness and Blackglass scenes become more grounded in mercy instead of panic |
 | `miners_exchange_dispute_resolved`, `miners_exchange_ledgers_checked` | Act 1 Delvers' Exchange path | raises starting `Route Control`; Halia is easier to justify as a sponsor, but the player also sees her more clearly |
 | `act2_edermath_cache_routework` | recovering Daran Orchard's old adventurer's cache at the orchard | raises starting `Route Control`; Act 2 status text can cite the quiet orchard-to-highland control line |
 | `early_companion_recruited` | Kaelis or Rhogar in Greywake | Kaelis improves route logic; Rhogar improves civic steadiness |
-| `neverwinter_contract_house_political_callback` | spending contract-house intel in Blackwake or Mira's Greywake follow-up report | raises starting `Route Control`; Oren, Sabra, Vessa, and Garren create city-side witness pressure against copied road authority |
+| `greywake_contract_house_political_callback` | spending contract-house intel in Blackwake or Mira's Greywake follow-up report | raises starting `Route Control`; Oren, Sabra, Vessa, and Garren create city-side witness pressure against copied road authority |
 | `bryn_ledger_sold` vs `bryn_ledger_burned` | `Loose Ends` personal quest | selling the ledger pushes more pressure and distrust into the expedition opening; burning it makes the town start cleaner but poorer |
 | `elira_mercy_blessing` vs `elira_hard_verdict` | `Faith Under Ash` personal quest | shapes whether frontier justice enters Act 2 as hopeful mercy or hard deterrence |
 | Recruiting Bryn, Tolan, or Elira | Act 1 town companion work | each companion now supplies Act 2 sidetrack decisions that change later story pressure instead of only flavor text |
@@ -115,7 +115,7 @@ Act 2 opens with Act 1 choices already pressing on the opening metrics and later
   - Full draft: `information/Story/ACT2_GLASSWATER_INTAKE_DRAFT.md`
 - Additional branch-heavy location packets:
   - `information/Story/ACT2_LOCATION_BRANCH_PACKETS.md` collects deeper multi-stage branch webs for the dead-testimony circuit, Greywake Survey Camp, `Stonehollow Dig`, `Broken Prospect`, and Blackglass Causeway.
-  - `information/Story/ACT2_CONYBERRY_AGATHA_DRAFT.md` is a legacy implementation draft for the dead-testimony circuit; keep only the warning-custody structure and replace old names during implementation.
+  - `information/Story/archive/legacy_drafts/ACT2_CONYBERRY_AGATHA_DRAFT.md` is a legacy implementation draft for the dead-testimony circuit; keep only the warning-custody structure and replace old names during implementation.
 
 ## Choice Web
 
@@ -180,10 +180,10 @@ Act 2 opens with Act 1 choices already pressing on the opening metrics and later
 ### Scene support hooks
 
 - Nim: `stonehollow_dig`, gives hero bonus and player Blessed
-- Nim: `wave_echo_outer_galleries`, gives hero bonus and enemy Reeling; public text should call this the Resonant Vaults.
-- Nim: `forge_of_spells`, reads support traffic aloud at the threshold so the Meridian Forge feels like routework as well as spectacle.
+- Nim: `resonant_vault_outer_galleries`, gives hero bonus and enemy Reeling; public text should call this the Resonant Vaults.
+- Nim: `meridian_forge`, reads support traffic aloud at the threshold so the Meridian Forge feels like routework as well as spectacle.
 - Irielle: `south_adit`, gives hero bonus and player Invisible
-- Irielle: `forge_of_spells`, gives hero bonus and enemy Frightened, and now speaks into the resonance-lens / counter-cadence reads directly.
+- Irielle: `meridian_forge`, gives hero bonus and enemy Frightened, and now speaks into the resonance-lens / counter-cadence reads directly.
 
 ## Companion Arc Hooks
 
@@ -296,7 +296,7 @@ These enemies should carry the act's thematic load: cave pressure, expedition ri
 | `rescue_stonehollow_scholars` | Bring Back the Survey Team | Linene Ironward | Stonehollow Dig | offered if the player asks about missing hired specialists | `140 XP`, `70 gp`, `stonehollow_survey_lantern x1`, `miners_ration_tin x4` |
 | `cut_woodland_saboteurs` | Break the Woodland Saboteurs | Daran Orchard | Greywake Survey Line | offered if the player pushes the road-and-ranger angle | `140 XP`, `65 gp`, `woodland_wayfinder_boots x1`, `delvers_amber x2` |
 | `hold_the_claims_meet` | Hold the Claims Meeting Together | Linene Ironward | Iron Hollow | triggers automatically once any two early leads are cleared | `120 XP`, `75 gp`, `claims_accord_brooch x1` |
-| `free_wave_echo_captives` | Free the South Adit Prisoners | Elira Lanternward | South Adit | offered when the resonance cells are discovered | `160 XP`, `80 gp`, `freed_captive_prayer_beads x1`, `scroll_echo_step x1`, `scroll_lesser_restoration x1` |
+| `free_resonant_vault_captives` | Free the South Adit Prisoners | Elira Lanternward | South Adit | offered when the resonance cells are discovered | `160 XP`, `80 gp`, `freed_captive_prayer_beads x1`, `scroll_echo_step x1`, `scroll_lesser_restoration x1` |
 | `sever_quiet_choir` | Sever the Quiet Choir | Iron Hollow Council | Resonant Vaults | becomes active once Caldra and the cult cell are positively identified | `250 XP`, `150 gp`, `forgeheart_cinder x1`, `forge_blessing_elixir x2`, `scroll_forge_shelter x1` |
 
 ### Quest state logic
@@ -351,12 +351,12 @@ Implementation note for later: add an act-scope field such as `act_exclusive` or
 - `act2_first_late_route`
 - `act2_captive_outcome`
 - `irielle_recruited`
-- `wave_echo_reached`
+- `resonant_vault_reached`
 - `quiet_choir_identified`
 - `act2_companion_arc_started`
 - `act2_companion_arc_resolved`
-- `black_lake_shrine_purified`
-- `black_lake_barracks_raided`
+- `blackglass_shrine_purified`
+- `blackglass_barracks_raided`
 - `caldra_defeated`
 - `act3_iron_hollow_state`
 - `act3_claims_balance`

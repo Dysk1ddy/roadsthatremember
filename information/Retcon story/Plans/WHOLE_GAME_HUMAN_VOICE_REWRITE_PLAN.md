@@ -46,7 +46,7 @@ Highest-value live files from the scan:
 Highest-value design and lore files from the scan:
 
 - `information/Story/ACT2_LOCATION_BRANCH_PACKETS.md`
-- `information/Story/ACT2_CONYBERRY_AGATHA_DRAFT.md`
+- `information/Story/archive/legacy_drafts/ACT2_CONYBERRY_AGATHA_DRAFT.md`
 - `information/Story/ACT2_GLASSWATER_INTAKE_DRAFT.md`
 - `information/Story/ACT2_CONTENT_REFERENCE.md`
 - `information/Story/ACT1_DIALOGUE_REFERENCE.md`
@@ -57,7 +57,7 @@ One caution from the audit: `information/catalogs/ITEM_CATALOG.md` throws a huge
 
 ## Rewrite Target
 
-Every rewritten file should follow the repo voice already set by `information/Story/ACT1_PRE_NEVERWINTER_ELIRA_DRAFT.md`, especially the opening around the shrine.
+Every rewritten file should follow the repo voice already set by `information/Story/archive/legacy_drafts/ACT1_PRE_NEVERWINTER_ELIRA_DRAFT.md`, especially the opening around the shrine.
 
 Use these habits on every pass:
 
@@ -116,8 +116,8 @@ Primary files:
 - `information/Story/ACT2_CONTENT_REFERENCE.md`
 - `information/Story/ACT2_LOCATION_BRANCH_PACKETS.md`
 - `information/Story/ACT2_GLASSWATER_INTAKE_DRAFT.md`
-- `information/Story/COMPANION_DIALOGUE_INPUTS_DRAFT.md`
-- `information/Story/COMPANION_CAMP_BANTER_DRAFT.md`
+- `information/Story/archive/legacy_drafts/COMPANION_DIALOGUE_INPUTS_DRAFT.md`
+- `information/Story/archive/legacy_drafts/COMPANION_CAMP_BANTER_DRAFT.md`
 
 Rules for this lane:
 
@@ -170,9 +170,9 @@ Some files are worth keeping as history. They do not all deserve a full polish p
 
 Check these after the live and active-doc lanes are stable:
 
-- `information/Story/ACT1_PRE_NEVERWINTER_ELIRA_DRAFT.md`
-- `information/Story/MIRA_NEVERWINTER_DIALOGUE_DRAFT.md`
-- `information/Story/ACT2_CONYBERRY_AGATHA_DRAFT.md`
+- `information/Story/archive/legacy_drafts/ACT1_PRE_NEVERWINTER_ELIRA_DRAFT.md`
+- `information/Story/archive/legacy_drafts/MIRA_NEVERWINTER_DIALOGUE_DRAFT.md`
+- `information/Story/archive/legacy_drafts/ACT2_CONYBERRY_AGATHA_DRAFT.md`
 - older plan files that still guide implementation
 
 For each historical file, choose one:

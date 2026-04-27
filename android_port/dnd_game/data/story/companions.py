@@ -6,13 +6,66 @@ from ...models import Character
 PARTY_LIMIT = 4
 ACTIVE_COMPANION_LIMIT = PARTY_LIMIT - 1
 
+COMPANION_CLASS_RETCONS: dict[str, dict[str, str]] = {
+    "tolan_ironshield": {
+        "class_name": "Warrior",
+        "default_subclass": "juggernaut",
+        "secondary_subclass": "weapon_master",
+    },
+    "bryn_underbough": {
+        "class_name": "Rogue",
+        "default_subclass": "shadowguard",
+        "secondary_subclass": "assassin",
+    },
+    "elira_dawnmantle": {
+        "class_name": "Mage",
+        "default_subclass": "aethermancer",
+        "secondary_subclass": "spellguard",
+        "spellcasting_ability": "WIS",
+    },
+    "kaelis_starling": {
+        "class_name": "Rogue",
+        "default_subclass": "assassin",
+        "secondary_subclass": "shadowguard",
+    },
+    "rhogar_valeguard": {
+        "class_name": "Warrior",
+        "default_subclass": "bloodreaver",
+        "secondary_subclass": "juggernaut",
+    },
+    "nim_ardentglass": {
+        "class_name": "Mage",
+        "default_subclass": "arcanist",
+        "secondary_subclass": "spellguard",
+        "spellcasting_ability": "INT",
+    },
+    "irielle_ashwake": {
+        "class_name": "Mage",
+        "default_subclass": "elementalist",
+        "secondary_subclass": "arcanist",
+        "spellcasting_ability": "CHA",
+    },
+}
+
+
+def companion_class_retcon(companion_id: str) -> dict[str, str]:
+    return dict(COMPANION_CLASS_RETCONS.get(companion_id, {}))
+
+
+def companion_retcon_class(companion_id: str) -> str:
+    return str(COMPANION_CLASS_RETCONS.get(companion_id, {}).get("class_name", ""))
+
+
+def companion_default_subclass(companion_id: str) -> str:
+    return str(COMPANION_CLASS_RETCONS.get(companion_id, {}).get("default_subclass", ""))
+
 COMPANION_PROFILES: dict[str, dict[str, object]] = {
     "tolan_ironshield": {
         "name": "Tolan Ironshield",
         "summary": "A dwarven shield veteran who measures people by whether they hold the line when it matters.",
         "lore": [
-            "Tolan served on caravan routes out of Neverwinter for two decades, long enough to see three trade leagues fail and two rise in their place.",
-            "He still carries a notched tower-shield rivet from the ambush that killed his older brother near the Mere of Dead Men.",
+            "Tolan served on Emberway caravans out of Greywake for two decades, long enough to see three trade leagues fail and two rise in their place.",
+            "He still carries a notched tower-shield rivet from the ambush that killed his older brother near the drowned flats west of Blackwake.",
             "He trusts steady action more than speeches, but remembers every promise anyone makes in his hearing.",
         ],
         "camp_topics": [
@@ -34,17 +87,41 @@ COMPANION_PROFILES: dict[str, dict[str, object]] = {
                 "response": "Old habits are the reason more people are alive than dead.",
                 "delta": -2,
             },
+            {
+                "id": "blackwake_ledgers_people",
+                "prompt": "\"Would you have saved the ledgers or the people?\"",
+                "response": "People. Then ledgers if the gods give you time. Proof can shame a city, but a breathing witness can still choose tomorrow.",
+                "delta": 1,
+                "requires_flags": ["blackwake_completed"],
+            },
         ],
         "great_dialogue": "I'd trust your call in a blind pass.",
         "exceptional_dialogue": "Shield-kin. That's what you are to me now. This campfire feels more like home than any barracks has in years.",
         "great_bonuses": {"AC": 1},
         "exceptional_bonuses": {"CON_save": 1},
+        "assist_skills": ["Athletics", "Intimidation", "Survival"],
+        "camp_counsel": {
+            "name": "shield-line drill",
+            "bonuses": {"Athletics": 1, "Intimidation": 1},
+            "text": "Tolan runs the company through a blunt shield-line drill until the rhythm sits in your shoulders.",
+        },
+        "combat_opener": {
+            "name": "Hold the Line",
+            "text": "Tolan plants his feet and calls Hold the Line before steel ever meets steel.",
+            "ally_statuses": {"guarded": 2},
+            "exceptional_ally_statuses": {"emboldened": 1},
+        },
         "scene_support": {
             "ashfall_watch": {
                 "text": "Tolan quietly maps the tower angles for you and helps the party tighten their approach.",
                 "hero_bonus": 1,
                 "ally_statuses": {"blessed": 1},
-            }
+            },
+            "blackwake_crossing": {
+                "text": "Tolan plants himself where panicked survivors can see a shield, and the company moves with steadier purpose.",
+                "hero_bonus": 1,
+                "ally_statuses": {"blessed": 1},
+            },
         },
     },
     "bryn_underbough": {
@@ -74,22 +151,51 @@ COMPANION_PROFILES: dict[str, dict[str, object]] = {
                 "response": "Surviving usually starts with worrying before anyone else does.",
                 "delta": -2,
             },
+            {
+                "id": "blackwake_greywake_cares",
+                "prompt": "\"Do you think Greywake's offices even care?\"",
+                "response": "Greywake cares when caring has handles: names, seals, routes, someone to blame. Blackwake gave us handles. Now we see who grabs them.",
+                "delta": 1,
+                "requires_flags": ["blackwake_completed"],
+            },
         ],
         "great_dialogue": "I start noticing more when you're around, mostly because I know you'll actually listen.",
         "exceptional_dialogue": "I don't plan my exit route first anymore when you walk into a room. That's new.",
         "great_bonuses": {"Stealth": 1, "initiative": 1},
         "exceptional_bonuses": {"Perception": 1},
+        "assist_skills": ["Perception", "Sleight of Hand", "Stealth"],
+        "camp_counsel": {
+            "name": "exit-map briefing",
+            "bonuses": {"Perception": 1, "Stealth": 1},
+            "text": "Bryn marks exits, blind spots, and bad floorboards until the next dangerous room already feels half-read.",
+        },
+        "combat_opener": {
+            "name": "Shadow Volley",
+            "text": "Bryn opens with a quick shadow-sign that gives the company one clean beat before the room catches up.",
+            "ally_statuses": {"invisible": 1},
+            "exceptional_ally_statuses": {"emboldened": 1},
+        },
         "scene_support": {
+            "blackglass_well": {
+                "text": "Bryn quietly points out the blind angles in the dig ring and the one trench line nobody is properly watching.",
+                "hero_bonus": 1,
+                "ally_statuses": {"invisible": 1},
+            },
             "emberhall_cellars": {
                 "text": "Bryn spots the safest shadow-line through the cellar and hands the party a cleaner opening.",
                 "hero_bonus": 1,
                 "ally_statuses": {"invisible": 1},
-            }
+            },
+            "blackwake_crossing": {
+                "text": "Bryn reads the false roadwarden marks quickly enough to turn one bad paper trail into an opening.",
+                "hero_bonus": 1,
+                "ally_statuses": {"emboldened": 1},
+            },
         },
     },
     "elira_dawnmantle": {
         "name": "Elira Dawnmantle",
-        "summary": "A priestess of Tymora whose compassion is sharpened, not softened, by the frontier's cruelty.",
+        "summary": "A priestess of the Lantern whose compassion is sharpened, not softened, by the frontier's cruelty.",
         "lore": [
             "Elira learned battlefield triage from roadside shrines that treated lumber crews, miners, and pilgrims with equal urgency.",
             "She believes luck is not random mercy but a chance people build for one another with courage and timing.",
@@ -104,8 +210,8 @@ COMPANION_PROFILES: dict[str, dict[str, object]] = {
             },
             {
                 "id": "luck",
-                "prompt": "\"Why does Tymora still matter on the frontier?\"",
-                "response": "Because luck matters most where survival depends on one brave person acting at exactly the right second.",
+                "prompt": "\"Why does the Lantern still matter on the frontier?\"",
+                "response": "Because a kept light matters most where survival depends on one brave person acting at exactly the right second.",
                 "delta": 1,
             },
             {
@@ -114,31 +220,55 @@ COMPANION_PROFILES: dict[str, dict[str, object]] = {
                 "response": "Prayer alone won't, but contempt has never saved anyone either.",
                 "delta": -2,
             },
+            {
+                "id": "blackwake_aftermath",
+                "prompt": "\"What should I carry from Blackwake?\"",
+                "response": "Carry the faces with the proof. Records move officials, and faces remind them who the records are for.",
+                "delta": 1,
+                "requires_flags": ["blackwake_completed"],
+            },
         ],
         "great_dialogue": "There are doubts I only trust you to hear.",
         "exceptional_dialogue": "I pray for your future by name now, not because I fear losing you, but because I believe in what you'll become.",
         "great_bonuses": {"healing": 1},
         "exceptional_bonuses": {"WIS_save": 1},
+        "assist_skills": ["Insight", "Medicine", "Persuasion"],
+        "camp_counsel": {
+            "name": "Lantern triage",
+            "bonuses": {"Insight": 1, "Medicine": 1},
+            "text": "Elira walks you through breath, pulse, and panic until mercy has a procedure again.",
+        },
+        "combat_opener": {
+            "name": "Lantern Ward",
+            "text": "Elira lifts the Lantern symbol and gives the company a steadier first breath.",
+            "ally_statuses": {"blessed": 1},
+            "exceptional_ally_statuses": {"guarded": 1},
+        },
         "scene_support": {
             "camp_rest": {
                 "text": "Elira blesses the camp before sleep, and everyone wakes steadier than expected.",
                 "hero_bonus": 0,
                 "ally_statuses": {"blessed": 2},
-            }
+            },
+            "blackwake_crossing": {
+                "text": "Elira triages the burned and frightened with calm hands, buying the party cleaner testimony and a little mercy.",
+                "hero_bonus": 1,
+                "ally_statuses": {"blessed": 1},
+            },
         },
     },
     "kaelis_starling": {
         "name": "Kaelis Starling",
-        "summary": "A sharp-eyed ranger scout who learned to trust patterns before promises.",
+        "summary": "A sharp-eyed scout-rogue with Assassin patience, trained to trust patterns before promises.",
         "lore": [
-            "Kaelis spent years guiding outriders and woodsmen through the northern edges of the Neverwinter Wood, where bad judgment kills faster than monsters do.",
+            "Kaelis spent years guiding outriders and woodsfolk through the northern edges of Greywake Wood, where bad judgment kills faster than steel does.",
             "He keeps private sketches of trails, ridges, and blind corners because memory alone has betrayed him once already.",
             "He rarely speaks first in a room, but once he commits to someone he watches over them with relentless attention.",
         ],
         "camp_topics": [
             {
                 "id": "forest",
-                "prompt": "\"What did the Neverwinter Wood teach you first?\"",
+                "prompt": "\"What did Greywake Wood teach you first?\"",
                 "response": "That every quiet place is full of messages if you slow down enough to read them.",
                 "delta": 1,
             },
@@ -154,22 +284,51 @@ COMPANION_PROFILES: dict[str, dict[str, object]] = {
                 "response": "Caution kept me alive long before trust became an option.",
                 "delta": -2,
             },
+            {
+                "id": "blackwake_crossing",
+                "prompt": "\"What happened at the crossing?\"",
+                "response": "A clean road was taught to look dangerous, then dangerous people used the fear as cover. That is not banditry. That is logistics with a knife.",
+                "delta": 1,
+                "requires_flags": ["blackwake_completed"],
+            },
         ],
         "great_dialogue": "You get the unspoken version of my scouting reports now. I don't hand that to many people.",
         "exceptional_dialogue": "I'd follow your trail by instinct even without prints to guide me.",
         "great_bonuses": {"Perception": 1, "initiative": 1},
         "exceptional_bonuses": {"attack": 1},
+        "assist_skills": ["Perception", "Stealth", "Survival"],
+        "camp_counsel": {
+            "name": "trail read",
+            "bonuses": {"Perception": 1, "Survival": 1},
+            "text": "Kaelis redraws the next route in dirt and boot-scrapes, leaving you with cleaner instincts for the trail.",
+        },
+        "combat_opener": {
+            "name": "Shadow Volley",
+            "text": "Kaelis reads the brush like a page and murmurs the exact second to strike.",
+            "ally_statuses": {"invisible": 1},
+            "exceptional_ally_statuses": {"attack_pressure": 1},
+        },
         "scene_support": {
+            "red_mesa_hold": {
+                "text": "Kaelis reads the shelf wind and the worg tracks in one glance, giving you the cleaner first angle.",
+                "hero_bonus": 1,
+                "ally_statuses": {"emboldened": 1},
+            },
             "road_ambush": {
                 "text": "Kaelis reads the brush like a page and murmurs the exact second to strike.",
                 "hero_bonus": 1,
                 "ally_statuses": {"invisible": 1},
-            }
+            },
+            "blackwake_crossing": {
+                "text": "Kaelis follows the ash-scored tracks and keeps the pursuit from stumbling into the obvious alarm lines.",
+                "hero_bonus": 1,
+                "ally_statuses": {"invisible": 1},
+            },
         },
     },
     "rhogar_valeguard": {
         "name": "Rhogar Valeguard",
-        "summary": "A dragonborn oathsworn who treats duty like a living thing that must be fed by action.",
+        "summary": "A Forged oathsworn who treats duty like a living thing that must be fed by action.",
         "lore": [
             "Rhogar was raised among caravan wardens who believed a sworn road was as sacred as any temple threshold.",
             "He carries every oath like a visible weight and grows restless whenever words are left unfinished.",
@@ -194,17 +353,155 @@ COMPANION_PROFILES: dict[str, dict[str, object]] = {
                 "response": "Belief is only naive when nobody is brave enough to defend it.",
                 "delta": -2,
             },
+            {
+                "id": "blackwake_ledgers_people",
+                "prompt": "\"Would you have saved the ledgers or the people?\"",
+                "response": "A ledger cannot look you in the eye and ask whether your oath meant anything. Save the living first. Then make the guilty fear what testimony can do.",
+                "delta": 1,
+                "requires_flags": ["blackwake_completed"],
+            },
         ],
         "great_dialogue": "Your plans feel less like arrangements now and more like shared vows.",
         "exceptional_dialogue": "Your banner would be one I could swear to without hesitation.",
         "great_bonuses": {"damage": 1},
         "exceptional_bonuses": {"AC": 1},
+        "assist_skills": ["Athletics", "Intimidation", "Persuasion"],
+        "camp_counsel": {
+            "name": "oath counsel",
+            "bonuses": {"Athletics": 1, "Persuasion": 1},
+            "text": "Rhogar tests every promise in your plan until the weak joints stop creaking.",
+        },
+        "combat_opener": {
+            "name": "Oath Challenge",
+            "text": "Rhogar speaks an open challenge, and the company steps into the first clash with cleaner resolve.",
+            "ally_statuses": {"emboldened": 1},
+            "exceptional_ally_statuses": {"guarded": 1},
+        },
         "scene_support": {
             "ashfall_watch": {
                 "text": "Rhogar's certainty steadies the campfire briefing and turns hesitation into resolve.",
                 "hero_bonus": 1,
                 "ally_statuses": {"blessed": 1},
-            }
+            },
+            "blackwake_crossing": {
+                "text": "Rhogar's open challenge draws frightened eyes away from the wounded long enough for the company to act.",
+                "hero_bonus": 1,
+                "ally_statuses": {"emboldened": 1},
+            },
+        },
+    },
+    "nim_ardentglass": {
+        "name": "Nim Ardentglass",
+        "summary": "An Unrecorded ruin scholar who treats maps, mechanisms, and old promises like equally fragile machines.",
+        "lore": [
+            "Nim apprenticed under three different surveyors because no single mentor could answer every question the old Meridian routes raised.",
+            "He masks nerves with precision, talking fastest when he is frightened enough to think everyone else has already noticed.",
+            "Part of him still believes lost knowledge should be shared; another part has seen too many smart people killed for opening the wrong door first.",
+        ],
+        "camp_topics": [
+            {
+                "id": "maps",
+                "prompt": "\"Why do old maps matter this much to you?\"",
+                "response": "Because a bad map kills honest people and a good one lets them stop guessing where the dark begins.",
+                "delta": 1,
+            },
+            {
+                "id": "mentor",
+                "prompt": "\"Who taught you to read ruins this way?\"",
+                "response": "A stubborn old delver who said every collapsed hall is still trying to explain itself if you stop panicking long enough to listen.",
+                "delta": 1,
+            },
+            {
+                "id": "dismissive",
+                "prompt": "\"All this theorizing sounds like fear wearing spectacles.\"",
+                "response": "And swagger sounds like a cave-in waiting for a witness.",
+                "delta": -2,
+            },
+        ],
+        "great_dialogue": "You make dangerous planning feel almost respectable.",
+        "exceptional_dialogue": "I trust you with unfinished notes now. That is either friendship or professional recklessness, and I think I'm all right with either.",
+        "great_bonuses": {"Arcana": 1, "Investigation": 1},
+        "exceptional_bonuses": {"spell_attack": 1},
+        "assist_skills": ["Arcana", "History", "Investigation"],
+        "camp_counsel": {
+            "name": "survey notes",
+            "bonuses": {"Arcana": 1, "Investigation": 1},
+            "text": "Nim leaves you with a tidy packet of route marks, old-mechanism tells, and one warning written twice.",
+        },
+        "combat_opener": {
+            "name": "Surveyor's Angles",
+            "text": "Nim calls the first bad angle before anyone steps into it.",
+            "ally_statuses": {"attack_pressure": 1},
+            "exceptional_ally_statuses": {"blessed": 1},
+        },
+        "scene_support": {
+            "stonehollow_dig": {
+                "text": "Nim sketches a cleaner route through the dig and quietly points out which noises mean 'duck now.'",
+                "hero_bonus": 1,
+                "ally_statuses": {"blessed": 1},
+            },
+            "resonant_vault_outer_galleries": {
+                "text": "Nim calls the old survey marks before the echoes turn them misleading, and the enemy line loses a heartbeat.",
+                "hero_bonus": 1,
+                "ally_statuses": {},
+            },
+        },
+    },
+    "irielle_ashwake": {
+        "name": "Irielle Ashwake",
+        "summary": "A Fire-Blooded escapee from the Quiet Choir who knows just enough about the whispers beneath the Vaults to fear them properly.",
+        "lore": [
+            "Irielle was drawn into the Quiet Choir by people who promised revelation and delivered obedience, secrecy, and the slow theft of self.",
+            "She has learned to treat certainty with suspicion, especially when it arrives in a voice no one else can hear.",
+            "Even at rest she listens for patterns in sound and silence alike, as though one wrong rhythm might open the door again.",
+        ],
+        "camp_topics": [
+            {
+                "id": "choir",
+                "prompt": "\"What did the Quiet Choir promise you first?\"",
+                "response": "Meaning. Then belonging. Then the kind of answers that stop sounding like your own thoughts halfway through.",
+                "delta": 1,
+            },
+            {
+                "id": "freedom",
+                "prompt": "\"What does freedom look like to you now?\"",
+                "response": "A night where silence is only silence and not a doorway pretending to be one.",
+                "delta": 1,
+            },
+            {
+                "id": "distrust",
+                "prompt": "\"How do I know you won't lead us straight back into their hands?\"",
+                "response": "You don't. You'll have to decide whether what I've risked escaping counts for anything.",
+                "delta": -2,
+            },
+        ],
+        "great_dialogue": "You ask the kind of careful questions that make panic less useful.",
+        "exceptional_dialogue": "When the whispers start pressing at the edges, you're the reason they still sound like something outside me instead of inside.",
+        "great_bonuses": {"spell_damage": 1, "Insight": 1},
+        "exceptional_bonuses": {"WIS_save": 1},
+        "assist_skills": ["Arcana", "Insight", "Religion"],
+        "camp_counsel": {
+            "name": "counter-cadence lesson",
+            "bonuses": {"Arcana": 1, "Insight": 1},
+            "text": "Irielle taps out a counter-cadence on a tin cup until the wrong silences become easier to hear.",
+        },
+        "combat_opener": {
+            "name": "Counter-Cadence",
+            "text": "Irielle catches the enemy rhythm before it settles and cuts a clean beat through it.",
+            "ally_statuses": {"blessed": 1},
+            "exceptional_ally_statuses": {"attack_pressure": 1},
+        },
+        "scene_support": {
+            "south_adit": {
+                "text": "Irielle catches the cult's rhythm before it settles over the room and tears a clean opening through it.",
+                "hero_bonus": 1,
+                "ally_statuses": {"invisible": 1},
+            },
+            "meridian_forge": {
+                "text": "Irielle names the Choir's cadence out loud, and the thing posing as certainty finally sounds afraid.",
+                "hero_bonus": 1,
+                "ally_statuses": {},
+            },
         },
     },
 }
@@ -212,9 +509,15 @@ COMPANION_PROFILES: dict[str, dict[str, object]] = {
 
 def apply_companion_profile(character: Character, companion_id: str) -> Character:
     profile = COMPANION_PROFILES[companion_id]
+    retcon = companion_class_retcon(companion_id)
     character.companion_id = companion_id
     character.lore = list(profile["lore"])
-    character.bond_flags = {"talked_topics": []}
+    character.bond_flags = {
+        "talked_topics": [],
+        "retcon_class": retcon.get("class_name", ""),
+        "default_subclass": retcon.get("default_subclass", ""),
+        "secondary_subclass": retcon.get("secondary_subclass", ""),
+    }
     character.disposition = 0
     character.relationship_bonuses = {}
     character.notes.extend([profile["summary"]])

@@ -75,6 +75,14 @@ from dnd_game.drafts.map_system.runtime import (
 )
 from dnd_game.drafts.map_system import ACT2_ENEMY_DRIVEN_MAP
 from dnd_game.drafts.map_system.data.act1_hybrid_map import ACT1_HYBRID_MAP
+from dnd_game.data.id_aliases import (
+    canonical_dungeon_id,
+    canonical_flag_id,
+    canonical_map_node_id,
+    canonical_quest_id,
+    canonical_scene_id,
+    runtime_scene_id,
+)
 from dnd_game.data.story.lore import APPENDIX_LORE
 from dnd_game.data.quests import QUESTS, QuestLogEntry
 from dnd_game.data.items.catalog import LOOT_TABLES
@@ -302,6 +310,138 @@ class CoreTests(unittest.TestCase):
         with self.assertRaises(gameplay_base.GameInterrupted):
             game.read_input("> ")
 
+    def test_id_alias_layer_resolves_planned_and_active_ids(self) -> None:
+        self.assertEqual(canonical_scene_id("greywake_briefing"), "greywake_briefing")
+        self.assertEqual(runtime_scene_id("greywake_briefing"), "greywake_briefing")
+        self.assertEqual(runtime_scene_id("conyberry_agatha"), "hushfen_pale_circuit")
+        self.assertEqual(canonical_quest_id("seek_agathas_truth"), "seek_pale_witness_truth")
+        self.assertEqual(canonical_flag_id("agatha_truth_secured"), "hushfen_truth_secured")
+        self.assertEqual(canonical_map_node_id("conyberry_agatha"), "hushfen_pale_circuit")
+        self.assertEqual(canonical_dungeon_id("agathas_circuit"), "pale_circuit")
+
+    def test_game_state_from_dict_accepts_target_scene_id_during_transition(self) -> None:
+        player = build_character(
+            name="Vale",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        payload = GameState(player=player, current_scene="iron_hollow_hub").to_dict()
+        payload["current_scene"] = "iron_hollow_hub"
+
+        state = GameState.from_dict(payload)
+
+        self.assertEqual(state.current_scene, "iron_hollow_hub")
+
+    def test_console_setscene_accepts_target_scene_id_during_transition(self) -> None:
+        player = build_character(
+            name="Vale",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        log: list[str] = []
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(90053))
+        game.state = GameState(player=player, current_scene="iron_hollow_hub")
+
+        self.assertTrue(game.execute_setscene_console_command(["setscene", "greywake_briefing"]))
+
+        self.assertEqual(game.state.current_scene, "greywake_briefing")
+        self.assertEqual(game.state.current_act, 1)
+        self.assertIn("Console jumps to scene `greywake_briefing`.", self.plain_output(log))
+
+    def test_legacy_id_save_loads_and_resaves_with_canonical_ids(self) -> None:
+        player = build_character(
+            name="Vale",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        save_dir = Path.cwd() / "tests_output" / "id_alias_roundtrip"
+        save_dir.mkdir(parents=True, exist_ok=True)
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, save_dir=save_dir, rng=random.Random(90054))
+        legacy_state = GameState(
+            player=player,
+            current_scene="tresendar_manor",
+            flags={
+                "briefing_q_neverwinter": True,
+                "blackwake_return_destination": "neverwinter",
+                "old_owl_notes_found": True,
+                "wyvern_beast_stampede": True,
+                "tresendar_records_secured": True,
+                game.MAP_STATE_KEY: {
+                    "current_node_id": "tresendar_manor",
+                    "current_dungeon_id": "tresendar_undercellars",
+                    "visited_nodes": ["neverwinter_briefing", "phandalin_hub", "old_owl_well", "wyvern_tor", "tresendar_manor"],
+                    "node_history": ["neverwinter_briefing", "phandalin_hub", "high_road_ambush"],
+                    "cleared_rooms": ["hidden_stair"],
+                },
+            },
+            quests={
+                "restore_barthen_supplies": QuestLogEntry(
+                    quest_id="restore_barthen_supplies",
+                    status="active",
+                    notes=["Old provisioning note."],
+                ),
+                "break_wyvern_tor_raiders": QuestLogEntry(
+                    quest_id="break_wyvern_tor_raiders",
+                    status="ready_to_turn_in",
+                    notes=["Old ridge note."],
+                ),
+            },
+        )
+        legacy_path = save_dir / "legacy_id_roundtrip.json"
+        saved_path = save_dir / "canonical_id_roundtrip.json"
+        try:
+            legacy_path.write_text(json.dumps(legacy_state.to_dict(), indent=2), encoding="utf-8")
+
+            game.load_save_path(legacy_path)
+
+            assert game.state is not None
+            self.assertEqual(game.state.current_scene, "duskmere_manor")
+            self.assertTrue(game.state.flags["briefing_q_greywake"])
+            self.assertEqual(game.state.flags["blackwake_return_destination"], "greywake")
+            self.assertTrue(game.state.flags["blackglass_well_notes_found"])
+            self.assertTrue(game.state.flags["red_mesa_beast_stampede"])
+            self.assertTrue(game.state.flags["duskmere_records_secured"])
+            self.assertIn("restore_hadrik_supplies", game.state.quests)
+            self.assertIn("break_red_mesa_raiders", game.state.quests)
+            map_state = game.state.flags[game.MAP_STATE_KEY]
+            self.assertEqual(map_state["current_node_id"], "duskmere_manor")
+            self.assertEqual(map_state["current_dungeon_id"], "duskmere_undercellars")
+            self.assertIn("iron_hollow_hub", map_state["visited_nodes"])
+            self.assertEqual(map_state["node_history"], ["greywake_briefing", "iron_hollow_hub", "emberway_ambush"])
+
+            saved_path = game.save_game(slot_name="canonical_id_roundtrip")
+            saved = json.loads(saved_path.read_text(encoding="utf-8"))
+
+            self.assertEqual(saved["current_scene"], "duskmere_manor")
+            self.assertIn("restore_hadrik_supplies", saved["quests"])
+            self.assertIn("break_red_mesa_raiders", saved["quests"])
+            self.assertNotIn("restore_barthen_supplies", saved["quests"])
+            self.assertNotIn("break_wyvern_tor_raiders", saved["quests"])
+            saved_flags = saved["flags"]
+            self.assertIn("briefing_q_greywake", saved_flags)
+            self.assertNotIn("briefing_q_neverwinter", saved_flags)
+            self.assertEqual(saved_flags["blackwake_return_destination"], "greywake")
+            self.assertEqual(saved_flags[game.MAP_STATE_KEY]["current_node_id"], "duskmere_manor")
+            self.assertEqual(saved_flags[game.MAP_STATE_KEY]["current_dungeon_id"], "duskmere_undercellars")
+        finally:
+            legacy_path.unlink(missing_ok=True)
+            saved_path.unlink(missing_ok=True)
+            settings_path = save_dir / "settings.json"
+            settings_path.unlink(missing_ok=True)
+            try:
+                save_dir.rmdir()
+            except OSError:
+                pass
+
     def test_resolve_save_path_accepts_slot_and_filename(self) -> None:
         save_dir = Path.cwd() / "tests_output" / "cli_save_lookup"
         save_dir.mkdir(parents=True, exist_ok=True)
@@ -314,7 +454,7 @@ class CoreTests(unittest.TestCase):
             class_skill_choices=["Athletics", "Survival"],
         )
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, save_dir=save_dir, rng=random.Random(90052))
-        game.state = GameState(player=player, current_scene="phandalin_hub")
+        game.state = GameState(player=player, current_scene="iron_hollow_hub")
         save_path = game.save_game(slot_name="campaign")
 
         self.assertEqual(resolve_save_path(game, "campaign"), save_path)
@@ -335,8 +475,8 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(
             set(CITY_SCENE_KEYS),
             {
-                "neverwinter_briefing",
-                "phandalin_hub",
+                "greywake_briefing",
+                "iron_hollow_hub",
                 "act1_complete",
                 "act2_claims_council",
                 "act2_expedition_hub",
@@ -352,18 +492,18 @@ class CoreTests(unittest.TestCase):
                 "greywake_road_breakout",
                 "road_decision_post_blackwake",
                 "road_ambush",
-                "high_road_liars_circle",
-                "high_road_false_checkpoint",
-                "high_road_false_tollstones",
+                "emberway_liars_circle",
+                "emberway_false_checkpoint",
+                "emberway_false_tollstones",
             },
         )
         self.assertEqual(SCENE_MUSIC_CONTEXTS["background_prologue"], "wilderness")
         self.assertEqual(SCENE_MUSIC_CONTEXTS["wayside_luck_shrine"], "wilderness")
         self.assertEqual(SCENE_MUSIC_CONTEXTS["greywake_triage_yard"], "wilderness")
         self.assertEqual(SCENE_MUSIC_CONTEXTS["greywake_road_breakout"], "wilderness")
-        self.assertEqual(SCENE_MUSIC_CONTEXTS["neverwinter_briefing"], "city")
-        self.assertEqual(SCENE_MUSIC_CONTEXTS["phandalin_hub"], "city")
-        self.assertEqual(SCENE_MUSIC_CONTEXTS["tresendar_manor"], "dungeon")
+        self.assertEqual(SCENE_MUSIC_CONTEXTS["greywake_briefing"], "city")
+        self.assertEqual(SCENE_MUSIC_CONTEXTS["iron_hollow_hub"], "city")
+        self.assertEqual(SCENE_MUSIC_CONTEXTS["duskmere_manor"], "dungeon")
         self.assertEqual(SCENE_MUSIC_CONTEXTS["blackwake_crossing"], "dungeon")
         self.assertEqual(SCENE_MUSIC_CONTEXTS["road_ambush"], "wilderness")
         all_mapped_scenes = set(CITY_SCENE_KEYS) | set(WILDERNESS_SCENE_KEYS) | set(DUNGEON_SCENE_KEYS)
@@ -410,7 +550,7 @@ class CoreTests(unittest.TestCase):
         for scene_name in ("wayside_luck_shrine", "greywake_triage_yard", "greywake_road_breakout"):
             self.assertEqual(game.scene_music_context(scene_name), "wilderness")
 
-        self.assertEqual(game.scene_music_context("neverwinter_briefing"), "city")
+        self.assertEqual(game.scene_music_context("greywake_briefing"), "city")
 
     def test_music_picker_exhausts_folder_tracks_before_repeating(self) -> None:
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(9003140))
@@ -1056,7 +1196,7 @@ class CoreTests(unittest.TestCase):
         kaelis = create_kaelis_starling()
         log: list[str] = []
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(900611))
-        game.state = GameState(player=player, companions=[tolan, kaelis], current_scene="phandalin_hub")
+        game.state = GameState(player=player, companions=[tolan, kaelis], current_scene="iron_hollow_hub")
 
         self.assertIs(game.active_party_leader(), player)
         player.current_hp = 0
@@ -1166,7 +1306,7 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(900736))
         game.rich_console_width = lambda: 120
         game.detected_terminal_width = lambda: 54
-        map_state = DraftMapState(current_node_id="phandalin_hub", visited_nodes={"phandalin_hub"})
+        map_state = DraftMapState(current_node_id="iron_hollow_hub", visited_nodes={"iron_hollow_hub"})
         rendered = game.emit_rich(build_overworld_panel(ACT1_HYBRID_MAP, map_state), width=108)
         self.assertTrue(rendered)
         self.assertTrue(log)
@@ -1374,7 +1514,7 @@ class CoreTests(unittest.TestCase):
         companion.disposition = 6
         log: list[str] = []
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(9014))
-        game.state = GameState(player=player, companions=[companion], current_scene="phandalin_hub")
+        game.state = GameState(player=player, companions=[companion], current_scene="iron_hollow_hub")
         game.roll_check_d20 = lambda *args, **kwargs: SimpleNamespace(kept=4, rerolls=[])  # type: ignore[method-assign]
 
         self.assertTrue(game.skill_check(player, "Athletics", 10, context="to hold the gate"))
@@ -1396,7 +1536,7 @@ class CoreTests(unittest.TestCase):
         companion.disposition = -3
         log: list[str] = []
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(9015))
-        game.state = GameState(player=player, companions=[companion], current_scene="phandalin_hub")
+        game.state = GameState(player=player, companions=[companion], current_scene="iron_hollow_hub")
         game.roll_check_d20 = lambda *args, **kwargs: SimpleNamespace(kept=5, rerolls=[])  # type: ignore[method-assign]
 
         self.assertFalse(game.skill_check(player, "Persuasion", 5, context="to calm a crowd"))
@@ -1512,7 +1652,7 @@ class CoreTests(unittest.TestCase):
         enemy.current_hp = 0
         enemy.dead = True
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(90081))
-        game.state = GameState(player=player, current_scene="forge_of_spells")
+        game.state = GameState(player=player, current_scene="meridian_forge")
         game.pause_for_combat_transition = lambda: None
         calls: list[tuple[str, object]] = []
         game.play_encounter_music = lambda encounter: calls.append(
@@ -1944,7 +2084,7 @@ class CoreTests(unittest.TestCase):
         player.weapon.ranged = True
         player.weapon.damage = "1d8"
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(900862))
-        game.state = GameState(player=player, current_scene="black_lake_causeway", current_act=2)
+        game.state = GameState(player=player, current_scene="blackglass_causeway", current_act=2)
         adjudicator = create_enemy("blacklake_adjudicator")
         game._active_round_number = 1
         game.roll_check_d20 = lambda *args, **kwargs: SimpleNamespace(kept=18)  # type: ignore[method-assign]
@@ -1969,7 +2109,7 @@ class CoreTests(unittest.TestCase):
         )
         log: list[str] = []
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(90083))
-        game.state = GameState(player=player, current_scene="neverwinter_briefing")
+        game.state = GameState(player=player, current_scene="greywake_briefing")
         game.speaker("Mira Thann", "The road south is failing.")
         game.speaker("Mira Thann", "We need it secured.")
         rendered = self.plain_output(log)
@@ -2028,7 +2168,7 @@ class CoreTests(unittest.TestCase):
         rendered = self.plain_output(log)
         self.assertIn("Rukhar Cinderfang is a broad hobgoblin sergeant", rendered)
 
-    def test_phandalin_arrival_action_choice_renders_as_action_not_speech(self) -> None:
+    def test_iron_hollow_arrival_action_choice_renders_as_action_not_speech(self) -> None:
         player = build_character(
             name="Velkor",
             race="Human",
@@ -2042,17 +2182,17 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=log.append, rng=random.Random(90081))
         game.state = GameState(
             player=player,
-            current_scene="phandalin_hub",
+            current_scene="iron_hollow_hub",
             clues=["one", "two"],
             flags={"miners_exchange_lead": True},
         )
         game.skill_check = lambda actor, skill, dc, context: False
-        game.scene_phandalin_hub()
+        game.scene_iron_hollow_hub()
         rendered = self.plain_output(log)
         self.assertIn("*Show me the tracks, barricades, and weak points first.", rendered)
         self.assertNotIn('Velkor: "Show me the tracks, barricades, and weak points first."', rendered)
 
-    def test_map_state_initializes_for_phandalin_hub(self) -> None:
+    def test_map_state_initializes_for_iron_hollow_hub(self) -> None:
         player = build_character(
             name="Vale",
             race="Human",
@@ -2062,18 +2202,18 @@ class CoreTests(unittest.TestCase):
             class_skill_choices=["Athletics", "Survival"],
         )
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(90082))
-        game.state = GameState(player=player, current_scene="phandalin_hub", flags={"phandalin_arrived": True})
+        game.state = GameState(player=player, current_scene="iron_hollow_hub", flags={"iron_hollow_arrived": True})
         game.ensure_state_integrity()
         map_state = game.state.flags["map_state"]
-        self.assertEqual(map_state["current_node_id"], "phandalin_hub")
+        self.assertEqual(map_state["current_node_id"], "iron_hollow_hub")
         self.assertIsNone(map_state["current_dungeon_id"])
         self.assertIn("wayside_luck_shrine", map_state["visited_nodes"])
         self.assertIn("greywake_triage_yard", map_state["visited_nodes"])
         self.assertIn("greywake_road_breakout", map_state["visited_nodes"])
-        self.assertIn("neverwinter_briefing", map_state["visited_nodes"])
-        self.assertIn("high_road_ambush", map_state["visited_nodes"])
-        self.assertIn("phandalin_hub", map_state["visited_nodes"])
-        self.assertEqual(map_state["node_history"], ["neverwinter_briefing", "high_road_ambush"])
+        self.assertIn("greywake_briefing", map_state["visited_nodes"])
+        self.assertIn("emberway_ambush", map_state["visited_nodes"])
+        self.assertIn("iron_hollow_hub", map_state["visited_nodes"])
+        self.assertEqual(map_state["node_history"], ["greywake_briefing", "emberway_ambush"])
 
         rendered_map = build_overworld_panel_text(
             ACT1_HYBRID_MAP,
@@ -2093,7 +2233,7 @@ class CoreTests(unittest.TestCase):
         rendered_map = build_overworld_panel_text(
             ACT1_HYBRID_MAP,
             DraftMapState(
-                current_node_id="neverwinter_briefing",
+                current_node_id="greywake_briefing",
                 visited_nodes=set(ACT1_HYBRID_MAP.nodes),
             ),
         )
@@ -2123,7 +2263,7 @@ class CoreTests(unittest.TestCase):
         rendered_map = build_overworld_panel_text(
             ACT1_HYBRID_MAP,
             DraftMapState(
-                current_node_id="neverwinter_briefing",
+                current_node_id="greywake_briefing",
                 visited_nodes=set(ACT1_HYBRID_MAP.nodes),
             ),
         )
@@ -2187,7 +2327,7 @@ class CoreTests(unittest.TestCase):
     @unittest.skipUnless(RICH_AVAILABLE, "Rich rendering is optional")
     def test_rich_act1_overworld_map_preserves_fixed_grid_alignment(self) -> None:
         state = DraftMapState(
-            current_node_id="neverwinter_briefing",
+            current_node_id="greywake_briefing",
             visited_nodes=set(ACT1_HYBRID_MAP.nodes),
             flags={
                 "act1_started",
@@ -2195,7 +2335,7 @@ class CoreTests(unittest.TestCase):
                 "greywake_triage_yard_seen",
                 "greywake_breakout_resolved",
                 "road_ambush_cleared",
-                "phandalin_arrived",
+                "iron_hollow_arrived",
             },
         )
         rendered_lines = [
@@ -2278,8 +2418,8 @@ class CoreTests(unittest.TestCase):
         rendered_map = build_overworld_panel_text(
             ACT1_HYBRID_MAP,
             DraftMapState(
-                current_node_id="neverwinter_briefing",
-                visited_nodes={"neverwinter_briefing"},
+                current_node_id="greywake_briefing",
+                visited_nodes={"greywake_briefing"},
             ),
         )
         lines = rendered_map.splitlines()
@@ -2315,7 +2455,7 @@ class CoreTests(unittest.TestCase):
         self.assertIn("gallows_hanging_path", dungeon.rooms["charred_tollhouse"].exits)
         self.assertEqual(dungeon.rooms["floodgate_chamber"].encounter_key, "sereth_vane_boss")
 
-    def test_phandalin_arrival_mentions_blackwake_resolution_once(self) -> None:
+    def test_iron_hollow_arrival_mentions_blackwake_resolution_once(self) -> None:
         player = build_character(
             name="Velkor",
             race="Human",
@@ -2328,7 +2468,7 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(9201))
         game.state = GameState(
             player=player,
-            current_scene="phandalin_hub",
+            current_scene="iron_hollow_hub",
             flags={
                 "blackwake_completed": True,
                 "blackwake_resolution": "evidence",
@@ -2344,11 +2484,11 @@ class CoreTests(unittest.TestCase):
         game.scenario_choice = choose_once  # type: ignore[method-assign]
         game.skill_check = lambda actor, skill, dc, context: True
         with self.assertRaises(self._SceneExit):
-            game.scene_phandalin_hub()
+            game.scene_iron_hollow_hub()
         rendered = self.plain_output(log)
         self.assertIn("The copied seals and ledgers from Blackwake", rendered)
         self.assertIn("Sereth Vane's name", rendered)
-        self.assertTrue(game.state.flags["phandalin_blackwake_arrival_seen"])
+        self.assertTrue(game.state.flags["iron_hollow_blackwake_arrival_seen"])
 
     def blackwake_finale_game(
         self,
@@ -2470,7 +2610,7 @@ class CoreTests(unittest.TestCase):
             flags={
                 "act1_started": True,
                 "blackwake_started": True,
-                "neverwinter_private_room_intel": True,
+                "greywake_private_room_intel": True,
             },
         )
         game.grant_quest("trace_blackwake_cell")
@@ -2519,7 +2659,7 @@ class CoreTests(unittest.TestCase):
                 "blackwake_completed": True,
                 "blackwake_resolution": "evidence",
                 "blackwake_sereth_fate": "captured",
-                "neverwinter_private_room_intel": True,
+                "greywake_private_room_intel": True,
             },
         )
         game.resolve_level_ups = lambda: None  # type: ignore[method-assign]
@@ -2527,8 +2667,8 @@ class CoreTests(unittest.TestCase):
 
         game.scene_road_decision_post_blackwake()
 
-        self.assertTrue(game.state.flags["neverwinter_contract_house_blackwake_reported"])
-        self.assertTrue(game.state.flags["neverwinter_contract_house_political_callback"])
+        self.assertTrue(game.state.flags["greywake_contract_house_blackwake_reported"])
+        self.assertTrue(game.state.flags["greywake_contract_house_political_callback"])
         self.assertEqual(game.state.quests["trace_blackwake_cell"].status, "completed")
         rendered = self.plain_output(log)
         self.assertIn("Sabra Kestrel", rendered)
@@ -2879,7 +3019,7 @@ class CoreTests(unittest.TestCase):
         self.assertFalse(
             requirement_met(
                 DraftMapState(
-                    current_node_id="forge_of_spells",
+                    current_node_id="meridian_forge",
                     flag_values={
                         "act2_first_late_route": "south_adit",
                         "act2_whisper_pressure": 5,
@@ -2891,7 +3031,7 @@ class CoreTests(unittest.TestCase):
         self.assertFalse(
             requirement_met(
                 DraftMapState(
-                    current_node_id="forge_of_spells",
+                    current_node_id="meridian_forge",
                     flag_values={
                         "act2_first_late_route": "broken_prospect",
                         "act2_whisper_pressure": 3,
@@ -2903,7 +3043,7 @@ class CoreTests(unittest.TestCase):
         self.assertTrue(
             requirement_met(
                 DraftMapState(
-                    current_node_id="forge_of_spells",
+                    current_node_id="meridian_forge",
                     flag_values={
                         "act2_first_late_route": "broken_prospect",
                         "act2_whisper_pressure": 4,
@@ -2920,7 +3060,7 @@ class CoreTests(unittest.TestCase):
         self.assertFalse(requirement_met(DraftMapState(current_node_id="act2_expedition_hub"), relay_node.requirement))
         self.assertTrue(
             requirement_met(
-                DraftMapState(current_node_id="act2_expedition_hub", flags={"black_lake_crossed"}),
+                DraftMapState(current_node_id="act2_expedition_hub", flags={"blackglass_crossed"}),
                 relay_node.requirement,
             )
         )
@@ -2928,7 +3068,7 @@ class CoreTests(unittest.TestCase):
             requirement_met(
                 DraftMapState(
                     current_node_id="act2_expedition_hub",
-                    flags={"black_lake_crossed", "caldra_defeated"},
+                    flags={"blackglass_crossed", "caldra_defeated"},
                 ),
                 relay_node.requirement,
             )
@@ -2946,8 +3086,8 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(relay_dungeon.rooms["null_bell_walk"].exits, ("counterweight_crown",))
         self.assertTrue(
             requirement_met(
-                DraftMapState(current_node_id="act2_expedition_hub", flags={"black_lake_crossed"}),
-                ACT2_ENEMY_DRIVEN_MAP.nodes["forge_of_spells"].requirement,
+                DraftMapState(current_node_id="act2_expedition_hub", flags={"blackglass_crossed"}),
+                ACT2_ENEMY_DRIVEN_MAP.nodes["meridian_forge"].requirement,
             )
         )
 
@@ -3013,7 +3153,7 @@ class CoreTests(unittest.TestCase):
             )
         )
 
-    def test_old_owl_well_branching_tracks_cleared_rooms(self) -> None:
+    def test_blackglass_well_branching_tracks_cleared_rooms(self) -> None:
         player = build_character(
             name="Vale",
             race="Human",
@@ -3026,19 +3166,19 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=lambda _: None, rng=random.Random(90083))
         game.state = GameState(
             player=player,
-            current_scene="old_owl_well",
+            current_scene="blackglass_well",
             flags={"miners_exchange_lead": True},
         )
         game.run_encounter = lambda encounter: "victory"
-        game.scene_old_owl_well()
-        self.assertEqual(game.state.current_scene, "phandalin_hub")
-        self.assertEqual(game.state.flags["map_state"]["current_node_id"], "phandalin_hub")
+        game.scene_blackglass_well()
+        self.assertEqual(game.state.current_scene, "iron_hollow_hub")
+        self.assertEqual(game.state.flags["map_state"]["current_node_id"], "iron_hollow_hub")
         self.assertCountEqual(
             game.state.flags["map_state"]["cleared_rooms"],
             ["well_ring", "supply_trench", "gravecaller_lip"],
         )
 
-    def test_old_owl_well_vaelith_miniboss_uses_buffed_encounter_setup(self) -> None:
+    def test_blackglass_well_vaelith_miniboss_uses_buffed_encounter_setup(self) -> None:
         player = build_character(
             name="Vale",
             race="Human",
@@ -3054,7 +3194,7 @@ class CoreTests(unittest.TestCase):
         game.state = GameState(
             player=player,
             companions=companions,
-            current_scene="old_owl_well",
+            current_scene="blackglass_well",
             flags={"miners_exchange_lead": True},
         )
 
@@ -3063,9 +3203,9 @@ class CoreTests(unittest.TestCase):
             return "victory"
 
         game.run_encounter = capture_encounter  # type: ignore[method-assign]
-        game.scene_old_owl_well()
+        game.scene_blackglass_well()
         boss_encounter = next(encounter for encounter in encounters if encounter.title == "Miniboss: Vaelith Marr")
-        self.assertTrue(game.state.flags["old_owl_ritual_sabotaged"])
+        self.assertTrue(game.state.flags["blackglass_well_ritual_sabotaged"])
         self.assertEqual(len(boss_encounter.enemies), 4)
         self.assertEqual(boss_encounter.enemies[0].name, "Vaelith Marr")
         self.assertEqual(boss_encounter.enemies[0].archetype, "vaelith_marr")
@@ -3076,7 +3216,7 @@ class CoreTests(unittest.TestCase):
         self.assertTrue(any(enemy.name == "Carrion Lash Crawler" for enemy in boss_encounter.enemies[1:]))
         self.assertTrue(any(enemy.name == "Corpse-Salt Sentry" for enemy in boss_encounter.enemies[1:]))
 
-    def test_old_owl_vaelith_gravecall_clock_raises_support_and_blesses_line(self) -> None:
+    def test_blackglass_well_vaelith_gravecall_clock_raises_support_and_blesses_line(self) -> None:
         player = build_character(
             name="Vale",
             race="Human",
@@ -3088,7 +3228,7 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(9008320))
         game.state = GameState(
             player=player,
-            current_scene="old_owl_well",
+            current_scene="blackglass_well",
             flags={"miners_exchange_lead": True},
         )
         game.ensure_state_integrity()
@@ -3118,7 +3258,7 @@ class CoreTests(unittest.TestCase):
         self.assertTrue(vaelith.bond_flags["gravecall_line_blessed"])
         self.assertTrue(any(enemy.name == "Gravecalled Sentry" for enemy in encounter.enemies))
 
-    def test_old_owl_vaelith_gravecall_pauses_while_disrupted(self) -> None:
+    def test_blackglass_well_vaelith_gravecall_pauses_while_disrupted(self) -> None:
         player = build_character(
             name="Vale",
             race="Human",
@@ -3130,7 +3270,7 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(9008321))
         game.state = GameState(
             player=player,
-            current_scene="old_owl_well",
+            current_scene="blackglass_well",
             flags={"miners_exchange_lead": True},
         )
         vaelith = create_enemy("vaelith_marr")
@@ -3141,7 +3281,7 @@ class CoreTests(unittest.TestCase):
 
         self.assertNotIn("gravecall_counter", vaelith.bond_flags)
 
-    def test_old_owl_vaelith_ritual_terrain_bites_even_when_gravecall_is_disrupted(self) -> None:
+    def test_blackglass_well_vaelith_ritual_terrain_bites_even_when_gravecall_is_disrupted(self) -> None:
         player = build_character(
             name="Vale",
             race="Human",
@@ -3153,7 +3293,7 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(90083215))
         game.state = GameState(
             player=player,
-            current_scene="old_owl_well",
+            current_scene="blackglass_well",
             flags={"miners_exchange_lead": True},
         )
         vaelith = create_enemy("vaelith_marr")
@@ -3169,7 +3309,7 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(player.current_hp, starting_hp - 4)
         self.assertIn("reeling", player.conditions)
 
-    def test_old_owl_vaelith_bloodied_grave_ward_frightens_top_threat(self) -> None:
+    def test_blackglass_well_vaelith_bloodied_grave_ward_frightens_top_threat(self) -> None:
         player = build_character(
             name="Vale",
             race="Human",
@@ -3181,7 +3321,7 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(9008322))
         game.state = GameState(
             player=player,
-            current_scene="old_owl_well",
+            current_scene="blackglass_well",
             flags={"miners_exchange_lead": True},
         )
         game.ensure_state_integrity()
@@ -3199,7 +3339,7 @@ class CoreTests(unittest.TestCase):
         self.assertLessEqual(vaelith.temp_hp, 8)
         self.assertIn("frightened", player.conditions)
 
-    def test_old_owl_vaelith_gets_extra_support_if_lull_was_skipped(self) -> None:
+    def test_blackglass_well_vaelith_gets_extra_support_if_lull_was_skipped(self) -> None:
         player = build_character(
             name="Vale",
             race="Human",
@@ -3212,7 +3352,7 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: "3", output_fn=lambda _: None, rng=random.Random(9008323))
         game.state = GameState(
             player=player,
-            current_scene="old_owl_well",
+            current_scene="blackglass_well",
             flags={"miners_exchange_lead": True},
         )
         game.ensure_state_integrity()
@@ -3220,12 +3360,12 @@ class CoreTests(unittest.TestCase):
         assert dungeon is not None
         game.run_encounter = lambda encounter: encounters.append(encounter) or "victory"  # type: ignore[method-assign]
 
-        game._old_owl_gravecaller_lip(dungeon, dungeon.rooms["gravecaller_lip"])
+        game._blackglass_well_gravecaller_lip(dungeon, dungeon.rooms["gravecaller_lip"])
 
         boss_encounter = encounters[0]
         self.assertTrue(any(enemy.name == "Gravecalled Sentry" for enemy in boss_encounter.enemies))
 
-    def test_old_owl_notes_unlock_cinderfall_route_and_reduce_ashen_strength(self) -> None:
+    def test_blackglass_well_notes_unlock_cinderfall_route_and_reduce_ashen_strength(self) -> None:
         player = build_character(
             name="Vale",
             race="Human",
@@ -3237,16 +3377,16 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(900833))
         game.state = GameState(
             player=player,
-            current_scene="old_owl_well",
+            current_scene="blackglass_well",
             flags={"miners_exchange_lead": True},
         )
         game.ensure_state_integrity()
         dungeon = game.current_act1_dungeon()
         assert dungeon is not None
         game.complete_map_room(dungeon, "well_ring")
-        game._old_owl_supply_trench(dungeon, dungeon.rooms["supply_trench"])
+        game._blackglass_well_supply_trench(dungeon, dungeon.rooms["supply_trench"])
         self.assertTrue(game.state.flags["hidden_route_unlocked"])
-        self.assertTrue(game.state.flags["old_owl_notes_found"])
+        self.assertTrue(game.state.flags["blackglass_well_notes_found"])
         self.assertTrue(game.state.flags["varyn_filter_logic_seen"])
         self.assertEqual(game.act1_metric_value("act1_ashen_strength"), 3)
         self.assertTrue(any("Cinderfall" in clue for clue in game.state.clues))
@@ -3265,7 +3405,7 @@ class CoreTests(unittest.TestCase):
         elira = create_elira_dawnmantle()
         elira.disposition = 3
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(9008331))
-        game.state = GameState(player=player, companions=[bryn, elira], current_scene="phandalin_hub")
+        game.state = GameState(player=player, companions=[bryn, elira], current_scene="iron_hollow_hub")
         game.maybe_offer_act1_personal_quests()
         self.assertIn("bryn_loose_ends", game.state.quests)
         self.assertIn("elira_faith_under_ash", game.state.quests)
@@ -3286,7 +3426,7 @@ class CoreTests(unittest.TestCase):
         game.state = GameState(
             player=player,
             companions=[bryn],
-            current_scene="phandalin_hub",
+            current_scene="iron_hollow_hub",
             flags={"bryn_cache_found": True, "act1_town_fear": 2},
         )
         game.grant_quest("bryn_loose_ends")
@@ -3316,7 +3456,7 @@ class CoreTests(unittest.TestCase):
         game.state = GameState(
             player=player,
             companions=[bryn, rhogar],
-            current_scene="phandalin_hub",
+            current_scene="iron_hollow_hub",
             flags={"cinderfall_relay_destroyed": True},
         )
         game.maybe_run_act1_companion_conflict()
@@ -3324,7 +3464,7 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(rhogar.disposition, rhogar_before + 1)
         self.assertEqual(bryn.disposition, bryn_before - 1)
 
-    def test_wyvern_followup_flags_buff_brughor_setup(self) -> None:
+    def test_red_mesa_followup_flags_buff_brughor_setup(self) -> None:
         player = build_character(
             name="Vale",
             race="Human",
@@ -3337,7 +3477,7 @@ class CoreTests(unittest.TestCase):
         game.state = GameState(
             player=player,
             companions=[create_tolan_ironshield()],
-            current_scene="wyvern_tor",
+            current_scene="red_mesa_hold",
             flags={"edermath_orchard_lead": True},
         )
         game.ensure_state_integrity()
@@ -3347,15 +3487,15 @@ class CoreTests(unittest.TestCase):
         encounters: list[Encounter] = []
         game.input_fn = lambda _: next(answers)
         game.run_encounter = lambda encounter: encounters.append(encounter) or "victory"  # type: ignore[method-assign]
-        game._wyvern_drover_hollow(dungeon, dungeon.rooms["drover_hollow"])
-        game._wyvern_high_shelf(dungeon, dungeon.rooms["high_shelf"])
+        game._red_mesa_drover_hollow(dungeon, dungeon.rooms["drover_hollow"])
+        game._red_mesa_high_shelf(dungeon, dungeon.rooms["high_shelf"])
         boss_encounter = encounters[-1]
-        self.assertTrue(game.state.flags["wyvern_beast_stampede"])
+        self.assertTrue(game.state.flags["red_mesa_beast_stampede"])
         self.assertTrue(game.state.flags["varyn_detour_logic_seen"])
         self.assertIn("surprised", boss_encounter.enemies[1].conditions)
         self.assertLess(boss_encounter.enemies[1].current_hp, boss_encounter.enemies[1].max_hp)
 
-    def test_phandalin_hub_marks_wyvern_tor_as_recommended_level_three_when_underleveled(self) -> None:
+    def test_iron_hollow_hub_marks_red_mesa_hold_as_recommended_level_three_when_underleveled(self) -> None:
         player = build_character(
             name="Vale",
             race="Human",
@@ -3368,10 +3508,10 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(900832))
         game.state = GameState(
             player=player,
-            current_scene="phandalin_hub",
-            flags={"phandalin_arrived": True, "edermath_orchard_lead": True, "miners_exchange_lead": True},
+            current_scene="iron_hollow_hub",
+            flags={"iron_hollow_arrived": True, "edermath_orchard_lead": True, "miners_exchange_lead": True},
         )
-        game.run_phandalin_council_event = lambda: None  # type: ignore[method-assign]
+        game.run_iron_hollow_council_event = lambda: None  # type: ignore[method-assign]
         game.run_after_watch_gathering = lambda: None  # type: ignore[method-assign]
 
         def capture_choice(prompt: str, options: list[str], **kwargs) -> int:
@@ -3382,10 +3522,10 @@ class CoreTests(unittest.TestCase):
 
         game.scenario_choice = capture_choice  # type: ignore[method-assign]
         with self.assertRaises(self._SceneExit):
-            game.scene_phandalin_hub()
+            game.scene_iron_hollow_hub()
         self.assertIn("*Hunt the raiders at Red Mesa Hold (recommended level 3)", captured)
 
-    def test_confirm_wyvern_tor_departure_can_cancel_underleveled_trip(self) -> None:
+    def test_confirm_red_mesa_hold_departure_can_cancel_underleveled_trip(self) -> None:
         player = build_character(
             name="Vale",
             race="Human",
@@ -3395,11 +3535,11 @@ class CoreTests(unittest.TestCase):
             class_skill_choices=["Athletics", "Survival"],
         )
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(900833))
-        game.state = GameState(player=player, current_scene="phandalin_hub")
+        game.state = GameState(player=player, current_scene="iron_hollow_hub")
         game.scenario_choice = lambda prompt, options, **kwargs: 2  # type: ignore[method-assign]
-        self.assertFalse(game.confirm_wyvern_tor_departure())
+        self.assertFalse(game.confirm_red_mesa_hold_departure())
 
-    def test_tresendar_encounters_scale_up_for_full_party(self) -> None:
+    def test_duskmere_encounters_scale_up_for_full_party(self) -> None:
         player = build_character(
             name="Vale",
             race="Human",
@@ -3414,20 +3554,20 @@ class CoreTests(unittest.TestCase):
         game.state = GameState(
             player=player,
             companions=companions,
-            current_scene="tresendar_manor",
-            flags={"tresendar_revealed": True},
+            current_scene="duskmere_manor",
+            flags={"duskmere_revealed": True},
         )
         game.ensure_state_integrity()
         dungeon = game.current_act1_dungeon()
         assert dungeon is not None
         game.run_encounter = lambda encounter: encounters.append(encounter) or "victory"  # type: ignore[method-assign]
-        game._tresendar_cellar_intake(dungeon, dungeon.rooms["cellar_intake"])
-        game._tresendar_nothic_lair(dungeon, dungeon.rooms["nothic_lair"])
+        game._duskmere_cellar_intake(dungeon, dungeon.rooms["cellar_intake"])
+        game._duskmere_nothic_lair(dungeon, dungeon.rooms["nothic_lair"])
         self.assertEqual(len(encounters[0].enemies), 4)
         self.assertEqual(len(encounters[1].enemies), 3)
         self.assertGreater(encounters[1].enemies[0].max_hp, 29)
 
-    def test_tresendar_nothic_kill_route_records_choice_and_tolan_approval(self) -> None:
+    def test_duskmere_nothic_kill_route_records_choice_and_tolan_approval(self) -> None:
         player = build_character(
             name="Vale",
             race="Human",
@@ -3439,21 +3579,21 @@ class CoreTests(unittest.TestCase):
         tolan = create_tolan_ironshield()
         encounters: list[Encounter] = []
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(9008341))
-        game.state = GameState(player=player, companions=[tolan], current_scene="tresendar_manor", flags={"tresendar_revealed": True})
+        game.state = GameState(player=player, companions=[tolan], current_scene="duskmere_manor", flags={"duskmere_revealed": True})
         game.ensure_state_integrity()
         dungeon = game.current_act1_dungeon()
         assert dungeon is not None
         game.scenario_choice = lambda prompt, options, **kwargs: 1  # type: ignore[method-assign]
         game.run_encounter = lambda encounter: encounters.append(encounter) or "victory"  # type: ignore[method-assign]
 
-        game._tresendar_nothic_lair(dungeon, dungeon.rooms["nothic_lair"])
+        game._duskmere_nothic_lair(dungeon, dungeon.rooms["nothic_lair"])
 
-        self.assertEqual(game.state.flags["tresendar_nothic_route"], "kill")
-        self.assertTrue(game.state.flags["tresendar_nothic_tolan_kill_approved"])
+        self.assertEqual(game.state.flags["duskmere_nothic_route"], "kill")
+        self.assertTrue(game.state.flags["duskmere_nothic_tolan_kill_approved"])
         self.assertEqual(tolan.disposition, 1)
         self.assertEqual(len(encounters), 1)
 
-    def test_tresendar_nothic_deception_failure_sets_ambush_fallback(self) -> None:
+    def test_duskmere_nothic_deception_failure_sets_ambush_fallback(self) -> None:
         player = build_character(
             name="Vale",
             race="Human",
@@ -3464,7 +3604,7 @@ class CoreTests(unittest.TestCase):
         )
         encounters: list[Encounter] = []
         game = TextDnDGame(input_fn=lambda _: "4", output_fn=lambda _: None, rng=random.Random(9008342))
-        game.state = GameState(player=player, current_scene="tresendar_manor", flags={"tresendar_revealed": True})
+        game.state = GameState(player=player, current_scene="duskmere_manor", flags={"duskmere_revealed": True})
         game.ensure_state_integrity()
         dungeon = game.current_act1_dungeon()
         assert dungeon is not None
@@ -3472,15 +3612,15 @@ class CoreTests(unittest.TestCase):
         game.skill_check = lambda actor, skill, dc, context: False  # type: ignore[method-assign]
         game.run_encounter = lambda encounter: encounters.append(encounter) or "victory"  # type: ignore[method-assign]
 
-        game._tresendar_nothic_lair(dungeon, dungeon.rooms["nothic_lair"])
+        game._duskmere_nothic_lair(dungeon, dungeon.rooms["nothic_lair"])
 
-        self.assertEqual(game.state.flags["tresendar_nothic_route"], "deceive")
-        self.assertTrue(game.state.flags["tresendar_nothic_deception_failed"])
+        self.assertEqual(game.state.flags["duskmere_nothic_route"], "deceive")
+        self.assertTrue(game.state.flags["duskmere_nothic_deception_failed"])
         self.assertEqual(encounters[0].enemy_initiative_bonus, 2)
         self.assertIn("surprised", player.conditions)
         self.assertIn("reeling", player.conditions)
 
-    def test_tresendar_nothic_memory_trade_reads_background_and_costs_player(self) -> None:
+    def test_duskmere_nothic_memory_trade_reads_background_and_costs_player(self) -> None:
         player = build_character(
             name="Vale",
             race="Human",
@@ -3492,7 +3632,7 @@ class CoreTests(unittest.TestCase):
         log: list[str] = []
         encounters: list[Encounter] = []
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(9008343))
-        game.state = GameState(player=player, current_scene="tresendar_manor", flags={"tresendar_revealed": True})
+        game.state = GameState(player=player, current_scene="duskmere_manor", flags={"duskmere_revealed": True})
         game.ensure_state_integrity()
         dungeon = game.current_act1_dungeon()
         assert dungeon is not None
@@ -3507,20 +3647,20 @@ class CoreTests(unittest.TestCase):
         game.scenario_choice = choose_memory_trade  # type: ignore[method-assign]
         game.run_encounter = lambda encounter: encounters.append(encounter) or "victory"  # type: ignore[method-assign]
 
-        game._tresendar_nothic_lair(dungeon, dungeon.rooms["nothic_lair"])
+        game._duskmere_nothic_lair(dungeon, dungeon.rooms["nothic_lair"])
 
         rendered = self.plain_output(log)
         self.assertIn("You washed blood from temple cloth", rendered)
-        self.assertEqual(game.state.flags["tresendar_nothic_route"], "trade")
-        self.assertEqual(game.state.flags["tresendar_nothic_trade"], "memory")
-        self.assertTrue(game.state.flags["tresendar_nothic_memory_paid"])
-        self.assertTrue(game.state.flags["tresendar_nothic_trade_info_gained"])
+        self.assertEqual(game.state.flags["duskmere_nothic_route"], "trade")
+        self.assertEqual(game.state.flags["duskmere_nothic_trade"], "memory")
+        self.assertTrue(game.state.flags["duskmere_nothic_memory_paid"])
+        self.assertTrue(game.state.flags["duskmere_nothic_trade_info_gained"])
         self.assertEqual(game.state.flags["deep_ledger_hint_count"], 1)
         self.assertIn("reeling", player.conditions)
         self.assertTrue(any("The Cistern Eye names Emberhall" in clue for clue in game.state.clues))
         self.assertEqual(encounters[0].hero_initiative_bonus, 0)
 
-    def test_tresendar_nothic_self_truth_trade_grants_clear_eyed_wound(self) -> None:
+    def test_duskmere_nothic_self_truth_trade_grants_clear_eyed_wound(self) -> None:
         player = build_character(
             name="Vale",
             race="Human",
@@ -3531,7 +3671,7 @@ class CoreTests(unittest.TestCase):
         )
         encounters: list[Encounter] = []
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(9008344))
-        game.state = GameState(player=player, current_scene="tresendar_manor", flags={"tresendar_revealed": True})
+        game.state = GameState(player=player, current_scene="duskmere_manor", flags={"duskmere_revealed": True})
         game.ensure_state_integrity()
         dungeon = game.current_act1_dungeon()
         assert dungeon is not None
@@ -3546,10 +3686,10 @@ class CoreTests(unittest.TestCase):
         game.scenario_choice = choose_truth_trade  # type: ignore[method-assign]
         game.run_encounter = lambda encounter: encounters.append(encounter) or "victory"  # type: ignore[method-assign]
 
-        game._tresendar_nothic_lair(dungeon, dungeon.rooms["nothic_lair"])
+        game._duskmere_nothic_lair(dungeon, dungeon.rooms["nothic_lair"])
 
-        self.assertEqual(game.state.flags["tresendar_nothic_trade"], "self_truth")
-        self.assertTrue(game.state.flags["tresendar_nothic_self_truth_spoken"])
+        self.assertEqual(game.state.flags["duskmere_nothic_trade"], "self_truth")
+        self.assertTrue(game.state.flags["duskmere_nothic_self_truth_spoken"])
         self.assertEqual(player.story_skill_bonuses, {"Arcana": 1, "Insight": 1, "Persuasion": 1})
         self.assertEqual(encounters[0].hero_initiative_bonus, 1)
         self.assertIn(
@@ -3557,7 +3697,7 @@ class CoreTests(unittest.TestCase):
             game.state.journal,
         )
 
-    def test_tresendar_nothic_bryn_betrayal_exposes_secret_and_penalizes_active_quest(self) -> None:
+    def test_duskmere_nothic_bryn_betrayal_exposes_secret_and_penalizes_active_quest(self) -> None:
         player = build_character(
             name="Vale",
             race="Human",
@@ -3570,7 +3710,7 @@ class CoreTests(unittest.TestCase):
         bryn.disposition = 3
         encounters: list[Encounter] = []
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(9008345))
-        game.state = GameState(player=player, companions=[bryn], current_scene="tresendar_manor", flags={"tresendar_revealed": True})
+        game.state = GameState(player=player, companions=[bryn], current_scene="duskmere_manor", flags={"duskmere_revealed": True})
         game.ensure_state_integrity()
         game.grant_quest("bryn_loose_ends")
         dungeon = game.current_act1_dungeon()
@@ -3586,15 +3726,15 @@ class CoreTests(unittest.TestCase):
         game.scenario_choice = choose_bryn_trade  # type: ignore[method-assign]
         game.run_encounter = lambda encounter: encounters.append(encounter) or "victory"  # type: ignore[method-assign]
 
-        game._tresendar_nothic_lair(dungeon, dungeon.rooms["nothic_lair"])
+        game._duskmere_nothic_lair(dungeon, dungeon.rooms["nothic_lair"])
 
-        self.assertEqual(game.state.flags["tresendar_nothic_trade"], "betray_bryn")
+        self.assertEqual(game.state.flags["duskmere_nothic_trade"], "betray_bryn")
         self.assertTrue(game.state.flags["bryn_secret_exposed"])
-        self.assertTrue(game.state.flags["tresendar_nothic_trade_info_gained"])
+        self.assertTrue(game.state.flags["duskmere_nothic_trade_info_gained"])
         self.assertEqual(bryn.disposition, 0)
         self.assertEqual(len(encounters), 1)
 
-    def test_tresendar_nothic_rhogar_betrayal_sets_conflict_arc(self) -> None:
+    def test_duskmere_nothic_rhogar_betrayal_sets_conflict_arc(self) -> None:
         player = build_character(
             name="Vale",
             race="Human",
@@ -3607,7 +3747,7 @@ class CoreTests(unittest.TestCase):
         rhogar.disposition = 4
         encounters: list[Encounter] = []
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(9008346))
-        game.state = GameState(player=player, companions=[rhogar], current_scene="tresendar_manor", flags={"tresendar_revealed": True})
+        game.state = GameState(player=player, companions=[rhogar], current_scene="duskmere_manor", flags={"duskmere_revealed": True})
         game.ensure_state_integrity()
         dungeon = game.current_act1_dungeon()
         assert dungeon is not None
@@ -3622,15 +3762,15 @@ class CoreTests(unittest.TestCase):
         game.scenario_choice = choose_rhogar_trade  # type: ignore[method-assign]
         game.run_encounter = lambda encounter: encounters.append(encounter) or "victory"  # type: ignore[method-assign]
 
-        game._tresendar_nothic_lair(dungeon, dungeon.rooms["nothic_lair"])
+        game._duskmere_nothic_lair(dungeon, dungeon.rooms["nothic_lair"])
 
-        self.assertEqual(game.state.flags["tresendar_nothic_trade"], "betray_rhogar")
+        self.assertEqual(game.state.flags["duskmere_nothic_trade"], "betray_rhogar")
         self.assertTrue(game.state.flags["rhogar_secret_exposed"])
         self.assertTrue(game.state.flags["rhogar_cistern_conflict_pending"])
         self.assertEqual(rhogar.disposition, 2)
         self.assertEqual(len(encounters), 1)
 
-    def test_tresendar_nothic_bargain_tier_two_reveals_cinderfall_and_costs_trust(self) -> None:
+    def test_duskmere_nothic_bargain_tier_two_reveals_cinderfall_and_costs_trust(self) -> None:
         player = build_character(
             name="Vale",
             race="Human",
@@ -3646,8 +3786,8 @@ class CoreTests(unittest.TestCase):
         game.state = GameState(
             player=player,
             companions=[bryn, tolan],
-            current_scene="tresendar_manor",
-            flags={"tresendar_revealed": True, "cinderfall_relay_destroyed": True},
+            current_scene="duskmere_manor",
+            flags={"duskmere_revealed": True, "cinderfall_relay_destroyed": True},
         )
         game.ensure_state_integrity()
         dungeon = game.current_act1_dungeon()
@@ -3665,13 +3805,13 @@ class CoreTests(unittest.TestCase):
         game.scenario_choice = choose_cinderfall_bargain  # type: ignore[method-assign]
         game.run_encounter = lambda encounter: encounters.append(encounter) or "victory"  # type: ignore[method-assign]
 
-        game._tresendar_nothic_lair(dungeon, dungeon.rooms["nothic_lair"])
+        game._duskmere_nothic_lair(dungeon, dungeon.rooms["nothic_lair"])
 
-        self.assertEqual(game.state.flags["tresendar_nothic_route"], "bargain")
-        self.assertEqual(game.state.flags["tresendar_nothic_bargain_tier"], 2)
-        self.assertEqual(game.state.flags["tresendar_nothic_sanity_cost"], 2)
-        self.assertTrue(game.state.flags["tresendar_nothic_cinderfall_lore"])
-        self.assertNotIn("tresendar_nothic_wave_echo_lore", game.state.flags)
+        self.assertEqual(game.state.flags["duskmere_nothic_route"], "bargain")
+        self.assertEqual(game.state.flags["duskmere_nothic_bargain_tier"], 2)
+        self.assertEqual(game.state.flags["duskmere_nothic_sanity_cost"], 2)
+        self.assertTrue(game.state.flags["duskmere_nothic_cinderfall_lore"])
+        self.assertNotIn("duskmere_nothic_resonant_vault_lore", game.state.flags)
         self.assertEqual(game.state.flags["deep_ledger_hint_count"], 2)
         self.assertTrue(any("destroying it cut Ashfall's reserve channel" in clue for clue in game.state.clues))
         self.assertIn("reeling", player.conditions)
@@ -3680,7 +3820,7 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(tolan.disposition, -1)
         self.assertEqual(encounters[0].enemy_initiative_bonus, 1)
 
-    def test_tresendar_nothic_bargain_tier_three_reveals_wave_echo_and_whispers_through(self) -> None:
+    def test_duskmere_nothic_bargain_tier_three_reveals_resonant_vault_and_whispers_through(self) -> None:
         player = build_character(
             name="Vale",
             race="Human",
@@ -3693,12 +3833,12 @@ class CoreTests(unittest.TestCase):
         rhogar.disposition = 4
         encounters: list[Encounter] = []
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(9008348))
-        game.state = GameState(player=player, companions=[rhogar], current_scene="tresendar_manor", flags={"tresendar_revealed": True})
+        game.state = GameState(player=player, companions=[rhogar], current_scene="duskmere_manor", flags={"duskmere_revealed": True})
         game.ensure_state_integrity()
         dungeon = game.current_act1_dungeon()
         assert dungeon is not None
 
-        def choose_wave_echo_bargain(prompt: str, options: list[str], **kwargs) -> int:
+        def choose_resonant_vault_bargain(prompt: str, options: list[str], **kwargs) -> int:
             if prompt == "The Cistern Eye waits to learn what kind of answer you are.":
                 return self.option_index_containing(options, "every secret")
             if prompt == "The Eye's first truth leaves another shape under the water.":
@@ -3707,16 +3847,16 @@ class CoreTests(unittest.TestCase):
                 return self.option_index_containing(options, "past the Ashen Brand")
             raise AssertionError(prompt)
 
-        game.scenario_choice = choose_wave_echo_bargain  # type: ignore[method-assign]
+        game.scenario_choice = choose_resonant_vault_bargain  # type: ignore[method-assign]
         game.run_encounter = lambda encounter: encounters.append(encounter) or "victory"  # type: ignore[method-assign]
 
-        game._tresendar_nothic_lair(dungeon, dungeon.rooms["nothic_lair"])
+        game._duskmere_nothic_lair(dungeon, dungeon.rooms["nothic_lair"])
 
-        self.assertEqual(game.state.flags["tresendar_nothic_bargain_tier"], 3)
-        self.assertEqual(game.state.flags["tresendar_nothic_sanity_cost"], 3)
-        self.assertTrue(game.state.flags["tresendar_nothic_cinderfall_lore"])
-        self.assertTrue(game.state.flags["tresendar_nothic_wave_echo_lore"])
-        self.assertTrue(game.state.flags["tresendar_nothic_bargain_whispered_through"])
+        self.assertEqual(game.state.flags["duskmere_nothic_bargain_tier"], 3)
+        self.assertEqual(game.state.flags["duskmere_nothic_sanity_cost"], 3)
+        self.assertTrue(game.state.flags["duskmere_nothic_cinderfall_lore"])
+        self.assertTrue(game.state.flags["duskmere_nothic_resonant_vault_lore"])
+        self.assertTrue(game.state.flags["duskmere_nothic_bargain_whispered_through"])
         self.assertEqual(game.state.flags["deep_ledger_hint_count"], 3)
         self.assertTrue(any("keeping Resonant Vaults unreachable" in clue for clue in game.state.clues))
         self.assertTrue(any("Meridian Forge can listen" in clue for clue in game.state.clues))
@@ -3726,7 +3866,7 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(rhogar.disposition, 2)
         self.assertEqual(encounters[0].enemy_initiative_bonus, 3)
 
-    def test_tresendar_nothic_deception_success_grants_full_lore_without_sanity_cost(self) -> None:
+    def test_duskmere_nothic_deception_success_grants_full_lore_without_sanity_cost(self) -> None:
         player = build_character(
             name="Vale",
             race="Human",
@@ -3737,7 +3877,7 @@ class CoreTests(unittest.TestCase):
         )
         encounters: list[Encounter] = []
         game = TextDnDGame(input_fn=lambda _: "4", output_fn=lambda _: None, rng=random.Random(9008349))
-        game.state = GameState(player=player, current_scene="tresendar_manor", flags={"tresendar_revealed": True})
+        game.state = GameState(player=player, current_scene="duskmere_manor", flags={"duskmere_revealed": True})
         game.ensure_state_integrity()
         dungeon = game.current_act1_dungeon()
         assert dungeon is not None
@@ -3745,15 +3885,15 @@ class CoreTests(unittest.TestCase):
         game.skill_check = lambda actor, skill, dc, context: True  # type: ignore[method-assign]
         game.run_encounter = lambda encounter: encounters.append(encounter) or "victory"  # type: ignore[method-assign]
 
-        game._tresendar_nothic_lair(dungeon, dungeon.rooms["nothic_lair"])
+        game._duskmere_nothic_lair(dungeon, dungeon.rooms["nothic_lair"])
 
-        self.assertEqual(game.state.flags["tresendar_nothic_route"], "deceive")
-        self.assertTrue(game.state.flags["tresendar_nothic_deceived"])
-        self.assertTrue(game.state.flags["tresendar_nothic_trade_info_gained"])
-        self.assertTrue(game.state.flags["tresendar_nothic_cinderfall_lore"])
-        self.assertTrue(game.state.flags["tresendar_nothic_wave_echo_lore"])
+        self.assertEqual(game.state.flags["duskmere_nothic_route"], "deceive")
+        self.assertTrue(game.state.flags["duskmere_nothic_deceived"])
+        self.assertTrue(game.state.flags["duskmere_nothic_trade_info_gained"])
+        self.assertTrue(game.state.flags["duskmere_nothic_cinderfall_lore"])
+        self.assertTrue(game.state.flags["duskmere_nothic_resonant_vault_lore"])
         self.assertEqual(game.state.flags["deep_ledger_hint_count"], 3)
-        self.assertNotIn("tresendar_nothic_sanity_cost", game.state.flags)
+        self.assertNotIn("duskmere_nothic_sanity_cost", game.state.flags)
         self.assertEqual(player.conditions, {})
         self.assertEqual(player.story_skill_bonuses, {})
         self.assertEqual(encounters[0].hero_initiative_bonus, 2)
@@ -3770,7 +3910,7 @@ class CoreTests(unittest.TestCase):
         )
         elira = create_elira_dawnmantle()
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(9008352))
-        game.state = GameState(player=player, companions=[elira], current_scene="tresendar_manor", flags={"tresendar_revealed": True})
+        game.state = GameState(player=player, companions=[elira], current_scene="duskmere_manor", flags={"duskmere_revealed": True})
         game.ensure_state_integrity()
         eye = create_enemy("nothic", name="Cistern Eye")
         encounter = Encounter(title="The Cistern Eye", description="", enemies=[eye])
@@ -3793,8 +3933,8 @@ class CoreTests(unittest.TestCase):
         protected_game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(9008353))
         protected_game.state = GameState(
             player=protected_player,
-            current_scene="tresendar_manor",
-            flags={"tresendar_revealed": True, "tresendar_eye_read": True},
+            current_scene="duskmere_manor",
+            flags={"duskmere_revealed": True, "duskmere_eye_read": True},
         )
         protected_eye = create_enemy("nothic", name="Cistern Eye")
         protected_game.saving_throw = lambda actor, ability, dc, context, against_poison=False: False  # type: ignore[method-assign]
@@ -3819,14 +3959,14 @@ class CoreTests(unittest.TestCase):
         )
         encounters: list[Encounter] = []
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(9008354))
-        game.state = GameState(player=player, current_scene="tresendar_manor", flags={"tresendar_revealed": True})
+        game.state = GameState(player=player, current_scene="duskmere_manor", flags={"duskmere_revealed": True})
         game.ensure_state_integrity()
         dungeon = game.current_act1_dungeon()
         assert dungeon is not None
         game.scenario_choice = lambda prompt, options, **kwargs: 1  # type: ignore[method-assign]
         game.run_encounter = lambda encounter: encounters.append(encounter) or "victory"  # type: ignore[method-assign]
 
-        game._tresendar_nothic_lair(dungeon, dungeon.rooms["nothic_lair"])
+        game._duskmere_nothic_lair(dungeon, dungeon.rooms["nothic_lair"])
 
         eye = encounters[0].enemies[0]
         self.assertEqual(eye.conditions.get("guarded"), 2)
@@ -3844,8 +3984,8 @@ class CoreTests(unittest.TestCase):
         protected_game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(9008355))
         protected_game.state = GameState(
             player=protected_player,
-            current_scene="tresendar_manor",
-            flags={"tresendar_revealed": True, "tresendar_records_secured": True},
+            current_scene="duskmere_manor",
+            flags={"duskmere_revealed": True, "duskmere_records_secured": True},
         )
         protected_game.ensure_state_integrity()
         protected_dungeon = protected_game.current_act1_dungeon()
@@ -3853,13 +3993,13 @@ class CoreTests(unittest.TestCase):
         protected_game.scenario_choice = lambda prompt, options, **kwargs: 1  # type: ignore[method-assign]
         protected_game.run_encounter = lambda encounter: protected_encounters.append(encounter) or "victory"  # type: ignore[method-assign]
 
-        protected_game._tresendar_nothic_lair(protected_dungeon, protected_dungeon.rooms["nothic_lair"])
+        protected_game._duskmere_nothic_lair(protected_dungeon, protected_dungeon.rooms["nothic_lair"])
 
         protected_eye = protected_encounters[0].enemies[0]
         self.assertNotIn("guarded", protected_eye.conditions)
         self.assertNotIn("cistern_reflection_active", protected_eye.bond_flags)
 
-    def test_tresendar_entry_failure_triggers_cellar_alarm_chain(self) -> None:
+    def test_duskmere_entry_failure_triggers_cellar_alarm_chain(self) -> None:
         player = build_character(
             name="Vale",
             race="Human",
@@ -3871,8 +4011,8 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(9008356))
         game.state = GameState(
             player=player,
-            current_scene="tresendar_manor",
-            flags={"tresendar_revealed": True, "tresendar_entry_approach_failed": True},
+            current_scene="duskmere_manor",
+            flags={"duskmere_revealed": True, "duskmere_entry_approach_failed": True},
         )
         game.ensure_state_integrity()
         guard = create_enemy("bandit", name="Ashen Brand Collector")
@@ -3882,11 +4022,11 @@ class CoreTests(unittest.TestCase):
 
         game.on_encounter_round_start(encounter, [player], enemies, initiative, 3)
 
-        self.assertTrue(guard.bond_flags["tresendar_cellar_alarm_chain_triggered"])
+        self.assertTrue(guard.bond_flags["duskmere_cellar_alarm_chain_triggered"])
         self.assertEqual(enemies[-1].name, "Records Passage Cutout")
         self.assertIn(enemies[-1], initiative)
 
-    def test_tresendar_collapse_timer_hits_hero_and_enemy_after_second_room(self) -> None:
+    def test_duskmere_collapse_timer_hits_hero_and_enemy_after_second_room(self) -> None:
         player = build_character(
             name="Vale",
             race="Human",
@@ -3896,13 +4036,13 @@ class CoreTests(unittest.TestCase):
             class_skill_choices=["Athletics", "Survival"],
         )
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(9008357))
-        game.state = GameState(player=player, current_scene="tresendar_manor", flags={"tresendar_revealed": True})
+        game.state = GameState(player=player, current_scene="duskmere_manor", flags={"duskmere_revealed": True})
         game.ensure_state_integrity()
         game.state.flags[game.MAP_STATE_KEY] = {
-            "current_node_id": "tresendar_manor",
-            "current_dungeon_id": "tresendar_undercellars",
+            "current_node_id": "duskmere_manor",
+            "current_dungeon_id": "duskmere_undercellars",
             "current_room_id": "nothic_lair",
-            "visited_nodes": ["tresendar_manor"],
+            "visited_nodes": ["duskmere_manor"],
             "cleared_rooms": ["hidden_stair", "cellar_intake"],
             "seen_story_beats": [],
             "node_history": [],
@@ -3918,7 +4058,7 @@ class CoreTests(unittest.TestCase):
 
         game.on_encounter_round_start(encounter, [player], enemies, initiative, 3)
 
-        self.assertTrue(guard.bond_flags["tresendar_collapse_timer_triggered"])
+        self.assertTrue(guard.bond_flags["duskmere_collapse_timer_triggered"])
         self.assertLess(player.current_hp, player_hp)
         self.assertLess(guard.current_hp, guard_hp)
         self.assertTrue({"prone", "reeling"} & set(player.conditions))
@@ -3936,7 +4076,7 @@ class CoreTests(unittest.TestCase):
         elira = create_elira_dawnmantle()
         elira.current_hp = 5
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(9008358))
-        game.state = GameState(player=player, companions=[elira], current_scene="tresendar_manor", flags={"tresendar_revealed": True})
+        game.state = GameState(player=player, companions=[elira], current_scene="duskmere_manor", flags={"duskmere_revealed": True})
         game.ensure_state_integrity()
         eye = create_enemy("nothic", name="Cistern Eye")
         encounter = Encounter(title="The Cistern Eye", description="", enemies=[eye])
@@ -4057,15 +4197,15 @@ class CoreTests(unittest.TestCase):
             ),
             companions=act2_companions,
             camp_companions=[create_tolan_ironshield(), create_bryn_underbough(), create_irielle_ashwake()],
-            current_scene="forge_of_spells",
+            current_scene="meridian_forge",
             current_act=2,
-            flags={"black_lake_barracks_raided": True},
+            flags={"blackglass_barracks_raided": True},
         )
         act2_game.run_encounter = lambda encounter: encounters.append(encounter) or "victory"  # type: ignore[method-assign]
-        act2_game.scene_black_lake_causeway()
+        act2_game.scene_blackglass_causeway()
         assert act2_game.state is not None
         act2_game.state.inventory["sigil_anchor_ring_rare"] = 1
-        act2_game.scene_forge_of_spells()
+        act2_game.scene_meridian_forge()
         self.assertEqual(encounters[3].title, "Blackglass Waterline")
         self.assertEqual(len(encounters[3].enemies), 3)
         self.assertEqual(encounters[4].title, "Blackglass Causeway")
@@ -4139,7 +4279,7 @@ class CoreTests(unittest.TestCase):
         for term in forbidden_terms:
             self.assertNotIn(term, runtime_text)
 
-    def test_black_lake_barracks_raid_removes_forge_reserve_without_strong_gear(self) -> None:
+    def test_blackglass_barracks_raid_removes_forge_reserve_without_strong_gear(self) -> None:
         player = build_character(
             name="Vale",
             race="Human",
@@ -4153,11 +4293,11 @@ class CoreTests(unittest.TestCase):
             player=player,
             companions=[create_rhogar_valeguard(), create_elira_dawnmantle(), create_nim_ardentglass()],
             current_act=2,
-            current_scene="forge_of_spells",
+            current_scene="meridian_forge",
             flags={
                 "act2_started": True,
-                "black_lake_crossed": True,
-                "black_lake_barracks_raided": True,
+                "blackglass_crossed": True,
+                "blackglass_barracks_raided": True,
                 "act2_town_stability": 3,
                 "act2_route_control": 3,
                 "act2_whisper_pressure": 2,
@@ -4166,7 +4306,7 @@ class CoreTests(unittest.TestCase):
         )
         encounters: list[Encounter] = []
         game.ensure_state_integrity()
-        game.travel_to_act2_node("forge_of_spells")
+        game.travel_to_act2_node("meridian_forge")
         dungeon = game.current_act2_dungeon()
         assert dungeon is not None
         game.scenario_choice = lambda prompt, options, **kwargs: 3  # type: ignore[method-assign]
@@ -4188,7 +4328,7 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(90084))
         game.state = GameState(
             player=player,
-            current_scene="old_owl_well",
+            current_scene="blackglass_well",
             flags={"miners_exchange_lead": True},
         )
         game.ensure_state_integrity()
@@ -4244,7 +4384,7 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(9008491))
         game.state = GameState(
             player=player,
-            current_scene="neverwinter_briefing",
+            current_scene="greywake_briefing",
             flags={"act1_started": True, "blackwake_started": True},
         )
         game.ensure_state_integrity()
@@ -4255,7 +4395,7 @@ class CoreTests(unittest.TestCase):
 
         options = game.act1_room_navigation_options(dungeon)
         option_labels = [label for _, _, label in options]
-        self.assertIn(("overworld_backtrack", "neverwinter_briefing", "[BACKTRACK] *Backtrack to Greywake Briefing"), options)
+        self.assertIn(("overworld_backtrack", "greywake_briefing", "[BACKTRACK] *Backtrack to Greywake Briefing"), options)
         self.assertIn("[BACKTRACK] *Backtrack to Greywake Briefing", option_labels)
         self.assertIn("*Withdraw to the Blackwake road decision", option_labels)
 
@@ -4426,7 +4566,7 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(90085))
         game.state = GameState(
             player=player,
-            current_scene="old_owl_well",
+            current_scene="blackglass_well",
             flags={"miners_exchange_lead": True},
         )
         game.ensure_state_integrity()
@@ -4460,13 +4600,13 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(900851))
         game.state = GameState(
             player=player,
-            current_scene="phandalin_hub",
-            flags={"phandalin_arrived": True, "miners_exchange_lead": True},
+            current_scene="iron_hollow_hub",
+            flags={"iron_hollow_arrived": True, "miners_exchange_lead": True},
         )
         game.ensure_state_integrity()
-        game.travel_to_act1_node("old_owl_well")
+        game.travel_to_act1_node("blackglass_well")
         rendered = self.plain_output(log)
-        self.assertEqual(game.state.current_scene, "old_owl_well")
+        self.assertEqual(game.state.current_scene, "blackglass_well")
         self.assertIn("Overworld Route Map", rendered)
         self.assertIn("Blackglass Well", rendered)
 
@@ -4482,7 +4622,7 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(9008511))
         game.state = GameState(
             player=player,
-            current_scene="neverwinter_briefing",
+            current_scene="greywake_briefing",
             flags={"act1_started": True, "blackwake_started": True},
         )
         game.ensure_state_integrity()
@@ -4509,19 +4649,19 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(9008512))
         game.state = GameState(
             player=player,
-            current_scene="phandalin_hub",
-            flags={"phandalin_arrived": True, "miners_exchange_lead": True},
+            current_scene="iron_hollow_hub",
+            flags={"iron_hollow_arrived": True, "miners_exchange_lead": True},
         )
         game.ensure_state_integrity()
-        game.travel_to_act1_node("old_owl_well")
-        game.return_to_phandalin("You withdraw from Blackglass Well and ride back to Iron Hollow to regroup.")
+        game.travel_to_act1_node("blackglass_well")
+        game.return_to_iron_hollow("You withdraw from Blackglass Well and ride back to Iron Hollow to regroup.")
 
         candidate = game.peek_act1_overworld_backtrack_node()
         assert candidate is not None
-        self.assertEqual(candidate.node_id, "old_owl_well")
+        self.assertEqual(candidate.node_id, "blackglass_well")
         self.assertTrue(game.backtrack_act1_overworld_node())
-        self.assertEqual(game.state.current_scene, "old_owl_well")
-        self.assertEqual(game._map_state_payload()["node_history"], ["neverwinter_briefing", "high_road_ambush", "phandalin_hub"])
+        self.assertEqual(game.state.current_scene, "blackglass_well")
+        self.assertEqual(game._map_state_payload()["node_history"], ["greywake_briefing", "emberway_ambush", "iron_hollow_hub"])
         rendered = self.plain_output(log)
         self.assertIn("You leave Iron Hollow by the same track you used before", rendered)
         self.assertIn("Tessa's runners argue supplies", rendered)
@@ -4540,7 +4680,7 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(9008513))
         game.state = GameState(
             player=player,
-            current_scene="neverwinter_briefing",
+            current_scene="greywake_briefing",
             flags={"act1_started": True, "blackwake_started": True},
         )
         game.ensure_state_integrity()
@@ -4548,10 +4688,10 @@ class CoreTests(unittest.TestCase):
 
         candidate = game.peek_act1_overworld_backtrack_node()
         assert candidate is not None
-        self.assertEqual(candidate.node_id, "neverwinter_briefing")
+        self.assertEqual(candidate.node_id, "greywake_briefing")
         self.assertTrue(game.backtrack_act1_overworld_node())
-        self.assertEqual(game.state.current_scene, "neverwinter_briefing")
-        self.assertEqual(game._map_state_payload()["current_node_id"], "neverwinter_briefing")
+        self.assertEqual(game.state.current_scene, "greywake_briefing")
+        self.assertEqual(game._map_state_payload()["current_node_id"], "greywake_briefing")
         self.assertEqual(game._map_state_payload()["node_history"], [])
         rendered = self.plain_output(log)
         self.assertIn("backtrack north toward Greywake", rendered)
@@ -4569,21 +4709,21 @@ class CoreTests(unittest.TestCase):
         )
         log: list[str] = []
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(9008514))
-        game.state = GameState(player=player, current_scene="phandalin_hub", flags={"phandalin_arrived": True})
+        game.state = GameState(player=player, current_scene="iron_hollow_hub", flags={"iron_hollow_arrived": True})
         game.ensure_state_integrity()
 
         candidate = game.peek_act1_overworld_backtrack_node()
         assert candidate is not None
-        self.assertEqual(candidate.node_id, "high_road_ambush")
+        self.assertEqual(candidate.node_id, "emberway_ambush")
         self.assertTrue(game.backtrack_act1_overworld_node())
         self.assertEqual(game.state.current_scene, "road_ambush")
-        self.assertEqual(game._map_state_payload()["node_history"], ["neverwinter_briefing"])
+        self.assertEqual(game._map_state_payload()["node_history"], ["greywake_briefing"])
 
         candidate = game.peek_act1_overworld_backtrack_node()
         assert candidate is not None
-        self.assertEqual(candidate.node_id, "neverwinter_briefing")
+        self.assertEqual(candidate.node_id, "greywake_briefing")
         self.assertTrue(game.backtrack_act1_overworld_node())
-        self.assertEqual(game.state.current_scene, "neverwinter_briefing")
+        self.assertEqual(game.state.current_scene, "greywake_briefing")
         self.assertEqual(game._map_state_payload()["node_history"], [])
         rendered = self.plain_output(log)
         self.assertIn("backtrack north along the Emberway", rendered)
@@ -4601,17 +4741,17 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(90085141))
         game.state = GameState(
             player=player,
-            current_scene="phandalin_hub",
-            flags={"phandalin_arrived": True, "road_ambush_cleared": True, "liars_circle_solved": True},
+            current_scene="iron_hollow_hub",
+            flags={"iron_hollow_arrived": True, "road_ambush_cleared": True, "liars_circle_solved": True},
         )
         game.ensure_state_integrity()
         payload = game._map_state_payload()
-        payload["node_history"] = ["neverwinter_briefing", "high_road_ambush", "liars_circle"]
+        payload["node_history"] = ["greywake_briefing", "emberway_ambush", "liars_circle"]
 
         candidate = game.peek_act1_overworld_backtrack_node()
 
         assert candidate is not None
-        self.assertEqual(candidate.node_id, "high_road_ambush")
+        self.assertEqual(candidate.node_id, "emberway_ambush")
 
     def test_liars_circle_return_to_iron_hollow_keeps_emberway_as_backtrack(self) -> None:
         player = build_character(
@@ -4632,13 +4772,13 @@ class CoreTests(unittest.TestCase):
         game.ensure_state_integrity()
         game.travel_to_act1_node("liars_circle")
 
-        game.scene_high_road_liars_circle()
+        game.scene_emberway_liars_circle()
 
-        self.assertEqual(game.state.current_scene, "phandalin_hub")
-        self.assertEqual(game._map_state_payload()["node_history"], ["neverwinter_briefing", "high_road_ambush"])
+        self.assertEqual(game.state.current_scene, "iron_hollow_hub")
+        self.assertEqual(game._map_state_payload()["node_history"], ["greywake_briefing", "emberway_ambush"])
         candidate = game.peek_act1_overworld_backtrack_node()
         assert candidate is not None
-        self.assertEqual(candidate.node_id, "high_road_ambush")
+        self.assertEqual(candidate.node_id, "emberway_ambush")
 
     def test_cleared_emberway_scene_can_backtrack_to_greywake(self) -> None:
         player = build_character(
@@ -4660,7 +4800,7 @@ class CoreTests(unittest.TestCase):
         game.ensure_state_integrity()
 
         game.scene_road_ambush()
-        self.assertEqual(game.state.current_scene, "neverwinter_briefing")
+        self.assertEqual(game.state.current_scene, "greywake_briefing")
         self.assertEqual(game._map_state_payload()["node_history"], [])
         rendered = self.plain_output(log)
         self.assertIn("Where do you go from the Emberway?", rendered)
@@ -4683,13 +4823,13 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=fake_input, output_fn=log.append, rng=random.Random(9008511))
         game.state = GameState(
             player=player,
-            current_scene="phandalin_hub",
-            flags={"phandalin_arrived": True, "miners_exchange_lead": True},
+            current_scene="iron_hollow_hub",
+            flags={"iron_hollow_arrived": True, "miners_exchange_lead": True},
         )
         game.ensure_state_integrity()
-        game.travel_to_act1_node("old_owl_well")
+        game.travel_to_act1_node("blackglass_well")
         with self.assertRaises(self._SceneExit):
-            game.scene_old_owl_well()
+            game.scene_blackglass_well()
         rendered = self.plain_output(log)
         map_index = rendered.rfind("Overworld Route Map")
         scene_index = rendered.rfind("The old watchtower rises from the scrub like a cracked finger of Netherese stone.")
@@ -4713,8 +4853,8 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(900852))
         game.state = GameState(
             player=player,
-            current_scene="old_owl_well",
-            flags={"miners_exchange_lead": True, "old_owl_ring_cleared": True},
+            current_scene="blackglass_well",
+            flags={"miners_exchange_lead": True, "blackglass_well_ring_cleared": True},
         )
         game.ensure_state_integrity()
         game.set_current_map_room("salt_cart", announce=True)
@@ -4984,7 +5124,7 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(90086))
         game.state = GameState(
             player=player,
-            current_scene="old_owl_well",
+            current_scene="blackglass_well",
             flags={"miners_exchange_lead": True},
         )
         game.ensure_state_integrity()
@@ -5219,7 +5359,7 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(game.state.current_scene, "act2_expedition_hub")
         self.assertTrue(drainage_offered)
         self.assertTrue(game.state.flags["south_adit_cleared"])
-        self.assertTrue(game.state.flags["wave_echo_reached"])
+        self.assertTrue(game.state.flags["resonant_vault_reached"])
         self.assertTrue(game.state.flags["quiet_choir_identified"])
         self.assertTrue(game.state.flags["irielle_contact_made"])
         self.assertTrue(game.state.flags["counter_cadence_known"])
@@ -5680,7 +5820,7 @@ class CoreTests(unittest.TestCase):
         self.assertIn("Pilgrims from Hushfen arrive with lamp discipline", rendered)
         self.assertEqual([encounter.title for encounter in captured], ["Midpoint: Sabotage Night"])
 
-    def test_hushfen_relit_chapel_guides_black_lake_if_sabotage_payoff_was_unused(self) -> None:
+    def test_hushfen_relit_chapel_guides_blackglass_if_sabotage_payoff_was_unused(self) -> None:
         player = build_character(
             name="Vale",
             race="Human",
@@ -5694,28 +5834,28 @@ class CoreTests(unittest.TestCase):
         game.state = GameState(
             player=player,
             current_act=2,
-            current_scene="black_lake_causeway",
+            current_scene="blackglass_causeway",
             flags={
                 "act2_started": True,
-                "wave_echo_outer_cleared": True,
+                "resonant_vault_outer_cleared": True,
                 "hushfen_chapel_relit": True,
                 "act2_town_stability": 3,
                 "act2_route_control": 3,
                 "act2_whisper_pressure": 3,
             },
         )
-        dungeon = ACT2_ENEMY_DRIVEN_MAP.dungeons["black_lake_crossing"]
+        dungeon = ACT2_ENEMY_DRIVEN_MAP.dungeons["blackglass_crossing"]
         room = dungeon.rooms["causeway_lip"]
         game.skill_check = lambda actor, skill, dc, context: False  # type: ignore[method-assign]
         game.scenario_choice = lambda prompt, options, **kwargs: self.option_index_containing(options, "Test the anchor pull")  # type: ignore[method-assign]
 
-        game._black_lake_causeway_lip(dungeon, room)
+        game._blackglass_causeway_lip(dungeon, room)
 
         assert game.state is not None
         rendered = strip_ansi("\n".join(log))
-        self.assertTrue(game.state.flags["black_lake_hushfen_lamp_guidance"])
-        self.assertTrue(game.state.flags["black_lake_hushfen_pressure_payoff"])
-        self.assertTrue(game.state.flags["black_lake_shrine_route_marked"])
+        self.assertTrue(game.state.flags["blackglass_hushfen_lamp_guidance"])
+        self.assertTrue(game.state.flags["blackglass_hushfen_pressure_payoff"])
+        self.assertTrue(game.state.flags["blackglass_shrine_route_marked"])
         self.assertEqual(game.state.flags["act2_whisper_pressure"], 2)
         self.assertIn("lamp discipline you restored at Hushfen", rendered)
 
@@ -5734,10 +5874,10 @@ class CoreTests(unittest.TestCase):
         game.state = GameState(
             player=player,
             current_act=2,
-            current_scene="forge_of_spells",
+            current_scene="meridian_forge",
             flags={
                 "act2_started": True,
-                "black_lake_crossed": True,
+                "blackglass_crossed": True,
                 "hushfen_sigil_copied": True,
                 "act2_town_stability": 3,
                 "act2_route_control": 3,
@@ -5778,25 +5918,25 @@ class CoreTests(unittest.TestCase):
         game.state = GameState(
             player=player,
             current_act=2,
-            current_scene="black_lake_causeway",
+            current_scene="blackglass_causeway",
             flags={
                 "act2_started": True,
-                "wave_echo_outer_cleared": True,
+                "resonant_vault_outer_cleared": True,
                 "act2_town_stability": 3,
                 "act2_route_control": 3,
                 "act2_whisper_pressure": 2,
             },
         )
-        dungeon = ACT2_ENEMY_DRIVEN_MAP.dungeons["black_lake_crossing"]
+        dungeon = ACT2_ENEMY_DRIVEN_MAP.dungeons["blackglass_crossing"]
         room = dungeon.rooms["drowned_shrine"]
         game.skill_check = lambda actor, skill, dc, context: True  # type: ignore[method-assign]
         game.scenario_choice = lambda prompt, options, **kwargs: self.option_index_containing(options, "Wake the old rite")  # type: ignore[method-assign]
 
-        game._black_lake_drowned_shrine(dungeon, room)
+        game._blackglass_drowned_shrine(dungeon, room)
 
         assert game.state is not None
         rendered = strip_ansi("\n".join(log))
-        self.assertTrue(game.state.flags["black_lake_shrine_sanctity_named"])
+        self.assertTrue(game.state.flags["blackglass_shrine_sanctity_named"])
         self.assertTrue(game.state.flags["caldra_drowned_shrine_doctrine"])
         self.assertEqual(game.state.flags["caldra_doctrine_seen_count"], 1)
         self.assertEqual(game.state.flags["act2_caldra_traces_seen"], 1)
@@ -5858,10 +5998,10 @@ class CoreTests(unittest.TestCase):
         game.state = GameState(
             player=player,
             current_act=2,
-            current_scene="forge_of_spells",
+            current_scene="meridian_forge",
             flags={
                 "act2_started": True,
-                "black_lake_crossed": True,
+                "blackglass_crossed": True,
                 "caldra_corrected_ledger_siltlock": True,
                 "caldra_corrected_ledger_south_adit": True,
                 "act2_town_stability": 3,
@@ -5904,10 +6044,10 @@ class CoreTests(unittest.TestCase):
         game.state = GameState(
             player=player,
             current_act=2,
-            current_scene="forge_of_spells",
+            current_scene="meridian_forge",
             flags={
                 "act2_started": True,
-                "black_lake_crossed": True,
+                "blackglass_crossed": True,
                 "forge_lens_caldra_method_named": True,
                 "act2_town_stability": 3,
                 "act2_route_control": 3,
@@ -5942,10 +6082,10 @@ class CoreTests(unittest.TestCase):
         game.state = GameState(
             player=player,
             current_act=2,
-            current_scene="forge_of_spells",
+            current_scene="meridian_forge",
             flags={
                 "act2_started": True,
-                "black_lake_crossed": True,
+                "blackglass_crossed": True,
                 "forge_lens_caldra_method_named": True,
                 "caldra_drowned_shrine_doctrine": True,
                 "caldra_harmed_tovin_marr": True,
@@ -6152,14 +6292,14 @@ class CoreTests(unittest.TestCase):
         assert game.state is not None
         self.assertEqual(game.state.current_scene, "act2_expedition_hub")
         self.assertTrue(game.state.flags["broken_prospect_cleared"])
-        self.assertTrue(game.state.flags["wave_echo_reached"])
+        self.assertTrue(game.state.flags["resonant_vault_reached"])
         self.assertCountEqual(
             game.state.flags["act2_map_state"]["cleared_rooms"],
             ["broken_shelf", "rival_survey_shelf", "sealed_approach", "foreman_shift"],
         )
         self.assertEqual([encounter.title for encounter in encounters], ["Broken Prospect Rival Shelf", "Broken Prospect"])
 
-    def test_wave_echo_outer_galleries_uses_playable_act2_room_map(self) -> None:
+    def test_resonant_vault_outer_galleries_uses_playable_act2_room_map(self) -> None:
         player = build_character(
             name="Vale",
             race="Human",
@@ -6173,12 +6313,12 @@ class CoreTests(unittest.TestCase):
         game.state = GameState(
             player=player,
             current_act=2,
-            current_scene="wave_echo_outer_galleries",
+            current_scene="resonant_vault_outer_galleries",
             flags={
                 "act2_started": True,
                 "broken_prospect_cleared": True,
                 "south_adit_cleared": True,
-                "wave_echo_reached": True,
+                "resonant_vault_reached": True,
                 "act2_town_stability": 3,
                 "act2_route_control": 3,
                 "act2_whisper_pressure": 2,
@@ -6204,18 +6344,18 @@ class CoreTests(unittest.TestCase):
             return 1
 
         game.scenario_choice = fake_scenario_choice  # type: ignore[method-assign]
-        game.scene_wave_echo_outer_galleries()
+        game.scene_resonant_vault_outer_galleries()
 
         assert game.state is not None
         self.assertEqual(game.state.current_scene, "act2_expedition_hub")
-        self.assertTrue(game.state.flags["wave_echo_outer_cleared"])
+        self.assertTrue(game.state.flags["resonant_vault_outer_cleared"])
         self.assertCountEqual(
             game.state.flags["act2_map_state"]["cleared_rooms"],
             ["rail_junction", "slime_sluice", "false_echo_loop", "deep_haul_gate"],
         )
         self.assertEqual([encounter.title for encounter in encounters], ["Resonant Vaults Slime Sluice", "Outer Gallery Pressure"])
 
-    def test_black_lake_causeway_uses_playable_act2_room_map(self) -> None:
+    def test_blackglass_causeway_uses_playable_act2_room_map(self) -> None:
         player = build_character(
             name="Vale",
             race="Human",
@@ -6229,10 +6369,10 @@ class CoreTests(unittest.TestCase):
         game.state = GameState(
             player=player,
             current_act=2,
-            current_scene="black_lake_causeway",
+            current_scene="blackglass_causeway",
             flags={
                 "act2_started": True,
-                "wave_echo_outer_cleared": True,
+                "resonant_vault_outer_cleared": True,
                 "act2_town_stability": 3,
                 "act2_route_control": 3,
                 "act2_whisper_pressure": 2,
@@ -6258,12 +6398,12 @@ class CoreTests(unittest.TestCase):
             return 1
 
         game.scenario_choice = fake_scenario_choice  # type: ignore[method-assign]
-        game.scene_black_lake_causeway()
+        game.scene_blackglass_causeway()
 
         assert game.state is not None
         self.assertEqual(game.state.current_scene, "act2_expedition_hub")
-        self.assertTrue(game.state.flags["black_lake_crossed"])
-        self.assertTrue(game.state.flags["black_lake_barracks_raided"])
+        self.assertTrue(game.state.flags["blackglass_crossed"])
+        self.assertTrue(game.state.flags["blackglass_barracks_raided"])
         self.assertCountEqual(
             game.state.flags["act2_map_state"]["cleared_rooms"],
             ["causeway_lip", "choir_barracks", "blackwater_edge", "far_landing"],
@@ -6274,7 +6414,7 @@ class CoreTests(unittest.TestCase):
             ["Blackglass Barracks", "Blackglass Waterline", "Blackglass Causeway"],
         )
 
-    def test_forge_of_spells_uses_playable_act2_room_map_and_black_lake_changes_route(self) -> None:
+    def test_meridian_forge_uses_playable_act2_room_map_and_blackglass_changes_route(self) -> None:
         player = build_character(
             name="Vale",
             race="Human",
@@ -6290,14 +6430,14 @@ class CoreTests(unittest.TestCase):
             player=player,
             companions=[create_nim_ardentglass(), create_irielle_ashwake()],
             current_act=2,
-            current_scene="forge_of_spells",
+            current_scene="meridian_forge",
             flags={
                 "act2_started": True,
-                "black_lake_crossed": True,
-                "black_lake_shrine_purified": True,
-                "black_lake_barracks_raided": True,
-                "black_lake_barracks_orders_taken": True,
-                "black_lake_causeway_shaken": True,
+                "blackglass_crossed": True,
+                "blackglass_shrine_purified": True,
+                "blackglass_barracks_raided": True,
+                "blackglass_barracks_orders_taken": True,
+                "blackglass_causeway_shaken": True,
                 "nim_countermeasure_notes": True,
                 "south_adit_counter_cadence_learned": True,
                 "act2_town_stability": 3,
@@ -6325,7 +6465,7 @@ class CoreTests(unittest.TestCase):
             return 1
 
         game.scenario_choice = fake_scenario_choice  # type: ignore[method-assign]
-        game.scene_forge_of_spells()
+        game.scene_meridian_forge()
 
         assert game.state is not None
         self.assertEqual(game.state.current_scene, "act2_expedition_hub")
@@ -6391,9 +6531,9 @@ class CoreTests(unittest.TestCase):
                 "nim_countermeasure_notes": True,
                 "irielle_contact_made": True,
                 "quiet_choir_identified": True,
-                "black_lake_barracks_orders_taken": True,
-                "black_lake_barracks_raided": True,
-                "wave_echo_outer_cleared": True,
+                "blackglass_barracks_orders_taken": True,
+                "blackglass_barracks_raided": True,
+                "resonant_vault_outer_cleared": True,
                 "act2_town_stability": 3,
                 "act2_route_control": 4,
                 "act2_whisper_pressure": 2,
@@ -6440,7 +6580,7 @@ class CoreTests(unittest.TestCase):
         self.assertIn("Blackwake callback: Sereth Vane escaped the crossing", rendered)
         self.assertIn("Blackwake consequence: Sereth Vane escaped into Act 2's route war", rendered)
 
-    def test_act2_start_records_neverwinter_contract_house_political_callback(self) -> None:
+    def test_act2_start_records_greywake_contract_house_political_callback(self) -> None:
         player = build_character(
             name="Vale",
             race="Human",
@@ -6454,7 +6594,7 @@ class CoreTests(unittest.TestCase):
         game.state = GameState(
             player=player,
             current_scene="act1_complete",
-            flags={"neverwinter_contract_house_political_callback": True},
+            flags={"greywake_contract_house_political_callback": True},
         )
 
         game.start_act2_scaffold()
@@ -6463,8 +6603,8 @@ class CoreTests(unittest.TestCase):
 
         rendered = self.plain_output(log)
         self.assertEqual(game.state.flags["act2_route_control"], 3)
-        self.assertTrue(game.state.flags["act2_neverwinter_witness_pressure_active"])
-        self.assertTrue(game.state.flags["act2_neverwinter_witness_callback_recorded"])
+        self.assertTrue(game.state.flags["act2_greywake_witness_pressure_active"])
+        self.assertTrue(game.state.flags["act2_greywake_witness_callback_recorded"])
         self.assertIn("Greywake politics: Oren, Sabra, Vessa, and Garren", rendered)
         self.assertIn("Greywake callback: Oren, Sabra, Vessa, and Garren kept pressure", rendered)
 
@@ -6855,7 +6995,7 @@ class CoreTests(unittest.TestCase):
         )
         log: list[str] = []
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(90087))
-        game.state = GameState(player=player, current_scene="phandalin_hub")
+        game.state = GameState(player=player, current_scene="iron_hollow_hub")
         if RICH_AVAILABLE:
             game._interactive_output = True
         game.show_global_commands()
@@ -6893,7 +7033,7 @@ class CoreTests(unittest.TestCase):
         )
         state = GameState(
             player=player,
-            current_scene="phandalin_hub",
+            current_scene="iron_hollow_hub",
             flags={
                 "varyn_body_defeated_act1": True,
                 "varyn_route_displaced": True,
@@ -6920,7 +7060,7 @@ class CoreTests(unittest.TestCase):
         loaded = json.loads(Path(path).read_text(encoding="utf-8"))
         restored = GameState.from_dict(loaded)
         self.assertEqual(restored.player.name, "Iri")
-        self.assertEqual(restored.current_scene, "phandalin_hub")
+        self.assertEqual(restored.current_scene, "iron_hollow_hub")
         self.assertTrue(restored.flags["varyn_body_defeated_act1"])
         self.assertTrue(restored.flags["varyn_route_displaced"])
         self.assertTrue(restored.flags["act1_ashen_brand_broken"])
@@ -6950,7 +7090,7 @@ class CoreTests(unittest.TestCase):
             player=player,
             companions=[companion],
             current_act=1,
-            current_scene="phandalin_hub",
+            current_scene="iron_hollow_hub",
             playtime_seconds=125.0,
         )
         game._playtime_checkpoint = 100.0
@@ -7067,7 +7207,7 @@ class CoreTests(unittest.TestCase):
             log: list[str] = []
             prompts: list[str] = []
             game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, save_dir=save_dir, rng=random.Random(31))
-            game.state = GameState(player=player, current_scene="phandalin_hub")
+            game.state = GameState(player=player, current_scene="iron_hollow_hub")
             game.ask_text = lambda prompt: "inline_save_decline_slot"  # type: ignore[method-assign]
             game.confirm = lambda prompt: prompts.append(prompt) or False  # type: ignore[method-assign]
 
@@ -7096,14 +7236,14 @@ class CoreTests(unittest.TestCase):
         try:
             prompts: list[str] = []
             game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, save_dir=save_dir, rng=random.Random(32))
-            game.state = GameState(player=player, current_scene="phandalin_hub", gold=37)
+            game.state = GameState(player=player, current_scene="iron_hollow_hub", gold=37)
             game.ask_text = lambda prompt: "inline_save_confirm_slot"  # type: ignore[method-assign]
             game.confirm = lambda prompt: prompts.append(prompt) or True  # type: ignore[method-assign]
 
             game.inline_save()
 
             loaded = json.loads(existing_path.read_text(encoding="utf-8"))
-            self.assertEqual(loaded["current_scene"], "phandalin_hub")
+            self.assertEqual(loaded["current_scene"], "iron_hollow_hub")
             self.assertEqual(loaded["gold"], 37)
             self.assertEqual(loaded["player"]["name"], "Iri")
             self.assertEqual(prompts, ["Overwrite inline_save_confirm_slot.json?"])
@@ -7122,7 +7262,7 @@ class CoreTests(unittest.TestCase):
         answers = iter(["1", "3"])
         log: list[str] = []
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=log.append, rng=random.Random(301))
-        game.state = GameState(player=player, current_scene="phandalin_hub")
+        game.state = GameState(player=player, current_scene="iron_hollow_hub")
         game.visit_steward()
         self.assertIn("secure_miners_road", game.state.quests)
         game.show_journal()
@@ -7144,7 +7284,7 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(3011))
         game.state = GameState(
             player=player,
-            current_scene="phandalin_hub",
+            current_scene="iron_hollow_hub",
             clues=["A hidden tunnel runs under the shrine."],
             journal=[
                 "Clue: A hidden tunnel runs under the shrine.",
@@ -7180,7 +7320,7 @@ class CoreTests(unittest.TestCase):
         game.state = GameState(
             player=player,
             companions=[companion],
-            current_scene="phandalin_hub",
+            current_scene="iron_hollow_hub",
             flags={
                 "act1_town_fear": 3,
                 "act1_ashen_strength": 2,
@@ -7216,7 +7356,7 @@ class CoreTests(unittest.TestCase):
         self.assertIn("Unresolved Clues:", rendered)
         self.assertIn("false toll ledger", rendered)
 
-    def test_ashfall_watch_returns_to_phandalin_and_marks_quests_ready(self) -> None:
+    def test_ashfall_watch_returns_to_iron_hollow_and_marks_quests_ready(self) -> None:
         player = build_character(
             name="Vale",
             race="Human",
@@ -7231,11 +7371,11 @@ class CoreTests(unittest.TestCase):
         game.grant_quest("secure_miners_road")
         game.run_encounter = lambda encounter: "victory"
         game.scene_ashfall_watch()
-        self.assertEqual(game.state.current_scene, "phandalin_hub")
+        self.assertEqual(game.state.current_scene, "iron_hollow_hub")
         self.assertTrue(game.state.flags["ashfall_watch_cleared"])
         self.assertEqual(game.state.quests["secure_miners_road"].status, "ready_to_turn_in")
 
-    def test_phandalin_hub_can_travel_to_cinderfall_when_hidden_route_is_unlocked(self) -> None:
+    def test_iron_hollow_hub_can_travel_to_cinderfall_when_hidden_route_is_unlocked(self) -> None:
         player = build_character(
             name="Vale",
             race="Human",
@@ -7248,10 +7388,10 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(900834))
         game.state = GameState(
             player=player,
-            current_scene="phandalin_hub",
-            flags={"phandalin_arrived": True, "hidden_route_unlocked": True},
+            current_scene="iron_hollow_hub",
+            flags={"iron_hollow_arrived": True, "hidden_route_unlocked": True},
         )
-        game.run_phandalin_council_event = lambda: None  # type: ignore[method-assign]
+        game.run_iron_hollow_council_event = lambda: None  # type: ignore[method-assign]
         game.run_after_watch_gathering = lambda: None  # type: ignore[method-assign]
 
         def choose_route(prompt: str, options: list[str], **kwargs) -> int:
@@ -7260,7 +7400,7 @@ class CoreTests(unittest.TestCase):
 
         game.scenario_choice = choose_route  # type: ignore[method-assign]
         game.travel_to_act1_node = lambda node_id: selected.append(node_id)  # type: ignore[method-assign]
-        game.scene_phandalin_hub()
+        game.scene_iron_hollow_hub()
         self.assertEqual(selected, ["cinderfall_ruins"])
 
     def test_post_combat_random_encounter_pool_has_fifteen_plus_entries(self) -> None:
@@ -7277,7 +7417,7 @@ class CoreTests(unittest.TestCase):
             class_skill_choices=["Athletics", "Survival"],
         )
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(811))
-        game.state = GameState(player=player, current_scene="phandalin_hub")
+        game.state = GameState(player=player, current_scene="iron_hollow_hub")
         enemy = create_enemy("bandit")
         enemy.current_hp = 0
         enemy.dead = True
@@ -7357,7 +7497,7 @@ class CoreTests(unittest.TestCase):
             class_skill_choices=["Athletics", "Survival"],
         )
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(812))
-        game.state = GameState(player=player, current_scene="phandalin_hub")
+        game.state = GameState(player=player, current_scene="iron_hollow_hub")
         calls: list[str] = []
         game.run_named_post_combat_random_encounter = lambda encounter_id: calls.append(encounter_id)
         game.rng = SimpleNamespace(random=lambda: 0.99, choice=lambda options: options[0])
@@ -7374,7 +7514,7 @@ class CoreTests(unittest.TestCase):
             class_skill_choices=["Athletics", "Survival"],
         )
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(813))
-        game.state = GameState(player=player, current_scene="phandalin_hub")
+        game.state = GameState(player=player, current_scene="iron_hollow_hub")
         calls: list[str] = []
         game.run_named_post_combat_random_encounter = lambda encounter_id: calls.append(encounter_id)
         game.rng = SimpleNamespace(random=lambda: 0.0, choice=lambda options: options[0])
@@ -7393,7 +7533,7 @@ class CoreTests(unittest.TestCase):
             class_skill_choices=["Athletics", "Survival"],
         )
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(8131))
-        game.state = GameState(player=player, current_scene="old_owl_well", current_act=1)
+        game.state = GameState(player=player, current_scene="blackglass_well", current_act=1)
         calls: list[str] = []
         game.run_named_post_combat_random_encounter = lambda encounter_id: calls.append(encounter_id)
         game.rng = SimpleNamespace(random=lambda: 0.0, choice=lambda options: options[0])
@@ -7415,7 +7555,7 @@ class CoreTests(unittest.TestCase):
             class_skill_choices=["Athletics", "Survival"],
         )
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(8132))
-        game.state = GameState(player=player, current_scene="forge_of_spells", current_act=2)
+        game.state = GameState(player=player, current_scene="meridian_forge", current_act=2)
         calls: list[str] = []
         game.run_named_post_combat_random_encounter = lambda encounter_id: calls.append(encounter_id)
         game.rng = SimpleNamespace(random=lambda: 0.0, choice=lambda options: options[0])
@@ -7437,7 +7577,7 @@ class CoreTests(unittest.TestCase):
             class_skill_choices=["Athletics", "Survival"],
         )
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(8133))
-        game.state = GameState(player=player, current_scene="old_owl_well", current_act=1)
+        game.state = GameState(player=player, current_scene="blackglass_well", current_act=1)
         calls: list[str] = []
         game.run_named_post_combat_random_encounter = lambda encounter_id: calls.append(encounter_id)
         game.rng = SimpleNamespace(random=lambda: 0.0, choice=lambda options: options[0])
@@ -7462,7 +7602,7 @@ class CoreTests(unittest.TestCase):
         )
         answers = iter(["2"])
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=lambda _: None, rng=random.Random(814))
-        game.state = GameState(player=player, current_scene="phandalin_hub", inventory={}, gold=0)
+        game.state = GameState(player=player, current_scene="iron_hollow_hub", inventory={}, gold=0)
         game.skill_check = lambda actor, skill, dc, context: True
         game.run_named_post_combat_random_encounter("locked_chest_under_ferns")
         self.assertGreater(game.state.gold, 0)
@@ -7479,7 +7619,7 @@ class CoreTests(unittest.TestCase):
             expertise_choices=["Stealth", "Perception"],
         )
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(812))
-        game.state = GameState(player=player, current_scene="phandalin_hub", inventory={})
+        game.state = GameState(player=player, current_scene="iron_hollow_hub", inventory={})
         pauses: list[str] = []
         game.pause_for_loot_reveal = lambda: pauses.append("pause")
         game.grant_random_encounter_rewards(reason="the fern-hidden chest", gold=9, items={"potion_healing": 1, "bread_round": 1})
@@ -7496,7 +7636,7 @@ class CoreTests(unittest.TestCase):
         )
         answers = iter(["3"])
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=lambda _: None, rng=random.Random(815))
-        game.state = GameState(player=player, current_scene="phandalin_hub")
+        game.state = GameState(player=player, current_scene="iron_hollow_hub")
         captured: list[Encounter] = []
 
         def fake_run_encounter(encounter: Encounter) -> str:
@@ -7550,7 +7690,7 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(817))
         game.state = GameState(
             player=player,
-            current_scene="phandalin_hub",
+            current_scene="iron_hollow_hub",
             flags={"random_encounters_seen": ["locked_chest_under_ferns"]},
         )
         pool = game.weighted_post_combat_random_encounter_pool()
@@ -7571,7 +7711,7 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(8171))
         game.state = GameState(
             player=player,
-            current_scene="phandalin_hub",
+            current_scene="iron_hollow_hub",
             flags={"saved_wounded_messenger": True},
         )
         unlocked_pool = game.weighted_post_combat_random_encounter_pool()
@@ -7592,7 +7732,7 @@ class CoreTests(unittest.TestCase):
         bryn = create_bryn_underbough()
         answers = iter(["2"])
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=lambda _: None, rng=random.Random(8172))
-        game.state = GameState(player=player, companions=[bryn], current_scene="phandalin_hub")
+        game.state = GameState(player=player, companions=[bryn], current_scene="iron_hollow_hub")
         game.grant_quest("bryn_loose_ends")
         game.skill_check = lambda actor, skill, dc, context: True
         game.random_encounter_smuggler_cookfire()
@@ -7614,7 +7754,7 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=print, rng=random.Random(818), type_dialogue=True)
         game.output_fn = lambda _: None
         game.typewrite_narration = lambda text: typed.append(text)
-        game.state = GameState(player=player, current_scene="phandalin_hub")
+        game.state = GameState(player=player, current_scene="iron_hollow_hub")
         game.random_encounter_intro("A hidden danger waits in the reeds.")
         self.assertEqual(typed, ["A hidden danger waits in the reeds."])
 
@@ -7666,7 +7806,7 @@ class CoreTests(unittest.TestCase):
         )
         game.run_encounter = lambda encounter: "victory"
         game.scene_cinderfall_ruins()
-        self.assertEqual(game.state.current_scene, "phandalin_hub")
+        self.assertEqual(game.state.current_scene, "iron_hollow_hub")
         self.assertTrue(game.state.flags["cinderfall_ruins_cleared"])
         self.assertTrue(game.state.flags["cinderfall_relay_destroyed"])
         self.assertTrue(game.state.flags["varyn_relay_broken"])
@@ -7857,7 +7997,7 @@ class CoreTests(unittest.TestCase):
             expertise_choices=["Stealth", "Perception"],
         )
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(3031))
-        game.state = GameState(player=player, current_scene="phandalin_hub", inventory={})
+        game.state = GameState(player=player, current_scene="iron_hollow_hub", inventory={})
         checks: list[tuple[str, int, str]] = []
         encounters: list[Encounter] = []
         game.skill_check = lambda actor, skill, dc, context: checks.append((skill, dc, context)) or True  # type: ignore[method-assign]
@@ -7875,7 +8015,7 @@ class CoreTests(unittest.TestCase):
         self.assertTrue(game.state.flags["edermath_old_cache_trust"])
         self.assertTrue(game.state.flags["act2_edermath_cache_routework"])
 
-    def test_edermath_old_cache_reacts_to_completed_wyvern_tor(self) -> None:
+    def test_edermath_old_cache_reacts_to_completed_red_mesa_hold(self) -> None:
         player = build_character(
             name="Vale",
             race="Human",
@@ -7889,9 +8029,9 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(30311))
         game.state = GameState(
             player=player,
-            current_scene="phandalin_hub",
+            current_scene="iron_hollow_hub",
             inventory={},
-            flags={"wyvern_tor_cleared": True},
+            flags={"red_mesa_hold_cleared": True},
         )
         game.skill_check = lambda actor, skill, dc, context: True  # type: ignore[method-assign]
 
@@ -7912,7 +8052,7 @@ class CoreTests(unittest.TestCase):
             class_skill_choices=["Athletics", "Survival"],
         )
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(3032))
-        game.state = GameState(player=player, current_scene="phandalin_hub", inventory={})
+        game.state = GameState(player=player, current_scene="iron_hollow_hub", inventory={})
         encounters: list[Encounter] = []
         game.skill_check = lambda actor, skill, dc, context: False  # type: ignore[method-assign]
         game.run_encounter = lambda encounter: encounters.append(encounter) or "victory"  # type: ignore[method-assign]
@@ -7961,15 +8101,15 @@ class CoreTests(unittest.TestCase):
         )
         answers = iter(["1", "3"])
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=lambda _: None, rng=random.Random(303))
-        game.state = GameState(player=player, current_scene="phandalin_hub", flags={"ashfall_watch_cleared": True})
-        game.grant_quest("restore_barthen_supplies")
+        game.state = GameState(player=player, current_scene="iron_hollow_hub", flags={"ashfall_watch_cleared": True})
+        game.grant_quest("restore_hadrik_supplies")
         game.refresh_quest_statuses(announce=False)
-        self.assertEqual(game.state.quests["restore_barthen_supplies"].status, "ready_to_turn_in")
+        self.assertEqual(game.state.quests["restore_hadrik_supplies"].status, "ready_to_turn_in")
         self.assertEqual(game.state.gold, 0)
         self.assertEqual(game.state.xp, 0)
         self.assertNotIn("bread_round", game.state.inventory)
         game.visit_barthen_provisions()
-        self.assertEqual(game.state.quests["restore_barthen_supplies"].status, "completed")
+        self.assertEqual(game.state.quests["restore_hadrik_supplies"].status, "completed")
         self.assertEqual(game.state.gold, 35)
         self.assertEqual(game.state.xp, 75)
         self.assertEqual(game.state.inventory["barthen_resupply_token"], 1)
@@ -7989,12 +8129,12 @@ class CoreTests(unittest.TestCase):
         )
         output: list[str] = []
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=output.append, rng=random.Random(303))
-        game.state = GameState(player=player, current_scene="phandalin_hub", flags={"ashfall_watch_cleared": True})
-        game.grant_quest("restore_barthen_supplies")
+        game.state = GameState(player=player, current_scene="iron_hollow_hub", flags={"ashfall_watch_cleared": True})
+        game.grant_quest("restore_hadrik_supplies")
         game.refresh_quest_statuses(announce=False)
 
-        self.assertFalse(game.turn_in_quest("restore_barthen_supplies", giver="Linene Ironward"))
-        self.assertEqual(game.state.quests["restore_barthen_supplies"].status, "ready_to_turn_in")
+        self.assertFalse(game.turn_in_quest("restore_hadrik_supplies", giver="Linene Ironward"))
+        self.assertEqual(game.state.quests["restore_hadrik_supplies"].status, "ready_to_turn_in")
         self.assertEqual(game.state.gold, 0)
         self.assertEqual(game.state.xp, 0)
         self.assertNotIn("bread_round", game.state.inventory)
@@ -8017,7 +8157,7 @@ class CoreTests(unittest.TestCase):
             player=player,
             current_act=2,
             current_scene="act2_expedition_hub",
-            flags={"hushfen_truth_secured": True, "wave_echo_reached": True},
+            flags={"hushfen_truth_secured": True, "resonant_vault_reached": True},
         )
         game.grant_quest("recover_pact_waymap")
         game.grant_quest("seek_pale_witness_truth")
@@ -8171,7 +8311,7 @@ class CoreTests(unittest.TestCase):
             class_skill_choices=["Athletics", "Survival"],
         )
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(500))
-        game.state = GameState(player=player, current_scene="phandalin_hub")
+        game.state = GameState(player=player, current_scene="iron_hollow_hub")
         player.equipment_slots = {slot: None for slot in ["head", "ring_1", "ring_2", "neck", "chest", "gloves", "boots", "main_hand", "off_hand", "cape"]}
         player.equipment_slots["main_hand"] = "longsword_uncommon"
         player.equipment_slots["boots"] = "silent_step_boots_uncommon"
@@ -8239,7 +8379,7 @@ class CoreTests(unittest.TestCase):
         )
         answers = iter(["1"])
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=lambda _: None, rng=random.Random(501))
-        game.state = GameState(player=player, current_scene="phandalin_hub", inventory={"fireward_elixir": 1})
+        game.state = GameState(player=player, current_scene="iron_hollow_hub", inventory={"fireward_elixir": 1})
         used = game.use_item_from_inventory()
         self.assertTrue(used)
         self.assertIn("resist_fire", player.conditions)
@@ -8288,8 +8428,8 @@ class CoreTests(unittest.TestCase):
         game.scene_greywake_triage_yard()
         self.assertEqual(game.state.current_scene, "greywake_road_breakout")
         game.scene_greywake_road_breakout()
-        self.assertEqual(game.state.current_scene, "neverwinter_briefing")
-        game.scene_neverwinter_briefing()
+        self.assertEqual(game.state.current_scene, "greywake_briefing")
+        game.scene_greywake_briefing()
         self.assertEqual(game.state.current_scene, "road_ambush")
         self.assertTrue(any(companion.name in {"Kaelis Starling", "Rhogar Valeguard"} for companion in game.state.companions))
 
@@ -8331,7 +8471,7 @@ class CoreTests(unittest.TestCase):
         game.scene_wayside_luck_shrine()
         game.scene_greywake_triage_yard()
         game.scene_greywake_road_breakout()
-        game.scene_neverwinter_briefing()
+        game.scene_greywake_briefing()
         self.assertEqual(game.state.current_scene, "road_ambush")
         self.assertTrue(any(companion.name == "Kaelis Starling" for companion in game.state.companions))
 
@@ -8349,16 +8489,16 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=log.append, rng=random.Random(8042))
         game.state = GameState(
             player=player,
-            current_scene="neverwinter_briefing",
+            current_scene="greywake_briefing",
             flags={
                 "act1_started": True,
                 "early_companion_recruited": "Kaelis Starling",
-                "neverwinter_tymora_shrine_seen": True,
-                "neverwinter_high_road_milehouse_seen": True,
-                "neverwinter_signal_cairn_seen": True,
+                "greywake_tymora_shrine_seen": True,
+                "greywake_emberway_milehouse_seen": True,
+                "greywake_signal_cairn_seen": True,
             },
         )
-        game.handle_neverwinter_departure_fork()
+        game.handle_greywake_departure_fork()
         self.assertEqual(game.state.current_scene, "blackwake_crossing")
         self.assertTrue(game.state.flags["blackwake_started"])
         self.assertIn("trace_blackwake_cell", game.state.quests)
@@ -8366,7 +8506,7 @@ class CoreTests(unittest.TestCase):
         self.assertIn("Overworld Route Map", rendered)
         self.assertIn("Blackwake Crossing", rendered)
 
-    def test_departure_fork_rumor_backtracks_to_neverwinter(self) -> None:
+    def test_departure_fork_rumor_backtracks_to_greywake(self) -> None:
         player = build_character(
             name="Vale",
             race="Human",
@@ -8380,24 +8520,24 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=log.append, rng=random.Random(8043))
         game.state = GameState(
             player=player,
-            current_scene="neverwinter_briefing",
+            current_scene="greywake_briefing",
             flags={
                 "act1_started": True,
                 "early_companion_recruited": "Kaelis Starling",
-                "neverwinter_tymora_shrine_seen": True,
-                "neverwinter_high_road_milehouse_seen": True,
-                "neverwinter_signal_cairn_seen": True,
+                "greywake_tymora_shrine_seen": True,
+                "greywake_emberway_milehouse_seen": True,
+                "greywake_signal_cairn_seen": True,
             },
         )
-        game.handle_neverwinter_departure_fork()
-        self.assertEqual(game.state.current_scene, "neverwinter_briefing")
-        self.assertTrue(game.state.flags["blackwake_neverwinter_rumor"])
+        game.handle_greywake_departure_fork()
+        self.assertEqual(game.state.current_scene, "greywake_briefing")
+        self.assertTrue(game.state.flags["blackwake_greywake_rumor"])
         self.assertTrue(any("forged river-cut inspections" in clue for clue in game.state.clues))
         rendered = self.plain_output(log)
         self.assertIn("[BACKTRACK] *Circle back long enough to gather one more rumor in Greywake.", rendered)
         self.assertIn("good-looking papers and bad patience", rendered)
 
-    def test_road_ambush_approach_can_backtrack_to_neverwinter(self) -> None:
+    def test_road_ambush_approach_can_backtrack_to_greywake(self) -> None:
         player = build_character(
             name="Vale",
             race="Human",
@@ -8412,7 +8552,7 @@ class CoreTests(unittest.TestCase):
         encounters: list[Encounter] = []
         game.run_encounter = lambda encounter: encounters.append(encounter) or "victory"
         game.scene_road_ambush()
-        self.assertEqual(game.state.current_scene, "neverwinter_briefing")
+        self.assertEqual(game.state.current_scene, "greywake_briefing")
         self.assertFalse(game.state.flags.get("road_approach_chosen", False))
         self.assertEqual(encounters, [])
         rendered = self.plain_output(log)
@@ -8434,7 +8574,7 @@ class CoreTests(unittest.TestCase):
         encounters: list[Encounter] = []
         game.run_encounter = lambda encounter: encounters.append(encounter) or "victory"
         game.scene_road_ambush()
-        self.assertEqual(game.state.current_scene, "phandalin_hub")
+        self.assertEqual(game.state.current_scene, "iron_hollow_hub")
         self.assertTrue(any(companion.name == "Tolan Ironshield" for companion in game.state.companions))
         self.assertEqual([encounter.title for encounter in encounters], ["Roadside Ambush: First Wave", "Emberway Second Wave"])
         self.assertFalse(encounters[0].allow_post_combat_random_encounter)
@@ -8442,7 +8582,7 @@ class CoreTests(unittest.TestCase):
         rendered = self.plain_output(log)
         self.assertIn("Tolan Ironshield: \"Good. Give me a minute to cinch the shield", rendered)
 
-    def test_freshly_cleared_high_road_offers_side_branches_before_phandalin(self) -> None:
+    def test_freshly_cleared_emberway_offers_side_branches_before_iron_hollow(self) -> None:
         player = build_character(
             name="Vale",
             race="Human",
@@ -8471,9 +8611,9 @@ class CoreTests(unittest.TestCase):
         self.assertEqual([encounter.title for encounter in encounters], ["Roadside Ambush: First Wave", "Emberway Second Wave"])
         self.assertTrue(game.state.flags["road_ambush_cleared"])
         self.assertTrue(game.state.flags["liars_circle_branch_available"])
-        self.assertTrue(game.state.flags["high_road_tollstones_branch_available"])
-        self.assertTrue(game.state.flags["high_road_false_checkpoint_available"])
-        self.assertEqual(game.state.current_scene, "high_road_liars_circle")
+        self.assertTrue(game.state.flags["emberway_tollstones_branch_available"])
+        self.assertTrue(game.state.flags["emberway_false_checkpoint_available"])
+        self.assertEqual(game.state.current_scene, "emberway_liars_circle")
         rendered_options = "\n".join(captured_options)
         self.assertIn("*Follow the Emberway to Iron Hollow.", rendered_options)
         self.assertIn("*Follow the overgrown statue trail into the wilderness.", rendered_options)
@@ -8483,7 +8623,7 @@ class CoreTests(unittest.TestCase):
         self.assertNotIn("[PARLEY]", rendered_options)
         self.assertNotIn("[SOCIAL]", rendered_options)
 
-    def test_sereth_escape_leaves_high_road_followup_note(self) -> None:
+    def test_sereth_escape_leaves_emberway_followup_note(self) -> None:
         player = build_character(
             name="Vale",
             race="Human",
@@ -8514,7 +8654,7 @@ class CoreTests(unittest.TestCase):
         self.assertTrue(any("Sereth Vane survived Blackwake" in clue for clue in game.state.clues))
         self.assertTrue(any("Sereth Vane's initials surfaced" in entry for entry in game.state.journal))
 
-    def test_cleared_high_road_can_branch_to_liars_circle(self) -> None:
+    def test_cleared_emberway_can_branch_to_liars_circle(self) -> None:
         player = build_character(
             name="Vale",
             race="Human",
@@ -8535,7 +8675,7 @@ class CoreTests(unittest.TestCase):
             },
         )
         game.scene_road_ambush()
-        self.assertEqual(game.state.current_scene, "high_road_liars_circle")
+        self.assertEqual(game.state.current_scene, "emberway_liars_circle")
         self.assertEqual(game.state.flags["map_state"]["current_node_id"], "liars_circle")
         rendered = self.plain_output(log)
         self.assertIn("*Follow the overgrown statue trail into the wilderness.", rendered)
@@ -8556,11 +8696,11 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=lambda _: None, rng=random.Random(9211))
         game.state = GameState(
             player=player,
-            current_scene="high_road_liars_circle",
+            current_scene="emberway_liars_circle",
             flags={"act1_started": True, "road_ambush_cleared": True, "liars_circle_branch_available": True},
             xp=385,
         )
-        game.scene_high_road_liars_circle()
+        game.scene_emberway_liars_circle()
         self.assertTrue(game.state.flags["liars_circle_solved"])
         self.assertTrue(game.state.flags["liars_circle_locked"])
         self.assertTrue(game.state.flags["liars_blessing_active"])
@@ -8586,10 +8726,10 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=lambda _: None, rng=random.Random(9212))
         game.state = GameState(
             player=player,
-            current_scene="high_road_liars_circle",
+            current_scene="emberway_liars_circle",
             flags={"act1_started": True, "road_ambush_cleared": True, "liars_circle_branch_available": True},
         )
-        game.scene_high_road_liars_circle()
+        game.scene_emberway_liars_circle()
         self.assertTrue(game.state.flags["liars_circle_failed"])
         self.assertTrue(game.state.flags["liars_circle_locked"])
         self.assertTrue(game.state.flags["liars_curse_active"])
@@ -8613,7 +8753,7 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(9213))
         game.state = GameState(
             player=player,
-            current_scene="phandalin_hub",
+            current_scene="iron_hollow_hub",
             inventory={"camp_stew_jar": 3, "bread_round": 4, "goat_cheese": 2},
         )
         game.apply_liars_curse()
@@ -8661,7 +8801,7 @@ class CoreTests(unittest.TestCase):
         log: list[str] = []
         answers = iter(["1", "2"])
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=log.append, rng=random.Random(9215))
-        game.state = GameState(player=player, current_scene="phandalin_hub")
+        game.state = GameState(player=player, current_scene="iron_hollow_hub")
         game.apply_liars_blessing()
         game.show_party()
         game.show_character_sheets()
@@ -8682,8 +8822,8 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(9216))
         game.state = GameState(
             player=player,
-            current_scene="high_road_false_tollstones",
-            flags={"act1_started": True, "road_ambush_cleared": True, "high_road_tollstones_branch_available": True},
+            current_scene="emberway_false_tollstones",
+            flags={"act1_started": True, "road_ambush_cleared": True, "emberway_tollstones_branch_available": True},
         )
 
         def fake_skill_check(actor, skill, dc, context):
@@ -8691,13 +8831,13 @@ class CoreTests(unittest.TestCase):
             return True
 
         game.skill_check = fake_skill_check
-        game.scene_high_road_false_tollstones()
+        game.scene_emberway_false_tollstones()
         self.assertEqual(checks, [("Deception", 14)])
-        self.assertTrue(game.state.flags["high_road_tollstones_ledger_taken"])
+        self.assertTrue(game.state.flags["emberway_tollstones_ledger_taken"])
         self.assertTrue(game.state.flags["system_profile_seeded"])
         self.assertTrue(game.state.flags["varyn_route_pattern_seen"])
-        self.assertEqual(game.state.flags["high_road_tollstones_resolution"], "deception")
-        self.assertEqual(game.state.current_scene, "phandalin_hub")
+        self.assertEqual(game.state.flags["emberway_tollstones_resolution"], "deception")
+        self.assertEqual(game.state.current_scene, "iron_hollow_hub")
 
     def test_false_tollstones_blessing_path_skips_check_and_adds_passphrase(self) -> None:
         player = build_character(
@@ -8712,8 +8852,8 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(9217))
         game.state = GameState(
             player=player,
-            current_scene="high_road_false_tollstones",
-            flags={"act1_started": True, "road_ambush_cleared": True, "high_road_tollstones_branch_available": True},
+            current_scene="emberway_false_tollstones",
+            flags={"act1_started": True, "road_ambush_cleared": True, "emberway_tollstones_branch_available": True},
         )
         game.apply_liars_blessing()
 
@@ -8721,12 +8861,12 @@ class CoreTests(unittest.TestCase):
             raise AssertionError("Liar's Blessing path should not require a skill check")
 
         game.skill_check = fail_skill_check
-        game.scene_high_road_false_tollstones()
-        self.assertTrue(game.state.flags["high_road_tollstones_blessing_used"])
-        self.assertTrue(game.state.flags["high_road_tollstones_passphrase_known"])
+        game.scene_emberway_false_tollstones()
+        self.assertTrue(game.state.flags["emberway_tollstones_blessing_used"])
+        self.assertTrue(game.state.flags["emberway_tollstones_passphrase_known"])
         self.assertTrue(game.state.flags["system_profile_seeded"])
         self.assertTrue(game.state.flags["varyn_route_pattern_seen"])
-        self.assertEqual(game.state.flags["high_road_tollstones_resolution"], "blessing")
+        self.assertEqual(game.state.flags["emberway_tollstones_resolution"], "blessing")
         self.assertEqual(game.state.inventory.get("antitoxin_vial"), 1)
         self.assertEqual(game.state.xp, 25)
         self.assertEqual(game.state.gold, 16)
@@ -8734,7 +8874,7 @@ class CoreTests(unittest.TestCase):
         self.assertIn("[LIAR'S BLESSING]", rendered)
         self.assertIn("The false paint almost seems to arrange itself", rendered)
 
-    def test_cleared_high_road_can_branch_to_false_checkpoint(self) -> None:
+    def test_cleared_emberway_can_branch_to_false_checkpoint(self) -> None:
         player = build_character(
             name="Vale",
             race="Human",
@@ -8760,7 +8900,7 @@ class CoreTests(unittest.TestCase):
 
         game.scene_road_ambush()
 
-        self.assertEqual(game.state.current_scene, "high_road_false_checkpoint")
+        self.assertEqual(game.state.current_scene, "emberway_false_checkpoint")
         self.assertEqual(game.state.flags["map_state"]["current_node_id"], "false_checkpoint")
         rendered = self.plain_output(log)
         self.assertIn("You follow fresh bootlines to a canvas shade", rendered)
@@ -8778,11 +8918,11 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(92172))
         game.state = GameState(
             player=player,
-            current_scene="high_road_false_checkpoint",
+            current_scene="emberway_false_checkpoint",
             flags={
                 "act1_started": True,
                 "road_ambush_cleared": True,
-                "high_road_false_checkpoint_available": True,
+                "emberway_false_checkpoint_available": True,
                 "false_manifest_oren_detail": True,
                 "false_manifest_garren_detail": True,
             },
@@ -8794,20 +8934,20 @@ class CoreTests(unittest.TestCase):
 
         game.skill_check = fail_skill_check
 
-        game.scene_high_road_false_checkpoint()
+        game.scene_emberway_false_checkpoint()
 
-        self.assertTrue(game.state.flags["high_road_false_checkpoint_contract_proof_used"])
-        self.assertTrue(game.state.flags["neverwinter_contract_house_checkpoint_pressure"])
+        self.assertTrue(game.state.flags["emberway_false_checkpoint_contract_proof_used"])
+        self.assertTrue(game.state.flags["greywake_contract_house_checkpoint_pressure"])
         self.assertTrue(game.state.flags["blackwake_false_checkpoint_exposed"])
         self.assertTrue(game.state.flags["blackwake_millers_ford_lead"])
         self.assertTrue(game.state.flags["blackwake_gallows_copse_lead"])
         self.assertTrue(game.state.flags["road_patrol_writ"])
         self.assertTrue(game.state.flags["system_profile_seeded"])
         self.assertTrue(game.state.flags["varyn_route_pattern_seen"])
-        self.assertEqual(game.state.flags["high_road_false_checkpoint_resolution"], "proof")
+        self.assertEqual(game.state.flags["emberway_false_checkpoint_resolution"], "proof")
         self.assertEqual(game.state.xp, 30)
         self.assertEqual(game.state.gold, 14)
-        self.assertEqual(game.state.current_scene, "phandalin_hub")
+        self.assertEqual(game.state.current_scene, "iron_hollow_hub")
         rendered = self.plain_output(log)
         self.assertIn("[CONTRACT HOUSE PROOF]", rendered)
         self.assertIn("Oren's room line, Sabra's corrected manifest", rendered)
@@ -8825,11 +8965,11 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: "2", output_fn=lambda _: None, rng=random.Random(92173))
         game.state = GameState(
             player=player,
-            current_scene="high_road_false_checkpoint",
+            current_scene="emberway_false_checkpoint",
             flags={
                 "act1_started": True,
                 "road_ambush_cleared": True,
-                "high_road_false_checkpoint_available": True,
+                "emberway_false_checkpoint_available": True,
             },
         )
 
@@ -8839,15 +8979,15 @@ class CoreTests(unittest.TestCase):
 
         game.skill_check = fake_skill_check  # type: ignore[method-assign]
 
-        game.scene_high_road_false_checkpoint()
+        game.scene_emberway_false_checkpoint()
 
         self.assertEqual(checks, [("Insight", 12, "to expose the false roadwarden cadence in their demand")])
-        self.assertEqual(game.state.flags["high_road_false_checkpoint_resolution"], "insight")
+        self.assertEqual(game.state.flags["emberway_false_checkpoint_resolution"], "insight")
         self.assertTrue(game.state.flags["blackwake_millers_ford_lead"])
         self.assertTrue(game.state.flags["road_patrol_writ"])
         self.assertTrue(game.state.flags["system_profile_seeded"])
         self.assertTrue(game.state.flags["varyn_route_pattern_seen"])
-        self.assertEqual(game.state.current_scene, "phandalin_hub")
+        self.assertEqual(game.state.current_scene, "iron_hollow_hub")
 
     def test_point_buy_character_creation_flow(self) -> None:
         answers = iter(
@@ -9424,20 +9564,20 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=log.append, rng=random.Random(3010))
         game.state = GameState(
             player=player,
-            current_scene="neverwinter_briefing",
+            current_scene="greywake_briefing",
             flags={
                 "early_companion_recruited": "Kaelis Starling",
-                "neverwinter_tymora_shrine_seen": True,
-                "neverwinter_high_road_milehouse_seen": True,
-                "neverwinter_signal_cairn_seen": True,
+                "greywake_tymora_shrine_seen": True,
+                "greywake_emberway_milehouse_seen": True,
+                "greywake_signal_cairn_seen": True,
             },
         )
-        game.scene_neverwinter_briefing()
+        game.scene_greywake_briefing()
         rendered = self.plain_output(log)
         self.assertIn("better story and a sharper tongue", rendered)
         self.assertIn("Reward gained for Bard identity choice: 20 XP, 6 gold.", rendered)
 
-    def test_neverwinter_briefing_routes_response_menu_through_keyboard_choice_menu(self) -> None:
+    def test_greywake_briefing_routes_response_menu_through_keyboard_choice_menu(self) -> None:
         player = build_character(
             name="Vale",
             race="Human",
@@ -9447,10 +9587,10 @@ class CoreTests(unittest.TestCase):
             class_skill_choices=["Athletics", "Survival"],
         )
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(3011))
-        game.state = GameState(player=player, current_scene="neverwinter_briefing", flags={"briefing_seen": True})
+        game.state = GameState(player=player, current_scene="greywake_briefing", flags={"briefing_seen": True})
         game.scene_identity_options = lambda scene_key: []
         game.offer_early_companion = lambda: None
-        game.handle_neverwinter_departure_fork = lambda: setattr(game.state, "current_scene", "road_ambush")
+        game.handle_greywake_departure_fork = lambda: setattr(game.state, "current_scene", "road_ambush")
         game.player_choice_output = lambda text: None
         game.keyboard_choice_menu_supported = lambda: True
         seen: dict[str, object] = {}
@@ -9463,12 +9603,12 @@ class CoreTests(unittest.TestCase):
             return len(options)
 
         game.run_keyboard_choice_menu = fake_run
-        game.scene_neverwinter_briefing()
+        game.scene_greywake_briefing()
         self.assertEqual(seen["prompt"], "Choose your response to Mira.")
         self.assertIn("*Take the writ and head for the Emberway.", seen["options"])
         self.assertEqual(game.state.current_scene, "road_ambush")
 
-    def test_race_identity_option_appears_on_phandalin_arrival(self) -> None:
+    def test_race_identity_option_appears_on_iron_hollow_arrival(self) -> None:
         player = build_character(
             name="Cairn",
             race="Tiefling",
@@ -9479,10 +9619,10 @@ class CoreTests(unittest.TestCase):
         )
         log: list[str] = []
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(3011))
-        game.state = GameState(player=player, current_scene="phandalin_hub")
-        option_key, option_text = game.scene_identity_options("phandalin_arrival")[0]
+        game.state = GameState(player=player, current_scene="iron_hollow_hub")
+        option_key, option_text = game.scene_identity_options("iron_hollow_arrival")[0]
         self.assertIn("look ominous enough to trust", option_text)
-        game.handle_scene_identity_action("phandalin_arrival", option_key)
+        game.handle_scene_identity_action("iron_hollow_arrival", option_key)
         rendered = self.plain_output(log)
         self.assertIn("Embarrassed honesty starts doing", rendered)
 
@@ -9547,7 +9687,7 @@ class CoreTests(unittest.TestCase):
             class_skill_choices=["Athletics", "Survival"],
         )
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(33))
-        game.state = GameState(player=player, current_scene="phandalin_hub")
+        game.state = GameState(player=player, current_scene="iron_hollow_hub")
         game.recruit_companion(create_tolan_ironshield())
         game.recruit_companion(create_kaelis_starling())
         game.recruit_companion(create_elira_dawnmantle())
@@ -9571,7 +9711,7 @@ class CoreTests(unittest.TestCase):
             output_fn=lambda _: None,
             rng=random.Random(331),
         )
-        game.state = GameState(player=player, current_scene="phandalin_hub")
+        game.state = GameState(player=player, current_scene="iron_hollow_hub")
         for next_level in (2, 3):
             game.level_up_character_automatically(player, next_level, announce=False)
         companion = create_tolan_ironshield()
@@ -9596,7 +9736,7 @@ class CoreTests(unittest.TestCase):
             output_fn=lambda _: None,
             rng=random.Random(332),
         )
-        game.state = GameState(player=player, current_scene="phandalin_hub")
+        game.state = GameState(player=player, current_scene="iron_hollow_hub")
         for next_level in (2, 3, 4):
             game.level_up_character_automatically(player, next_level, announce=False)
         game.recruit_companion(create_tolan_ironshield())
@@ -9640,7 +9780,7 @@ class CoreTests(unittest.TestCase):
         )
         answers = iter(["2"])
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=lambda _: None, rng=random.Random(333))
-        game.state = GameState(player=player, current_scene="phandalin_hub")
+        game.state = GameState(player=player, current_scene="iron_hollow_hub")
         companion = create_bryn_underbough()
         game.recruit_companion(companion)
 
@@ -9670,7 +9810,7 @@ class CoreTests(unittest.TestCase):
             output_fn=lambda _: None,
             rng=random.Random(334),
         )
-        game.state = GameState(player=player, current_scene="phandalin_hub")
+        game.state = GameState(player=player, current_scene="iron_hollow_hub")
         for next_level in (2, 3):
             game.level_up_character_automatically(player, next_level, announce=False)
         companion = create_nim_ardentglass()
@@ -9694,7 +9834,7 @@ class CoreTests(unittest.TestCase):
         companion = create_tolan_ironshield()
         answers = iter(["1", "1", "5"])
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=lambda _: None, rng=random.Random(34))
-        game.state = GameState(player=player, companions=[companion], current_scene="phandalin_hub")
+        game.state = GameState(player=player, companions=[companion], current_scene="iron_hollow_hub")
         game.talk_to_companion()
         self.assertEqual(companion.disposition, 1)
         self.assertIn("old_road", companion.bond_flags["talked_topics"])
@@ -9736,7 +9876,7 @@ class CoreTests(unittest.TestCase):
         log: list[str] = []
         answers = iter(["1", "1", "4", "5"])
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=log.append, rng=random.Random(341))
-        game.state = GameState(player=player, companions=[companion], current_scene="phandalin_hub")
+        game.state = GameState(player=player, companions=[companion], current_scene="iron_hollow_hub")
         game.talk_to_companion()
         rendered = self.plain_output(log)
         self.assertIn('"Tell me about the worst road you ever guarded."', rendered)
@@ -9886,7 +10026,7 @@ class CoreTests(unittest.TestCase):
             player=player,
             companions=[tolan],
             camp_companions=[bryn],
-            current_scene="phandalin_hub",
+            current_scene="iron_hollow_hub",
         )
 
         self.assertEqual(game.run_dialogue_input("barthen_shortage"), 1)
@@ -9913,7 +10053,7 @@ class CoreTests(unittest.TestCase):
         game.state = GameState(
             player=player,
             companions=[create_tolan_ironshield()],
-            current_scene="phandalin_hub",
+            current_scene="iron_hollow_hub",
         )
 
         def choose_barthen(prompt: str, options: list[str], **kwargs) -> int:
@@ -9929,7 +10069,7 @@ class CoreTests(unittest.TestCase):
         self.assertIn("Food that keeps, bandages, lamp oil", rendered)
         self.assertIn("Empty shelves are a siege by another name.", rendered)
         self.assertTrue(game.state.flags["barthen_shortage_asked"])
-        self.assertTrue(game.has_quest("restore_barthen_supplies"))
+        self.assertTrue(game.has_quest("restore_hadrik_supplies"))
 
     def test_act2_claims_council_runs_opening_and_sponsor_inputs(self) -> None:
         player = build_character(
@@ -9976,7 +10116,7 @@ class CoreTests(unittest.TestCase):
             player=player,
             companions=[create_irielle_ashwake(), create_nim_ardentglass(), create_elira_dawnmantle()],
             current_act=2,
-            current_scene="forge_of_spells",
+            current_scene="meridian_forge",
         )
 
         self.assertEqual(game.run_dialogue_input("act2_forge_entry", max_entries=2), 2)
@@ -10071,7 +10211,7 @@ class CoreTests(unittest.TestCase):
         )
         companion = create_tolan_ironshield()
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(35))
-        game.state = GameState(player=player, companions=[companion], current_scene="phandalin_hub")
+        game.state = GameState(player=player, companions=[companion], current_scene="iron_hollow_hub")
         game.adjust_companion_disposition(companion, -6, "testing cruelty")
         self.assertFalse(any(member.name == "Tolan Ironshield" for member in game.state.all_companions()))
         self.assertIn("Tolan Ironshield", game.state.flags["departed_companions"])
@@ -10100,7 +10240,7 @@ class CoreTests(unittest.TestCase):
             ]
         )
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=lambda _: None, rng=random.Random(36))
-        game.state = GameState(player=player, current_scene="phandalin_hub", gold=150)
+        game.state = GameState(player=player, current_scene="iron_hollow_hub", gold=150)
         game.visit_magic_mirror()
         self.assertEqual(game.state.gold, 50)
         self.assertEqual(game.state.player.level, 2)
@@ -10195,7 +10335,7 @@ class CoreTests(unittest.TestCase):
         game.state = GameState(player=player, current_scene="road_ambush", clues=[], journal=[])
         game.run_encounter = lambda encounter: "victory"
         game.scene_road_ambush()
-        self.assertEqual(game.state.current_scene, "phandalin_hub")
+        self.assertEqual(game.state.current_scene, "iron_hollow_hub")
 
     def test_road_ambush_athletics_success_grants_real_combat_advantage(self) -> None:
         player = build_character(
@@ -10334,7 +10474,7 @@ class CoreTests(unittest.TestCase):
             class_skill_choices=["Athletics", "Survival"],
         )
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=lambda _: None, rng=random.Random(14))
-        game.state = GameState(player=player, current_scene="phandalin_hub", clues=[], journal=[], xp=290, gold=5)
+        game.state = GameState(player=player, current_scene="iron_hollow_hub", clues=[], journal=[], xp=290, gold=5)
         game.reward_party(xp=20, gold=7, reason="testing rewards")
         self.assertEqual(game.state.xp, 310)
         self.assertEqual(game.state.gold, 12)
@@ -10352,7 +10492,7 @@ class CoreTests(unittest.TestCase):
             class_skill_choices=["Athletics", "Survival"],
         )
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(1401))
-        game.state = GameState(player=player, current_scene="phandalin_hub", xp=0)
+        game.state = GameState(player=player, current_scene="iron_hollow_hub", xp=0)
         self.assertEqual(game.scaled_check_reward_xp(), 20)
 
         player.level = 3
@@ -10373,7 +10513,7 @@ class CoreTests(unittest.TestCase):
             class_skill_choices=["Athletics", "Survival"],
         )
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(1402))
-        game.state = GameState(player=player, current_scene="phandalin_hub")
+        game.state = GameState(player=player, current_scene="iron_hollow_hub")
         game.roll_check_d20 = lambda *args, **kwargs: SimpleNamespace(kept=17)  # type: ignore[method-assign]
 
         self.assertTrue(game.skill_check(player, "Athletics", 10, context="to test scaled rewards"))
@@ -10836,7 +10976,7 @@ class CoreTests(unittest.TestCase):
             output_fn=lambda _: None,
             rng=random.Random(163),
         )
-        game.state = GameState(player=player, companions=[companion], current_scene="phandalin_hub")
+        game.state = GameState(player=player, companions=[companion], current_scene="iron_hollow_hub")
         leveled = game.level_up_party_instantly()
         self.assertEqual(leveled, 2)
         self.assertEqual(game.state.xp, 300)
@@ -10853,7 +10993,7 @@ class CoreTests(unittest.TestCase):
             class_skill_choices=["Athletics", "Survival"],
         )
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(164))
-        game.state = GameState(player=player, current_scene="neverwinter_briefing", gold=25)
+        game.state = GameState(player=player, current_scene="greywake_briefing", gold=25)
         game.confirm = lambda prompt: True
         self.assertTrue(game.jump_to_act2_developer_start())
         self.assertEqual(game.state.current_act, 2)
@@ -10883,7 +11023,7 @@ class CoreTests(unittest.TestCase):
         )
         answers = iter(["~", "instantact2", "1"])
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=lambda _: None, rng=random.Random(165))
-        game.state = GameState(player=player, current_scene="phandalin_hub", gold=25)
+        game.state = GameState(player=player, current_scene="iron_hollow_hub", gold=25)
 
         with self.assertRaises(gameplay_base.ResumeLoadedGame):
             game.choose("Where do you go next?", ["Stay in Iron Hollow", "Ride out"])
@@ -10969,7 +11109,7 @@ class CoreTests(unittest.TestCase):
         wizard.resources.pop("mp", None)
         wizard.max_resources.pop("mp", None)
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(16011))
-        game.state = GameState(player=wizard, current_scene="phandalin_hub")
+        game.state = GameState(player=wizard, current_scene="iron_hollow_hub")
         game.ensure_state_integrity()
         self.assertEqual(magic_point_summary(wizard), "12/12")
 
@@ -11029,7 +11169,7 @@ class CoreTests(unittest.TestCase):
         game.scale_level_resources(warlock)
         warlock.resources["spell_slots_2"] = 0
         warlock.resources["mp"] = 0
-        game.state = GameState(player=warlock, current_scene="phandalin_hub", short_rests_remaining=2)
+        game.state = GameState(player=warlock, current_scene="iron_hollow_hub", short_rests_remaining=2)
         game.short_rest()
         self.assertEqual(warlock.resources["spell_slots_2"], warlock.max_resources["spell_slots_2"])
         self.assertEqual(warlock.resources["mp"], warlock.max_resources["mp"])
@@ -11048,7 +11188,7 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(17))
         game.state = GameState(
             player=player,
-            current_scene="phandalin_hub",
+            current_scene="iron_hollow_hub",
             inventory={"camp_stew_jar": 3, "bread_round": 4, "goat_cheese": 2},
             short_rests_remaining=0,
         )
@@ -11074,7 +11214,7 @@ class CoreTests(unittest.TestCase):
         game.state = GameState(
             player=player,
             companions=[companion],
-            current_scene="phandalin_hub",
+            current_scene="iron_hollow_hub",
             gold=20,
             inventory={"camp_stew_jar": 3, "bread_round": 4, "goat_cheese": 2},
             short_rests_remaining=0,
@@ -11109,7 +11249,7 @@ class CoreTests(unittest.TestCase):
         game.state = GameState(
             player=player,
             companions=[companion],
-            current_scene="phandalin_hub",
+            current_scene="iron_hollow_hub",
             gold=20,
             short_rests_remaining=0,
         )
@@ -11135,7 +11275,7 @@ class CoreTests(unittest.TestCase):
         player.current_hp = 2
         log: list[str] = []
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(173))
-        game.state = GameState(player=player, current_scene="phandalin_hub", gold=4, short_rests_remaining=0)
+        game.state = GameState(player=player, current_scene="iron_hollow_hub", gold=4, short_rests_remaining=0)
         self.assertFalse(game.paid_inn_long_rest("Ashlamp Inn"))
         self.assertEqual(game.state.gold, 4)
         self.assertEqual(player.current_hp, 2)
@@ -11155,7 +11295,7 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(1701))
         game.state = GameState(
             player=player,
-            current_scene="phandalin_hub",
+            current_scene="iron_hollow_hub",
             short_rests_remaining=2,
         )
         game.short_rest()
@@ -11173,7 +11313,7 @@ class CoreTests(unittest.TestCase):
         )
         player.resources["mp"] = 0
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(1702))
-        game.state = GameState(player=player, current_scene="phandalin_hub", short_rests_remaining=2)
+        game.state = GameState(player=player, current_scene="iron_hollow_hub", short_rests_remaining=2)
         game.short_rest()
         self.assertEqual(player.resources["mp"], (player.max_resources["mp"] + 1) // 2)
         self.assertEqual(game.state.short_rests_remaining, 1)
@@ -11190,7 +11330,7 @@ class CoreTests(unittest.TestCase):
         player.resources["mp"] = 0
         log: list[str] = []
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(1703))
-        game.state = GameState(player=player, current_scene="phandalin_hub", inventory={"resonance_tonic": 1})
+        game.state = GameState(player=player, current_scene="iron_hollow_hub", inventory={"resonance_tonic": 1})
         self.assertTrue(game.use_item_from_inventory())
         self.assertEqual(player.resources["mp"], 4)
         self.assertNotIn("resonance_tonic", game.state.inventory)
@@ -11227,7 +11367,7 @@ class CoreTests(unittest.TestCase):
         game.state = GameState(
             player=player,
             companions=[companion],
-            current_scene="phandalin_hub",
+            current_scene="iron_hollow_hub",
             inventory={"camp_stew_jar": 3, "bread_round": 4, "goat_cheese": 2},
         )
         game.long_rest()
@@ -11252,7 +11392,7 @@ class CoreTests(unittest.TestCase):
         game.state = GameState(
             player=player,
             companions=[companion],
-            current_scene="phandalin_hub",
+            current_scene="iron_hollow_hub",
             inventory={"camp_stew_jar": 3, "bread_round": 4, "goat_cheese": 2},
         )
         game.long_rest()
@@ -11321,7 +11461,7 @@ class CoreTests(unittest.TestCase):
         game.state = GameState(
             player=player,
             camp_companions=[companion],
-            current_scene="phandalin_hub",
+            current_scene="iron_hollow_hub",
             inventory={"scroll_revivify": 1},
         )
         game.open_camp_menu()
@@ -11346,7 +11486,7 @@ class CoreTests(unittest.TestCase):
             player=player,
             companions=[create_irielle_ashwake()],
             camp_companions=[create_nim_ardentglass()],
-            current_scene="phandalin_hub",
+            current_scene="iron_hollow_hub",
             current_act=2,
             flags={
                 "act2_started": True,
@@ -11356,8 +11496,8 @@ class CoreTests(unittest.TestCase):
                 "stonehollow_scholars_found": True,
                 "stonehollow_notes_preserved": True,
                 "south_adit_counter_cadence_learned": True,
-                "black_lake_shrine_purified": True,
-                "black_lake_barracks_raided": True,
+                "blackglass_shrine_purified": True,
+                "blackglass_barracks_raided": True,
                 "act2_town_stability": 3,
                 "act2_route_control": 4,
                 "act2_whisper_pressure": 2,
@@ -11392,7 +11532,7 @@ class CoreTests(unittest.TestCase):
         game.state = GameState(
             player=player,
             camp_companions=[companion],
-            current_scene="phandalin_hub",
+            current_scene="iron_hollow_hub",
             inventory={"scroll_revivify": 1},
         )
         self.assertTrue(game.use_scroll_of_revivify())
@@ -11421,7 +11561,7 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(18))
         game.state = GameState(
             player=player,
-            current_scene="phandalin_hub",
+            current_scene="iron_hollow_hub",
             inventory={"longbow_common": 1, "shield_common": 1},
         )
         player.equipment_slots = {
@@ -11464,7 +11604,7 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(181))
         game.state = GameState(
             player=player,
-            current_scene="phandalin_hub",
+            current_scene="iron_hollow_hub",
             inventory={
                 "iron_cap_common": 1,
                 "soldiers_amulet_common": 1,
@@ -11493,7 +11633,7 @@ class CoreTests(unittest.TestCase):
         companion = create_tolan_ironshield()
         answers = iter(["2", "9", "2", "10", "2", "3"])
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=lambda _: None, rng=random.Random(182))
-        game.state = GameState(player=player, companions=[companion], current_scene="phandalin_hub", inventory={"dagger_common": 1})
+        game.state = GameState(player=player, companions=[companion], current_scene="iron_hollow_hub", inventory={"dagger_common": 1})
         game.ensure_state_integrity()
         game.state.inventory["dagger_common"] = 1
         game.manage_equipment()
@@ -11512,7 +11652,7 @@ class CoreTests(unittest.TestCase):
         log: list[str] = []
         answers = iter(["2", "2"])
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=log.append, rng=random.Random(183))
-        game.state = GameState(player=player, companions=[companion], current_scene="phandalin_hub")
+        game.state = GameState(player=player, companions=[companion], current_scene="iron_hollow_hub")
         game.ensure_state_integrity()
         game.show_character_sheets()
         rendered = self.plain_output(log)
@@ -11541,7 +11681,7 @@ class CoreTests(unittest.TestCase):
         )
         companion = create_kaelis_starling()
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(184))
-        game.state = GameState(player=player, companions=[companion], current_scene="phandalin_hub")
+        game.state = GameState(player=player, companions=[companion], current_scene="iron_hollow_hub")
 
         renderable = game.build_character_sheet_rich_renderable(companion)
         lines = render_rich_lines(renderable, width=game.character_sheet_render_width())
@@ -11566,7 +11706,7 @@ class CoreTests(unittest.TestCase):
         )
         answers = iter(["1"])
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=lambda _: None, rng=random.Random(19))
-        game.state = GameState(player=player, current_scene="phandalin_hub", gold=0, inventory={"bread_round": 1})
+        game.state = GameState(player=player, current_scene="iron_hollow_hub", gold=0, inventory={"bread_round": 1})
         player.equipment_slots = {slot: None for slot in ["head", "ring_1", "ring_2", "neck", "chest", "gloves", "boots", "main_hand", "off_hand", "cape"]}
         game.sell_items(merchant_id="linene_graywind", merchant_name="Linene Ironward")
         self.assertEqual(game.state.gold, 1)
@@ -11582,7 +11722,7 @@ class CoreTests(unittest.TestCase):
             class_skill_choices=["Athletics", "Survival"],
         )
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(20))
-        game.state = GameState(player=player, current_scene="phandalin_hub", gold=0, inventory={"bread_round": 1})
+        game.state = GameState(player=player, current_scene="iron_hollow_hub", gold=0, inventory={"bread_round": 1})
         player.equipment_slots = {slot: None for slot in ["head", "ring_1", "ring_2", "neck", "chest", "gloves", "boots", "main_hand", "off_hand", "cape"]}
         game.sell_items()
         self.assertEqual(game.state.gold, 0)
@@ -11599,7 +11739,7 @@ class CoreTests(unittest.TestCase):
         )
         answers = iter(["2"])
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=lambda _: None, rng=random.Random(21))
-        game.state = GameState(player=player, current_scene="phandalin_hub", gold=0, inventory={"bread_round": 1})
+        game.state = GameState(player=player, current_scene="iron_hollow_hub", gold=0, inventory={"bread_round": 1})
         player.equipment_slots = {slot: None for slot in ["head", "ring_1", "ring_2", "neck", "chest", "gloves", "boots", "main_hand", "off_hand", "cape"]}
         game.sell_items(merchant_id="linene_graywind", merchant_name="Linene Ironward")
         self.assertEqual(game.state.gold, 0)
@@ -11616,7 +11756,7 @@ class CoreTests(unittest.TestCase):
         )
         log: list[str] = []
         game = TextDnDGame(input_fn=lambda _: "6", output_fn=log.append, rng=random.Random(22))
-        game.state = GameState(player=player, current_scene="phandalin_hub", inventory={"bread_round": 1})
+        game.state = GameState(player=player, current_scene="iron_hollow_hub", inventory={"bread_round": 1})
         game.manage_inventory()
         rendered = "\n".join(log)
         self.assertNotIn("Sell items", rendered)
@@ -11633,7 +11773,7 @@ class CoreTests(unittest.TestCase):
         )
         log: list[str] = []
         game = TextDnDGame(input_fn=lambda _: "9", output_fn=log.append, rng=random.Random(221))
-        game.state = GameState(player=player, current_scene="phandalin_hub", inventory={"bread_round": 1})
+        game.state = GameState(player=player, current_scene="iron_hollow_hub", inventory={"bread_round": 1})
         game.manage_inventory(merchant_id="barthen_provisions", merchant_name="Hadrik")
         rendered = self.plain_output(log)
         self.assertIn("[TRADE] Browse Hadrik's wares", rendered)
@@ -11654,7 +11794,7 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(2211))
         game.state = GameState(
             player=player,
-            current_scene="phandalin_hub",
+            current_scene="iron_hollow_hub",
             inventory={"potion_healing": 2, "bread_round": 1, "longsword_common": 1},
         )
         game.show_inventory(filter_key="consumables")
@@ -11678,7 +11818,7 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(2212))
         game.state = GameState(
             player=player,
-            current_scene="phandalin_hub",
+            current_scene="iron_hollow_hub",
             inventory={"potion_healing": 2, "longsword_common": 1},
         )
         game.show_inventory()
@@ -11702,7 +11842,7 @@ class CoreTests(unittest.TestCase):
         )
         log: list[str] = []
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(2213))
-        game.state = GameState(player=player, current_scene="phandalin_hub", inventory={})
+        game.state = GameState(player=player, current_scene="iron_hollow_hub", inventory={})
         stock = game.get_merchant_stock("barthen_provisions")
         stock.clear()
         stock["bread_round"] = 3
@@ -11725,7 +11865,7 @@ class CoreTests(unittest.TestCase):
             class_skill_choices=["Insight", "Performance", "Persuasion"],
         )
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(222))
-        game.state = GameState(player=player, current_scene="phandalin_hub", inventory={})
+        game.state = GameState(player=player, current_scene="iron_hollow_hub", inventory={})
         game.state.flags["merchant_attitudes"] = {"barthen_provisions": 50}
         self.assertEqual(game.trade_persuasion(), 5)
         self.assertAlmostEqual(game.buy_price_multiplier("barthen_provisions"), 1.70)
@@ -11742,7 +11882,7 @@ class CoreTests(unittest.TestCase):
         )
         answers = iter(["1", "3"])
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=lambda _: None, rng=random.Random(23))
-        game.state = GameState(player=player, current_scene="phandalin_hub", gold=15, inventory={})
+        game.state = GameState(player=player, current_scene="iron_hollow_hub", gold=15, inventory={})
         stock = game.get_merchant_stock("barthen_provisions")
         stock.clear()
         stock["bread_round"] = 5
@@ -11767,7 +11907,7 @@ class CoreTests(unittest.TestCase):
         )
         answers = iter(["1", "2"])
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=lambda _: None, rng=random.Random(24))
-        game.state = GameState(player=player, current_scene="phandalin_hub", gold=0, inventory={"bread_round": 3})
+        game.state = GameState(player=player, current_scene="iron_hollow_hub", gold=0, inventory={"bread_round": 3})
         player.equipment_slots = {slot: None for slot in ["head", "ring_1", "ring_2", "neck", "chest", "gloves", "boots", "main_hand", "off_hand", "cape"]}
         stock = game.get_merchant_stock("barthen_provisions")
         stock.clear()
@@ -11786,9 +11926,9 @@ class CoreTests(unittest.TestCase):
             class_skill_choices=["Athletics", "Survival"],
         )
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(25))
-        game.state = GameState(player=player, current_scene="neverwinter_briefing", xp=0, gold=0)
+        game.state = GameState(player=player, current_scene="greywake_briefing", xp=0, gold=0)
         game.skill_check = lambda actor, skill, dc, context: False
-        game.handle_neverwinter_prep()
+        game.handle_greywake_prep()
         self.assertEqual(game.state.xp, 0)
 
     def test_returning_from_ashfall_watch_guarantees_level_two_before_emberhall(self) -> None:
@@ -11804,16 +11944,16 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=lambda _: None, rng=random.Random(52))
         game.state = GameState(
             player=player,
-            current_scene="phandalin_hub",
+            current_scene="iron_hollow_hub",
             clues=["one", "two"],
             xp=180,
-            flags={"ashfall_watch_cleared": True, "phandalin_arrived": True, "tresendar_cleared": True},
+            flags={"ashfall_watch_cleared": True, "iron_hollow_arrived": True, "duskmere_cleared": True},
         )
-        game.scene_phandalin_hub()
+        game.scene_iron_hollow_hub()
         self.assertEqual(game.state.player.level, 2)
         self.assertEqual(game.state.current_scene, "emberhall_cellars")
 
-    def test_neverwinter_prep_skill_check_has_situation_specific_failure_text(self) -> None:
+    def test_greywake_prep_skill_check_has_situation_specific_failure_text(self) -> None:
         player = build_character(
             name="Velkor",
             race="Human",
@@ -11824,9 +11964,9 @@ class CoreTests(unittest.TestCase):
         )
         log: list[str] = []
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(251))
-        game.state = GameState(player=player, current_scene="neverwinter_briefing", xp=0, gold=0)
+        game.state = GameState(player=player, current_scene="greywake_briefing", xp=0, gold=0)
         game.skill_check = lambda actor, skill, dc, context: False
-        game.handle_neverwinter_prep()
+        game.handle_greywake_prep()
         rendered = self.plain_output(log)
         self.assertIn("The ledgers are too incomplete and hastily corrected", rendered)
 
@@ -11842,7 +11982,7 @@ class CoreTests(unittest.TestCase):
         log: list[str] = []
         answers = iter(["1", "4"])
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=log.append, rng=random.Random(26))
-        game.state = GameState(player=player, current_scene="phandalin_hub", xp=0, gold=0)
+        game.state = GameState(player=player, current_scene="iron_hollow_hub", xp=0, gold=0)
         game.skill_check = lambda actor, skill, dc, context: True
         game.visit_shrine()
         rendered = self.plain_output(log)
@@ -11860,7 +12000,7 @@ class CoreTests(unittest.TestCase):
         log: list[str] = []
         answers = iter(["1", "3"])
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=log.append, rng=random.Random(29))
-        game.state = GameState(player=player, current_scene="phandalin_hub")
+        game.state = GameState(player=player, current_scene="iron_hollow_hub")
         game.visit_steward()
         rendered = self.plain_output(log)
         self.assertLess(
@@ -11892,7 +12032,7 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=log.append, rng=random.Random(9204))
         game.state = GameState(
             player=player,
-            current_scene="phandalin_hub",
+            current_scene="iron_hollow_hub",
             flags={
                 "steward_seen": True,
                 "steward_pressure_asked": True,
@@ -11911,7 +12051,7 @@ class CoreTests(unittest.TestCase):
         self.assertTrue(game.state.flags["steward_blackwake_asked"])
         self.assertEqual(game.state.gold, 8)
 
-    def test_phandalin_menu_hides_exhausted_npc_destinations(self) -> None:
+    def test_iron_hollow_menu_hides_exhausted_npc_destinations(self) -> None:
         player = build_character(
             name="Velkor",
             race="Human",
@@ -11923,9 +12063,9 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(92041))
         game.state = GameState(
             player=player,
-            current_scene="phandalin_hub",
+            current_scene="iron_hollow_hub",
             flags={
-                "phandalin_arrived": True,
+                "iron_hollow_arrived": True,
                 "steward_seen": True,
                 "steward_pressure_asked": True,
                 "steward_ruins_asked": True,
@@ -11937,7 +12077,7 @@ class CoreTests(unittest.TestCase):
                 "shrine_recruit_attempted": True,
                 "edermath_orchard_seen": True,
                 "edermath_orchard_blight_checked": True,
-                "edermath_orchard_wyvern_tor_asked": True,
+                "edermath_orchard_red_mesa_hold_asked": True,
                 "edermath_orchard_training_done": True,
                 "edermath_old_cache_recovered": True,
                 "miners_exchange_seen": True,
@@ -11946,7 +12086,7 @@ class CoreTests(unittest.TestCase):
                 "miners_exchange_dispute_resolved": True,
             },
         )
-        game.run_phandalin_council_event = lambda: None
+        game.run_iron_hollow_council_event = lambda: None
         game.run_after_watch_gathering = lambda: None
         game._sync_story_beats_from_flags = lambda: None
         game.maybe_offer_act1_personal_quests = lambda: None
@@ -11962,7 +12102,7 @@ class CoreTests(unittest.TestCase):
 
         game.scenario_choice = capture_menu  # type: ignore[method-assign]
         with self.assertRaises(self._SceneExit):
-            game.scene_phandalin_hub()
+            game.scene_iron_hollow_hub()
 
         rendered = "\n".join(captured)
         self.assertNotIn("Report to Steward Tessa Harrow", rendered)
@@ -11985,7 +12125,7 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(92042))
         game.state = GameState(
             player=player,
-            current_scene="phandalin_hub",
+            current_scene="iron_hollow_hub",
             quests={
                 "marked_keg_investigation": QuestLogEntry("marked_keg_investigation", status="completed"),
                 "find_dain_harl": QuestLogEntry("find_dain_harl", status="completed"),
@@ -12051,27 +12191,27 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(92043))
         game.state = GameState(
             player=player,
-            current_scene="neverwinter_briefing",
+            current_scene="greywake_briefing",
             quests={"false_manifest_circuit": QuestLogEntry("false_manifest_circuit", status="completed")},
             flags={
-                "neverwinter_contract_house_seen": True,
-                "neverwinter_oren_met": True,
+                "greywake_contract_house_seen": True,
+                "greywake_oren_met": True,
                 "false_manifest_oren_detail": True,
-                "neverwinter_oren_room_asked": True,
-                "neverwinter_oren_mira_asked": True,
-                "neverwinter_sabra_met": True,
-                "neverwinter_sabra_fear_asked": True,
-                "neverwinter_vessa_met": True,
+                "greywake_oren_room_asked": True,
+                "greywake_oren_mira_asked": True,
+                "greywake_sabra_met": True,
+                "greywake_sabra_fear_asked": True,
+                "greywake_vessa_met": True,
                 "false_manifest_vessa_detail": True,
-                "neverwinter_vessa_cards_played": True,
-                "neverwinter_smuggler_phrase_known": True,
-                "neverwinter_vessa_smoke_asked": True,
-                "neverwinter_garren_met": True,
+                "greywake_vessa_cards_played": True,
+                "greywake_smuggler_phrase_known": True,
+                "greywake_vessa_smoke_asked": True,
+                "greywake_garren_met": True,
                 "false_manifest_garren_detail": True,
-                "neverwinter_garren_route_asked": True,
-                "neverwinter_garren_pressed": True,
-                "quest_reward_neverwinter_private_room_access": True,
-                "neverwinter_private_room_scene_done": True,
+                "greywake_garren_route_asked": True,
+                "greywake_garren_pressed": True,
+                "quest_reward_greywake_private_room_access": True,
+                "greywake_private_room_scene_done": True,
             },
         )
         captured: list[str] = []
@@ -12084,7 +12224,7 @@ class CoreTests(unittest.TestCase):
 
         game.scenario_choice = capture_menu  # type: ignore[method-assign]
         with self.assertRaises(self._SceneExit):
-            game.visit_neverwinter_contract_house()
+            game.visit_greywake_contract_house()
 
         rendered = "\n".join(captured)
         self.assertNotIn("Oren Vale", rendered)
@@ -12104,7 +12244,7 @@ class CoreTests(unittest.TestCase):
         )
         log: list[str] = []
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(92044))
-        game.state = GameState(player=player, current_scene="neverwinter_briefing")
+        game.state = GameState(player=player, current_scene="greywake_briefing")
 
         def capture_menu(prompt: str, options: list[str], **kwargs) -> int:
             if prompt == "The contract house room keeps three conversations going at once.":
@@ -12113,7 +12253,7 @@ class CoreTests(unittest.TestCase):
 
         game.scenario_choice = capture_menu  # type: ignore[method-assign]
         with self.assertRaises(self._SceneExit):
-            game.visit_neverwinter_contract_house()
+            game.visit_greywake_contract_house()
 
         rendered = self.plain_output(log)
         self.assertIn("Oren Vale runs his contract house in rolled sleeves and measured glances", rendered)
@@ -12129,7 +12269,7 @@ class CoreTests(unittest.TestCase):
             class_skill_choices=["Insight", "Investigation", "Sleight of Hand"],
         )
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(92045))
-        game.state = GameState(player=player, current_scene="neverwinter_briefing")
+        game.state = GameState(player=player, current_scene="greywake_briefing")
         prompt = "Choose what you say to Garren Flint."
         spent_option = game.skill_tag(
             "PERSUASION",
@@ -12149,7 +12289,7 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(choice, 2)
         self.assertEqual(captured, [strip_ansi(leave_option)])
 
-    def test_neverwinter_garren_failed_persuasion_hides_retry_option(self) -> None:
+    def test_greywake_garren_failed_persuasion_hides_retry_option(self) -> None:
         player = build_character(
             name="Velkor",
             race="Human",
@@ -12161,7 +12301,7 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(92046))
         game.state = GameState(
             player=player,
-            current_scene="neverwinter_briefing",
+            current_scene="greywake_briefing",
             quests={"false_manifest_circuit": QuestLogEntry("false_manifest_circuit", status="active")},
         )
         captured: list[list[str]] = []
@@ -12181,7 +12321,7 @@ class CoreTests(unittest.TestCase):
         game.choose_with_display_mode = fake_choose  # type: ignore[method-assign]
         game.roll_check_d20 = lambda actor, advantage, **kwargs: SimpleNamespace(kept=1)  # type: ignore[method-assign]
 
-        game.neverwinter_talk_garren()
+        game.greywake_talk_garren()
 
         first_menu = "\n".join(captured[0])
         second_menu = "\n".join(captured[1])
@@ -12275,7 +12415,7 @@ class CoreTests(unittest.TestCase):
                 {
                     "edermath_orchard_seen": True,
                     "edermath_orchard_blight_checked": True,
-                    "edermath_orchard_wyvern_tor_asked": True,
+                    "edermath_orchard_red_mesa_hold_asked": True,
                     "edermath_orchard_training_done": True,
                     "edermath_old_cache_recovered": True,
                 },
@@ -12296,34 +12436,34 @@ class CoreTests(unittest.TestCase):
                 "Leave the exchange",
             ),
             (
-                "neverwinter_talk_oren",
-                {"neverwinter_oren_met": True, "neverwinter_oren_room_asked": True, "neverwinter_oren_mira_asked": True},
+                "greywake_talk_oren",
+                {"greywake_oren_met": True, "greywake_oren_room_asked": True, "greywake_oren_mira_asked": True},
                 {},
                 "Choose what you say to Oren Vale.",
                 "Leave Oren",
             ),
             (
-                "neverwinter_talk_sabra",
-                {"neverwinter_sabra_met": True, "neverwinter_sabra_fear_asked": True},
+                "greywake_talk_sabra",
+                {"greywake_sabra_met": True, "greywake_sabra_fear_asked": True},
                 {"false_manifest_circuit": completed("false_manifest_circuit")},
                 "Choose what you say to Sabra Kestrel.",
                 "Leave Sabra",
             ),
             (
-                "neverwinter_talk_vessa",
+                "greywake_talk_vessa",
                 {
-                    "neverwinter_vessa_met": True,
-                    "neverwinter_vessa_cards_played": True,
-                    "neverwinter_smuggler_phrase_known": True,
-                    "neverwinter_vessa_smoke_asked": True,
+                    "greywake_vessa_met": True,
+                    "greywake_vessa_cards_played": True,
+                    "greywake_smuggler_phrase_known": True,
+                    "greywake_vessa_smoke_asked": True,
                 },
                 {},
                 "Choose what you say to Vessa Marr.",
                 "Leave Vessa",
             ),
             (
-                "neverwinter_talk_garren",
-                {"neverwinter_garren_met": True, "neverwinter_garren_route_asked": True, "neverwinter_garren_pressed": True},
+                "greywake_talk_garren",
+                {"greywake_garren_met": True, "greywake_garren_route_asked": True, "greywake_garren_pressed": True},
                 {},
                 "Choose what you say to Garren Flint.",
                 "Leave Garren",
@@ -12333,7 +12473,7 @@ class CoreTests(unittest.TestCase):
         for method_name, flags, quests, expected_prompt, leave_needle in cases:
             with self.subTest(method_name=method_name):
                 game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(92044))
-                game.state = GameState(player=player, current_scene="phandalin_hub", flags=dict(flags), quests=dict(quests))
+                game.state = GameState(player=player, current_scene="iron_hollow_hub", flags=dict(flags), quests=dict(quests))
                 captured: list[list[str]] = []
 
                 def capture_menu(prompt: str, options: list[str], **kwargs) -> int:
@@ -12361,7 +12501,7 @@ class CoreTests(unittest.TestCase):
         log: list[str] = []
         answers = iter(["1", "9"])
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=log.append, rng=random.Random(30))
-        game.state = GameState(player=player, current_scene="phandalin_hub")
+        game.state = GameState(player=player, current_scene="iron_hollow_hub")
         game.visit_stonehill_inn()
         rendered = self.plain_output(log)
         self.assertEqual(rendered.count('1. "Mind if I buy you a drink and ask a few questions?"'), 1)
@@ -12380,7 +12520,7 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=log.append, rng=random.Random(9205))
         game.state = GameState(
             player=player,
-            current_scene="phandalin_hub",
+            current_scene="iron_hollow_hub",
             flags={
                 "inn_seen": True,
                 "inn_buy_drink_asked": True,
@@ -12410,7 +12550,7 @@ class CoreTests(unittest.TestCase):
         )
         log: list[str] = []
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(9206))
-        game.state = GameState(player=player, current_scene="phandalin_hub")
+        game.state = GameState(player=player, current_scene="iron_hollow_hub")
         game.keyboard_choice_menu_supported = lambda: True
         common_room_visits = 0
 
@@ -12449,7 +12589,7 @@ class CoreTests(unittest.TestCase):
         )
         log: list[str] = []
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(411))
-        game.state = GameState(player=player, current_scene="phandalin_hub")
+        game.state = GameState(player=player, current_scene="iron_hollow_hub")
         game.skill_check = lambda actor, skill, dc, context: True  # type: ignore[method-assign]
 
         def fake_scenario_choice(prompt: str, options: list[str], **kwargs) -> int:
@@ -12489,7 +12629,7 @@ class CoreTests(unittest.TestCase):
         )
         log: list[str] = []
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(412))
-        game.state = GameState(player=player, current_scene="phandalin_hub")
+        game.state = GameState(player=player, current_scene="iron_hollow_hub")
         game.apply_liars_blessing()
 
         def fail_skill_check(actor, skill, dc, context):
@@ -12512,7 +12652,7 @@ class CoreTests(unittest.TestCase):
         )
         log: list[str] = []
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(413))
-        game.state = GameState(player=player, current_scene="phandalin_hub")
+        game.state = GameState(player=player, current_scene="iron_hollow_hub")
         game.skill_check = lambda actor, skill, dc, context: True  # type: ignore[method-assign]
 
         def first_sella_choice(prompt: str, options: list[str], **kwargs) -> int:
@@ -12586,7 +12726,7 @@ class CoreTests(unittest.TestCase):
         )
         log: list[str] = []
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(414))
-        game.state = GameState(player=player, current_scene="phandalin_hub")
+        game.state = GameState(player=player, current_scene="iron_hollow_hub")
 
         def selective_skill_check(actor, skill, dc, context):
             if skill == "Stealth":
@@ -12645,7 +12785,7 @@ class CoreTests(unittest.TestCase):
         )
         log: list[str] = []
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(415))
-        game.state = GameState(player=player, current_scene="phandalin_hub", flags={"act1_town_fear": 2})
+        game.state = GameState(player=player, current_scene="iron_hollow_hub", flags={"act1_town_fear": 2})
 
         def jerek_accept_choice(prompt: str, options: list[str], **kwargs) -> int:
             if "Jerek Harl" in prompt:
@@ -12670,7 +12810,7 @@ class CoreTests(unittest.TestCase):
         self.assertTrue(game.state.flags["dain_harl_truth_found"])
         self.assertEqual(game.state.quests["find_dain_harl"].status, "ready_to_turn_in")
 
-        game.state.current_scene = "phandalin_hub"
+        game.state.current_scene = "iron_hollow_hub"
 
         def jerek_turnin_choice(prompt: str, options: list[str], **kwargs) -> int:
             if "Jerek Harl" in prompt:
@@ -12703,7 +12843,7 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(416))
         game.state = GameState(
             player=player,
-            current_scene="phandalin_hub",
+            current_scene="iron_hollow_hub",
             flags={
                 "inn_seen": True,
                 "inn_buy_drink_asked": True,
@@ -12758,7 +12898,7 @@ class CoreTests(unittest.TestCase):
         captured: list[Encounter] = []
         game.scenario_choice = lambda prompt, options, **kwargs: self.option_index_containing(options, "QUIET ROOM INTEL")  # type: ignore[method-assign]
         game.run_encounter = lambda encounter: captured.append(encounter) or "victory"  # type: ignore[method-assign]
-        game.return_to_phandalin = lambda text: None  # type: ignore[method-assign]
+        game.return_to_iron_hollow = lambda text: None  # type: ignore[method-assign]
 
         game._ashfall_rukhar_command(dungeon, room)
 
@@ -12789,7 +12929,7 @@ class CoreTests(unittest.TestCase):
 
         self.assertTrue(game.state.flags["emberhall_ledger_read"])
 
-    def test_neverwinter_contract_house_quest_can_unlock_private_room(self) -> None:
+    def test_greywake_contract_house_quest_can_unlock_private_room(self) -> None:
         player = build_character(
             name="Velkor",
             race="Human",
@@ -12800,7 +12940,7 @@ class CoreTests(unittest.TestCase):
         )
         log: list[str] = []
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(419))
-        game.state = GameState(player=player, current_scene="neverwinter_briefing")
+        game.state = GameState(player=player, current_scene="greywake_briefing")
         game.skill_check = lambda actor, skill, dc, context: True  # type: ignore[method-assign]
 
         def contract_house_choice(prompt: str, options: list[str], **kwargs) -> int:
@@ -12815,7 +12955,7 @@ class CoreTests(unittest.TestCase):
                     return self.option_index_containing(options, "Garren Flint")
                 if game.quest_is_ready("false_manifest_circuit") and not game.quest_is_completed("false_manifest_circuit"):
                     return self.option_index_containing(options, "Sabra Kestrel")
-                if game.state.flags.get("quest_reward_neverwinter_private_room_access") and not game.state.flags.get("neverwinter_private_room_scene_done"):
+                if game.state.flags.get("quest_reward_greywake_private_room_access") and not game.state.flags.get("greywake_private_room_scene_done"):
                     return self.option_index_containing(options, "upstairs private room")
                 return self.option_index_containing(options, "Leave the contract house")
             if "Sabra Kestrel" in prompt:
@@ -12841,13 +12981,13 @@ class CoreTests(unittest.TestCase):
             raise AssertionError(prompt)
 
         game.scenario_choice = contract_house_choice  # type: ignore[method-assign]
-        game.visit_neverwinter_contract_house()
+        game.visit_greywake_contract_house()
 
         self.assertEqual(game.state.quests["false_manifest_circuit"].status, "completed")
         self.assertEqual(game.state.inventory["kestrel_ledger_clasp"], 1)
-        self.assertTrue(game.state.flags["quest_reward_neverwinter_private_room_access"])
-        self.assertTrue(game.state.flags["neverwinter_private_room_scene_done"])
-        self.assertTrue(game.state.flags["neverwinter_private_room_intel"])
+        self.assertTrue(game.state.flags["quest_reward_greywake_private_room_access"])
+        self.assertTrue(game.state.flags["greywake_private_room_scene_done"])
+        self.assertTrue(game.state.flags["greywake_private_room_intel"])
         rendered = self.plain_output(log)
         self.assertIn("Additional quest reward: Kestrel Ledger Clasp x1.", rendered)
         self.assertIn("Upstairs Contract Room", rendered)
@@ -12863,7 +13003,7 @@ class CoreTests(unittest.TestCase):
         )
         log: list[str] = []
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(4191))
-        game.state = GameState(player=player, current_scene="neverwinter_briefing")
+        game.state = GameState(player=player, current_scene="greywake_briefing")
         game.keyboard_choice_menu_supported = lambda: True
         contract_house_visits = 0
 
@@ -12880,7 +13020,7 @@ class CoreTests(unittest.TestCase):
             raise AssertionError(prompt)
 
         game.run_keyboard_choice_menu = fake_run
-        game.visit_neverwinter_contract_house()
+        game.visit_greywake_contract_house()
 
         rendered = self.plain_output(log)
         selected_text = 'Let me see the ledgers Sabra Kestrel keeps glaring at.'
@@ -12912,7 +13052,7 @@ class CoreTests(unittest.TestCase):
                 "act2_whisper_pressure": 2,
                 "quest_reward_jerek_road_knot": True,
                 "stonehill_quiet_room_intel_decoded": True,
-                "act2_neverwinter_witness_pressure_active": True,
+                "act2_greywake_witness_pressure_active": True,
             },
         )
         game.skill_check = lambda actor, skill, dc, context: False  # type: ignore[method-assign]
@@ -12960,7 +13100,7 @@ class CoreTests(unittest.TestCase):
         self.assertTrue(game.state.flags["stonehollow_supports_stabilized"])
         self.assertEqual(game.state.xp, 10)
 
-    def test_black_lake_quiet_room_intel_option_takes_orders_without_skill_check(self) -> None:
+    def test_blackglass_quiet_room_intel_option_takes_orders_without_skill_check(self) -> None:
         player = build_character(
             name="Velkor",
             race="Human",
@@ -12973,7 +13113,7 @@ class CoreTests(unittest.TestCase):
         game.state = GameState(
             player=player,
             current_act=2,
-            current_scene="black_lake_causeway",
+            current_scene="blackglass_causeway",
             flags={
                 "act2_started": True,
                 "act2_town_stability": 3,
@@ -12982,7 +13122,7 @@ class CoreTests(unittest.TestCase):
                 "stonehill_quiet_room_intel_decoded": True,
             },
         )
-        dungeon = ACT2_ENEMY_DRIVEN_MAP.dungeons["black_lake_crossing"]
+        dungeon = ACT2_ENEMY_DRIVEN_MAP.dungeons["blackglass_crossing"]
         room = dungeon.rooms["choir_barracks"]
         captured: list[Encounter] = []
 
@@ -12993,13 +13133,13 @@ class CoreTests(unittest.TestCase):
         game.scenario_choice = lambda prompt, options, **kwargs: self.option_index_containing(options, "QUIET ROOM INTEL")  # type: ignore[method-assign]
         game.run_encounter = lambda encounter: captured.append(encounter) or "victory"  # type: ignore[method-assign]
 
-        game._black_lake_choir_barracks(dungeon, room)
+        game._blackglass_choir_barracks(dungeon, room)
 
-        self.assertTrue(game.state.flags["black_lake_barracks_orders_taken"])
+        self.assertTrue(game.state.flags["blackglass_barracks_orders_taken"])
         self.assertEqual(len(captured), 1)
         self.assertEqual(captured[0].enemies[1].conditions.get("surprised"), 1)
 
-    def test_black_lake_many_saved_survivor_testimony_auto_reads_barracks_watch(self) -> None:
+    def test_blackglass_many_saved_survivor_testimony_auto_reads_barracks_watch(self) -> None:
         player = build_character(
             name="Velkor",
             race="Human",
@@ -13013,28 +13153,28 @@ class CoreTests(unittest.TestCase):
         game.state = GameState(
             player=player,
             current_act=2,
-            current_scene="black_lake_causeway",
+            current_scene="blackglass_causeway",
             flags={
                 "act2_started": True,
-                "wave_echo_outer_cleared": True,
+                "resonant_vault_outer_cleared": True,
                 "act2_captive_outcome": "many_saved",
                 "act2_town_stability": 3,
                 "act2_route_control": 3,
                 "act2_whisper_pressure": 2,
             },
         )
-        dungeon = ACT2_ENEMY_DRIVEN_MAP.dungeons["black_lake_crossing"]
+        dungeon = ACT2_ENEMY_DRIVEN_MAP.dungeons["blackglass_crossing"]
         room = dungeon.rooms["causeway_lip"]
         game.skill_check = lambda actor, skill, dc, context: False  # type: ignore[method-assign]
         game.scenario_choice = lambda prompt, options, **kwargs: self.option_index_containing(options, "Test the anchor pull")  # type: ignore[method-assign]
 
-        game._black_lake_causeway_lip(dungeon, room)
+        game._blackglass_causeway_lip(dungeon, room)
 
-        self.assertTrue(game.state.flags["black_lake_survivor_testimony"])
-        self.assertTrue(game.state.flags["black_lake_barracks_watch_read"])
+        self.assertTrue(game.state.flags["blackglass_survivor_testimony"])
+        self.assertTrue(game.state.flags["blackglass_barracks_watch_read"])
         self.assertIn("South Adit survivors", self.plain_output(log))
 
-    def test_black_lake_few_saved_reserve_intact_adds_pressure_and_extra_enemy(self) -> None:
+    def test_blackglass_few_saved_reserve_intact_adds_pressure_and_extra_enemy(self) -> None:
         player = build_character(
             name="Velkor",
             race="Human",
@@ -13049,17 +13189,17 @@ class CoreTests(unittest.TestCase):
         game.state = GameState(
             player=player,
             current_act=2,
-            current_scene="black_lake_causeway",
+            current_scene="blackglass_causeway",
             flags={
                 "act2_started": True,
-                "wave_echo_outer_cleared": True,
+                "resonant_vault_outer_cleared": True,
                 "act2_captive_outcome": "few_saved",
                 "act2_town_stability": 3,
                 "act2_route_control": 3,
                 "act2_whisper_pressure": 2,
             },
         )
-        dungeon = ACT2_ENEMY_DRIVEN_MAP.dungeons["black_lake_crossing"]
+        dungeon = ACT2_ENEMY_DRIVEN_MAP.dungeons["blackglass_crossing"]
         causeway_room = dungeon.rooms["causeway_lip"]
         barracks_room = dungeon.rooms["choir_barracks"]
         game.skill_check = lambda actor, skill, dc, context: False  # type: ignore[method-assign]
@@ -13074,11 +13214,11 @@ class CoreTests(unittest.TestCase):
         game.scenario_choice = choose_option  # type: ignore[method-assign]
         game.run_encounter = lambda encounter: captured.append(encounter) or "victory"  # type: ignore[method-assign]
 
-        game._black_lake_causeway_lip(dungeon, causeway_room)
-        self.assertTrue(game.state.flags["black_lake_choir_reserve_intact"])
+        game._blackglass_causeway_lip(dungeon, causeway_room)
+        self.assertTrue(game.state.flags["blackglass_choir_reserve_intact"])
         self.assertEqual(game.state.flags["act2_whisper_pressure"], 3)
 
-        game._black_lake_choir_barracks(dungeon, barracks_room)
+        game._blackglass_choir_barracks(dungeon, barracks_room)
 
         self.assertEqual(len(captured), 1)
         self.assertEqual(len(captured[0].enemies), 3)
@@ -13097,7 +13237,7 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(423))
         game.state = GameState(
             player=player,
-            current_scene="phandalin_hub",
+            current_scene="iron_hollow_hub",
             flags={"quest_reward_jerek_road_knot": True},
             quests={
                 "songs_for_the_missing": QuestLogEntry(quest_id="songs_for_the_missing", status="completed", notes=[]),
@@ -13134,16 +13274,16 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=log.append, rng=random.Random(27))
         game.state = GameState(
             player=player,
-            current_scene="neverwinter_briefing",
+            current_scene="greywake_briefing",
             flags={
                 "briefing_seen": True,
                 "early_companion_recruited": "Kaelis Starling",
-                "neverwinter_tymora_shrine_seen": True,
-                "neverwinter_high_road_milehouse_seen": True,
-                "neverwinter_signal_cairn_seen": True,
+                "greywake_tymora_shrine_seen": True,
+                "greywake_emberway_milehouse_seen": True,
+                "greywake_signal_cairn_seen": True,
             },
         )
-        game.scene_neverwinter_briefing()
+        game.scene_greywake_briefing()
         rendered = self.plain_output(log)
         self.assertEqual(rendered.count('1. "How is Greywake holding together these days?"'), 1)
 
@@ -13158,7 +13298,7 @@ class CoreTests(unittest.TestCase):
         )
         log: list[str] = []
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(28))
-        game.state = GameState(player=player, current_scene="phandalin_hub", xp=120, gold=9)
+        game.state = GameState(player=player, current_scene="iron_hollow_hub", xp=120, gold=9)
         game.show_party()
         rendered = self.plain_output(log)
         self.assertIn("Next level in 180 XP", rendered)
@@ -13202,14 +13342,14 @@ class CoreTests(unittest.TestCase):
         )
         log: list[str] = []
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(24))
-        game.state = GameState(player=player, current_scene="neverwinter_briefing")
+        game.state = GameState(player=player, current_scene="greywake_briefing")
         game.offer_early_companion()
         rendered = self.plain_output(log)
         self.assertIn("Kaelis Starling, a scout-rogue with Assassin training", rendered)
         self.assertIn("Rhogar Valeguard, an oathsworn Warrior lineholder", rendered)
         self.assertNotIn("Handle the road alone for now.", rendered)
 
-    def test_neverwinter_tymora_shrine_can_recruit_elira_before_phandalin(self) -> None:
+    def test_greywake_tymora_shrine_can_recruit_elira_before_iron_hollow(self) -> None:
         player = build_character(
             name="Velkor",
             race="Human",
@@ -13223,14 +13363,14 @@ class CoreTests(unittest.TestCase):
         game.state = GameState(
             player=player,
             companions=[create_kaelis_starling()],
-            current_scene="neverwinter_briefing",
+            current_scene="greywake_briefing",
         )
         game.skill_check = lambda actor, skill, dc, context: True  # type: ignore[method-assign]
 
-        game.handle_neverwinter_tymora_shrine()
+        game.handle_greywake_tymora_shrine()
 
         self.assertTrue(game.has_companion("Elira Dawnmantle"))
-        self.assertTrue(game.state.flags["elira_neverwinter_recruited"])
+        self.assertTrue(game.state.flags["elira_greywake_recruited"])
         self.assertTrue(game.state.flags["elira_helped"])
         self.assertEqual(len(game.state.party_members()), 3)
 
@@ -13261,8 +13401,8 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(game.state.flags["wayside_aid_route"], "wounded")
         self.assertEqual(game.state.flags["elira_initial_trust_reason"], "warm_trust")
         self.assertTrue(game.state.flags["elira_first_companion"])
-        self.assertTrue(game.state.flags["elira_pre_neverwinter_recruited"])
-        self.assertTrue(game.state.flags["elira_neverwinter_recruited"])
+        self.assertTrue(game.state.flags["elira_pre_greywake_recruited"])
+        self.assertTrue(game.state.flags["elira_greywake_recruited"])
         self.assertTrue(game.state.flags["wayside_luck_bell_promised"])
         self.assertNotIn("early_companion_recruited", game.state.flags)
         self.assertEqual(game.state.current_scene, "greywake_triage_yard")
@@ -13379,7 +13519,7 @@ class CoreTests(unittest.TestCase):
         self.assertIn("This is not a ledger mistake", rendered)
         self.assertIn("first arrow cuts the quarantine line", rendered)
 
-    def test_greywake_road_breakout_preserves_manifest_and_reaches_neverwinter(self) -> None:
+    def test_greywake_road_breakout_preserves_manifest_and_reaches_greywake(self) -> None:
         player = build_character(
             name="Velkor",
             race="Human",
@@ -13406,11 +13546,11 @@ class CoreTests(unittest.TestCase):
         self.assertTrue(game.state.flags["system_profile_seeded"])
         self.assertTrue(game.state.flags["varyn_route_pattern_seen"])
         self.assertEqual(game.state.flags["greywake_mira_evidence_kind"], "marked_manifest")
-        self.assertEqual(game.state.current_scene, "neverwinter_briefing")
+        self.assertEqual(game.state.current_scene, "greywake_briefing")
         self.assertEqual([encounter.title for encounter in encounters], ["Greywake Road Breakout"])
         self.assertTrue(encounters[0].allow_post_combat_random_encounter)
 
-    def test_neverwinter_briefing_reacts_to_greywake_outcome_manifest(self) -> None:
+    def test_greywake_briefing_reacts_to_greywake_outcome_manifest(self) -> None:
         player = build_character(
             name="Velkor",
             race="Human",
@@ -13424,7 +13564,7 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=log.append, rng=random.Random(90114))
         game.state = GameState(
             player=player,
-            current_scene="neverwinter_briefing",
+            current_scene="greywake_briefing",
             flags={
                 "greywake_breakout_resolved": True,
                 "greywake_manifest_preserved": True,
@@ -13435,9 +13575,9 @@ class CoreTests(unittest.TestCase):
             companions=[create_elira_dawnmantle()],
         )
         game.scene_identity_options = lambda scene_key: []
-        game.handle_neverwinter_departure_fork = lambda: setattr(game.state, "current_scene", "road_ambush")
+        game.handle_greywake_departure_fork = lambda: setattr(game.state, "current_scene", "road_ambush")
 
-        game.scene_neverwinter_briefing()
+        game.scene_greywake_briefing()
 
         rendered = self.plain_output(log)
         self.assertTrue(game.state.flags["greywake_mira_reacted"])
@@ -13448,7 +13588,7 @@ class CoreTests(unittest.TestCase):
         self.assertTrue(any("survivors can testify" in clue for clue in game.state.clues))
         self.assertTrue(any("coordinating who got hurt and when" in entry for entry in game.state.journal))
 
-    def test_neverwinter_briefing_reacts_to_burned_greywake_manifest(self) -> None:
+    def test_greywake_briefing_reacts_to_burned_greywake_manifest(self) -> None:
         player = build_character(
             name="Velkor",
             race="Human",
@@ -13462,23 +13602,23 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=log.append, rng=random.Random(90115))
         game.state = GameState(
             player=player,
-            current_scene="neverwinter_briefing",
+            current_scene="greywake_briefing",
             flags={
                 "greywake_manifest_destroyed": True,
                 "greywake_mira_evidence_kind": "burned_manifest_corner",
             },
         )
         game.scene_identity_options = lambda scene_key: []
-        game.handle_neverwinter_departure_fork = lambda: setattr(game.state, "current_scene", "road_ambush")
+        game.handle_greywake_departure_fork = lambda: setattr(game.state, "current_scene", "road_ambush")
 
-        game.scene_neverwinter_briefing()
+        game.scene_greywake_briefing()
 
         rendered = self.plain_output(log)
         self.assertTrue(game.state.flags["greywake_mira_reacted"])
         self.assertIn("Then we work from witnesses. Less clean, but sometimes harder to kill.", rendered)
         self.assertTrue(any("witness testimony" in clue for clue in game.state.clues))
 
-    def test_neverwinter_briefing_greywake_question_uses_preserved_manifest_details(self) -> None:
+    def test_greywake_briefing_greywake_question_uses_preserved_manifest_details(self) -> None:
         player = build_character(
             name="Velkor",
             race="Human",
@@ -13491,7 +13631,7 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(90116))
         game.state = GameState(
             player=player,
-            current_scene="neverwinter_briefing",
+            current_scene="greywake_briefing",
             flags={
                 "briefing_seen": True,
                 "greywake_outcome_sorting_seen": True,
@@ -13501,7 +13641,7 @@ class CoreTests(unittest.TestCase):
             },
         )
         game.scene_identity_options = lambda scene_key: []
-        game.handle_neverwinter_departure_fork = lambda: setattr(game.state, "current_scene", "road_ambush")
+        game.handle_greywake_departure_fork = lambda: setattr(game.state, "current_scene", "road_ambush")
 
         def choose_mira_option(prompt: str, options: list[str], **kwargs) -> int:
             if any("What do you make of Greywake" in option for option in options):
@@ -13510,7 +13650,7 @@ class CoreTests(unittest.TestCase):
 
         game.scenario_choice = choose_mira_option  # type: ignore[method-assign]
 
-        game.scene_neverwinter_briefing()
+        game.scene_greywake_briefing()
 
         rendered = self.plain_output(log)
         self.assertTrue(game.state.flags["mira_q_greywake_initial"])
@@ -13519,7 +13659,7 @@ class CoreTests(unittest.TestCase):
         self.assertIn("witnesses alive long enough to speak", rendered)
         self.assertIn("Public witnesses", rendered)
 
-    def test_neverwinter_briefing_elira_question_reflects_prior_trust(self) -> None:
+    def test_greywake_briefing_elira_question_reflects_prior_trust(self) -> None:
         player = build_character(
             name="Velkor",
             race="Human",
@@ -13532,16 +13672,16 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(90117))
         game.state = GameState(
             player=player,
-            current_scene="neverwinter_briefing",
+            current_scene="greywake_briefing",
             flags={
                 "briefing_seen": True,
                 "elira_first_contact": True,
                 "elira_initial_trust_reason": "spiritual_kinship",
-                "elira_phandalin_fallback_pending": True,
+                "elira_iron_hollow_fallback_pending": True,
             },
         )
         game.scene_identity_options = lambda scene_key: []
-        game.handle_neverwinter_departure_fork = lambda: setattr(game.state, "current_scene", "road_ambush")
+        game.handle_greywake_departure_fork = lambda: setattr(game.state, "current_scene", "road_ambush")
 
         def choose_mira_option(prompt: str, options: list[str], **kwargs) -> int:
             if any("You know Elira Lanternward" in option for option in options):
@@ -13550,7 +13690,7 @@ class CoreTests(unittest.TestCase):
 
         game.scenario_choice = choose_mira_option  # type: ignore[method-assign]
 
-        game.scene_neverwinter_briefing()
+        game.scene_greywake_briefing()
 
         rendered = self.plain_output(log)
         self.assertTrue(game.state.flags["mira_q_elira_initial"])
@@ -13558,7 +13698,7 @@ class CoreTests(unittest.TestCase):
         self.assertIn("Faith that keeps people alive is useful", rendered)
         self.assertIn("With a life, yes", rendered)
 
-    def test_neverwinter_briefing_elira_question_lets_present_elira_answer(self) -> None:
+    def test_greywake_briefing_elira_question_lets_present_elira_answer(self) -> None:
         player = build_character(
             name="Velkor",
             race="Human",
@@ -13571,7 +13711,7 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(901171))
         game.state = GameState(
             player=player,
-            current_scene="neverwinter_briefing",
+            current_scene="greywake_briefing",
             flags={
                 "briefing_seen": True,
                 "elira_first_contact": True,
@@ -13580,7 +13720,7 @@ class CoreTests(unittest.TestCase):
             companions=[create_elira_dawnmantle()],
         )
         game.scene_identity_options = lambda scene_key: []
-        game.handle_neverwinter_departure_fork = lambda: setattr(game.state, "current_scene", "road_ambush")
+        game.handle_greywake_departure_fork = lambda: setattr(game.state, "current_scene", "road_ambush")
 
         def choose_mira_option(prompt: str, options: list[str], **kwargs) -> int:
             if any("You know Elira Lanternward" in option for option in options):
@@ -13589,7 +13729,7 @@ class CoreTests(unittest.TestCase):
 
         game.scenario_choice = choose_mira_option  # type: ignore[method-assign]
 
-        game.scene_neverwinter_briefing()
+        game.scene_greywake_briefing()
 
         rendered = self.plain_output(log)
         self.assertTrue(game.state.flags["mira_q_elira_initial"])
@@ -13599,7 +13739,7 @@ class CoreTests(unittest.TestCase):
         self.assertIn("With a life, yes", rendered)
         self.assertNotIn("find her at the shrine", rendered)
 
-    def test_neverwinter_return_after_phandalin_uses_return_debrief(self) -> None:
+    def test_greywake_return_after_iron_hollow_uses_return_debrief(self) -> None:
         player = build_character(
             name="Velkor",
             race="Human",
@@ -13612,10 +13752,10 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(90118))
         game.state = GameState(
             player=player,
-            current_scene="neverwinter_briefing",
+            current_scene="greywake_briefing",
             flags={
                 "briefing_seen": True,
-                "phandalin_arrived": True,
+                "iron_hollow_arrived": True,
                 "steward_seen": True,
                 "steward_vow_made": True,
                 "blackwake_completed": True,
@@ -13630,18 +13770,18 @@ class CoreTests(unittest.TestCase):
 
         game.scenario_choice = choose_mira_option  # type: ignore[method-assign]
 
-        game.scene_neverwinter_briefing()
+        game.scene_greywake_briefing()
 
         rendered = self.plain_output(log)
-        self.assertTrue(game.state.flags["mira_return_intro_phandalin_return"])
-        self.assertTrue(game.state.flags["mira_q_phandalin_return"])
+        self.assertTrue(game.state.flags["mira_return_intro_iron_hollow_return"])
+        self.assertTrue(game.state.flags["mira_q_iron_hollow_return"])
         self.assertIn("town pressure is not collateral", rendered)
         self.assertIn("Tessa Harrow usually sounds tired", rendered)
         self.assertIn("You made her a vow", rendered)
         self.assertIn("The Blackwake ledgers will make the merchants angrier", rendered)
-        self.assertEqual(game.state.current_scene, "phandalin_hub")
+        self.assertEqual(game.state.current_scene, "iron_hollow_hub")
 
-    def test_neverwinter_return_after_act1_reports_varyn_displacement(self) -> None:
+    def test_greywake_return_after_act1_reports_varyn_displacement(self) -> None:
         player = build_character(
             name="Velkor",
             race="Human",
@@ -13654,10 +13794,10 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(90119))
         game.state = GameState(
             player=player,
-            current_scene="neverwinter_briefing",
+            current_scene="greywake_briefing",
             flags={
                 "briefing_seen": True,
-                "phandalin_arrived": True,
+                "iron_hollow_arrived": True,
                 "varyn_body_defeated_act1": True,
                 "varyn_route_displaced": True,
                 "act1_victory_tier": "fractured_victory",
@@ -13672,7 +13812,7 @@ class CoreTests(unittest.TestCase):
 
         game.scenario_choice = choose_mira_option  # type: ignore[method-assign]
 
-        game.scene_neverwinter_briefing()
+        game.scene_greywake_briefing()
 
         rendered = self.plain_output(log)
         self.assertTrue(game.state.flags["mira_return_intro_post_act1_return"])
@@ -13682,7 +13822,7 @@ class CoreTests(unittest.TestCase):
         self.assertIn("Iron Hollow will spend months learning what the word cost", rendered)
         self.assertIn("the exit that should not have worked", rendered)
 
-    def test_phandalin_shrine_recruits_elira_after_failed_early_attempts(self) -> None:
+    def test_iron_hollow_shrine_recruits_elira_after_failed_early_attempts(self) -> None:
         player = build_character(
             name="Velkor",
             race="Human",
@@ -13695,12 +13835,12 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: "4", output_fn=log.append, rng=random.Random(90113))
         game.state = GameState(
             player=player,
-            current_scene="phandalin_hub",
+            current_scene="iron_hollow_hub",
             flags={
                 "elira_first_contact": True,
                 "elira_wayside_recruit_failed": True,
                 "elira_greywake_recruit_failed": True,
-                "elira_phandalin_fallback_pending": True,
+                "elira_iron_hollow_fallback_pending": True,
                 "wayside_luck_bell_seen": True,
             },
         )
@@ -13713,12 +13853,12 @@ class CoreTests(unittest.TestCase):
         game.visit_shrine()
 
         self.assertTrue(game.has_companion("Elira Dawnmantle"))
-        self.assertTrue(game.state.flags["elira_phandalin_recruited"])
-        self.assertNotIn("elira_phandalin_fallback_pending", game.state.flags)
+        self.assertTrue(game.state.flags["elira_iron_hollow_recruited"])
+        self.assertNotIn("elira_iron_hollow_fallback_pending", game.state.flags)
         rendered = self.plain_output(log).replace("\n", " ")
         self.assertIn("green road-ribbon from the cracked luck bell", rendered)
 
-    def test_neverwinter_tymora_shrine_elira_checks_are_dc_8(self) -> None:
+    def test_greywake_tymora_shrine_elira_checks_are_dc_8(self) -> None:
         check_cases = [
             ("1", "2", "Medicine", "to slow the ash-bitter poison"),
             ("2", "2", "Religion", "to steady the shrine and caravan"),
@@ -13738,7 +13878,7 @@ class CoreTests(unittest.TestCase):
                 answers = iter([shrine_choice, recruit_choice])
                 checks: list[tuple[str, int, str]] = []
                 game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=lambda _: None, rng=random.Random(900901))
-                game.state = GameState(player=player, current_scene="neverwinter_briefing")
+                game.state = GameState(player=player, current_scene="greywake_briefing")
 
                 def capture_check(actor, skill: str, dc: int, context: str) -> bool:
                     checks.append((skill, dc, context))
@@ -13746,11 +13886,11 @@ class CoreTests(unittest.TestCase):
 
                 game.skill_check = capture_check  # type: ignore[method-assign]
 
-                game.handle_neverwinter_tymora_shrine()
+                game.handle_greywake_tymora_shrine()
 
                 self.assertEqual(checks, [(expected_skill, 8, expected_context)])
 
-    def test_phandalin_shrine_elira_checks_are_dc_8(self) -> None:
+    def test_iron_hollow_shrine_elira_checks_are_dc_8(self) -> None:
         player = build_character(
             name="Velkor",
             race="Human",
@@ -13762,7 +13902,7 @@ class CoreTests(unittest.TestCase):
         answers = iter(["1", "1", "2", "2"])
         checks: list[tuple[str, int, str]] = []
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=lambda _: None, rng=random.Random(900902))
-        game.state = GameState(player=player, current_scene="phandalin_hub")
+        game.state = GameState(player=player, current_scene="iron_hollow_hub")
 
         def capture_check(actor, skill: str, dc: int, context: str) -> bool:
             checks.append((skill, dc, context))
@@ -13781,7 +13921,7 @@ class CoreTests(unittest.TestCase):
             ],
         )
 
-    def test_neverwinter_high_road_milehouse_sets_route_effect_for_three_member_party(self) -> None:
+    def test_greywake_emberway_milehouse_sets_route_effect_for_three_member_party(self) -> None:
         player = build_character(
             name="Velkor",
             race="Human",
@@ -13795,20 +13935,20 @@ class CoreTests(unittest.TestCase):
         game.state = GameState(
             player=player,
             companions=[create_kaelis_starling(), create_elira_dawnmantle()],
-            current_scene="neverwinter_briefing",
+            current_scene="greywake_briefing",
         )
         game.skill_check = lambda actor, skill, dc, context: True  # type: ignore[method-assign]
         game.run_encounter = lambda encounter: encounters.append(encounter) or "victory"  # type: ignore[method-assign]
 
-        game.handle_neverwinter_high_road_milehouse()
+        game.handle_greywake_emberway_milehouse()
 
-        self.assertTrue(game.state.flags["neverwinter_woodline_path"])
+        self.assertTrue(game.state.flags["greywake_woodline_path"])
         self.assertTrue(game.state.flags["road_ambush_scouted"])
         self.assertEqual([encounter.title for encounter in encounters], ["Emberway Milehouse Intercept"])
         self.assertTrue(encounters[0].allow_post_combat_random_encounter)
         self.assertEqual(len(encounters[0].enemies), 2)
 
-    def test_neverwinter_signal_cairn_sets_second_wave_edge(self) -> None:
+    def test_greywake_signal_cairn_sets_second_wave_edge(self) -> None:
         player = build_character(
             name="Velkor",
             race="Human",
@@ -13822,12 +13962,12 @@ class CoreTests(unittest.TestCase):
         game.state = GameState(
             player=player,
             companions=[create_kaelis_starling(), create_elira_dawnmantle()],
-            current_scene="neverwinter_briefing",
+            current_scene="greywake_briefing",
         )
         game.skill_check = lambda actor, skill, dc, context: True  # type: ignore[method-assign]
         game.run_encounter = lambda encounter: encounters.append(encounter) or "victory"  # type: ignore[method-assign]
 
-        game.handle_neverwinter_signal_cairn()
+        game.handle_greywake_signal_cairn()
 
         self.assertTrue(game.state.flags["road_reinforcement_signal_cut"])
         self.assertTrue(game.state.flags["road_second_wave_trail_read"])
@@ -13835,7 +13975,7 @@ class CoreTests(unittest.TestCase):
         self.assertTrue(encounters[0].allow_post_combat_random_encounter)
         self.assertEqual(len(encounters[0].enemies), 2)
 
-    def test_phandalin_shrine_defers_when_elira_joined_in_neverwinter(self) -> None:
+    def test_iron_hollow_shrine_defers_when_elira_joined_in_greywake(self) -> None:
         player = build_character(
             name="Velkor",
             race="Human",
@@ -13849,8 +13989,8 @@ class CoreTests(unittest.TestCase):
         game.state = GameState(
             player=player,
             companions=[create_elira_dawnmantle()],
-            current_scene="phandalin_hub",
-            flags={"elira_neverwinter_recruited": True, "wayside_luck_bell_promised": True},
+            current_scene="iron_hollow_hub",
+            flags={"elira_greywake_recruited": True, "wayside_luck_bell_promised": True},
         )
 
         game.visit_shrine()
@@ -13872,7 +14012,7 @@ class CoreTests(unittest.TestCase):
         log: list[str] = []
         answers = iter(["help", "2"])
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=log.append, rng=random.Random(40))
-        game.state = GameState(player=player, current_scene="phandalin_hub")
+        game.state = GameState(player=player, current_scene="iron_hollow_hub")
         game.choose("Choose one.", ["First", "Second"])
         rendered = self.plain_output(log)
         self.assertIn("Global Commands", rendered)
@@ -13897,7 +14037,7 @@ class CoreTests(unittest.TestCase):
         opened: list[str] = []
         log: list[str] = []
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=log.append, rng=random.Random(4011))
-        game.state = GameState(player=player, current_scene="phandalin_hub")
+        game.state = GameState(player=player, current_scene="iron_hollow_hub")
         game.open_developer_tools_menu = lambda: opened.append("dev") or False
         choice = game.choose("Choose one.", ["First", "Second"])
         self.assertEqual(choice, 2)
@@ -13916,7 +14056,7 @@ class CoreTests(unittest.TestCase):
         answers = iter(["~", "2"])
         opened: list[str] = []
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=lambda _: None, rng=random.Random(4012))
-        game.state = GameState(player=player, current_scene="phandalin_hub")
+        game.state = GameState(player=player, current_scene="iron_hollow_hub")
         game.open_console_commands_menu = lambda: opened.append("console")  # type: ignore[method-assign]
         choice = game.choose("Choose one.", ["First", "Second"])
         self.assertEqual(choice, 2)
@@ -14000,7 +14140,7 @@ class CoreTests(unittest.TestCase):
         log: list[str] = []
         answers = iter(["helpconsole", "2"])
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=log.append, rng=random.Random(401301))
-        game.state = GameState(player=player, current_scene="phandalin_hub")
+        game.state = GameState(player=player, current_scene="iron_hollow_hub")
 
         choice = game.choose("Choose one.", ["First", "Second"])
 
@@ -14021,7 +14161,7 @@ class CoreTests(unittest.TestCase):
         )
         item_id = ITEMS["potion_healing"].item_id
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(40131))
-        game.state = GameState(player=player, current_scene="phandalin_hub")
+        game.state = GameState(player=player, current_scene="iron_hollow_hub")
 
         game.execute_console_command(f"give {item_id}")
         game.execute_console_command(f"give {item_id} 3")
@@ -14038,7 +14178,7 @@ class CoreTests(unittest.TestCase):
             class_skill_choices=["Athletics", "Survival"],
         )
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(40132))
-        game.state = GameState(player=player, current_scene="phandalin_hub", gold=5)
+        game.state = GameState(player=player, current_scene="iron_hollow_hub", gold=5)
 
         game.execute_console_command("give gold")
         game.execute_console_command("give gold 25")
@@ -14055,7 +14195,7 @@ class CoreTests(unittest.TestCase):
             class_skill_choices=["Athletics", "Survival"],
         )
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(40133))
-        game.state = GameState(player=player, current_scene="phandalin_hub")
+        game.state = GameState(player=player, current_scene="iron_hollow_hub")
 
         game.execute_console_command("god")
         game.execute_console_command("passallchecks")
@@ -14078,7 +14218,7 @@ class CoreTests(unittest.TestCase):
         )
         companion = create_tolan_ironshield()
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(40134))
-        game.state = GameState(player=player, companions=[companion], current_scene="phandalin_hub")
+        game.state = GameState(player=player, companions=[companion], current_scene="iron_hollow_hub")
 
         game.execute_console_command("levelup")
 
@@ -14100,7 +14240,7 @@ class CoreTests(unittest.TestCase):
         companion.dead = True
         companion.current_hp = 0
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(40135))
-        game.state = GameState(player=player, companions=[companion], current_scene="phandalin_hub", short_rests_remaining=0)
+        game.state = GameState(player=player, companions=[companion], current_scene="iron_hollow_hub", short_rests_remaining=0)
 
         game.execute_console_command("heal")
         self.assertEqual(player.current_hp, player.max_hp)
@@ -14129,7 +14269,7 @@ class CoreTests(unittest.TestCase):
         player.conditions.update({"poisoned": 2, "frightened": 1})
         companion.conditions.update({"blessed": 2, "marked": 1})
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(401351))
-        game.state = GameState(player=player, companions=[companion], current_scene="phandalin_hub")
+        game.state = GameState(player=player, companions=[companion], current_scene="iron_hollow_hub")
 
         game.execute_console_command("clearconditions")
 
@@ -14146,7 +14286,7 @@ class CoreTests(unittest.TestCase):
             class_skill_choices=["Athletics", "Survival"],
         )
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(401352))
-        game.state = GameState(player=player, current_scene="old_owl_well", current_act=1)
+        game.state = GameState(player=player, current_scene="blackglass_well", current_act=1)
 
         game.execute_console_command("unlockmap")
 
@@ -14165,7 +14305,7 @@ class CoreTests(unittest.TestCase):
             class_skill_choices=["Athletics", "Survival"],
         )
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(401353))
-        game.state = GameState(player=player, current_scene="phandalin_hub", current_act=1)
+        game.state = GameState(player=player, current_scene="iron_hollow_hub", current_act=1)
 
         game.execute_console_command("unlockallmaps")
 
@@ -14186,7 +14326,7 @@ class CoreTests(unittest.TestCase):
             class_skill_choices=["Athletics", "Survival"],
         )
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(40136))
-        game.state = GameState(player=player, current_scene="phandalin_hub", current_act=1)
+        game.state = GameState(player=player, current_scene="iron_hollow_hub", current_act=1)
 
         should_resume = game.execute_console_command("setscene act2_expedition_hub")
 
@@ -14204,7 +14344,7 @@ class CoreTests(unittest.TestCase):
             class_skill_choices=["Athletics", "Survival"],
         )
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(40137))
-        game.state = GameState(player=player, current_scene="phandalin_hub")
+        game.state = GameState(player=player, current_scene="iron_hollow_hub")
 
         game.execute_console_command("setflag test_console_flag true")
         self.assertTrue(game.state.flags["test_console_flag"])
@@ -14223,7 +14363,7 @@ class CoreTests(unittest.TestCase):
         )
         captured: list[Encounter] = []
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(40138))
-        game.state = GameState(player=player, current_scene="phandalin_hub")
+        game.state = GameState(player=player, current_scene="iron_hollow_hub")
         game.run_encounter = lambda encounter: captured.append(encounter) or "victory"  # type: ignore[method-assign]
 
         game.execute_console_command("spawn goblin_skirmisher 2")
@@ -14279,7 +14419,7 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: "2", output_fn=log.append, rng=random.Random(4001))
         game.state = GameState(
             player=player,
-            current_scene="phandalin_hub",
+            current_scene="iron_hollow_hub",
             gold=9,
             inventory={"bread_round": 1},
             quests={"secure_miners_road": QuestLogEntry(quest_id="secure_miners_road")},
@@ -14309,7 +14449,7 @@ class CoreTests(unittest.TestCase):
         )
         cleric.resources["mp"] = 6
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(400101))
-        game.state = GameState(player=player, companions=[cleric], current_scene="phandalin_hub")
+        game.state = GameState(player=player, companions=[cleric], current_scene="iron_hollow_hub")
         rendered = game.hud_party_summary()
         self.assertIn("Ash", strip_ansi(rendered))
         self.assertIn("MP [███   ]  6/13", strip_ansi(rendered))
@@ -14353,7 +14493,7 @@ class CoreTests(unittest.TestCase):
             answers = iter([command, "2"])
             opened: list[str] = []
             game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=lambda _: None, rng=random.Random(40012))
-            game.state = GameState(player=player, current_scene="old_owl_well", flags={"miners_exchange_lead": True})
+            game.state = GameState(player=player, current_scene="blackglass_well", flags={"miners_exchange_lead": True})
             game.ensure_state_integrity()
             game.open_map_menu = lambda: opened.append("map-menu")  # type: ignore[method-assign]
             choice = game.choose("Choose one.", ["First", "Second"])
@@ -14797,7 +14937,7 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=log.append, rng=random.Random(4006))
         game.state = GameState(
             player=player,
-            current_scene="phandalin_hub",
+            current_scene="iron_hollow_hub",
             inventory={"traveler_hood_common": 1, "iron_cap_common": 1},
         )
         game.ensure_state_integrity()
@@ -14822,7 +14962,7 @@ class CoreTests(unittest.TestCase):
         answers = iter(["map", "map", "1"])
         opened: list[str] = []
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=lambda _: None, rng=random.Random(4003))
-        game.state = GameState(player=player, current_scene="phandalin_hub")
+        game.state = GameState(player=player, current_scene="iron_hollow_hub")
         game.open_map_menu = lambda: opened.append("map-menu")  # type: ignore[method-assign]
         game.choose("Choose one.", ["First", "Second"])
         self.assertEqual(opened, ["map-menu", "map-menu"])
@@ -14839,7 +14979,7 @@ class CoreTests(unittest.TestCase):
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
         )
-        game.state = GameState(player=player, current_scene="phandalin_hub")
+        game.state = GameState(player=player, current_scene="iron_hollow_hub")
 
         selected = game.choose("Choose one.", ["First", "Second"])
 
@@ -14859,7 +14999,7 @@ class CoreTests(unittest.TestCase):
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
         )
-        game.state = GameState(player=player, current_scene="phandalin_hub")
+        game.state = GameState(player=player, current_scene="iron_hollow_hub")
 
         selected = game.choose("Choose one.", ["First", "Second"], allow_meta=False)
 
@@ -14921,7 +15061,7 @@ class CoreTests(unittest.TestCase):
         log: list[str] = []
         answers = iter(["settings", "7", "1"])
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=log.append, rng=random.Random(401))
-        game.state = GameState(player=player, current_scene="phandalin_hub")
+        game.state = GameState(player=player, current_scene="iron_hollow_hub")
         choice = game.choose("Choose one.", ["First", "Second"])
         self.assertEqual(choice, 1)
         rendered = self.plain_output(log)
@@ -15064,7 +15204,7 @@ class CoreTests(unittest.TestCase):
             base_ability_scores={"STR": 8, "DEX": 14, "CON": 12, "INT": 15, "WIS": 13, "CHA": 10},
             class_skill_choices=["Arcana", "Investigation"],
         )
-        state = GameState(player=player, current_scene="phandalin_hub")
+        state = GameState(player=player, current_scene="iron_hollow_hub")
         writer = TextDnDGame(
             input_fn=lambda _: "1",
             output_fn=lambda _: None,
@@ -15172,7 +15312,7 @@ class CoreTests(unittest.TestCase):
             save_dir=save_dir,
             rng=random.Random(501),
         )
-        writer.state = GameState(player=player, current_scene="phandalin_hub", gold=27)
+        writer.state = GameState(player=player, current_scene="iron_hollow_hub", gold=27)
         save_path = writer.save_game(slot_name="campaign")
 
         other_player = build_character(
@@ -15195,7 +15335,7 @@ class CoreTests(unittest.TestCase):
             reader.handle_meta_command("load")
 
         self.assertEqual(reader.state.player.name, "Iri")
-        self.assertEqual(reader.state.current_scene, "phandalin_hub")
+        self.assertEqual(reader.state.current_scene, "iron_hollow_hub")
         self.assertEqual(reader.state.gold, 27)
 
         Path(save_path).unlink(missing_ok=True)
@@ -15212,7 +15352,7 @@ class CoreTests(unittest.TestCase):
             class_skill_choices=["Athletics", "Survival"],
         )
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(503))
-        game.state = GameState(player=player, current_scene="phandalin_hub")
+        game.state = GameState(player=player, current_scene="iron_hollow_hub")
         game.confirm = lambda prompt: True
 
         with self.assertRaises(gameplay_base.ReturnToTitleMenu):
@@ -15240,7 +15380,7 @@ class CoreTests(unittest.TestCase):
         )
         log: list[str] = []
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(205))
-        game.state = GameState(player=player, current_scene="phandalin_hub")
+        game.state = GameState(player=player, current_scene="iron_hollow_hub")
         game.player_speaker("We should move.")
         game.speaker("Lantern Keeper", "Then move quickly.")
         rendered = "\n".join(log)
@@ -15263,7 +15403,7 @@ class CoreTests(unittest.TestCase):
         log: list[str] = []
         answers = iter(["camp", "7", "1"])
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=log.append, rng=random.Random(41))
-        game.state = GameState(player=player, current_scene="phandalin_hub")
+        game.state = GameState(player=player, current_scene="iron_hollow_hub")
         game.choose("Choose one.", ["First", "Second"])
         rendered = self.plain_output(log)
         self.assertIn("=== Camp ===", rendered)
@@ -15322,7 +15462,7 @@ class CoreTests(unittest.TestCase):
         )
         log: list[str] = []
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(430))
-        game.state = GameState(player=player, current_scene="phandalin_hub")
+        game.state = GameState(player=player, current_scene="iron_hollow_hub")
         game.player_choice_output(game.action_option("Take the writ and head for the Emberway."))
         self.assertEqual(log[-2], "*Take the writ and head for the Emberway.")
         self.assertEqual(log[-1], "")
@@ -15431,7 +15571,7 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=lambda _: None, rng=random.Random(115))
         game.state = GameState(
             player=player,
-            current_scene="phandalin_hub",
+            current_scene="iron_hollow_hub",
             inventory={"giantfire_balm": 1, "scroll_resurgent_flame": 1},
         )
         self.assertTrue(game.use_item_from_inventory())

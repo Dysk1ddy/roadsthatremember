@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 
-class StoryAct2ConyberryMixin:
+class StoryAct2HushfenMixin:
     def _hushfen_active_companion(self, name: str):
         assert self.state is not None
         companion = self.find_companion(name)

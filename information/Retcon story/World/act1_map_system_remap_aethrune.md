@@ -37,11 +37,11 @@ To avoid breaking Act 1 progression, tests, saves, and route unlocks:
 ### This means:
 
 For now:
-- `phandalin_hub` can still exist internally
-- `old_owl_well`
-- `wyvern_tor`
+- `iron_hollow_hub` can still exist internally
+- `blackglass_well`
+- `red_mesa_hold`
 - `ashfall_watch`
-- `tresendar_manor`
+- `duskmere_manor`
 - `emberhall_cellars`
 
 But the **player-facing runtime labels** should be rewritten to Aethrune equivalents.
@@ -84,17 +84,17 @@ That structure should remain unchanged.
 
 ## Major city opening
 
-- Old: Neverwinter
+- Old: Greywake
 - New: **Greywake**
 
 ## Main frontier hub town
 
-- Old: Phandalin
+- Old: Iron Hollow
 - New: **Iron Hollow**
 
 ## Main road
 
-- Old: High Road / Triboar Trail framing
+- Old: Emberway / Triboar Trail framing
 - New: **Emberway**
 
 The Emberway is the primary overland artery through the Shatterbelt: damaged, surveilled, and increasingly filtered by hostile route-control forces.
@@ -107,23 +107,23 @@ The Emberway is the primary overland artery through the Shatterbelt: damaged, su
 
 | Current public location | New public-facing Aethrune name | Keep internal id now? | Notes |
 | --- | --- | --- | --- |
-| Neverwinter | Greywake | Yes | major city opening and contract/briefing center |
-| High Road | Emberway | Yes | main Act 1 travel spine |
+| Greywake | Greywake | Yes | major city opening and contract/briefing center |
+| Emberway | Emberway | Yes | main Act 1 travel spine |
 | Wayside Luck Shrine | Wayside Lantern Shrine | Yes | early shared shrine stop |
 | Greywake Triage Yard | Greywake Triage Yard | Yes | already original enough; keep |
 | Greywake Road Breakout | Greywake Road Breakout | Yes | already original enough; keep |
-| Phandalin | Iron Hollow | Yes | main Act 1 hub town |
+| Iron Hollow | Iron Hollow | Yes | main Act 1 hub town |
 | Stonehill Inn | Ashlamp Inn | Yes | Act 1 inn hub |
 | Shrine of Tymora | Lantern Shrine | Yes | remove deity-specific reference |
-| Barthen's Provisions | Hadrik's Provisions | Yes | shop reskin |
+| Hadrik's Provisions | Hadrik's Provisions | Yes | shop reskin |
 | Lionshield Trading Post | Ironbound Trading Post | Yes | shop/faction reskin |
 | Edermath Orchard | Orchard Wall | Yes | keep function, rename surface label |
 | Miner's Exchange | Delvers' Exchange | Yes | town political/economic hub |
-| Old Owl Well | Blackglass Well | Yes | ruin/dig branch |
-| Wyvern Tor | Red Mesa Hold | Yes | raider branch |
+| Blackglass Well | Blackglass Well | Yes | ruin/dig branch |
+| Red Mesa Hold | Red Mesa Hold | Yes | raider branch |
 | Cinderfall Ruins | Cinderfall Ruins | Yes | already original enough; keep |
 | Ashfall Watch | Ashfall Watch | Yes | already original enough; keep |
-| Tresendar Manor | Duskmere Manor | Yes | late Act 1 descent site |
+| Duskmere Manor | Duskmere Manor | Yes | late Act 1 descent site |
 | Emberhall Cellars | Emberhall Cellars | Yes | already original enough; keep |
 | Blackwake Crossing | Blackwake Crossing | Yes | already original enough; keep |
 
@@ -153,7 +153,7 @@ The prologues are now framed as Greywake district incidents, frontier breakdowns
 - House of Knowledge Archives -> Greywake Archive Hall
 - Protector's Enclave Market -> Iron Quarter Market
 - River District Counting-House -> Lower Ledger Hall
-- Neverwinter Wood Trail Camp -> Greywake Wood Trail Camp
+- Greywake Survey Line Trail Camp -> Greywake Wood Trail Camp
 
 Functionally, these should behave the same.
 
@@ -180,7 +180,7 @@ This part should establish:
 
 ---
 
-## 3. Greywake Briefing (Was Neverwinter Briefing)
+## 3. Greywake Briefing (Was Greywake Briefing)
 
 Keep the same logic:
 - central exposition scene
@@ -201,7 +201,7 @@ Companion selection remains structurally identical.
 
 ---
 
-## 4. Emberway Road Ambush (Was High Road Ambush)
+## 4. Emberway Road Ambush (Was Emberway Ambush)
 
 Keep:
 - two-wave ambush structure
@@ -210,7 +210,7 @@ Keep:
 - same combat/opening choice pattern
 
 ### Surface rewrite
-This is no longer simply a road ambush outside Phandalin.
+This is no longer simply a road ambush outside Iron Hollow.
 
 It is an attack on the Emberway:
 - a controlled disruption point
@@ -260,7 +260,7 @@ These branches are especially important because they teach the player that road 
 
 ---
 
-# IRON HOLLOW HUB (Was Phandalin Hub)
+# IRON HOLLOW HUB (Was Iron Hollow Hub)
 
 ## Core Rule
 Keep the hub menu structure intact.
@@ -301,7 +301,7 @@ It should feel:
 | Report to Steward Tessa Harrow | Report to Steward Tessa Harrow |
 | Visit the Stonehill Inn | Visit the Ashlamp Inn |
 | Stop by the shrine of Tymora | Stop by the Lantern Shrine |
-| Barthen's Provisions | Hadrik's Provisions |
+| Hadrik's Provisions | Hadrik's Provisions |
 | Lionshield trading post | Ironbound Trading Post |
 | Walk the old walls of Edermath Orchard | Walk the old orchard wall |
 | Step into the Miner's Exchange | Step into the Delvers' Exchange |
@@ -321,7 +321,7 @@ But deity- and setting-specific bios should be rewritten later.
 
 # MAJOR ACT 1 BRANCH SITES
 
-## Branch A — Blackglass Well (Was Old Owl Well)
+## Branch A — Blackglass Well (Was Blackglass Well)
 
 ### Core role
 Preserve this as:
@@ -348,7 +348,7 @@ This remains one of the two gates before Ashfall Watch.
 
 ---
 
-## Branch B — Red Mesa Hold (Was Wyvern Tor)
+## Branch B — Red Mesa Hold (Was Red Mesa Hold)
 
 ### Core role
 Preserve this as:
@@ -472,7 +472,7 @@ This emotional reset is important and should not be cut.
 
 # LATE ACT DESCENT
 
-## Duskmere Manor (Was Tresendar Manor)
+## Duskmere Manor (Was Duskmere Manor)
 
 ### Core role
 Preserve this as:
@@ -621,18 +621,18 @@ Only after the public rewrite is stable:
 
 | Internal structure role | Current public label | New public label |
 | --- | --- | --- |
-| major city | Neverwinter | Greywake |
-| main road | High Road | Emberway |
-| main hub | Phandalin | Iron Hollow |
+| major city | Greywake | Greywake |
+| main road | Emberway | Emberway |
+| main hub | Iron Hollow | Iron Hollow |
 | inn | Stonehill Inn | Ashlamp Inn |
 | shrine | Shrine of Tymora | Lantern Shrine |
 | orchard / local elder loop | Edermath Orchard | Orchard Wall |
 | exchange / mining politics | Miner's Exchange | Delvers' Exchange |
-| ruin branch A | Old Owl Well | Blackglass Well |
-| ruin branch B | Wyvern Tor | Red Mesa Hold |
+| ruin branch A | Blackglass Well | Blackglass Well |
+| ruin branch B | Red Mesa Hold | Red Mesa Hold |
 | hidden relay | Cinderfall Ruins | Cinderfall Ruins |
 | fortress assault | Ashfall Watch | Ashfall Watch |
-| late descent site | Tresendar Manor | Duskmere Manor |
+| late descent site | Duskmere Manor | Duskmere Manor |
 | finale | Emberhall Cellars | Emberhall Cellars |
 
 ---

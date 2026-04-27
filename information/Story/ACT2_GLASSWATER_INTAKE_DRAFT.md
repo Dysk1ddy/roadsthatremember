@@ -21,7 +21,7 @@
 
 ## Narrative Role
 
-- `Glasswater Intake` is a Pact-era water-control annex buried in the lower slopes between Phandalin and the Wave Echo approaches.
+- `Glasswater Intake` is a Pact-era water-control annex buried in the lower slopes between Iron Hollow and the Resonant Vault approaches.
 - On the surface it is practical dwarfwork: sluice gates, pressure valves, lamp niches, and a relay office that once tracked safe flow and ration timing.
 - Under Quiet Choir use, it becomes an early-act proof point that the cult is seizing infrastructure, falsifying logistics, and turning ordinary systems into listening lines.
 - The dungeon bridges the tone between:
@@ -51,7 +51,7 @@
 
 - Wet stone, rusting gearwork, algae-dark channels, and lamp housings that still imply care even after neglect.
 - Sound design should matter in the writing: the intake hums, drips, rattles, and occasionally almost sounds like a breath catching in pipes.
-- The horror stays restrained. No full Black Lake spectacle, no Forge-light grandeur, no obvious cosmic revelation. The wrongness should still be deniable by frightened practical people.
+- The horror stays restrained. No full Blackglass spectacle, no Forge-light grandeur, no obvious cosmic revelation. The wrongness should still be deniable by frightened practical people.
 
 ## Physical Layout
 
@@ -307,7 +307,7 @@ This is the contaminated lower end. The ritual pressure is still small by Act 2 
   - weaker immediate route leverage
 - Ledger path:
   - better `Route Control`
-  - more precise sabotage-night or Black Lake leverage
+  - more precise sabotage-night or Blackglass leverage
   - morally murkier because the intake keeps hurting people longer
 
 ### Branch 2: Public Exposure Or Quiet Exploitation
@@ -418,7 +418,7 @@ If the player reaches the dungeon after `Sabotage Night`, the annex should not f
 ## Future Payoff Hooks
 
 - If the player decoded the relay traffic:
-  - grant a future special option in `Sabotage Night`, `Black Lake Barracks`, or a sponsor debrief
+  - grant a future special option in `Sabotage Night`, `Blackglass Barracks`, or a sponsor debrief
 - If the player restored clean flow:
   - `Town Stability` scenes in camp and town should sound less frightened
 - If the player repurposed the headgate:
@@ -580,7 +580,7 @@ This section is meant to be implementation-facing. The writing can still be tigh
 - Intended discoveries:
   - claims fraud
   - deliberate delays in repair allotments
-  - coded traffic references that can later support sponsor scenes, sabotage reads, or Black Lake barracks logic
+  - coded traffic references that can later support sponsor scenes, sabotage reads, or Blackglass barracks logic
 - Prompt:
   - "Which truth do you take out first?"
 - Recommended options:
@@ -773,7 +773,7 @@ These do not all need to ship at once, but the draft should think in flags so th
 - Phase 2:
   - add delayed-state variation, stronger sponsor hooks, and payoff flags into the midpoint
 - Phase 3:
-  - pay forward the relay intelligence and headgate choice into Black Lake, sponsor politics, or Act 3 contamination tone
+  - pay forward the relay intelligence and headgate choice into Blackglass, sponsor politics, or Act 3 contamination tone
 
 ## Bottom Line
 

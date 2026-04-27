@@ -246,23 +246,23 @@ Positive `act2_town_stability` and `act2_route_control` are beneficial. Negative
 | --- | --- | --- | --- | --- |
 | `trace_blackwake_cell` | Embers Before the Road | Mira Thann | `blackwake_completed` | 90 XP, 35 gp, `miras_blackwake_seal`, `scroll_ember_ward`, Blackwake watch backing flag. |
 | `secure_miners_road` | Stop the Watchtower Raids | Steward Tessa Harrow | `ashfall_watch_cleared` | 100 XP, 50 gp, `roadwarden_cloak`, supplies, miners-road-open flag. |
-| `restore_barthen_supplies` | Keep the Shelves Full | Hadrik | `ashfall_watch_cleared` | 75 XP, 35 gp, `barthen_resupply_token`, food, Hadrik attitude boost, resupply-credit flag. |
+| `restore_hadrik_supplies` | Keep the Shelves Full | Hadrik | `ashfall_watch_cleared` | 75 XP, 35 gp, `barthen_resupply_token`, food, Hadrik attitude boost, resupply-credit flag. |
 | `reopen_lionshield_trade` | Reopen the Trade Lane | Linene Ironward | `ashfall_watch_cleared` | 85 XP, 45 gp, `lionshield_quartermaster_badge`, potions, Linene attitude boost, logistics flag. |
 | `marked_keg_investigation` | The Marked Keg | Mara Ashlamp | `marked_keg_resolved` | 70 XP, 24 gp, `innkeeper_credit_token`, Ashlamp common-room-welcome flag. |
 | `songs_for_the_missing` | Songs for the Missing | Sella Quill | `songs_for_missing_jerek_detail`, `songs_for_missing_tam_detail`, `songs_for_missing_nera_detail` | 65 XP, 18 gp, `sella_ballad_token`, names-carried flag. |
 | `quiet_table_sharp_knives` | Quiet Table, Sharp Knives | Nera Doss | `quiet_table_knives_resolved` | 80 XP, 28 gp, `blackseal_taster_pin`, quiet-room-access flag. |
 | `find_dain_harl` | Bring Back Dain's Name | Jerek Harl | `dain_harl_truth_found` | 85 XP, 26 gp, `harl_road_knot`, Jerek road-knot flag. |
 | `false_manifest_circuit` | False Manifest Circuit | Sabra Kestrel | `false_manifest_oren_detail`, `false_manifest_vessa_detail`, `false_manifest_garren_detail` | 75 XP, 24 gp, `kestrel_ledger_clasp`, Greywake private-room access flag. |
-| `silence_old_owl_well` | Silence Blackglass Well | Halia Vey | `old_owl_well_cleared` | 100 XP, 45 gp, `gravequiet_amulet`, scroll and salve, gravequiet contacts flag. |
-| `break_wyvern_tor_raiders` | Break the Red Mesa Raiders | Daran Orchard | `wyvern_tor_cleared` | 100 XP, 40 gp, `edermath_scout_buckle`, healing draught, scout-network flag. |
+| `silence_blackglass_well` | Silence Blackglass Well | Halia Vey | `blackglass_well_cleared` | 100 XP, 45 gp, `gravequiet_amulet`, scroll and salve, gravequiet contacts flag. |
+| `break_red_mesa_raiders` | Break the Red Mesa Raiders | Daran Orchard | `red_mesa_hold_cleared` | 100 XP, 40 gp, `edermath_scout_buckle`, healing draught, scout-network flag. |
 | `bryn_loose_ends` | Loose Ends | Bryn Underbough | `bryn_loose_ends_resolved` | 80 XP, 25 gp, `bryns_cache_keyring`, `dust_of_disappearance`, underworld-favor flag. |
 | `elira_faith_under_ash` | Faith Under Ash | Elira Lanternward | `elira_faith_under_ash_resolved` | 80 XP, 20 gp, `dawnmantle_mercy_charm`, `blessed_salve`, mercy-blessing flag. |
-| `recover_pact_waymap` | Recover the Compact Waymap | Halia Vey | `hushfen_truth_secured`, `wave_echo_reached` | 140 XP, 75 gp, `pact_waymap_case`, resonance tonics, route-control boost. |
+| `recover_pact_waymap` | Recover the Compact Waymap | Halia Vey | `hushfen_truth_secured`, `resonant_vault_reached` | 140 XP, 75 gp, `pact_waymap_case`, resonance tonics, route-control boost. |
 | `seek_pale_witness_truth` | Ask the Pale Witness What Was Buried | Elira Lanternward | `hushfen_truth_secured` | 130 XP, 40 gp, `pale_witness_lantern`, `scroll_quell_the_deep`, whisper-pressure reduction. |
 | `rescue_stonehollow_scholars` | Bring Back the Survey Team | Linene Ironward | `stonehollow_dig_cleared` | 140 XP, 70 gp, `stonehollow_survey_lantern`, rations, Linene attitude boost, town and route boosts. |
 | `cut_woodland_saboteurs` | Break the Woodland Saboteurs | Daran Orchard | `woodland_survey_cleared` | 140 XP, 65 gp, `woodland_wayfinder_boots`, `delvers_amber`, route-control boost. |
 | `hold_the_claims_meet` | Hold the Claims Meeting Together | Linene Ironward | `claims_meet_held`, `iron_hollow_sabotage_resolved` | 120 XP, 75 gp, `claims_accord_brooch`, Linene attitude boost, major town-stability boost. |
-| `free_wave_echo_captives` | Free the South Adit Prisoners | Elira Lanternward | `south_adit_cleared` | 160 XP, 80 gp, `freed_captive_prayer_beads`, scrolls, town boost and whisper reduction. |
+| `free_resonant_vault_captives` | Free the South Adit Prisoners | Elira Lanternward | `south_adit_cleared` | 160 XP, 80 gp, `freed_captive_prayer_beads`, scrolls, town boost and whisper reduction. |
 | `sever_quiet_choir` | Sever the Quiet Choir | Town Council | `caldra_defeated` | 250 XP, 150 gp, `forgeheart_cinder`, forge consumables, town and route boosts, major whisper reduction. |
 
 ## Act 1 Reward Carryover Into Act 2
@@ -280,7 +280,7 @@ Act 1 reward and callback flags influence Act 2 starting metrics in `act2_initia
 | `act2_edermath_cache_routework` | +1 route control from Daran's old adventurer's cache; Act 2 status text can mention the quiet orchard-to-highland control line. |
 | `quest_reward_bryn_underworld_favor` | +1 route control. |
 | `quest_reward_elira_mercy_blessing` | +1 town stability, -1 whisper pressure. |
-| `neverwinter_contract_house_political_callback` | +1 route control, Act 2 witness-pressure status text, and claims-council dialogue from Oren, Sabra, Vessa, and Garren. |
+| `greywake_contract_house_political_callback` | +1 route control, Act 2 witness-pressure status text, and claims-council dialogue from Oren, Sabra, Vessa, and Garren. |
 
 These are the main current examples of quest rewards and connected report callbacks unlocking beneficial options further down the story.
 
@@ -292,12 +292,12 @@ Current turn-in scenes call `turn_in_quest()` with an explicit original giver.
 | --- | --- |
 | `trace_blackwake_cell` | Blackwake backtrack/report path in `map_system.py`, giver `Mira Thann`. |
 | `secure_miners_road` | Steward's Hall in `story_town_hub.py`, giver `Steward Tessa Harrow`. |
-| `restore_barthen_supplies` | Hadrik's Provisions in `story_town_services.py`, giver `Hadrik`. |
+| `restore_hadrik_supplies` | Hadrik's Provisions in `story_town_services.py`, giver `Hadrik`. |
 | `reopen_lionshield_trade` | Ironbound Trading Post in `story_town_services.py`, giver `Linene Ironward`. |
 | `find_dain_harl` | Ashlamp Inn in `story_town_hub.py`, giver `Jerek Harl`. |
 | `false_manifest_circuit` | Oren Vale's contract house in `story_intro.py`, giver `Sabra Kestrel`. |
-| `silence_old_owl_well` | Delvers' Exchange in `story_act1_expanded.py`, giver `Halia Vey`. |
-| `break_wyvern_tor_raiders` | Orchard Wall in `story_act1_expanded.py`, giver `Daran Orchard`. |
+| `silence_blackglass_well` | Delvers' Exchange in `story_act1_expanded.py`, giver `Halia Vey`. |
+| `break_red_mesa_raiders` | Orchard Wall in `story_act1_expanded.py`, giver `Daran Orchard`. |
 | `bryn_loose_ends` | Bryn's personal quest resolution in `map_system.py`, giver `Bryn Underbough`. |
 | `elira_faith_under_ash` | Elira's personal quest resolution in `map_system.py`, giver `Elira Lanternward`. |
 | Act 2 route quests | `run_act2_council_turnins()` lists each ready quest by original giver and turns in only the selected report. |

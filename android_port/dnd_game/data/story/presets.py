@@ -22,7 +22,7 @@ PRESET_CHARACTERS: dict[str, dict[str, object]] = {
     },
     "Fighter": {
         "name": "Riven Ashguard",
-        "race": "Half-Orc",
+        "race": "Orc",
         "background": "Soldier",
         "base_ability_scores": {"STR": 15, "DEX": 12, "CON": 14, "INT": 8, "WIS": 10, "CHA": 13},
         "class_skill_choices": ["Perception", "Survival"],
@@ -39,7 +39,7 @@ PRESET_CHARACTERS: dict[str, dict[str, object]] = {
     },
     "Cleric": {
         "name": "Sister Elowen",
-        "race": "Half-Elf",
+        "race": "Dwarf",
         "background": "Acolyte",
         "base_ability_scores": {"STR": 10, "DEX": 12, "CON": 13, "INT": 8, "WIS": 15, "CHA": 14},
         "class_skill_choices": ["Medicine", "Persuasion"],
@@ -47,7 +47,7 @@ PRESET_CHARACTERS: dict[str, dict[str, object]] = {
     },
     "Wizard": {
         "name": "Theron Vale",
-        "race": "Human",
+        "race": "Gnome",
         "background": "Sage",
         "base_ability_scores": {"STR": 8, "DEX": 14, "CON": 13, "INT": 15, "WIS": 12, "CHA": 10},
         "class_skill_choices": ["Arcana", "Investigation"],
@@ -71,7 +71,7 @@ PRESET_CHARACTERS: dict[str, dict[str, object]] = {
     },
     "Druid": {
         "name": "Liora Fenbloom",
-        "race": "Half-Elf",
+        "race": "Human",
         "background": "Hermit",
         "base_ability_scores": {"STR": 8, "DEX": 12, "CON": 13, "INT": 10, "WIS": 15, "CHA": 14},
         "class_skill_choices": ["Nature", "Perception"],
@@ -100,6 +100,14 @@ PRESET_CHARACTERS: dict[str, dict[str, object]] = {
         "base_ability_scores": {"STR": 8, "DEX": 14, "CON": 13, "INT": 10, "WIS": 12, "CHA": 15},
         "class_skill_choices": ["Intimidation", "Investigation"],
         "description": "A force-damage occultist built for strong Charisma pressure, unsettling dialogue, and repeatable ranged offense.",
+    },
+    "Warrior": {
+        "name": "Mara Gatehand",
+        "race": "Human",
+        "background": "Soldier",
+        "base_ability_scores": {"STR": 15, "DEX": 12, "CON": 14, "INT": 8, "WIS": 13, "CHA": 10},
+        "class_skill_choices": ["Athletics", "Perception"],
+        "description": "A line-holder built for Grit, Guard Stance, shoves, and reading armored enemies.",
     },
 }
 

@@ -14,6 +14,7 @@ try:
 except ImportError:  # pragma: no cover - Windows-only keyboard support
     msvcrt = None
 
+from ..data.id_aliases import runtime_scene_id
 from ..data.story.public_terms import marks_label, skill_option_label
 from ..models import GameState
 from ..ui.colors import ANSI_RE, colorize, rarity_color, rich_style_name, strip_ansi
@@ -1182,7 +1183,8 @@ class GameIOMixin:
     def scene_label_from_key(self, scene_key: object) -> str:
         raw_scene = str(scene_key or "")
         scene_labels = getattr(self, "SCENE_LABELS", {})
-        return scene_labels.get(raw_scene, raw_scene.replace("_", " ").title() or "Unknown")
+        runtime_scene = runtime_scene_id(raw_scene) or raw_scene
+        return scene_labels.get(runtime_scene, scene_labels.get(raw_scene, raw_scene.replace("_", " ").title() or "Unknown"))
 
     def act_label_from_number(self, act_number: object) -> str:
         try:
@@ -1297,8 +1299,12 @@ class GameIOMixin:
         if not isinstance(metadata, dict):
             metadata = {}
         scene_key = metadata.get("scene", data.get("current_scene", ""))
+        runtime_scene_key = runtime_scene_id(str(scene_key)) or str(scene_key)
         act = metadata.get("act", data.get("current_act", 1))
-        objective = metadata.get("last_objective") or getattr(self, "SCENE_OBJECTIVES", {}).get(str(scene_key), "Press on.")
+        objective = (
+            metadata.get("last_objective")
+            or getattr(self, "SCENE_OBJECTIVES", {}).get(runtime_scene_key, "Press on.")
+        )
         playtime_seconds = metadata.get("playtime_seconds", data.get("playtime_seconds", 0))
         try:
             party_level = int(metadata.get("party_level") or self.party_level_from_save_data(data))

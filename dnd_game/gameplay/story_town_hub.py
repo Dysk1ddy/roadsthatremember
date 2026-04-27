@@ -6,11 +6,11 @@ from .constants import LEVEL_XP_THRESHOLDS
 
 
 class StoryTownHubMixin:
-    def describe_blackwake_phandalin_arrival(self) -> None:
+    def describe_blackwake_iron_hollow_arrival(self) -> None:
         assert self.state is not None
-        if self.state.flags.get("phandalin_blackwake_arrival_seen"):
+        if self.state.flags.get("iron_hollow_blackwake_arrival_seen"):
             return
-        self.state.flags["phandalin_blackwake_arrival_seen"] = True
+        self.state.flags["iron_hollow_blackwake_arrival_seen"] = True
         resolution = self.state.flags.get("blackwake_resolution")
         if resolution == "rescue":
             self.say(
@@ -34,20 +34,20 @@ class StoryTownHubMixin:
         if self.state.flags.get("blackwake_sereth_fate") == "escaped":
             self.say("One road hand lowers their voice over Sereth Vane's name, as if saying it too clearly might invite him south.")
 
-    def scene_phandalin_hub(self) -> None:
+    def scene_iron_hollow_hub(self) -> None:
         assert self.state is not None
         self.banner("Iron Hollow")
-        if not self.state.flags.get("phandalin_arrived"):
+        if not self.state.flags.get("iron_hollow_arrived"):
             self.say(
                 "Iron Hollow rises from rocky foothills in a scatter of simple homes, muddy lanes, and broken "
                 "stonework left behind by an older, larger town. There are no real walls, no proper garrison, "
                 "and too many people keeping weapons close at hand.",
                 typed=True,
             )
-            self.state.flags["phandalin_arrived"] = True
+            self.state.flags["iron_hollow_arrived"] = True
             self.add_journal("You reached Iron Hollow, a resettled frontier town under pressure from the Ashen Brand.")
             if self.state.flags.get("blackwake_completed"):
-                self.describe_blackwake_phandalin_arrival()
+                self.describe_blackwake_iron_hollow_arrival()
             choice = self.scenario_choice(
                 "How do you enter town?",
                 [
@@ -55,14 +55,14 @@ class StoryTownHubMixin:
                     self.quoted_option("PERSUASION", "Let them know Greywake sent help."),
                     self.skill_tag("INVESTIGATION", self.action_option("Survey the tracks, barricades, and weak points first.")),
                 ]
-                + [text for _, text in self.scene_identity_options("phandalin_arrival")],
+                + [text for _, text in self.scene_identity_options("iron_hollow_arrival")],
                 allow_meta=False,
             )
-            identity_options = self.scene_identity_options("phandalin_arrival")
+            identity_options = self.scene_identity_options("iron_hollow_arrival")
             if choice > 3:
                 selection_key, _ = identity_options[choice - 4]
-                if self.handle_scene_identity_action("phandalin_arrival", selection_key):
-                    return self.scene_phandalin_hub()
+                if self.handle_scene_identity_action("iron_hollow_arrival", selection_key):
+                    return self.scene_iron_hollow_hub()
             elif choice == 1:
                 self.player_speaker("I want to read the mood of the town before I speak.")
                 success = self.skill_check(self.state.player, "Insight", 12, context="to gauge the town's fear")
@@ -72,7 +72,7 @@ class StoryTownHubMixin:
                     self.reward_party(xp=10, reason="reading Iron Hollow's mood on arrival")
                 else:
                     self.say("The town's fear is real, but too tangled and contradictory for one quick read to untangle.")
-                self.run_dialogue_input("phandalin_arrival_insight")
+                self.run_dialogue_input("iron_hollow_arrival_insight")
             elif choice == 2:
                 self.player_speaker("Let them know Greywake sent help.")
                 success = self.skill_check(self.state.player, "Persuasion", 12, context="to steady the town's nerves")
@@ -82,7 +82,7 @@ class StoryTownHubMixin:
                     self.say("A grateful merchant presses a few coins into your hand for road expenses.")
                 else:
                     self.say("Your words land, but suspicion clings harder than hope in a town this strained.")
-                self.run_dialogue_input("phandalin_arrival_persuasion")
+                self.run_dialogue_input("iron_hollow_arrival_persuasion")
             else:
                 self.player_action("Show me the tracks, barricades, and weak points first.")
                 success = self.skill_check(self.state.player, "Investigation", 12, context="to assess the town's defenses")
@@ -92,8 +92,8 @@ class StoryTownHubMixin:
                     self.reward_party(xp=10, reason="surveying Iron Hollow's defenses")
                 else:
                     self.say("Too many wagon ruts and bootprints overlap for a clean read before the trail goes cold.")
-                self.run_dialogue_input("phandalin_arrival_investigation")
-        elif self.state.flags.get("ashfall_watch_cleared") and not self.state.flags.get("phandalin_after_watch_seen"):
+                self.run_dialogue_input("iron_hollow_arrival_investigation")
+        elif self.state.flags.get("ashfall_watch_cleared") and not self.state.flags.get("iron_hollow_after_watch_seen"):
             self.say(
                 "When you return from Ashfall Watch, Iron Hollow feels changed in all the small ways that matter. "
                 "Doors open faster, wagon talk replaces funeral whispers, and more than one townsman studies the road "
@@ -104,7 +104,7 @@ class StoryTownHubMixin:
                 xp_to_level_two = max(0, LEVEL_XP_THRESHOLDS[2] - self.state.xp)
                 if xp_to_level_two > 0:
                     self.reward_party(xp=xp_to_level_two, reason="regrouping after Ashfall Watch")
-            self.state.flags["phandalin_after_watch_seen"] = True
+            self.state.flags["iron_hollow_after_watch_seen"] = True
 
         while True:
             if self.state.flags.get("ashfall_watch_cleared"):

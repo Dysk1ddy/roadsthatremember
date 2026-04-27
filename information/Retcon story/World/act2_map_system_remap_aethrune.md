@@ -46,9 +46,9 @@ For now, internal references such as these can remain:
 - `stonehollow_dig`
 - `broken_prospect`
 - `south_adit`
-- `wave_echo_outer_galleries`
-- `black_lake_causeway`
-- `forge_of_spells`
+- `resonant_vault_outer_galleries`
+- `blackglass_causeway`
+- `meridian_forge`
 
 But the **player-facing runtime labels and world framing** should shift to Aethrune.
 
@@ -84,7 +84,7 @@ That structure should remain unchanged.
 
 ## Region
 
-- Old public framing: Sword Mountains / Wave Echo frontier
+- Old public framing: Sword Mountains / Resonant Vault frontier
 - New framing: **The Vein of Glass**
 
 This is the buried Accord region beneath and beyond Iron Hollow:
@@ -96,14 +96,14 @@ This is the buried Accord region beneath and beyond Iron Hollow:
 
 ## Main frontier hub
 
-- Old: Phandalin
+- Old: Iron Hollow
 - New: **Iron Hollow**
 
 Keep the same Act 1 carryover town hub identity in public text for continuity.
 
 ## Deeper ruin complex
 
-- Old: Wave Echo Cave
+- Old: Resonant Vault
 - New: **The Resonant Vaults**
 
 This should become the major buried Accord complex beneath the Vein of Glass.
@@ -121,20 +121,20 @@ This is the old civic-engineering coalition or founding infrastructure compact t
 
 | Current public location / concept | New public-facing Aethrune name | Keep internal id now? | Notes |
 | --- | --- | --- | --- |
-| Phandalin claims council | Iron Hollow claims council | Yes | main Act 2 opening political beat |
+| Iron Hollow claims council | Iron Hollow claims council | Yes | main Act 2 opening political beat |
 | Miner's Exchange | Delvers' Exchange | Yes | reuse Act 1 remap |
-| Wave Echo Cave | Resonant Vaults | Yes | overall buried Act 2 megasite |
+| Resonant Vault | Resonant Vaults | Yes | overall buried Act 2 megasite |
 | Phandelver Pact | Meridian Compact | Yes | old buried system builders |
-| Conyberry | Hushfen | Yes | early lead region |
-| Agatha's Circuit | The Pale Circuit | Yes | ghost/ritual truth route |
-| Neverwinter Wood Survey Camp | Greywake Survey Camp | Yes | early lead region |
+| Hushfen | Hushfen | Yes | early lead region |
+| Pale Witness's Circuit | The Pale Circuit | Yes | ghost/ritual truth route |
+| Greywake Survey Line Survey Camp | Greywake Survey Camp | Yes | early lead region |
 | Stonehollow Dig | Stonehollow Dig | Yes | already original-facing enough |
 | Glasswater Intake | Glasswater Intake | Yes | already original-facing enough |
 | Broken Prospect | Broken Prospect | Yes | already original-facing enough |
 | South Adit | South Adit | Yes | already original-facing enough |
-| Wave Echo Outer Galleries | Resonant Vault Outer Galleries | Yes | late ruin approach |
-| Black Lake Causeway | Blackglass Causeway | Yes | late priority zone |
-| Forge of Spells | Meridian Forge | Yes | finale chamber/system |
+| Resonant Vault Outer Galleries | Resonant Vault Outer Galleries | Yes | late ruin approach |
+| Blackglass Causeway | Blackglass Causeway | Yes | late priority zone |
+| Meridian Forge | Meridian Forge | Yes | finale chamber/system |
 | Quiet Choir | Quiet Choir | Yes | already original-facing enough |
 | Sister Caldra Voss | Sister Caldra Voss | Yes | already original-facing enough |
 
@@ -185,7 +185,7 @@ This should preserve the current story spine:
 
 # ACT 2 OPENING
 
-## Iron Hollow Claims Council (Was Phandalin Claims Council)
+## Iron Hollow Claims Council (Was Iron Hollow Claims Council)
 
 ### Core rule
 Keep this scene intact as the political reconvergence point that opens Act 2.
@@ -264,7 +264,7 @@ This is one of Act 2's key structural strengths and should not be changed.
 ---
 
 # EARLY LEAD A — Hushfen and the Pale Circuit
-## (Was Conyberry and Agatha's Circuit)
+## (Was Hushfen and Pale Witness's Circuit)
 
 ### Core role
 Preserve this as:
@@ -282,7 +282,7 @@ The Pale Circuit is:
 - a ritual path built by Meridian Compact wardens
 - built to regulate which truths could travel safely
 
-### The Agatha equivalent
+### The Pale Witness equivalent
 Do not frame this as a direct banshee replacement.
 Instead, use a **Pale Witness**:
 - a dead or half-bound custodian of forbidden route-memory
@@ -295,7 +295,7 @@ It preserves the current branch role:
 ---
 
 # EARLY LEAD B — Greywake Survey Camp
-## (Was Neverwinter Wood Survey Camp)
+## (Was Greywake Survey Line Survey Camp)
 
 ### Core role
 Preserve this as:
@@ -530,7 +530,7 @@ South Adit first should still mean:
 # DEEP APPROACH
 
 ## Resonant Vault Outer Galleries
-### (Was Wave Echo Outer Galleries)
+### (Was Resonant Vault Outer Galleries)
 
 ### Core rule
 Keep this playable local-map site intact.
@@ -557,7 +557,7 @@ But it should still stop short of fully explicit cosmic explanation.
 # PRIORITY ZONE
 
 ## Blackglass Causeway
-### (Was Black Lake Causeway)
+### (Was Blackglass Causeway)
 
 ### Core rule
 Keep this site intact as the pre-finale priority zone.
@@ -589,7 +589,7 @@ Keep the choice families structurally similar:
 # FINALE
 
 ## Meridian Forge
-### (Was Forge of Spells)
+### (Was Meridian Forge)
 
 ### Core rule
 Keep the finale structure intact.
@@ -773,7 +773,7 @@ Do not yet rewrite:
 ## Phase 2 — Story wrapper rewrite
 Rewrite:
 - claims-war framing into salvage-rights / buried-route authority framing
-- Wave Echo language into Resonant Vaults language
+- Resonant Vault language into Resonant Vaults language
 - old Pact language into Meridian Compact language
 - public ruin history and sponsor rhetoric
 - all settlement-facing lore references
@@ -790,19 +790,19 @@ Only after the public rewrite is stable:
 
 | Internal structure role | Current public label | New public label |
 | --- | --- | --- |
-| main Act 2 hub | Phandalin | Iron Hollow |
+| main Act 2 hub | Iron Hollow | Iron Hollow |
 | claims council location | Miner's Exchange | Delvers' Exchange |
-| early lead A region | Conyberry | Hushfen |
-| early lead A ritual route | Agatha's Circuit | The Pale Circuit |
-| early lead B | Neverwinter Wood Survey Camp | Greywake Survey Camp |
+| early lead A region | Hushfen | Hushfen |
+| early lead A ritual route | Pale Witness's Circuit | The Pale Circuit |
+| early lead B | Greywake Survey Line Survey Camp | Greywake Survey Camp |
 | early lead C | Stonehollow Dig | Stonehollow Dig |
 | optional side-dungeon | Glasswater Intake | Glasswater Intake |
 | late route A | Broken Prospect | Broken Prospect |
 | late route B | South Adit | South Adit |
-| deep ruin complex | Wave Echo Cave | Resonant Vaults |
-| late deep approach | Wave Echo Outer Galleries | Resonant Vault Outer Galleries |
-| pre-finale zone | Black Lake Causeway | Blackglass Causeway |
-| finale | Forge of Spells | Meridian Forge |
+| deep ruin complex | Resonant Vault | Resonant Vaults |
+| late deep approach | Resonant Vault Outer Galleries | Resonant Vault Outer Galleries |
+| pre-finale zone | Blackglass Causeway | Blackglass Causeway |
+| finale | Meridian Forge | Meridian Forge |
 | old buried civilization | Phandelver Pact | Meridian Compact |
 
 ---

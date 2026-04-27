@@ -46,7 +46,7 @@ ACT_2_POST_COMBAT_RANDOM_ENCOUNTERS: tuple[tuple[str, str, str], ...] = (
     ("false_route_beacon", "False-Route Beacon", "random_encounter_act2_scaffold"),
     ("choir_map_ambush", "Choir Map Ambush", "random_encounter_act2_scaffold"),
     ("resonance_bleed_pool", "Resonance Bleed Pool", "random_encounter_act2_scaffold"),
-    ("black_lake_verdict", "Black Lake Verdict", "random_encounter_act2_scaffold"),
+    ("blackglass_verdict", "Blackglass Verdict", "random_encounter_act2_scaffold"),
     ("forge_heatshadow", "Forge Heatshadow", "random_encounter_act2_scaffold"),
 )
 ACT_3_POST_COMBAT_RANDOM_ENCOUNTERS: tuple[tuple[str, str, str], ...] = ()
@@ -78,11 +78,11 @@ class RandomEncounterMixin:
         if encounter_id == "smuggler_revenge_squad":
             return bool(self.state.flags.get("smuggler_revenge_pending")) and not bool(self.state.flags.get("smuggler_revenge_resolved"))
         if encounter_id == "resonance_bleed_pool":
-            return bool(self.state.flags.get("stonehollow_dig_cleared") or self.state.flags.get("wave_echo_reached"))
-        if encounter_id == "black_lake_verdict":
-            return bool(self.state.flags.get("wave_echo_outer_cleared") or self.state.flags.get("black_lake_crossed"))
+            return bool(self.state.flags.get("stonehollow_dig_cleared") or self.state.flags.get("resonant_vault_reached"))
+        if encounter_id == "blackglass_verdict":
+            return bool(self.state.flags.get("resonant_vault_outer_cleared") or self.state.flags.get("blackglass_crossed"))
         if encounter_id == "forge_heatshadow":
-            return bool(self.state.flags.get("black_lake_crossed"))
+            return bool(self.state.flags.get("blackglass_crossed"))
         return True
 
     def weighted_post_combat_random_encounter_pool(self) -> list[tuple[str, str, str]]:
@@ -276,7 +276,7 @@ class RandomEncounterMixin:
                 enemies.append(create_enemy("blackglass_listener"))
             outcome = self.resolve_random_encounter_fight(
                 title="Choir Map Ambush",
-                description="A Quiet Choir route cell tries to kill witnesses before the real map can be read.",
+                description="A Quiet Choir route cell tries to kill witnesses before the route map can be read.",
                 enemies=enemies,
                 parley_dc=15,
                 flee_text="You slip out before the cartographer can finish turning the whole branch into a prepared crossfire.",
@@ -307,17 +307,17 @@ class RandomEncounterMixin:
                     items={"thoughtward_draught": 1, "resonance_tonic": 1},
                 )
             return
-        if encounter_id == "black_lake_verdict":
+        if encounter_id == "blackglass_verdict":
             self.random_encounter_intro(
                 "At a narrow threshold above black water, old script wakes across the stone just long enough for a guardian shape to decide whether you count as permitted."
             )
             enemies = [create_enemy("pact_archive_warden")]
-            if self.state.flags.get("black_lake_crossed") or int(self.state.flags.get("act2_whisper_pressure", 2)) >= 4:
+            if self.state.flags.get("blackglass_crossed") or int(self.state.flags.get("act2_whisper_pressure", 2)) >= 4:
                 enemies.append(create_enemy("blacklake_adjudicator"))
             elif len(self.state.party_members()) >= 4:
                 enemies.append(create_enemy("starblighted_miner"))
             outcome = self.resolve_random_encounter_fight(
-                title="Black Lake Verdict",
+                title="Blackglass Verdict",
                 description="Threshold guardians try to deny you access by force and old authority both.",
                 enemies=enemies,
                 allow_parley=False,
@@ -439,7 +439,7 @@ class RandomEncounterMixin:
                 "skill": "Survival",
                 "dc": 13,
                 "context": "to read who cached the stolen claim markers and what route they intended to poison with them",
-                "success": "You sort the false trail from the real one, pocket the markers, and deny the next crew a manufactured feud.",
+                "success": "You sort the false trail from the honest one, pocket the markers, and deny the next crew a manufactured feud.",
                 "reason": "the stolen claim markers",
                 "gold": 9,
                 "items": {"miners_ration_tin": 1},

@@ -34,7 +34,7 @@ class D20Outcome:
     def describe(self) -> str:
         if self.advantage_state == 0:
             return f"d20 -> {self.kept}"
-        mode = "adv" if self.advantage_state > 0 else "dis"
+        mode = "edge" if self.advantage_state > 0 else "strain"
         shown = "/".join(str(value) for value in self.rolls)
         return f"d20 ({mode}) -> {shown}, kept {self.kept}"
 
@@ -58,6 +58,9 @@ def roll(expression: str, rng: random.Random | None = None, *, critical: bool = 
     animator = getattr(roller, "dice_roll_animator", None)
     if callable(animator):
         display_bonus = getattr(roller, "dice_roll_display_bonus", 0)
+        style = getattr(roller, "dice_roll_style", None)
+        outcome_kind = getattr(roller, "dice_roll_outcome_kind", None)
+        context_label = getattr(roller, "dice_roll_context_label", None)
         animator(
             kind="roll",
             expression=expression,
@@ -66,6 +69,9 @@ def roll(expression: str, rng: random.Random | None = None, *, critical: bool = 
             modifier=modifier,
             display_modifier=modifier + display_bonus,
             critical=critical,
+            style=style,
+            outcome_kind=outcome_kind,
+            context_label=context_label,
         )
     return RollOutcome(expression=expression, total=sum(rolls) + modifier, rolls=rolls, modifier=modifier)
 
@@ -102,6 +108,9 @@ def roll_d20(
         target_number = getattr(roller, "dice_roll_target_number", None)
         target_label = getattr(roller, "dice_roll_target_label", None)
         total_modifier = getattr(roller, "dice_roll_total_modifier", 0)
+        context_label = getattr(roller, "dice_roll_context_label", None)
+        style = getattr(roller, "dice_roll_style", None)
+        outcome_kind = getattr(roller, "dice_roll_outcome_kind", None)
         animator(
             kind="d20",
             expression="d20",
@@ -114,5 +123,8 @@ def roll_d20(
             kept=kept,
             target_number=target_number,
             target_label=target_label,
+            context_label=context_label,
+            style=style,
+            outcome_kind=outcome_kind,
         )
     return D20Outcome(kept=kept, rolls=processed, rerolls=rerolls, advantage_state=advantage_state)

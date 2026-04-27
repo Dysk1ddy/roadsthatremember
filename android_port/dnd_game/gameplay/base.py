@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
 import hashlib
+import json
 from pathlib import Path
 import random
 import re
@@ -12,40 +14,234 @@ try:
 except ImportError:  # pragma: no cover - Windows-only polling
     msvcrt = None
 
-from ..content import ACTS
+from ..content import (
+    ACTS,
+    create_bryn_underbough,
+    create_elira_dawnmantle,
+    create_enemy,
+    create_tolan_ironshield,
+)
+from ..data.id_aliases import RUNTIME_SCENE_ID_ALIASES, canonicalize_flag_mapping, runtime_scene_id
 from ..data.story.lore import LORE_INTRO, TITLE_LORE_SECTIONS, manual_text_for_entry
+from ..data.story.public_terms import (
+    class_label,
+    d20_edge_label,
+    feature_label,
+    race_label,
+)
+from ..dice import roll
+from ..drafts.map_system import ACT1_HYBRID_MAP, ACT2_ENEMY_DRIVEN_MAP
 from ..items import (
     EQUIPMENT_SLOTS,
     ITEMS,
     LEGACY_ITEM_NAMES,
+    canonicalize_item_mapping,
     canonical_equipment_slot,
+    get_item,
     initial_merchant_stock,
+    item_category_label,
+    item_rules_text,
+    item_type_label,
+    marks_label,
     starter_item_ids_for_character,
 )
 from ..models import Character, GameState, SKILL_TO_ABILITY, Weapon
-from ..ui.colors import strip_ansi
-from .constants import InputFn, MENU_PAGE_SIZE, OutputFn
+from ..ui.colors import rich_style_name, strip_ansi
+from ..ui.rich_render import Columns, Group, Panel, Table, Text, box, render_rich_lines
+from .constants import InputFn, LEVEL_XP_THRESHOLDS, MENU_PAGE_SIZE, OutputFn
+from .encounter import Encounter
+from .magic_points import current_magic_points, maximum_magic_points
 
 
 class GameInterrupted(Exception):
     pass
 
 
+class ReturnToTitleMenu(Exception):
+    pass
+
+
+class ResumeLoadedGame(Exception):
+    pass
+
+
+class QuitProgram(Exception):
+    pass
+
+
 class GameBase:
+    SETTINGS_FILENAME = "settings.json"
+    AUTOSAVE_PREFIX = "autosave__"
+    AUTOSAVE_LIMIT = 15
+    BOOLEAN_SETTINGS_KEYS = (
+        "sound_effects_enabled",
+        "music_enabled",
+        "dice_animations_enabled",
+        "typed_dialogue_enabled",
+        "pacing_pauses_enabled",
+        "staggered_reveals_enabled",
+        "animations_and_delays_enabled",
+    )
+    DICE_ANIMATION_MODES = ("off", "minimal", "full")
+    DICE_ANIMATION_MODE_LABELS = {
+        "off": "Off",
+        "minimal": "Minimal",
+        "full": "Full",
+    }
+    SETTINGS_KEYS = (*BOOLEAN_SETTINGS_KEYS, "dice_animation_mode")
+    DEFAULT_SETTINGS_PAYLOAD = {
+        "sound_effects_enabled": False,
+        "music_enabled": True,
+        "dice_animations_enabled": True,
+        "dice_animation_mode": "full",
+        "typed_dialogue_enabled": True,
+        "pacing_pauses_enabled": True,
+        "staggered_reveals_enabled": True,
+        "animations_and_delays_enabled": True,
+    }
+    ACT_LABELS = {
+        1: "I",
+        2: "II",
+        3: "III",
+    }
+    SCENE_LABELS = {
+        "opening_tutorial": "Frontier Primer",
+        "background_prologue": "Prologue",
+        "wayside_luck_shrine": "Wayside Luck Shrine",
+        "greywake_triage_yard": "Greywake Yard",
+        "greywake_road_breakout": "Greywake Breakout",
+        "greywake_briefing": "Greywake",
+        "road_ambush": "Emberway",
+        "emberway_liars_circle": "Liar's Circle",
+        "emberway_false_checkpoint": "False Checkpoint",
+        "emberway_false_tollstones": "False Tollstones",
+        "iron_hollow_hub": "Iron Hollow",
+        "blackglass_well": "Blackglass Well",
+        "red_mesa_hold": "Red Mesa Hold",
+        "ashfall_watch": "Ashfall Watch",
+        "duskmere_manor": "Duskmere Manor",
+        "emberhall_cellars": "Emberhall Cellars",
+        "act1_complete": "Iron Hollow",
+        "act2_claims_council": "Ashlamp Claims Council",
+        "act2_expedition_hub": "Act II Expedition Hub",
+        "hushfen_pale_circuit": "Hushfen and the Pale Circuit",
+        "greywake_survey_camp": "Greywake Wood",
+        "stonehollow_dig": "Stonehollow Dig",
+        "siltlock_counting_house": "Siltlock Counting House",
+        "act2_midpoint_convergence": "Sabotage Night",
+        "broken_prospect": "Broken Prospect",
+        "south_adit": "South Adit",
+        "resonant_vault_outer_galleries": "Resonant Vaults",
+        "blackglass_causeway": "Blackglass Causeway",
+        "blackglass_relay_house": "Blackglass Relay House",
+        "meridian_forge": "Meridian Forge",
+        "act2_scaffold_complete": "Resonant Vaults",
+        "act3_ninth_ledger_opens": "Ninth Ledger",
+        "act3_ninth_ledger_aftermath": "Ledger Aftermath",
+    }
+    SCENE_OBJECTIVES = {
+        "opening_tutorial": "Take the optional frontier primer or skip straight into your origin.",
+        "background_prologue": "Finish your origin story and answer the road's first test.",
+        "wayside_luck_shrine": "Meet Elira Lanternward and steady the first wounded travelers.",
+        "greywake_triage_yard": "Stabilize Greywake Yard before the road pressure breaks open.",
+        "greywake_road_breakout": "Protect the wounded or the proof when the Ashen Brand attacks.",
+        "greywake_briefing": "Hear Mira Thann out and take the road south.",
+        "blackwake_crossing": "Trace the Blackwake supply cell before committing to the Emberway.",
+        "road_decision_post_blackwake": "Choose whether to report back to Greywake or press south after Blackwake.",
+        "road_ambush": "Survive the Emberway attack and reach Iron Hollow.",
+        "emberway_liars_circle": "Solve the four-statue liar's puzzle or leave the circle alone.",
+        "emberway_false_checkpoint": "Expose or outtalk the fake roadwardens demanding travel papers.",
+        "emberway_false_tollstones": "Break or outtalk the false roadwarden toll at the broken milemarker.",
+        "iron_hollow_hub": "Choose which pressure in Iron Hollow to answer next.",
+        "blackglass_well": "Break the grave-salvage line at Blackglass Well.",
+        "red_mesa_hold": "Break the Red Mesa Hold raiders.",
+        "ashfall_watch": "Break Ashfall Watch and reopen the road.",
+        "duskmere_manor": "Push through Duskmere Manor.",
+        "emberhall_cellars": "Finish the fight beneath Emberhall.",
+        "act1_complete": "Close out Act I and prepare for the next march.",
+        "act2_claims_council": "Hold the claims council together and set the expedition's direction.",
+        "act2_expedition_hub": "Pick the next Act II lead and keep the expedition moving.",
+        "hushfen_pale_circuit": "Learn what Hushfen's dead still remember.",
+        "greywake_survey_camp": "Secure the survey route through the woods.",
+        "stonehollow_dig": "Stabilize Stonehollow and recover the missing team.",
+        "siltlock_counting_house": "Audit Siltlock's water permits, ration tags, and warning bell.",
+        "act2_midpoint_convergence": "Keep Iron Hollow from tearing itself apart overnight.",
+        "broken_prospect": "Push deeper toward the Resonant Vaults' broken claim.",
+        "south_adit": "Free the prisoners from the South Adit.",
+        "resonant_vault_outer_galleries": "Break into the deeper galleries safely.",
+        "blackglass_causeway": "Cross the Blackglass route and keep the line intact.",
+        "blackglass_relay_house": "Ground the Blackglass relay before the Forge answers it.",
+        "meridian_forge": "Break the Quiet Choir's hold on the Forge.",
+        "act2_scaffold_complete": "Bring the truth back out of the Resonant Vaults.",
+        "act3_ninth_ledger_opens": "Expose the route that Varyn did not design.",
+        "act3_ninth_ledger_aftermath": "Track revealed Ledger pressure and unrecorded choices.",
+    }
+    LEGACY_SCENE_ALIASES = RUNTIME_SCENE_ID_ALIASES
+    HUD_QUEST_FOCUSED_SCENES = {
+        "iron_hollow_hub",
+        "act1_complete",
+        "act2_claims_council",
+        "act2_expedition_hub",
+        "act2_scaffold_complete",
+    }
+    DEV_GOD_MODE_FLAG = "dev_god_mode"
+    DEV_PASS_CHECKS_FLAG = "dev_pass_every_dice_check"
+    DEV_FAIL_CHECKS_FLAG = "dev_fail_every_dice_check"
+    DEV_INSTANT_KILL_FLAG = "dev_instant_kill"
+    STORY_SKILL_MODIFIER_KEY = "story_skill_modifiers"
+    LIARS_BLESSING_MODIFIER_ID = "liars_blessing"
+    LIARS_CURSE_MODIFIER_ID = "liars_curse"
     STORY_CHECK_OPTION_FLAG_PREFIX = "story_check_option_attempt::"
     STORY_CHECK_OPTION_TAGS = frozenset(skill.upper() for skill in SKILL_TO_ABILITY)
+    PUBLIC_CHARACTER_NAMES = {
+        "Elira Dawnmantle": "Elira Lanternward",
+        "Barthen": "Hadrik",
+        "Halia Thornton": "Halia Vey",
+        "Daran Edermath": "Daran Orchard",
+        "Linene Graywind": "Linene Ironward",
+        "Mara Stonehill": "Mara Ashlamp",
+    }
     NAMED_CHARACTER_INTROS = {
-        "Mira Thann": "Mira Thann is a sharp-eyed Neverwinter officer who wears quiet authority like armor and studies every answer for weakness or leverage.",
-        "Tessa Harrow": "Tessa Harrow is Phandalin's exhausted steward, all ink-stained hands, sleepless focus, and frontier resolve held together by sheer will.",
+        "Mira Thann": "Mira Thann is a sharp-eyed Greywake officer who wears quiet authority like armor and studies every answer for weakness or leverage.",
+        "Tessa Harrow": "Tessa Harrow is Iron Hollow's exhausted steward, all ink-stained hands, sleepless focus, and frontier resolve held together by sheer will.",
         "Bryn Underbough": "Bryn Underbough is a halfling trail scout with quick eyes, a quicker tongue, and the watchful stillness of someone who trusts exits before promises.",
-        "Elira Dawnmantle": "Elira Dawnmantle is a priestess of Tymora whose steady hands and road-worn faith make the shrine feel more like a field hospital than a sanctuary.",
-        "Barthen": "Barthen is a broad-shouldered provisioner with a merchant's apron, a teamster's worry, and the tired patience of a man rationing hope as carefully as flour.",
-        "Linene Graywind": "Linene Graywind is a hard-edged quartermaster who keeps her post like a disciplined armory, missing nothing and trusting earned results over charm.",
-        "Kaelis Starling": "Kaelis Starling is a lean half-elf ranger whose attention never stops moving, as if every doorway and hedgeline is already a map in his head.",
-        "Rhogar Valeguard": "Rhogar Valeguard is a bronze-scaled dragonborn paladin who carries himself like a sworn roadwarden, proud-backed and visibly made of vows.",
+        "Elira Dawnmantle": "Elira Lanternward is a priestess of the Lantern whose steady hands and road-worn faith make the shrine feel more like a field hospital than a sanctuary.",
+        "Elira Lanternward": "Elira Lanternward is a priestess of the Lantern whose steady hands and road-worn faith make the shrine feel more like a field hospital than a sanctuary.",
+        "Hadrik": "Hadrik is a broad-shouldered provisioner with a merchant's apron, a teamster's worry, and the tired patience of a man rationing hope as carefully as flour.",
+        "Halia Vey": "Halia Vey is a polished guild agent with perfectly measured calm, sharp ledgers, and the kind of smile that always seems to know one more thing than it says.",
+        "Daran Orchard": "Daran Orchard is a retired half-elf adventurer tending his orchard like a quiet fortification, all old reflexes, weathered patience, and the easy economy of someone who has survived uglier frontiers.",
+        "Linene Ironward": "Linene Ironward is a hard-edged quartermaster who keeps her post like a disciplined armory, missing nothing and trusting earned results over charm.",
+        "Mara Ashlamp": "Mara Ashlamp is a hard-eyed innkeeper whose patience has edges, reading every table like weather before the room can turn dangerous.",
+        "Kaelis Starling": "Kaelis Starling is a lean half-elf scout-rogue whose Assassin patience keeps every doorway and hedgeline mapped in his head.",
+        "Rhogar Valeguard": "Rhogar Valeguard is a bronze-scaled dragonborn Warrior, an oathsworn lineholder whose Bloodreaver discipline turns hurt into pressure.",
         "Tolan Ironshield": "Tolan Ironshield is a battle-scarred dwarven caravan guard with a wall of a shield, a gravel voice, and the look of someone who has outlived too many ambushes.",
+        "Oren Vale": "Oren Vale runs his contract house in rolled sleeves and measured glances, keeping a tidy room where frightened professionals can buy privacy by the bowl and the hour.",
+        "Sabra Kestrel": "Sabra Kestrel is a ledger hawk with ink on her fingers, tired eyes, and the kind of attention that catches one wrong line in a page full of clean lies.",
+        "Vessa Marr": "Vessa Marr is a river-road card shark in cheap rings and fine poise, smiling like the hand matters less than what your face does before it lands.",
+        "Garren Flint": "Garren Flint is a roadwarden gone winter-hard around the edges, square-shouldered and visibly angry that copied authority now sounds enough like his trade to work.",
+        "Jerek Harl": "Jerek Harl is a road laborer with workman's shoulders, red-rimmed eyes, and grief sitting on him like he slept in it.",
+        "Sella Quill": "Sella Quill is a lean inn singer with a travel harp, a dry mouth for gossip, and the habit of listening hardest when rooms think they are only muttering.",
+        "Old Tam Veller": "Old Tam Veller is an old miner with a cooling cup, stone dust worked into his clothes, and the far-off stare of a man still walking roads the town paved over.",
+        "Nera Doss": "Nera Doss is a bruised courier with a split lip, one shoulder angled toward the exits, and the wary stillness of someone used to carrying messages people would rather edit.",
+        "Ashlamp Teamster": "The Ashlamp teamster is a mud-caked wagon hand with cup-callused fingers, a road cough, and the blunt caution of someone who knows freight turns political before merchants admit it.",
+        "Nim Ardentglass": "Nim Ardentglass is a ruin scholar in chalk-marked layers, all satchel straps, quick hands, and nerves he disguises as precision.",
+        "Irielle Ashwake": "Irielle Ashwake is a soot-dark escapee from the Quiet Choir, thin from captivity, sharp with caution, and always half-listening for the next wrong note in the air.",
+        "Pale Witness": "The Pale Witness is Hushfen's dead memory made visible: a woman-shaped hush in funeral white, carrying grief like weather that learned to speak.",
+        "Brother Merik Sorn": "Brother Merik Sorn is a Quiet Choir field priest in damp work robes, calm at the wheel like a man who trusts mechanisms more than the people drinking from them.",
+        "Auditor Pella Varr": "Auditor Pella Varr is a Siltlock claims auditor with ink-slick cuffs, polite stairway manners, and a gaze trained to price every accusation before it lands.",
+        "Sister Caldra Voss": "Sister Caldra Voss is a severe Choir sister standing straight inside the Forge's hum, ash-pale and composed as if every wrong sound in the room already belongs to her.",
+        "Vaelith Marr": "Vaelith Marr is a soot-handed gravecaller in scavenged ritual cloth, moving with the calm precision of someone who finds other people's dead more useful than the living.",
+        "Brughor Skullcleaver": "Brughor Skullcleaver is a broad orc blood-chief in battered scale, grinning like every fight is a feast he intends to survive.",
+        "Cragmaw-Ogre Thane": "The Cragmaw-Ogre Thane is a huge scar-latticed brute dragging a stone-shaved club, all stubborn muscle and habitually casual violence.",
+        "Cistern Eye": "The Cistern Eye is a warped cellar horror with one wet reflective gaze and a posture that suggests it has spent too long feeding on secrets in the dark.",
         "Rukhar Cinderfang": "Rukhar Cinderfang is a broad hobgoblin sergeant in disciplined mail, every movement controlled with the hard efficiency of a drilled war captain.",
+        "Sereth Vane": "Sereth Vane is a road-dusted Ashen Brand quartermaster with a negotiator's smile, a fixer's eyes, and hands that never drift far from hidden ash capsules.",
         "Varyn Sable": "Varyn Sable is a poised, sharp-featured brigand captain dressed better than the rest of the gang, with a duelist's balance and a smile that never warms.",
+        "Town Council": "The town council answers like one tired body made of claimants, merchants, and locals who know every clean sentence in Iron Hollow is going to cost somebody.",
+        "Knight": "The Knight statue stands sword-down in cracked mail, weathered into a posture that still feels like discipline.",
+        "Priest": "The Priest statue is narrow-faced and lichen-dusted, with stone robes carved to fall like old ritual linen.",
+        "Thief": "The Thief statue leans forward under a chipped hood, grin still visible in the stone as if the answer amused it years ago.",
+        "King": "The King statue wears a chipped crown and a rain-smoothed face, expecting obedience even now.",
         "Ashen Brand Runner": "The Ashen Brand Runner is a wiry courier with road dust on their boots and the twitchy focus of someone used to escaping before blades can reach them.",
         "Ashen Brand Collector": "The Ashen Brand Collector looks like a dockside broker turned enforcer, weighed down by stolen papers, quiet greed, and a hand never far from steel.",
         "Archive Cutout": "The Archive Cutout is a hired bow-hand with ink-smudged fingers and a scavenger's posture, more accustomed to theft and flight than a fair fight.",
@@ -55,6 +251,9 @@ class GameBase:
         "Ashen Brand Enforcer": "The Ashen Brand Enforcer is a thick-shouldered bruiser in scavenged gear, built to hold a doorway and make fear do half the work.",
         "Goblin Scavenger": "The Goblin Scavenger is a soot-streaked little raider with a sack on one shoulder and the quick, hungry stare of something that lives off battle's leftovers.",
     }
+
+    def public_character_name(self, name: object) -> str:
+        return self.PUBLIC_CHARACTER_NAMES.get(str(name), str(name))
 
     def __init__(
         self,
@@ -66,47 +265,285 @@ class GameBase:
         animate_dice: bool | None = None,
         pace_output: bool | None = None,
         type_dialogue: bool | None = None,
+        play_music: bool | None = None,
+        play_sfx: bool | None = None,
+        staggered_reveals: bool | None = None,
+        plain_output: bool = False,
     ) -> None:
         self.input_fn = input_fn
         self.output_fn = output_fn
+        self._plain_output = bool(plain_output)
+        stdio_is_interactive = getattr(self, "stdio_is_interactive", None)
+        self._stdio_interactive = bool(stdio_is_interactive() if callable(stdio_is_interactive) else True)
+        self._default_stdio = bool(input_fn is input and output_fn is print)
+        self._presentation_forced_off = bool(
+            self._plain_output
+            or (self._default_stdio and not self._stdio_interactive)
+        )
+        self._uses_default_save_dir = save_dir is None
         self.save_dir = Path(save_dir or Path.cwd() / "saves")
         self.save_dir.mkdir(parents=True, exist_ok=True)
+        self.settings_path = self.save_dir / self.SETTINGS_FILENAME
         self.rng = rng or random.Random()
-        self._interactive_output = input_fn is input and output_fn is print
-        self.animate_dice = self._interactive_output if animate_dice is None else animate_dice
-        self.pace_output = self._interactive_output if pace_output is None else pace_output
-        self.type_dialogue = (self._interactive_output if type_dialogue is None else type_dialogue) and output_fn is print
-        self._dice_animation_min_seconds = 2.0
-        self._dice_animation_max_seconds = 4.0
+        self._interactive_output = bool(self._default_stdio and not self._presentation_forced_off)
+        self.autosaves_enabled = self._interactive_output
+        should_apply_persisted_settings = self._interactive_output or not self._uses_default_save_dir
+        persisted_settings = self.load_persisted_settings() if should_apply_persisted_settings else {}
+        default_settings = self.default_settings_payload()
+        default_presentation = persisted_settings.get(
+            "animations_and_delays_enabled",
+            default_settings["animations_and_delays_enabled"] if should_apply_persisted_settings else self._interactive_output,
+        )
+        stored_dice_mode = persisted_settings.get("dice_animation_mode")
+        if animate_dice is None:
+            if isinstance(stored_dice_mode, str) and stored_dice_mode in self.DICE_ANIMATION_MODES:
+                requested_dice_mode = stored_dice_mode
+            elif "dice_animations_enabled" in persisted_settings:
+                requested_dice_mode = "full" if bool(persisted_settings["dice_animations_enabled"]) else "off"
+            else:
+                requested_dice_mode = "full" if default_presentation else "off"
+        else:
+            requested_dice_mode = "full" if animate_dice else "off"
+        requested_pacing = (
+            persisted_settings.get("pacing_pauses_enabled", default_presentation)
+            if pace_output is None
+            else pace_output
+        )
+        requested_dialogue_typing = (
+            persisted_settings.get("typed_dialogue_enabled", default_presentation)
+            if type_dialogue is None
+            else type_dialogue
+        )
+        requested_staggered_reveals = (
+            persisted_settings.get("staggered_reveals_enabled", default_presentation)
+            if staggered_reveals is None
+            else staggered_reveals
+        )
+        if self._presentation_forced_off:
+            requested_dice_mode = "off"
+            requested_pacing = False
+            requested_dialogue_typing = False
+            requested_staggered_reveals = False
+        self._dice_animation_mode_preference = (
+            requested_dice_mode if requested_dice_mode in self.DICE_ANIMATION_MODES else "off"
+        )
+        self._dice_animations_preference = self._dice_animation_mode_preference != "off"
+        self._pacing_pauses_preference = bool(requested_pacing)
+        self._typed_dialogue_preference = bool(requested_dialogue_typing)
+        self._staggered_reveals_preference = bool(requested_staggered_reveals)
+        self._animations_and_delays_preference = bool(
+            self._dice_animations_preference
+            and self._pacing_pauses_preference
+            and self._typed_dialogue_preference
+            and self._staggered_reveals_preference
+        )
+        self.animate_dice = self._dice_animations_preference
+        self.apply_dice_animation_mode_profile()
+        self.pace_output = self._pacing_pauses_preference
+        output_supports_unicode = getattr(self, "output_supports_unicode", None)
+        self.type_dialogue = bool(
+            self._typed_dialogue_preference
+            and output_fn is print
+            and not self._plain_output
+            and (output_supports_unicode() if callable(output_supports_unicode) else True)
+        )
+        self.staggered_reveals_enabled = self._staggered_reveals_preference
         self._dice_animation_width = 0
-        self._dice_total_reveal_pause_seconds = 0.75
         self._choice_pause_seconds = 1.0
         self._combat_transition_pause_seconds = 1.0
         self._option_reveal_pause_seconds = 0.5
         self._loot_reveal_pause_seconds = 0.75
         self._health_bar_width = 12
         self._health_bar_animation_step_seconds = 0.08
+        self._dialogue_character_delay_seconds = 0.03
         self._dialogue_seconds_per_sentence = 2.5
         self._narration_seconds_per_sentence = 2.5
         self._typing_sentence_pause_seconds = 0.75
+        self._animation_skip_latched = False
+        self._animation_skip_scope_depth = 0
+        self._compact_hud_last_scene_key: tuple[int, str] | None = None
+        self._compact_hud_requested = False
+        self._latest_narration_lines: list[str] = []
+        self._pending_story_check_option: tuple[str, str] | None = None
+        self._pending_scaled_check_reward = False
+        self._pending_act1_dungeon_map_refresh = False
+        self._pending_act1_dungeon_movement_text = ""
+        self._pending_act2_dungeon_map_refresh = False
+        self._pending_act2_dungeon_movement_text = ""
+        self._playtime_checkpoint = time.monotonic()
+        self._music_enabled_preference = bool(
+            persisted_settings.get(
+                "music_enabled",
+                default_settings["music_enabled"] if should_apply_persisted_settings else self._interactive_output,
+            )
+            if play_music is None
+            else play_music
+        )
+        initialize_music_system = getattr(self, "initialize_music_system", None)
+        if callable(initialize_music_system):
+            initialize_music_system(self._music_enabled_preference)
+        self._sound_effects_enabled_preference = bool(
+            persisted_settings.get(
+                "sound_effects_enabled",
+                default_settings["sound_effects_enabled"] if should_apply_persisted_settings else self._interactive_output,
+            )
+            if play_sfx is None
+            else play_sfx
+        )
+        initialize_sound_effects_system = getattr(self, "initialize_sound_effects_system", None)
+        if callable(initialize_sound_effects_system):
+            initialize_sound_effects_system(self._sound_effects_enabled_preference)
         if self.animate_dice:
             try:
                 setattr(self.rng, "dice_roll_animator", self.animate_dice_roll)
             except Exception:
                 self.animate_dice = False
+                self._dice_animations_preference = False
         self.state: GameState | None = None
-        self._playtime_checkpoint = time.monotonic()
-        self._pending_story_check_option: tuple[str, str] | None = None
         self._in_combat = False
+        self._at_title_screen = False
         self._scene_handlers = {
+            "opening_tutorial": self.scene_opening_tutorial,
             "background_prologue": self.scene_background_prologue,
-            "neverwinter_briefing": self.scene_neverwinter_briefing,
+            "wayside_luck_shrine": self.scene_wayside_luck_shrine,
+            "greywake_triage_yard": self.scene_greywake_triage_yard,
+            "greywake_road_breakout": self.scene_greywake_road_breakout,
+            "greywake_briefing": self.scene_greywake_briefing,
+            "blackwake_crossing": self.scene_blackwake_crossing,
+            "road_decision_post_blackwake": self.scene_road_decision_post_blackwake,
             "road_ambush": self.scene_road_ambush,
-            "phandalin_hub": self.scene_phandalin_hub,
+            "emberway_liars_circle": self.scene_emberway_liars_circle,
+            "emberway_false_checkpoint": self.scene_emberway_false_checkpoint,
+            "emberway_false_tollstones": self.scene_emberway_false_tollstones,
+            "iron_hollow_hub": self.scene_iron_hollow_hub,
+            "blackglass_well": self.scene_blackglass_well,
+            "red_mesa_hold": self.scene_red_mesa_hold,
             "ashfall_watch": self.scene_ashfall_watch,
+            "duskmere_manor": self.scene_duskmere_manor,
             "emberhall_cellars": self.scene_emberhall_cellars,
             "act1_complete": self.scene_act1_complete,
+            "act2_claims_council": self.scene_act2_claims_council,
+            "act2_expedition_hub": self.scene_act2_expedition_hub,
+            "hushfen_pale_circuit": self.scene_hushfen_pale_circuit,
+            "greywake_survey_camp": self.scene_greywake_survey_camp,
+            "stonehollow_dig": self.scene_stonehollow_dig,
+            "siltlock_counting_house": self.scene_siltlock_counting_house,
+            "act2_midpoint_convergence": self.scene_act2_midpoint_convergence,
+            "broken_prospect": self.scene_broken_prospect,
+            "south_adit": self.scene_south_adit,
+            "resonant_vault_outer_galleries": self.scene_resonant_vault_outer_galleries,
+            "blackglass_causeway": self.scene_blackglass_causeway,
+            "blackglass_relay_house": self.scene_blackglass_relay_house,
+            "meridian_forge": self.scene_meridian_forge,
+            "act2_scaffold_complete": self.scene_act2_scaffold_complete,
+            "act3_ninth_ledger_opens": self.scene_act3_ninth_ledger_opens,
+            "act3_ninth_ledger_aftermath": self.scene_act3_ninth_ledger_aftermath,
         }
+
+    def load_persisted_settings(self) -> dict[str, object]:
+        if not self.settings_path.exists():
+            return {}
+        try:
+            data = json.loads(self.settings_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return {}
+        if not isinstance(data, dict):
+            return {}
+        settings: dict[str, object] = {}
+        for key in self.BOOLEAN_SETTINGS_KEYS:
+            if key in data:
+                settings[key] = bool(data[key])
+        dice_mode = data.get("dice_animation_mode")
+        if isinstance(dice_mode, str) and dice_mode in self.DICE_ANIMATION_MODES:
+            settings["dice_animation_mode"] = dice_mode
+        return settings
+
+    @classmethod
+    def default_settings_payload(cls) -> dict[str, object]:
+        return dict(cls.DEFAULT_SETTINGS_PAYLOAD)
+
+    def current_settings_payload(self) -> dict[str, object]:
+        presentation_bundle = bool(
+            getattr(self, "_dice_animations_preference", self.animate_dice)
+            and getattr(self, "_typed_dialogue_preference", self.type_dialogue)
+            and getattr(self, "_pacing_pauses_preference", self.pace_output)
+            and getattr(self, "_staggered_reveals_preference", getattr(self, "staggered_reveals_enabled", False))
+        )
+        return {
+            "sound_effects_enabled": bool(
+                getattr(self, "_sound_effects_enabled_preference", getattr(self, "sound_effects_enabled", False))
+            ),
+            "music_enabled": bool(getattr(self, "_music_enabled_preference", getattr(self, "music_enabled", False))),
+            "dice_animations_enabled": bool(getattr(self, "_dice_animations_preference", self.animate_dice)),
+            "dice_animation_mode": self.current_dice_animation_mode(),
+            "typed_dialogue_enabled": bool(getattr(self, "_typed_dialogue_preference", self.type_dialogue)),
+            "pacing_pauses_enabled": bool(getattr(self, "_pacing_pauses_preference", self.pace_output)),
+            "staggered_reveals_enabled": bool(
+                getattr(self, "_staggered_reveals_preference", getattr(self, "staggered_reveals_enabled", False))
+            ),
+            "animations_and_delays_enabled": presentation_bundle,
+        }
+
+    def current_dice_animation_mode(self) -> str:
+        mode = getattr(self, "_dice_animation_mode_preference", "off")
+        return mode if mode in self.DICE_ANIMATION_MODES else "off"
+
+    def dice_animation_mode_label(self, mode: str | None = None) -> str:
+        return self.DICE_ANIMATION_MODE_LABELS.get(mode or self.current_dice_animation_mode(), "Off")
+
+    def apply_dice_animation_mode_profile(self) -> None:
+        mode = self.current_dice_animation_mode()
+        if getattr(self, "_presentation_forced_off", False):
+            mode = "off"
+            self._dice_animation_mode_preference = "off"
+        profiles = {
+            "off": {
+                "min_seconds": 0.0,
+                "max_seconds": 0.0,
+                "total_pause": 0.0,
+                "final_pause": 0.0,
+                "min_frames": 0,
+                "max_frames": 0,
+                "frame_rate": 0.0,
+            },
+            "minimal": {
+                "min_seconds": 0.4,
+                "max_seconds": 0.9,
+                "total_pause": 0.14,
+                "final_pause": 0.2,
+                "min_frames": 7,
+                "max_frames": 11,
+                "frame_rate": 10.0,
+            },
+            "full": {
+                "min_seconds": 0.85,
+                "max_seconds": 1.75,
+                "total_pause": 0.28,
+                "final_pause": 0.42,
+                "min_frames": 11,
+                "max_frames": 20,
+                "frame_rate": 14.0,
+            },
+        }
+        profile = profiles[mode]
+        self._dice_animations_preference = mode != "off"
+        self.animate_dice = self._dice_animations_preference
+        self._dice_animation_min_seconds = profile["min_seconds"]
+        self._dice_animation_max_seconds = profile["max_seconds"]
+        self._dice_total_reveal_pause_seconds = profile["total_pause"]
+        self._dice_animation_final_pause_seconds = profile["final_pause"]
+        self._dice_animation_min_frames = profile["min_frames"]
+        self._dice_animation_max_frames = profile["max_frames"]
+        self._dice_animation_frame_rate = profile["frame_rate"]
+
+    def persist_settings(self) -> None:
+        try:
+            self.settings_path.write_text(
+                json.dumps(self.current_settings_payload(), indent=2),
+                encoding="utf-8",
+            )
+        except OSError:
+            return
 
     MERCHANT_ATTITUDE_DEFAULTS = {
         "barthen_provisions": 20,
@@ -118,53 +555,105 @@ class GameBase:
 
     def run(self) -> None:
         try:
+            title_options = [
+                "Start a new game",
+                "Save Files",
+                "Read the lore notes",
+                "Settings",
+                "Quit",
+            ]
+            title_option_details = {
+                "Start a new game": "Build a new character and ride the Emberway toward Iron Hollow.",
+                "Save Files": "Browse save files, load a run, or delete old journals.",
+                "Read the lore notes": "Browse Aethrune context, mechanics guidance, and item basics.",
+                "Settings": "Adjust audio, animations, typed narration, and presentation pacing.",
+                "Quit": "Leave the frontier for now.",
+            }
             while True:
-                self.banner("Aethrune: Acts I-II")
-                self.say(
-                    "An original choice-driven fantasy text adventure across the "
-                    "Emberway, Iron Hollow, and the Resonant Vaults. "
-                    "Acts I and II are playable now, with later acts scaffolded for expansion."
-                )
-                choice = self.choose(
-                    "What would you like to do?",
-                    [
-                        "Start a new game",
-                        "Save Files",
-                        "Read the lore notes",
-                        "Quit",
-                    ],
-                    allow_meta=False,
-                )
-                if choice == 1:
-                    self.start_new_game()
-                    self.play_current_state()
-                elif choice == 2:
-                    loaded = self.open_save_files_menu()
-                    if loaded:
+                try:
+                    self._at_title_screen = True
+                    refresh_scene_music = getattr(self, "refresh_scene_music", None)
+                    if callable(refresh_scene_music):
+                        refresh_scene_music(default_to_menu=True)
+                    choice = self.choose_title_menu(
+                        "Aethrune",
+                        "Acts I-II: Frontier Roads and Echoing Depths",
+                        (
+                            "An original choice-driven fantasy text adventure across the "
+                            "Emberway, Iron Hollow, and the Resonant Vaults."
+                        ),
+                        title_options,
+                        option_details=title_option_details,
+                    )
+                    if choice == 1:
+                        self._at_title_screen = False
+                        self.start_new_game()
                         self.play_current_state()
-                elif choice == 3:
-                    self.show_lore_notes()
-                else:
+                    elif choice == 2:
+                        self._at_title_screen = False
+                        loaded = self.open_save_files_menu()
+                        if loaded:
+                            self.play_current_state()
+                    elif choice == 3:
+                        self.show_lore_notes()
+                    elif choice == 4:
+                        self.open_settings_menu()
+                    else:
+                        self.say("Safe travels, adventurer.")
+                        return
+                except ResumeLoadedGame:
+                    self._at_title_screen = False
+                    if self.state is not None:
+                        self.play_current_state()
+                except ReturnToTitleMenu:
+                    self.state = None
+                    self._compact_hud_last_scene_key = None
+                    self._at_title_screen = True
+                    continue
+                except QuitProgram:
                     self.say("Safe travels, adventurer.")
                     return
         except GameInterrupted:
             self.say("Input interrupted. Closing the game cleanly.")
             self.state = None
+        finally:
+            self._at_title_screen = False
 
     def play_current_state(self) -> None:
         try:
             while self.state is not None:
-                handler = self._scene_handlers.get(self.state.current_scene)
-                if handler is None:
-                    self.say(f"Unknown scene '{self.state.current_scene}'. Returning to the title screen.")
+                try:
+                    self._at_title_screen = False
+                    self.normalize_legacy_scene_key()
+                    handler = self._scene_handlers.get(self.state.current_scene)
+                    if handler is None:
+                        self.say(f"Unknown scene '{self.state.current_scene}'. Returning to the title screen.")
+                        self.state = None
+                        return
+                    refresh_scene_music = getattr(self, "refresh_scene_music", None)
+                    if callable(refresh_scene_music):
+                        refresh_scene_music()
+                    handler()
+                except ResumeLoadedGame:
+                    self._compact_hud_last_scene_key = None
+                    continue
+                except ReturnToTitleMenu:
                     self.state = None
+                    self._compact_hud_last_scene_key = None
                     return
-                handler()
         except GameInterrupted:
             self.say("Input interrupted. Returning to the title screen.")
             self.state = None
 
     def skill_tag(self, tag: str, text: str) -> str:
+        normalized_tag = tag.strip().upper()
+        if normalized_tag.startswith("BACKTRACK"):
+            return f"[{tag}] {text}"
+        normalized_text = strip_ansi(text).lower()
+        tag_words = re.findall(r"[a-z0-9']+", tag.lower())
+        text_words = set(re.findall(r"[a-z0-9']+", normalized_text))
+        if tag_words and all(word in text_words for word in tag_words):
+            return text
         return f"[{tag}] {text}"
 
     def quoted_option(self, tag: str, text: str) -> str:
@@ -217,9 +706,14 @@ class GameBase:
         self._pending_story_check_option = None
 
     def read_input(self, prompt: str) -> str:
+        self._animation_skip_latched = False
+        self._animation_skip_scope_depth = 0
         try:
             return self.input_fn(prompt)
         except KeyboardInterrupt as exc:
+            self.output_fn("")
+            raise GameInterrupted() from exc
+        except EOFError as exc:
             self.output_fn("")
             raise GameInterrupted() from exc
 
@@ -236,7 +730,7 @@ class GameBase:
             self.sleep_for_animation(self._loot_reveal_pause_seconds)
 
     def pause_for_option_reveal(self) -> None:
-        if self.pace_output:
+        if getattr(self, "staggered_reveals_enabled", False):
             self.sleep_for_animation(self._option_reveal_pause_seconds)
 
     def health_bar_color(self, current_hp: int, max_hp: int) -> str:
@@ -249,17 +743,46 @@ class GameBase:
             return "yellow"
         return "light_red"
 
-    def format_health_bar(self, current_hp: int, max_hp: int, *, width: int | None = None) -> str:
+    def format_resource_bar(
+        self,
+        label: str,
+        current_value: int,
+        max_value: int,
+        *,
+        width: int | None = None,
+        fill_color: str | None = None,
+        fill_color_resolver=None,
+    ) -> str:
         width = width or self._health_bar_width
-        if max_hp <= 0:
-            max_hp = 1
-        clamped = max(0, min(current_hp, max_hp))
-        filled = int(round((clamped / max_hp) * width))
+        max_value = max(1, max_value)
+        clamped = max(0, min(current_value, max_value))
+        filled = int(round((clamped / max_value) * width))
         filled = max(0, min(width, filled))
         empty = width - filled
-        bar = self.style_text("█" * filled, self.health_bar_color(clamped, max_hp)) + (" " * empty)
-        digits = len(str(max_hp))
-        return f"HP [{bar}] {clamped:>{digits}}/{max_hp}"
+        resolved_color = fill_color_resolver(clamped, max_value) if fill_color_resolver is not None else fill_color or "white"
+        output_supports_unicode = getattr(self, "output_supports_unicode", None)
+        fill_character = "█" if (output_supports_unicode() if callable(output_supports_unicode) else True) else "#"
+        bar = self.style_text(fill_character * filled, resolved_color) + (" " * empty)
+        digits = len(str(max_value))
+        return f"{label} [{bar}] {clamped:>{digits}}/{max_value}"
+
+    def format_health_bar(self, current_hp: int, max_hp: int, *, width: int | None = None) -> str:
+        return self.format_resource_bar(
+            "HP",
+            current_hp,
+            max_hp,
+            width=width,
+            fill_color_resolver=self.health_bar_color,
+        )
+
+    def format_magic_bar(self, current_mp: int, max_mp: int, *, width: int | None = None) -> str:
+        return self.format_resource_bar("MP", current_mp, max_mp, width=width, fill_color="blue")
+
+    def format_member_magic_bar(self, member, *, width: int | None = None) -> str | None:
+        max_mp = maximum_magic_points(member)
+        if max_mp <= 0:
+            return None
+        return self.format_magic_bar(current_magic_points(member), max_mp, width=width)
 
     def health_status_suffix(self, current_hp: int, *, dead: bool = False) -> str:
         if dead:
@@ -269,7 +792,26 @@ class GameBase:
         return ""
 
     def should_animate_health_bars(self) -> bool:
-        return self.pace_output and self.output_fn is print
+        return bool(self.pace_output and self.output_fn is print and getattr(self, "_interactive_output", False))
+
+    def begin_animation_skip_scope(self) -> None:
+        self._animation_skip_scope_depth += 1
+        if self._animation_skip_scope_depth == 1:
+            self._animation_skip_latched = False
+
+    def end_animation_skip_scope(self) -> None:
+        if self._animation_skip_scope_depth > 0:
+            self._animation_skip_scope_depth -= 1
+        if self._animation_skip_scope_depth == 0:
+            self._animation_skip_latched = False
+
+    def drain_animation_keys(self) -> bool:
+        requested = False
+        while msvcrt.kbhit():
+            key = msvcrt.getwch()
+            if key in {"\r", "\n"}:
+                requested = True
+        return requested
 
     def animation_skip_requested(self, *, require_animation: bool = False) -> bool:
         if require_animation and not self.animate_dice:
@@ -278,63 +820,75 @@ class GameBase:
             return False
         if hasattr(sys.stdin, "isatty") and not sys.stdin.isatty():
             return False
-        requested = False
-        while msvcrt.kbhit():
-            key = msvcrt.getwch()
-            if key in {"\r", "\n"}:
-                requested = True
+        if self._animation_skip_latched:
+            self.drain_animation_keys()
+            return False
+        requested = self.drain_animation_keys()
+        if requested:
+            self._animation_skip_latched = True
         return requested
 
     def sleep_for_animation(self, duration: float, *, require_animation: bool = False) -> bool:
-        end_time = time.perf_counter() + max(0.0, duration)
-        while True:
-            if self.animation_skip_requested(require_animation=require_animation):
-                return True
-            remaining = end_time - time.perf_counter()
-            if remaining <= 0:
-                return False
-            time.sleep(min(0.03, remaining))
+        started_scope = self._animation_skip_scope_depth == 0
+        if started_scope:
+            self.begin_animation_skip_scope()
+        try:
+            end_time = time.perf_counter() + max(0.0, duration)
+            while True:
+                if self.animation_skip_requested(require_animation=require_animation):
+                    return True
+                remaining = end_time - time.perf_counter()
+                if remaining <= 0:
+                    return False
+                time.sleep(min(0.03, remaining))
+        finally:
+            if started_scope:
+                self.end_animation_skip_scope()
 
     def animate_health_bar_loss(self, target, previous_hp: int, new_hp: int) -> None:
         if not self.should_animate_health_bars() or new_hp >= previous_hp or target.max_hp <= 0:
             return
-        width = 0
-        steps = max(1, min(12, previous_hp - new_hp))
-        values: list[int] = []
-        for index in range(1, steps + 1):
-            progress = index / steps
-            candidate = previous_hp - int(round((previous_hp - new_hp) * progress))
-            candidate = max(new_hp, min(previous_hp, candidate))
-            if not values or candidate != values[-1]:
-                values.append(candidate)
-        if not values or values[-1] != new_hp:
-            values.append(new_hp)
-        for value in values:
-            text = f"{self.style_name(target)} {self.format_health_bar(value, target.max_hp)}{self.health_status_suffix(value, dead=target.dead)}"
-            visible_width = len(strip_ansi(text))
-            padding = max(0, width - visible_width)
-            sys.stdout.write("\r" + text + (" " * padding))
-            sys.stdout.flush()
-            width = max(width, visible_width)
-            if self.sleep_for_animation(self._health_bar_animation_step_seconds):
-                final_text = (
-                    f"{self.style_name(target)} {self.format_health_bar(new_hp, target.max_hp)}"
-                    f"{self.health_status_suffix(new_hp, dead=target.dead)}"
-                )
-                final_width = len(strip_ansi(final_text))
-                final_padding = max(0, width - final_width)
-                sys.stdout.write("\r" + final_text + (" " * final_padding))
+        self.begin_animation_skip_scope()
+        try:
+            width = 0
+            steps = max(1, min(12, previous_hp - new_hp))
+            values: list[int] = []
+            for index in range(1, steps + 1):
+                progress = index / steps
+                candidate = previous_hp - int(round((previous_hp - new_hp) * progress))
+                candidate = max(new_hp, min(previous_hp, candidate))
+                if not values or candidate != values[-1]:
+                    values.append(candidate)
+            if not values or values[-1] != new_hp:
+                values.append(new_hp)
+            for value in values:
+                text = f"{self.style_name(target)} {self.format_health_bar(value, target.max_hp)}{self.health_status_suffix(value, dead=target.dead)}"
+                visible_width = len(strip_ansi(text))
+                padding = max(0, width - visible_width)
+                sys.stdout.write("\r" + text + (" " * padding))
                 sys.stdout.flush()
-                break
-        sys.stdout.write("\n")
-        sys.stdout.flush()
+                width = max(width, visible_width)
+                if self.sleep_for_animation(self._health_bar_animation_step_seconds):
+                    final_text = (
+                        f"{self.style_name(target)} {self.format_health_bar(new_hp, target.max_hp)}"
+                        f"{self.health_status_suffix(new_hp, dead=target.dead)}"
+                    )
+                    final_width = len(strip_ansi(final_text))
+                    final_padding = max(0, width - final_width)
+                    sys.stdout.write("\r" + final_text + (" " * final_padding))
+                    sys.stdout.flush()
+                    break
+            sys.stdout.write("\n")
+            sys.stdout.flush()
+        finally:
+            self.end_animation_skip_scope()
 
     def dialogue_sentence_count(self, text: str) -> int:
         parts = re.findall(r"[^.!?]+[.!?]+(?:['\"])?|[^.!?]+$", text)
         return max(1, sum(1 for part in parts if part.strip()))
 
     def dialogue_typing_duration(self, text: str) -> float:
-        return self._dialogue_seconds_per_sentence * self.dialogue_sentence_count(text)
+        return self._dialogue_character_delay_seconds * max(1, len(text))
 
     def is_sentence_boundary(self, text: str, index: int) -> bool:
         character = text[index]
@@ -346,37 +900,52 @@ class GameBase:
         return next_index >= len(text) or text[next_index].isspace()
 
     def typewrite_text(self, text: str, *, delay: float) -> None:
-        for index, character in enumerate(text):
-            if self.animation_skip_requested():
-                remainder = text[index:]
-                if remainder:
-                    sys.stdout.write(remainder)
-                    sys.stdout.flush()
-                return
-            sys.stdout.write(character)
-            sys.stdout.flush()
-            if self.sleep_for_animation(delay):
-                remainder = text[index + 1 :]
-                if remainder:
-                    sys.stdout.write(remainder)
-                    sys.stdout.flush()
-                return
-            if self.is_sentence_boundary(text, index):
-                if self.sleep_for_animation(self._typing_sentence_pause_seconds):
+        self.begin_animation_skip_scope()
+        try:
+            at_line_start = False
+            for index, character in enumerate(text):
+                if self.animation_skip_requested():
+                    remainder = text[index:]
+                    if remainder:
+                        sys.stdout.write(remainder)
+                        sys.stdout.flush()
+                    return
+                sys.stdout.write(character)
+                sys.stdout.flush()
+                if character == "\n":
+                    at_line_start = True
+                    continue
+                if at_line_start and character in {" ", "\t"}:
+                    continue
+                at_line_start = False
+                if self.sleep_for_animation(delay):
                     remainder = text[index + 1 :]
                     if remainder:
                         sys.stdout.write(remainder)
                         sys.stdout.flush()
                     return
+                if self.is_sentence_boundary(text, index):
+                    if self.sleep_for_animation(self._typing_sentence_pause_seconds):
+                        remainder = text[index + 1 :]
+                        if remainder:
+                            sys.stdout.write(remainder)
+                            sys.stdout.flush()
+                        return
+        finally:
+            self.end_animation_skip_scope()
 
     def typewrite_dialogue_line(self, speaker_name: str, text: str) -> None:
         self.output_fn("")
         prefix = f'{speaker_name}: "'
+        if callable(getattr(self, "dialogue_terminal_lines", None)):
+            rendered_dialogue = "\n".join(self.dialogue_terminal_lines(speaker_name, text))
+            typed_body = rendered_dialogue[len(prefix) :] if rendered_dialogue.startswith(prefix) else f'{text}"'
+        else:
+            typed_body = f'{text}"'
         sys.stdout.write(prefix)
         sys.stdout.flush()
-        delay = self.dialogue_typing_duration(text) / max(1, len(text))
-        self.typewrite_text(text, delay=delay)
-        sys.stdout.write('"\n\n')
+        self.typewrite_text(typed_body, delay=self._dialogue_character_delay_seconds)
+        sys.stdout.write("\n\n")
         sys.stdout.flush()
 
     def narration_typing_duration(self, text: str) -> float:
@@ -394,6 +963,546 @@ class GameBase:
     def sleep_for_dice_animation(self, duration: float) -> bool:
         return self.sleep_for_animation(duration, require_animation=True)
 
+    @contextmanager
+    def temporary_roll_animation_metadata(self, **metadata):
+        effective_metadata = {key: value for key, value in metadata.items() if value is not None}
+        if not effective_metadata:
+            yield
+            return
+        sentinel = object()
+        previous_values: dict[str, object] = {}
+        for key, value in effective_metadata.items():
+            attr_name = f"dice_roll_{key}"
+            previous_values[attr_name] = getattr(self.rng, attr_name, sentinel)
+            setattr(self.rng, attr_name, value)
+        try:
+            yield
+        finally:
+            for attr_name, previous in previous_values.items():
+                if previous is sentinel:
+                    try:
+                        delattr(self.rng, attr_name)
+                    except AttributeError:
+                        pass
+                else:
+                    setattr(self.rng, attr_name, previous)
+
+    @contextmanager
+    def suspend_dice_roll_animation(self):
+        sentinel = object()
+        previous_animator = getattr(self.rng, "dice_roll_animator", sentinel)
+        if previous_animator is sentinel:
+            yield
+            return
+        try:
+            delattr(self.rng, "dice_roll_animator")
+        except AttributeError:
+            pass
+        try:
+            yield
+        finally:
+            setattr(self.rng, "dice_roll_animator", previous_animator)
+
+    def roll_with_animation_context(
+        self,
+        expression: str,
+        *,
+        bonus: int | None = None,
+        critical: bool = False,
+        style: str | None = None,
+        context_label: str | None = None,
+        outcome_kind: str | None = None,
+    ):
+        metadata: dict[str, object] = {}
+        if bonus is not None:
+            metadata["display_bonus"] = bonus
+        if style is not None:
+            metadata["style"] = style
+        if context_label is not None:
+            metadata["context_label"] = context_label
+        if outcome_kind is not None:
+            metadata["outcome_kind"] = outcome_kind
+        with self.temporary_roll_animation_metadata(**metadata):
+            return roll(expression, self.rng, critical=critical)
+
+    def rich_dice_panel_enabled(self) -> bool:
+        can_emit_rich_output = getattr(self, "can_emit_rich_output", None)
+        return (
+            self.current_dice_animation_mode() == "full"
+            and callable(getattr(self, "emit_rich", None))
+            and callable(getattr(self, "rich_text", None))
+            and callable(can_emit_rich_output)
+            and can_emit_rich_output()
+            and Columns is not None
+            and Group is not None
+            and Panel is not None
+            and Table is not None
+            and Text is not None
+            and box is not None
+        )
+
+    def dice_animation_theme(self, kind: str, style: str | None) -> tuple[str, str]:
+        style_key = style or ("attack" if kind == "d20" else "utility")
+        themes = {
+            "attack": ("Strike Check", "light_red"),
+            "damage": ("Damage Roll", "light_red"),
+            "healing": ("Healing Roll", "light_green"),
+            "save": ("Resist Check", "light_yellow"),
+            "skill": ("Skill Check", "light_aqua"),
+            "initiative": ("Initiative", "yellow"),
+            "utility": ("Dice Roll", "light_yellow"),
+        }
+        return themes.get(style_key, ("Dice Roll", "light_yellow"))
+
+    def dice_animation_label(
+        self,
+        kind: str,
+        expression: str,
+        *,
+        style: str | None = None,
+        critical: bool,
+        advantage_state: int,
+    ) -> str:
+        if kind == "d20":
+            base_label = {
+                "attack": "Strike check",
+                "save": "Resist check",
+                "skill": "Skill check",
+                "initiative": "Initiative",
+            }.get(style or "", "Rolling d20")
+            edge = d20_edge_label(advantage_state)
+            if edge:
+                return f"{base_label} ({edge})"
+            return base_label
+        if style == "damage":
+            return "Rolling damage"
+        if style == "healing":
+            return "Rolling healing"
+        if critical:
+            return f"Rolling {expression} (critical)"
+        return f"Rolling {expression}"
+
+    def dice_animation_final_label(
+        self,
+        kind: str,
+        expression: str,
+        *,
+        style: str | None = None,
+        critical: bool,
+        advantage_state: int,
+    ) -> str:
+        if kind == "d20":
+            base_label = {
+                "attack": "Strike check",
+                "save": "Resist check",
+                "skill": "Skill check",
+                "initiative": "Initiative",
+            }.get(style or "", "Rolled d20")
+            edge = d20_edge_label(advantage_state)
+            if edge:
+                return f"{base_label} ({edge})"
+            return base_label
+        if style == "damage":
+            return "Damage roll"
+        if style == "healing":
+            return "Healing roll"
+        if critical:
+            return f"Rolled {expression} (critical)"
+        return f"Rolled {expression}"
+
+    def dice_kept_index(self, rolls: list[int], kept: int | None) -> int | None:
+        if kept is None:
+            return None
+        for index, value in enumerate(rolls):
+            if value == kept:
+                return index
+        return None
+
+    def dice_preview_rolls(
+        self,
+        final_rolls: list[int],
+        *,
+        sides: int,
+        preview_rng: random.Random,
+        progress: float,
+    ) -> list[int]:
+        if progress <= 0:
+            return [preview_rng.randint(1, sides) for _ in final_rolls]
+        lock_chance = max(0.0, (progress - 0.58) / 0.42)
+        shown: list[int] = []
+        for final_value in final_rolls:
+            if preview_rng.random() < lock_chance:
+                shown.append(final_value)
+            else:
+                shown.append(preview_rng.randint(1, sides))
+        return shown
+
+    def initiative_preview_rolls(
+        self,
+        final_rolls: list[int],
+        *,
+        preview_rng: random.Random,
+        progress: float,
+    ) -> list[int]:
+        return self.dice_preview_rolls(final_rolls, sides=20, preview_rng=preview_rng, progress=progress)
+
+    def dice_frame_core(self, kind: str, rolls: list[int], *, kept: int | None = None, final: bool = False) -> str:
+        if kind == "d20":
+            if len(rolls) == 1:
+                return f"Die: {rolls[0]}"
+            kept_index = self.dice_kept_index(rolls, kept) if final else None
+            lanes: list[str] = []
+            for index, value in enumerate(rolls):
+                lane = f"Die {chr(65 + index)}: {value}"
+                if kept_index == index:
+                    lane += " [kept]"
+                lanes.append(lane)
+            return " | ".join(lanes)
+        return " + ".join(str(value) for value in rolls)
+
+    def dice_breakdown_text(self, kind: str, rolls: list[int], *, modifier: int, kept: int | None = None) -> str:
+        if kind == "d20":
+            base_value = kept if kept is not None else (rolls[-1] if rolls else 0)
+        else:
+            base_value = sum(rolls)
+        if modifier > 0:
+            return f"{base_value} + {modifier}"
+        if modifier < 0:
+            return f"{base_value} - {abs(modifier)}"
+        return str(base_value)
+
+    def dice_outcome_details(
+        self,
+        *,
+        kind: str,
+        rolls: list[int],
+        modifier: int,
+        kept: int | None = None,
+        target_number: int | None = None,
+        style: str | None = None,
+        outcome_kind: str | None = None,
+        critical: bool = False,
+    ) -> tuple[str, str, str | None]:
+        if kind == "d20":
+            natural = kept if kept is not None else (rolls[-1] if rolls else 0)
+            total = natural + modifier
+            note: str | None = None
+            if natural == 20:
+                note = "Natural 20"
+            elif natural == 1:
+                note = "Natural 1"
+            if outcome_kind == "initiative":
+                return (f"Ready on {total}", "yellow", note)
+            if target_number is not None:
+                success = total >= target_number
+                if outcome_kind == "attack":
+                    if natural == 20:
+                        return ("Critical Hit", "yellow", note)
+                    if natural == 1:
+                        return ("Miss", "light_red", note)
+                    return ("Hit" if success else "Miss", "light_green" if success else "light_red", note)
+                return ("Success" if success else "Failure", "light_green" if success else "light_red", note)
+            if note is not None:
+                return (note, "yellow" if natural == 20 else "light_red", None)
+            return (f"Total {total}", "light_yellow", None)
+        total = sum(rolls) + modifier
+        if style == "healing":
+            note = "Critical healing roll" if critical else None
+            return (f"Restore {total} HP", "light_green", note)
+        if style == "damage":
+            note = "Critical damage roll" if critical else None
+            return (f"{total} damage", "light_red", note)
+        return (f"Total {total}", "light_yellow", None)
+
+    def render_dice_result_panel(
+        self,
+        *,
+        kind: str,
+        expression: str,
+        rolls: list[int],
+        modifier: int,
+        kept: int | None = None,
+        rerolls: list[tuple[int, int]] | None = None,
+        target_number: int | None = None,
+        target_label: str | None = None,
+        context_label: str | None = None,
+        style: str | None = None,
+        outcome_kind: str | None = None,
+        critical: bool = False,
+        advantage_state: int = 0,
+    ) -> None:
+        rerolls = rerolls or []
+        total = (kept if kept is not None else sum(rolls)) + modifier
+        panel_title, accent_color = self.dice_animation_theme(kind, style)
+        panel_heading = context_label or panel_title
+        outcome_label, outcome_color, outcome_note = self.dice_outcome_details(
+            kind=kind,
+            rolls=rolls,
+            modifier=modifier,
+            kept=kept,
+            target_number=target_number,
+            style=style,
+            outcome_kind=outcome_kind,
+            critical=critical,
+        )
+        breakdown = self.dice_breakdown_text(kind, rolls, modifier=modifier, kept=kept)
+        reroll_text = ", ".join(f"{old}->{new}" for old, new in rerolls)
+
+        if self.rich_dice_panel_enabled():
+            kept_index = self.dice_kept_index(rolls, kept)
+            dice_panels = []
+            for index, value in enumerate(rolls):
+                die_title = "Kept" if kept_index == index else (f"Die {chr(65 + index)}" if kind == "d20" and len(rolls) > 1 else "Die")
+                border = outcome_color if kept_index == index else accent_color
+                die_text = Text(str(value), style=f"bold {rich_style_name(border)}", justify="center")
+                dice_panels.append(
+                    Panel(
+                        die_text,
+                        title=self.rich_text(die_title, border, bold=True),
+                        border_style=rich_style_name(border),
+                        box=box.ROUNDED,
+                        padding=(0, 2),
+                    )
+                )
+            summary = Table.grid(expand=True, padding=(0, 1))
+            summary.add_column(style=f"bold {rich_style_name(accent_color)}", width=10)
+            summary.add_column(ratio=1)
+            summary.add_row("Roll", self.dice_animation_final_label(kind, expression, style=style, critical=critical, advantage_state=advantage_state))
+            summary.add_row("Breakdown", breakdown)
+            summary.add_row("Total", str(total))
+            if target_number is not None:
+                summary.add_row("Target", target_label or str(target_number))
+            summary.add_row("Outcome", self.rich_text(outcome_label, outcome_color, bold=True))
+            if outcome_note is not None:
+                summary.add_row("Note", outcome_note)
+            if reroll_text:
+                summary.add_row("Reroll", reroll_text)
+            rendered = self.emit_rich(
+                Panel(
+                    Group(Columns(dice_panels, expand=True, equal=True), summary),
+                    title=self.rich_text(panel_heading, accent_color, bold=True),
+                    border_style=rich_style_name(accent_color),
+                    box=box.DOUBLE if kind == "d20" and outcome_kind == "attack" else box.ROUNDED,
+                    padding=(0, 1),
+                ),
+                width=min(118, self.safe_rich_render_width()),
+            )
+            if rendered:
+                return
+
+        self.output_fn(f"{panel_heading}: {self.dice_frame_core(kind, rolls, kept=kept, final=True)}")
+        self.output_fn(f"Total: {total} ({breakdown})")
+        if target_number is not None:
+            self.output_fn(f"Target: {target_label or target_number}")
+        self.output_fn(f"Outcome: {outcome_label}")
+        if outcome_note is not None:
+            self.output_fn(f"Note: {outcome_note}")
+        if reroll_text:
+            self.output_fn(f"Reroll: {reroll_text}")
+
+    def initiative_actor_summary_name(self, actor):
+        if callable(getattr(self, "rich_from_ansi", None)):
+            return self.rich_from_ansi(self.style_name(actor))
+        return strip_ansi(self.style_name(actor))
+
+    def initiative_entry_note(self, entry: dict[str, object]) -> str:
+        outcome = entry["outcome"]
+        kept = getattr(outcome, "kept", 0)
+        rerolls = getattr(outcome, "rerolls", [])
+        if rerolls:
+            reroll_text = ", ".join(f"{old}->{new}" for old, new in rerolls)
+            return f"reroll {reroll_text}"
+        if kept == 20:
+            return "Natural 20"
+        if kept == 1:
+            return "Natural 1"
+        return ""
+
+    def can_render_initiative_panel_animation(self) -> bool:
+        return (
+            getattr(self, "_interactive_output", False)
+            and callable(getattr(sys.stdout, "write", None))
+            and Panel is not None
+            and Table is not None
+            and box is not None
+        )
+
+    def build_initiative_panel_lines(
+        self,
+        entries: list[dict[str, object]],
+        *,
+        shown_rolls: list[int] | None = None,
+        final: bool,
+    ) -> list[str]:
+        display_rolls = shown_rolls or [getattr(entry["outcome"], "kept", 0) for entry in entries]
+        if (
+            callable(getattr(self, "rich_enabled", None))
+            and self.rich_enabled()
+            and callable(getattr(self, "rich_text", None))
+        ):
+            table = Table(box=box.SIMPLE_HEAVY, expand=True, pad_edge=False)
+            table.add_column("#", justify="right", style=f"bold {rich_style_name('yellow')}", width=3)
+            table.add_column("Combatant", ratio=2)
+            table.add_column("Roll", justify="center", width=6)
+            table.add_column("Mod", justify="center", width=6)
+            table.add_column("Total", justify="center", style=f"bold {rich_style_name('yellow')}", width=7)
+            table.add_column("Status", ratio=2)
+            for index, (entry, shown) in enumerate(zip(entries, display_rolls), start=1):
+                modifier = int(entry["modifier"])
+                if final:
+                    total_text = str(entry["total"])
+                    status_text = self.initiative_entry_note(entry)
+                else:
+                    total_text = str(shown + modifier)
+                    status_text = "Rolling..."
+                table.add_row(
+                    str(index),
+                    self.initiative_actor_summary_name(entry["actor"]),
+                    str(shown),
+                    f"{modifier:+d}",
+                    total_text,
+                    status_text,
+                )
+            title = "Initiative Order" if final else "Rolling Initiative"
+            renderable = Panel(
+                table,
+                title=self.rich_text(title, "yellow", bold=True),
+                border_style=rich_style_name("yellow"),
+                box=box.ROUNDED,
+                padding=(0, 1),
+            )
+            return render_rich_lines(
+                renderable,
+                width=min(118, self.safe_rich_render_width()),
+                force_terminal=getattr(self, "_interactive_output", False),
+            )
+
+        lines = ["Initiative Order:" if final else "Rolling Initiative:"]
+        for index, (entry, shown) in enumerate(zip(entries, display_rolls), start=1):
+            modifier = int(entry["modifier"])
+            total_text = entry["total"] if final else shown + modifier
+            note = self.initiative_entry_note(entry) if final else "rolling"
+            suffix = f" [{note}]" if note else ""
+            lines.append(f"{index}. {strip_ansi(self.style_name(entry['actor']))}: {shown}{modifier:+d} = {total_text}{suffix}")
+        return lines
+
+    def draw_initiative_panel_lines(self, lines: list[str], *, previous_line_count: int = 0) -> None:
+        if previous_line_count > 0:
+            sys.stdout.write(f"\x1b[{previous_line_count}F")
+        total_lines = max(previous_line_count, len(lines))
+        for index in range(total_lines):
+            sys.stdout.write("\x1b[2K")
+            if index < len(lines):
+                sys.stdout.write(lines[index])
+            if index < total_lines - 1:
+                sys.stdout.write("\n")
+        sys.stdout.write("\n")
+        sys.stdout.flush()
+
+    def render_initiative_result_panel(self, entries: list[dict[str, object]]) -> None:
+        if not entries:
+            return
+        if (
+            callable(getattr(self, "emit_rich", None))
+            and callable(getattr(self, "rich_enabled", None))
+            and self.rich_enabled()
+            and Panel is not None
+            and Table is not None
+            and box is not None
+        ):
+            table = Table(box=box.SIMPLE_HEAVY, expand=True, pad_edge=False)
+            table.add_column("#", justify="right", style=f"bold {rich_style_name('yellow')}", width=3)
+            table.add_column("Combatant", ratio=2)
+            table.add_column("Roll", justify="center", width=6)
+            table.add_column("Mod", justify="center", width=6)
+            table.add_column("Total", justify="center", style=f"bold {rich_style_name('yellow')}", width=7)
+            table.add_column("Note", ratio=2)
+            for index, entry in enumerate(entries, start=1):
+                outcome = entry["outcome"]
+                modifier = int(entry["modifier"])
+                kept = getattr(outcome, "kept", 0)
+                table.add_row(
+                    str(index),
+                    self.initiative_actor_summary_name(entry["actor"]),
+                    str(kept),
+                    f"{modifier:+d}",
+                    str(entry["total"]),
+                    self.initiative_entry_note(entry),
+                )
+            if self.emit_rich(
+                Panel(
+                    table,
+                    title=self.rich_text("Initiative Order", "yellow", bold=True),
+                    border_style=rich_style_name("yellow"),
+                    box=box.ROUNDED,
+                    padding=(0, 1),
+                ),
+                width=min(118, self.safe_rich_render_width()),
+            ):
+                return
+
+        self.output_fn("Initiative Order:")
+        for index, entry in enumerate(entries, start=1):
+            actor = self.style_name(entry["actor"])
+            outcome = entry["outcome"]
+            modifier = int(entry["modifier"])
+            note = self.initiative_entry_note(entry)
+            suffix = f" [{note}]" if note else ""
+            self.output_fn(
+                f"{index}. {actor}: {outcome.kept}{modifier:+d} = {entry['total']}{suffix}"
+            )
+
+    def animate_initiative_rolls(self, entries: list[dict[str, object]]) -> None:
+        if not self.animate_dice or not entries:
+            return
+        self.begin_animation_skip_scope()
+        try:
+            can_preview_in_panel = self.can_render_initiative_panel_animation()
+            duration = min(
+                self._dice_animation_max_seconds + 0.2,
+                max(
+                    self._dice_animation_min_seconds + 0.08,
+                    self._dice_animation_min_seconds + 0.06 * max(0, len(entries) - 1) + 0.16,
+                ),
+            )
+            play_dice_roll_sound = getattr(self, "play_dice_roll_sound", None)
+            if callable(play_dice_roll_sound):
+                play_dice_roll_sound(duration, cooldown=0.08)
+            frames = min(
+                max(self._dice_animation_max_frames, 1),
+                max(self._dice_animation_min_frames, int(max(1.0, duration) * max(1.0, self._dice_animation_frame_rate))),
+            )
+            preview_rng = random.Random(time.perf_counter_ns() ^ len(entries) ^ (id(entries) << 1))
+            final_rolls = [getattr(entry["outcome"], "kept", 0) for entry in entries]
+            weights = [0.16 + ((index / max(1, frames - 1)) ** 3) * 2.75 for index in range(frames)]
+            scale = duration / sum(weights)
+            rendered_line_count = 0
+            for index, delay in enumerate(weights):
+                shown = self.initiative_preview_rolls(
+                    final_rolls,
+                    preview_rng=preview_rng,
+                    progress=(index + 1) / max(1, frames),
+                )
+                if can_preview_in_panel:
+                    lines = self.build_initiative_panel_lines(entries, shown_rolls=shown, final=False)
+                    self.draw_initiative_panel_lines(lines, previous_line_count=rendered_line_count)
+                    rendered_line_count = len(lines)
+                if self.sleep_for_dice_animation(delay * scale):
+                    break
+            if can_preview_in_panel:
+                lines = self.build_initiative_panel_lines(entries, shown_rolls=final_rolls, final=True)
+                self.draw_initiative_panel_lines(lines, previous_line_count=rendered_line_count)
+            else:
+                self.render_initiative_result_panel(entries)
+            if self._dice_total_reveal_pause_seconds > 0:
+                self.sleep_for_animation(self._dice_total_reveal_pause_seconds, require_animation=True)
+            if not can_preview_in_panel:
+                pass
+            if self._dice_animation_final_pause_seconds > 0:
+                self.sleep_for_animation(self._dice_animation_final_pause_seconds, require_animation=True)
+        finally:
+            self.end_animation_skip_scope()
+
     def animate_dice_roll(
         self,
         *,
@@ -409,151 +1518,241 @@ class GameBase:
         kept: int | None = None,
         target_number: int | None = None,
         target_label: str | None = None,
+        context_label: str | None = None,
+        style: str | None = None,
+        outcome_kind: str | None = None,
     ) -> None:
         if not self.animate_dice or not rolls:
             return
-        rerolls = rerolls or []
-        effective_modifier = modifier if display_modifier is None else display_modifier
-        show_total_frame = (kind == "d20" and (effective_modifier or target_number is not None)) or (
-            kind != "d20" and (effective_modifier != 0 or len(rolls) > 1)
-        )
-        duration = min(
-            self._dice_animation_max_seconds,
-            max(
-                self._dice_animation_min_seconds,
-                self._dice_animation_min_seconds + 0.35 * max(0, len(rolls) - 1) + (0.35 if advantage_state else 0.0),
-            ),
-        )
-        frames = min(34, max(20, int(duration * 8)))
-        preview_rng = random.Random(time.perf_counter_ns() ^ id(rolls) ^ (sides << 8))
-        label = self.dice_animation_label(kind, expression, critical=critical, advantage_state=advantage_state)
-        weights = [0.25 + ((index / max(1, frames - 1)) ** 2) * 2.0 for index in range(frames)]
-        scale = duration / sum(weights)
-        for delay in weights:
-            shown = [preview_rng.randint(1, sides) for _ in rolls]
+        self.begin_animation_skip_scope()
+        try:
+            rerolls = rerolls or []
+            effective_modifier = modifier if display_modifier is None else display_modifier
+            mode = self.current_dice_animation_mode()
+            show_total_frame = (
+                mode == "full"
+                or kind == "d20"
+                or effective_modifier != 0
+                or len(rolls) > 1
+                or style in {"damage", "healing"}
+            )
+            emphasis = 0.0
+            if critical:
+                emphasis += 0.18
+            if style in {"attack", "damage", "save", "skill"}:
+                emphasis += 0.12
+            if target_number is not None or advantage_state:
+                emphasis += 0.08
+            duration = min(
+                self._dice_animation_max_seconds,
+                max(
+                    self._dice_animation_min_seconds,
+                    self._dice_animation_min_seconds
+                    + 0.14 * max(0, len(rolls) - 1)
+                    + (0.12 if advantage_state else 0.0)
+                    + emphasis,
+                ),
+            )
+            play_dice_roll_sound = getattr(self, "play_dice_roll_sound", None)
+            if callable(play_dice_roll_sound):
+                play_dice_roll_sound(duration, cooldown=0.05)
+            frames = min(
+                self._dice_animation_max_frames,
+                max(self._dice_animation_min_frames, int(max(1.0, duration) * max(1.0, self._dice_animation_frame_rate))),
+            )
+            preview_rng = random.Random(time.perf_counter_ns() ^ id(rolls) ^ (sides << 8))
+            label = self.dice_animation_label(
+                kind,
+                expression,
+                style=style,
+                critical=critical,
+                advantage_state=advantage_state,
+            )
+            weights = [0.14 + ((index / max(1, frames - 1)) ** 3) * 2.6 for index in range(frames)]
+            scale = duration / sum(weights)
+            for index, delay in enumerate(weights):
+                shown = self.dice_preview_rolls(
+                    rolls,
+                    sides=sides,
+                    preview_rng=preview_rng,
+                    progress=(index + 1) / max(1, frames),
+                )
+                self.render_dice_animation_frame(
+                    label,
+                    shown,
+                    kind=kind,
+                    final=False,
+                    kept=kept,
+                    style=style,
+                    outcome_kind=outcome_kind,
+                    target_number=target_number,
+                    target_label=target_label,
+                    context_label=context_label,
+                )
+                if self.sleep_for_dice_animation(delay * scale):
+                    break
             self.render_dice_animation_frame(
-                label,
-                shown,
-                final=False,
+                self.dice_animation_final_label(
+                    kind,
+                    expression,
+                    style=style,
+                    critical=critical,
+                    advantage_state=advantage_state,
+                ),
+                rolls,
+                kind=kind,
+                final=True,
+                modifier=modifier,
+                kept=kept,
+                rerolls=rerolls,
+                style=style,
+                outcome_kind=outcome_kind,
                 target_number=target_number,
                 target_label=target_label,
+                show_total=not show_total_frame,
+                context_label=context_label,
             )
-            if self.sleep_for_dice_animation(delay * scale):
-                break
-        self.render_dice_animation_frame(
-            self.dice_animation_final_label(kind, expression, critical=critical, advantage_state=advantage_state),
-            rolls,
-            final=True,
-            modifier=modifier,
-            kept=kept,
-            rerolls=rerolls,
-            target_number=target_number,
-            target_label=target_label,
-            show_total=not show_total_frame,
-        )
-        if kind == "d20" and show_total_frame:
-            self.sleep_for_animation(self._dice_total_reveal_pause_seconds, require_animation=True)
-            self.render_dice_animation_total_frame(
-                kept=kept if kept is not None else rolls[-1],
-                modifier=effective_modifier,
-                target_number=target_number,
-                target_label=target_label,
-            )
-        elif show_total_frame:
-            self.sleep_for_animation(self._dice_total_reveal_pause_seconds, require_animation=True)
-            self.render_roll_animation_total_frame(rolls=rolls, modifier=effective_modifier)
-        self.sleep_for_animation(1.0, require_animation=True)
-
-    def dice_animation_label(self, kind: str, expression: str, *, critical: bool, advantage_state: int) -> str:
-        if kind == "d20":
-            if advantage_state > 0:
-                return "Rolling d20 (advantage)"
-            if advantage_state < 0:
-                return "Rolling d20 (disadvantage)"
-            return "Rolling d20"
-        if critical:
-            return f"Rolling {expression} (critical)"
-        return f"Rolling {expression}"
-
-    def dice_animation_final_label(self, kind: str, expression: str, *, critical: bool, advantage_state: int) -> str:
-        if kind == "d20":
-            if advantage_state > 0:
-                return "Rolled d20 (advantage)"
-            if advantage_state < 0:
-                return "Rolled d20 (disadvantage)"
-            return "Rolled d20"
-        if critical:
-            return f"Rolled {expression} (critical)"
-        return f"Rolled {expression}"
+            if show_total_frame and self._dice_total_reveal_pause_seconds > 0:
+                self.sleep_for_animation(self._dice_total_reveal_pause_seconds, require_animation=True)
+            if kind == "d20" and show_total_frame:
+                self.render_dice_animation_total_frame(
+                    rolls=list(rolls),
+                    kept=kept if kept is not None else rolls[-1],
+                    modifier=effective_modifier,
+                    rerolls=list(rerolls),
+                    target_number=target_number,
+                    target_label=target_label,
+                    context_label=context_label,
+                    expression=expression,
+                    style=style,
+                    outcome_kind=outcome_kind,
+                    critical=critical,
+                    advantage_state=advantage_state,
+                )
+            elif show_total_frame:
+                self.render_roll_animation_total_frame(
+                    rolls=list(rolls),
+                    modifier=effective_modifier,
+                    rerolls=list(rerolls),
+                    context_label=context_label,
+                    expression=expression,
+                    style=style,
+                    outcome_kind=outcome_kind,
+                    critical=critical,
+                )
+            if self._dice_animation_final_pause_seconds > 0:
+                self.sleep_for_animation(self._dice_animation_final_pause_seconds, require_animation=True)
+        finally:
+            self.end_animation_skip_scope()
 
     def render_dice_animation_frame(
         self,
         label: str,
         rolls: list[int],
         *,
+        kind: str = "roll",
         final: bool,
         modifier: int = 0,
         kept: int | None = None,
         rerolls: list[tuple[int, int]] | None = None,
+        style: str | None = None,
+        outcome_kind: str | None = None,
         target_number: int | None = None,
         target_label: str | None = None,
         show_total: bool = True,
+        context_label: str | None = None,
     ) -> None:
         rerolls = rerolls or []
-        core = " / ".join(str(value) for value in rolls) if "d20" in label else " + ".join(str(value) for value in rolls)
-        text = f"{label}: {core}"
+        core = self.dice_frame_core(kind, rolls, kept=kept, final=final)
+        text = f"{context_label}: {core}" if context_label else f"{label}: {core}"
         if target_number is not None:
             suffix = target_label or str(target_number)
             text += f" vs {suffix}"
-        if final and kept is not None:
-            text += f" | kept {kept}"
-        if final and show_total and modifier and kept is None:
-            text += f" {'+' if modifier > 0 else '-'} {abs(modifier)}"
-            text += f" = {sum(rolls) + modifier}"
-        elif final and show_total and kept is None:
-            text += f" = {sum(rolls) + modifier}"
+        if final and show_total:
+            text += f" | {self.dice_breakdown_text(kind, rolls, modifier=modifier, kept=kept)}"
+            if kind == "d20":
+                text += f" = {(kept if kept is not None else rolls[-1]) + modifier}"
+            else:
+                text += f" = {sum(rolls) + modifier}"
         if final and rerolls:
             reroll_text = ", ".join(f"{old}->{new}" for old, new in rerolls)
             text += f" | reroll {reroll_text}"
-        padding = max(0, self._dice_animation_width - len(text))
+        visible_length = len(strip_ansi(text))
+        padding = max(0, self._dice_animation_width - visible_length)
         sys.stdout.write("\r" + text + (" " * padding))
         if final:
             sys.stdout.write("\n")
             self._dice_animation_width = 0
         else:
-            self._dice_animation_width = max(self._dice_animation_width, len(text))
+            self._dice_animation_width = max(self._dice_animation_width, visible_length)
         sys.stdout.flush()
 
     def render_dice_animation_total_frame(
         self,
         *,
+        rolls: list[int] | None = None,
         kept: int,
         modifier: int,
+        rerolls: list[tuple[int, int]] | None = None,
         target_number: int | None = None,
         target_label: str | None = None,
+        context_label: str | None = None,
+        expression: str = "d20",
+        style: str | None = None,
+        outcome_kind: str | None = None,
+        critical: bool = False,
+        advantage_state: int = 0,
     ) -> None:
-        total = kept + modifier
-        modifier_text = f"{kept} {'+' if modifier >= 0 else '-'} {abs(modifier)}"
-        text = f"Final total: {total} ({modifier_text})"
-        if target_number is not None:
-            suffix = target_label or str(target_number)
-            text += f" vs {suffix}"
-        self.output_fn(text)
+        self.render_dice_result_panel(
+            kind="d20",
+            expression=expression,
+            rolls=list(rolls or [kept]),
+            modifier=modifier,
+            kept=kept,
+            rerolls=rerolls,
+            target_number=target_number,
+            target_label=target_label,
+            context_label=context_label,
+            style=style,
+            outcome_kind=outcome_kind,
+            critical=critical,
+            advantage_state=advantage_state,
+        )
 
-    def render_roll_animation_total_frame(self, *, rolls: list[int], modifier: int) -> None:
-        total = sum(rolls) + modifier
-        breakdown = " + ".join(str(value) for value in rolls) if rolls else "0"
-        if modifier > 0:
-            breakdown += f" + {modifier}"
-        elif modifier < 0:
-            breakdown += f" - {abs(modifier)}"
-        self.output_fn(f"Final total: {total} ({breakdown})")
+    def render_roll_animation_total_frame(
+        self,
+        *,
+        rolls: list[int],
+        modifier: int,
+        rerolls: list[tuple[int, int]] | None = None,
+        context_label: str | None = None,
+        expression: str = "roll",
+        style: str | None = None,
+        outcome_kind: str | None = None,
+        critical: bool = False,
+    ) -> None:
+        self.render_dice_result_panel(
+            kind="roll",
+            expression=expression,
+            rolls=list(rolls),
+            modifier=modifier,
+            rerolls=rerolls,
+            context_label=context_label,
+            style=style,
+            outcome_kind=outcome_kind,
+            critical=critical,
+        )
 
     def ensure_state_integrity(self) -> None:
         if self.state is None:
             return
-        self.state.inventory = dict(self.state.inventory)
+        self.normalize_legacy_scene_key()
+        self.state.flags = canonicalize_flag_mapping(self.state.flags)
+        self.state.inventory = canonicalize_item_mapping(self.state.inventory)
         self.state.short_rests_remaining = max(0, self.state.short_rests_remaining)
+        normalize_map_state_ids = getattr(self, "normalize_map_state_ids", None)
+        if callable(normalize_map_state_ids):
+            normalize_map_state_ids()
         ensure_quest_log = getattr(self, "ensure_quest_log", None)
         if callable(ensure_quest_log):
             ensure_quest_log()
@@ -574,6 +1773,7 @@ class GameBase:
             member.inventory.clear()
             self.reconcile_level_progression(member)
             self.sync_equipment(member)
+            self.rebuild_story_skill_bonuses(member)
             refresh_companion_state = getattr(self, "refresh_companion_state", None)
             if callable(refresh_companion_state):
                 refresh_companion_state(member)
@@ -583,7 +1783,8 @@ class GameBase:
         merchant_stocks = self.state.flags.setdefault("merchant_stocks", {})
         if merchant_id not in merchant_stocks:
             merchant_stocks[merchant_id] = initial_merchant_stock(merchant_id, rng=self.rng)
-        stock = merchant_stocks[merchant_id]
+        stock = canonicalize_item_mapping(merchant_stocks[merchant_id])
+        merchant_stocks[merchant_id] = stock
         for item_id in list(stock):
             if stock[item_id] <= 0:
                 stock.pop(item_id, None)
@@ -635,10 +1836,10 @@ class GameBase:
         return 1.0 / self.buy_price_multiplier(merchant_id)
 
     def merchant_buy_price(self, merchant_id: str, item_id: str) -> int:
-        return max(1, int(ITEMS[item_id].value * self.buy_price_multiplier(merchant_id) + 0.5))
+        return max(1, int(get_item(item_id).value * self.buy_price_multiplier(merchant_id) + 0.5))
 
     def merchant_sell_price(self, merchant_id: str, item_id: str) -> int:
-        return max(1, int(ITEMS[item_id].value / self.buy_price_multiplier(merchant_id) + 0.5))
+        return max(1, int(get_item(item_id).value / self.buy_price_multiplier(merchant_id) + 0.5))
 
     def merchant_trade_summary(self, merchant_id: str, merchant_name: str) -> str:
         negotiator = self.trade_negotiator()
@@ -693,7 +1894,17 @@ class GameBase:
             off_hand_item = ITEMS[off_hand_id]
             if off_hand_item.shield_bonus and member.weapon.hands_required == 1:
                 member.shield = True
-                member.gear_bonuses["AC"] = member.gear_bonuses.get("AC", 0) + max(0, off_hand_item.shield_bonus - 2)
+                shield_defense = int(getattr(off_hand_item, "shield_defense_percent", 0))
+                if shield_defense <= 0:
+                    shield_defense = 5 + max(0, off_hand_item.shield_bonus - 2) * 5
+                member.gear_bonuses["shield_defense_percent"] = (
+                    member.gear_bonuses.get("shield_defense_percent", 0) + shield_defense
+                )
+                raised_shield = int(getattr(off_hand_item, "raised_shield_defense_percent", 0))
+                if raised_shield > 0:
+                    member.gear_bonuses["raised_shield_defense_percent"] = (
+                        member.gear_bonuses.get("raised_shield_defense_percent", 0) + raised_shield
+                    )
             elif off_hand_item.weapon is not None and member.weapon.hands_required == 1 and off_hand_item.weapon.hands_required == 1:
                 pass
             else:
@@ -708,14 +1919,23 @@ class GameBase:
                 member.gear_bonuses[skill] = member.gear_bonuses.get(skill, 0) + bonus
             for save_key, bonus in (item.save_bonuses or {}).items():
                 member.gear_bonuses[save_key] = member.gear_bonuses.get(save_key, 0) + bonus
-            if item.ac_bonus:
-                member.gear_bonuses["AC"] = member.gear_bonuses.get("AC", 0) + item.ac_bonus
+            if item.defense_percent:
+                member.gear_bonuses["defense_percent"] = member.gear_bonuses.get("defense_percent", 0) + item.defense_percent
+            elif item.ac_bonus:
+                member.gear_bonuses["defense_percent"] = member.gear_bonuses.get("defense_percent", 0) + item.ac_bonus * 5
+            if item.defense_cap_percent:
+                member.gear_bonuses["defense_cap_percent"] = max(
+                    member.gear_bonuses.get("defense_cap_percent", 0),
+                    item.defense_cap_percent,
+                )
             if item.attack_bonus:
                 member.gear_bonuses["attack"] = member.gear_bonuses.get("attack", 0) + item.attack_bonus
             if item.damage_bonus:
                 member.gear_bonuses["damage"] = member.gear_bonuses.get("damage", 0) + item.damage_bonus
             if item.initiative_bonus:
                 member.gear_bonuses["initiative"] = member.gear_bonuses.get("initiative", 0) + item.initiative_bonus
+            if item.enchantment == "Quiet Mercy":
+                member.gear_bonuses["quiet_mercy"] = member.gear_bonuses.get("quiet_mercy", 0) + 1
             if item.spell_attack_bonus:
                 member.gear_bonuses["spell_attack"] = member.gear_bonuses.get("spell_attack", 0) + item.spell_attack_bonus
             if item.spell_damage_bonus:
@@ -730,20 +1950,45 @@ class GameBase:
                 member.gear_bonuses[f"resist_{damage_type}"] = 1
 
     def handle_meta_command(self, raw: str) -> bool:
-        lowered = raw.lower()
-        if lowered == "help":
-            self.show_global_commands()
+        lowered = raw.strip().lower()
+        if lowered in {"~", "console", "console menu", "console commands"}:
+            if self.open_console_commands_menu():
+                self._compact_hud_last_scene_key = None
+                raise ResumeLoadedGame()
+            return True
+        if lowered in {"helpconsole", "console help"}:
+            self.show_console_command_reference()
             return True
         if lowered == "load":
             if self.open_save_files_menu():
+                self._compact_hud_last_scene_key = None
                 raise ResumeLoadedGame()
-            return True
-        if lowered == "save":
-            self.inline_save()
             return True
         if lowered in {"saves", "save files"}:
             if self.open_save_files_menu():
+                self._compact_hud_last_scene_key = None
                 raise ResumeLoadedGame()
+            return True
+        if lowered == "quit":
+            if getattr(self, "_at_title_screen", False):
+                if self.confirm("Quit the program and close the main menu?"):
+                    raise QuitProgram()
+                self.say("You remain at the main menu.")
+                return True
+            if self.confirm("Return to the main menu? Unsaved progress since your last save will be lost."):
+                self.state = None
+                self._compact_hud_last_scene_key = None
+                raise ReturnToTitleMenu()
+            self.say("You stay with the current adventure.")
+            return True
+        if lowered == "help":
+            self.show_global_commands()
+            return True
+        if lowered == "settings":
+            self.open_settings_menu()
+            return True
+        if lowered == "save":
+            self.inline_save()
             return True
         if lowered == "party":
             if self.state is None:
@@ -789,39 +2034,1135 @@ class GameBase:
             return True
         return False
 
+    def is_party_member_actor(self, actor) -> bool:
+        if self.state is None:
+            return False
+        return any(member is actor for member in self.state.party_members())
+
+    def is_player_actor(self, actor) -> bool:
+        return self.state is not None and actor is self.state.player
+
+    def story_skill_modifier_payloads(self, actor: Character) -> dict[str, dict[str, object]]:
+        raw_modifiers = actor.bond_flags.get(self.STORY_SKILL_MODIFIER_KEY)
+        if not isinstance(raw_modifiers, dict):
+            raw_modifiers = {}
+        normalized: dict[str, dict[str, object]] = {}
+        for modifier_id, raw_payload in raw_modifiers.items():
+            if not isinstance(modifier_id, str) or not isinstance(raw_payload, dict):
+                continue
+            bonuses_payload = raw_payload.get("bonuses") if "bonuses" in raw_payload else raw_payload
+            if not isinstance(bonuses_payload, dict):
+                continue
+            bonuses: dict[str, int] = {}
+            for skill, value in bonuses_payload.items():
+                if not isinstance(skill, str) or skill not in SKILL_TO_ABILITY:
+                    continue
+                try:
+                    amount = int(value)
+                except (TypeError, ValueError):
+                    continue
+                if amount:
+                    bonuses[skill] = amount
+            if not bonuses:
+                continue
+            normalized[modifier_id] = {
+                "bonuses": bonuses,
+                "source": str(raw_payload.get("source") or modifier_id),
+                "duration": str(raw_payload.get("duration") or ""),
+            }
+        actor.bond_flags[self.STORY_SKILL_MODIFIER_KEY] = normalized
+        return normalized
+
+    def rebuild_story_skill_bonuses(self, actor: Character) -> None:
+        totals: dict[str, int] = {}
+        for payload in self.story_skill_modifier_payloads(actor).values():
+            bonuses = payload.get("bonuses", {})
+            if not isinstance(bonuses, dict):
+                continue
+            for skill, value in bonuses.items():
+                if isinstance(skill, str) and skill in SKILL_TO_ABILITY:
+                    totals[skill] = totals.get(skill, 0) + int(value)
+        actor.story_skill_bonuses = totals
+
+    def apply_story_skill_modifier(
+        self,
+        actor: Character,
+        modifier_id: str,
+        bonuses: dict[str, int],
+        *,
+        source: str,
+        duration: str,
+    ) -> bool:
+        clean_bonuses: dict[str, int] = {}
+        for skill, amount in bonuses.items():
+            if skill not in SKILL_TO_ABILITY:
+                continue
+            try:
+                numeric_amount = int(amount)
+            except (TypeError, ValueError):
+                continue
+            if numeric_amount:
+                clean_bonuses[skill] = numeric_amount
+        if not clean_bonuses:
+            return self.remove_story_skill_modifier(actor, modifier_id)
+        modifiers = self.story_skill_modifier_payloads(actor)
+        previous = modifiers.get(modifier_id)
+        modifiers[modifier_id] = {"bonuses": clean_bonuses, "source": source, "duration": duration}
+        actor.bond_flags[self.STORY_SKILL_MODIFIER_KEY] = modifiers
+        self.rebuild_story_skill_bonuses(actor)
+        return previous != modifiers[modifier_id]
+
+    def remove_story_skill_modifier(self, actor: Character, modifier_id: str) -> bool:
+        modifiers = self.story_skill_modifier_payloads(actor)
+        if modifier_id not in modifiers:
+            return False
+        modifiers.pop(modifier_id, None)
+        actor.bond_flags[self.STORY_SKILL_MODIFIER_KEY] = modifiers
+        self.rebuild_story_skill_bonuses(actor)
+        return True
+
+    def has_story_skill_modifier(self, actor: Character, modifier_id: str) -> bool:
+        return modifier_id in self.story_skill_modifier_payloads(actor)
+
+    def story_skill_modifier_display_lines(self, actor: Character) -> list[str]:
+        lines: list[str] = []
+        for modifier_id, payload in sorted(self.story_skill_modifier_payloads(actor).items()):
+            bonuses = payload.get("bonuses", {})
+            if not isinstance(bonuses, dict):
+                continue
+            bonus_parts = [
+                f"{skill} {int(amount):+d}"
+                for skill, amount in sorted(bonuses.items())
+                if isinstance(skill, str) and skill in SKILL_TO_ABILITY and int(amount) != 0
+            ]
+            if not bonus_parts:
+                continue
+            source = str(payload.get("source") or modifier_id)
+            duration = str(payload.get("duration") or "").strip()
+            suffix = f" ({duration})" if duration else ""
+            lines.append(f"{source}: {', '.join(bonus_parts)}{suffix}")
+        return lines
+
+    def story_skill_modifier_summary(self, actor: Character) -> str:
+        lines = self.story_skill_modifier_display_lines(actor)
+        return "; ".join(lines) if lines else "None"
+
+    def apply_liars_blessing(self) -> None:
+        assert self.state is not None
+        player = self.state.player
+        self.remove_story_skill_modifier(player, self.LIARS_CURSE_MODIFIER_ID)
+        changed = self.apply_story_skill_modifier(
+            player,
+            self.LIARS_BLESSING_MODIFIER_ID,
+            {"Deception": 2, "Persuasion": 1},
+            source="Liar's Blessing",
+            duration="until death",
+        )
+        self.state.flags["liars_blessing_active"] = True
+        self.state.flags["liars_curse_active"] = False
+        if changed:
+            self.say("The answer settles on your tongue as Liar's Blessing: +2 Deception and +1 Persuasion until death.")
+            self.add_journal("Liar's Blessing grants +2 Deception and +1 Persuasion until death.")
+
+    def apply_liars_curse(self) -> None:
+        assert self.state is not None
+        player = self.state.player
+        self.remove_story_skill_modifier(player, self.LIARS_BLESSING_MODIFIER_ID)
+        changed = self.apply_story_skill_modifier(
+            player,
+            self.LIARS_CURSE_MODIFIER_ID,
+            {"Deception": -1, "Persuasion": -1},
+            source="Liar's Curse",
+            duration="until long rest",
+        )
+        self.state.flags["liars_blessing_active"] = False
+        self.state.flags["liars_curse_active"] = True
+        if changed:
+            self.say("The statues' laughter leaves Liar's Curse behind: -1 Deception and -1 Persuasion until your next long rest.")
+            self.add_journal("Liar's Curse imposes -1 Deception and -1 Persuasion until the next long rest.")
+
+    def clear_liars_curse_after_long_rest(self) -> bool:
+        if self.state is None:
+            return False
+        cleared = self.remove_story_skill_modifier(self.state.player, self.LIARS_CURSE_MODIFIER_ID)
+        if cleared or self.state.flags.get("liars_curse_active"):
+            self.state.flags["liars_curse_active"] = False
+            self.say("By morning, Liar's Curse has thinned from your voice.")
+            self.add_journal("A long rest cleared Liar's Curse.")
+        return cleared
+
+    def clear_liars_blessing_on_player_death(self) -> bool:
+        if self.state is None or not self.state.player.dead:
+            return False
+        cleared = self.remove_story_skill_modifier(self.state.player, self.LIARS_BLESSING_MODIFIER_ID)
+        if cleared or self.state.flags.get("liars_blessing_active"):
+            self.state.flags["liars_blessing_active"] = False
+            self.state.flags["liars_blessing_lost_to_death"] = True
+            self.say("Liar's Blessing goes silent as death closes around you.")
+            self.add_journal("Death ended Liar's Blessing.")
+        return cleared
+
+    def developer_flag_enabled(self, flag_key: str) -> bool:
+        if self.state is None:
+            return False
+        return bool(self.state.flags.get(flag_key, False))
+
+    def god_mode_enabled(self) -> bool:
+        return self.developer_flag_enabled(self.DEV_GOD_MODE_FLAG)
+
+    def always_pass_dice_checks_enabled(self) -> bool:
+        return self.developer_flag_enabled(self.DEV_PASS_CHECKS_FLAG)
+
+    def always_fail_dice_checks_enabled(self) -> bool:
+        return self.developer_flag_enabled(self.DEV_FAIL_CHECKS_FLAG)
+
+    def instant_kill_enabled(self) -> bool:
+        return self.developer_flag_enabled(self.DEV_INSTANT_KILL_FLAG)
+
+    def set_developer_flag(self, flag_key: str, enabled: bool) -> None:
+        assert self.state is not None
+        self.state.flags[flag_key] = bool(enabled)
+
+    def toggle_god_mode(self) -> bool:
+        assert self.state is not None
+        enabled = not self.god_mode_enabled()
+        self.set_developer_flag(self.DEV_GOD_MODE_FLAG, enabled)
+        if enabled:
+            for member in self.state.party_members():
+                if member.dead:
+                    continue
+                if member.current_hp <= 0:
+                    member.current_hp = 1
+                    member.stable = False
+                    member.death_successes = 0
+                    member.death_failures = 0
+        self.say(f"God mode for the party is now {'ON' if enabled else 'OFF'}.")
+        return enabled
+
+    def toggle_pass_every_dice_check(self) -> bool:
+        assert self.state is not None
+        enabled = not self.always_pass_dice_checks_enabled()
+        self.set_developer_flag(self.DEV_PASS_CHECKS_FLAG, enabled)
+        if enabled:
+            self.set_developer_flag(self.DEV_FAIL_CHECKS_FLAG, False)
+        self.say(f"Pass every player dice check is now {'ON' if enabled else 'OFF'}.")
+        return enabled
+
+    def toggle_fail_every_dice_check(self) -> bool:
+        assert self.state is not None
+        enabled = not self.always_fail_dice_checks_enabled()
+        self.set_developer_flag(self.DEV_FAIL_CHECKS_FLAG, enabled)
+        if enabled:
+            self.set_developer_flag(self.DEV_PASS_CHECKS_FLAG, False)
+        self.say(f"Fail every player dice check is now {'ON' if enabled else 'OFF'}.")
+        return enabled
+
+    def toggle_instant_kill(self) -> bool:
+        assert self.state is not None
+        enabled = not self.instant_kill_enabled()
+        self.set_developer_flag(self.DEV_INSTANT_KILL_FLAG, enabled)
+        self.say(f"Instant kill for player attacks is now {'ON' if enabled else 'OFF'}.")
+        return enabled
+
+    def add_developer_gold(self, amount: int = 10_000) -> int:
+        assert self.state is not None
+        self.state.gold += amount
+        self.say(f"Developer tools add {amount:,} gold. Total gold: {self.state.gold:,}.")
+        return self.state.gold
+
+    def level_up_party_instantly(self, *, target_level: int | None = None, randomize_skill_choices: bool = True) -> int | None:
+        assert self.state is not None
+        max_level = max(LEVEL_XP_THRESHOLDS)
+        desired_level = target_level if target_level is not None else self.state.player.level + 1
+        desired_level = max(1, min(desired_level, max_level))
+        company = [self.state.player, *self.state.all_companions()]
+        if all(member.level >= desired_level for member in company):
+            if desired_level >= max_level:
+                self.say(f"The company is already at the maximum implemented level ({max_level}).")
+            else:
+                self.say(f"The company is already at level {desired_level} or higher.")
+            return None
+        self.state.xp = max(self.state.xp, LEVEL_XP_THRESHOLDS[desired_level])
+        for member in company:
+            for next_level in range(member.level + 1, desired_level + 1):
+                self.level_up_character_automatically(
+                    member,
+                    next_level,
+                    randomize_skill_choice=randomize_skill_choices,
+                )
+        self.ensure_state_integrity()
+        self.say(f"The company is now level {desired_level}.")
+        return desired_level
+
+    def reset_party_for_developer_snapshot(self) -> None:
+        assert self.state is not None
+        for member in self.state.party_members():
+            member.reset_for_rest()
+        self.state.short_rests_remaining = 2
+        self._in_combat = False
+
+    def jump_to_act2_developer_start(self) -> bool:
+        if self.state is None:
+            self.say("Start or load an adventure before jumping to the Act II test snapshot.")
+            return False
+        if self._in_combat:
+            self.say("Finish or leave combat before rebuilding the run into the Act II test snapshot.")
+            return False
+        if not self.confirm(
+            "Reset this run into a level 4 Act II test start? Current scene progress, quest state, journal, and roster setup will be replaced."
+        ):
+            self.say("The current run stays where it is.")
+            return False
+
+        preserved_flags = {
+            self.DEV_GOD_MODE_FLAG: self.god_mode_enabled(),
+            self.DEV_PASS_CHECKS_FLAG: self.always_pass_dice_checks_enabled(),
+            self.DEV_FAIL_CHECKS_FLAG: self.always_fail_dice_checks_enabled(),
+            self.DEV_INSTANT_KILL_FLAG: self.instant_kill_enabled(),
+        }
+        self.state.companions = []
+        self.state.camp_companions = []
+        self.state.flags = {
+            "act1_started": True,
+            "briefing_seen": True,
+            "iron_hollow_council_seen": True,
+            "steward_vow_made": True,
+            "miners_exchange_dispute_resolved": True,
+            "miners_exchange_ledgers_checked": True,
+            "elira_helped": True,
+            **preserved_flags,
+        }
+        self.state.completed_acts = [1]
+        self.state.clues = []
+        self.state.journal = [
+            "You broke the Ashen Brand and secured Iron Hollow through the end of Act 1.",
+        ]
+        self.state.quests = {}
+
+        for factory in (create_bryn_underbough, create_elira_dawnmantle, create_tolan_ironshield):
+            self.recruit_companion(factory())
+
+        self.level_up_party_instantly(target_level=4, randomize_skill_choices=True)
+        self.reset_party_for_developer_snapshot()
+        self.start_act2_scaffold()
+        self.ensure_state_integrity()
+        self._compact_hud_last_scene_key = None
+        refresh_scene_music = getattr(self, "refresh_scene_music", None)
+        if callable(refresh_scene_music):
+            refresh_scene_music()
+        self.say("Act II snapshot loaded: Act II begins with Bryn, Elira, and Tolan at level 4.")
+        return True
+
+    def console_command_groups(self) -> list[tuple[str, list[tuple[str, str]]]]:
+        return [
+            (
+                "Inventory And Gold",
+                [
+                    ("give <item id> [quantity]", "Add item(s) to the shared inventory; quantity defaults to 1."),
+                    ("give gold [quantity]", "Add gold; quantity defaults to 1,000. `marks` also works."),
+                    ("identify <item id>", "Print catalog details for an item."),
+                ],
+            ),
+            (
+                "Party State",
+                [
+                    ("god", "Toggle party god mode."),
+                    ("heal", "Heal every living active party member to full HP."),
+                    ("revive", "Revive every dead or downed active party member at 1 HP."),
+                    ("rest", "Complete a free long rest without consuming supplies."),
+                    ("clearconditions", "Remove all conditions from the active party."),
+                ],
+            ),
+            (
+                "Progression",
+                [
+                    ("levelup", "Level up the company by 1."),
+                    ("instantact2", "Rebuild this run at the Act II level 4 start."),
+                ],
+            ),
+            (
+                "Checks And Combat",
+                [
+                    ("passallchecks", "Toggle automatic success for player dice checks."),
+                    ("failallchecks", "Toggle automatic failure for player dice checks."),
+                    ("instantkill", "Toggle 1,000-damage instant kills on player attacks."),
+                    ("spawn <enemy id> [quantity]", "Start a console combat encounter; quantity defaults to 1."),
+                    ("killall", "Kill every currently active enemy in combat."),
+                ],
+            ),
+            (
+                "Map And Scene",
+                [
+                    ("unlockmap", "Reveal the current act map and its dungeon rooms."),
+                    ("unlockallmaps", "Reveal every Act I and Act II map node and dungeon room."),
+                    ("setscene <scene id>", "Jump to a scene and restart the scene loop."),
+                    ("setflag <flag> <true|false>", "Set a story flag."),
+                ],
+            ),
+            (
+                "Reference",
+                [
+                    ("helpconsole", "Show this command reference."),
+                ],
+            ),
+        ]
+
+    def console_command_reference(self) -> list[str]:
+        return [
+            f"{command} - {description.rstrip('.')}"
+            for _, commands in self.console_command_groups()
+            for command, description in commands
+        ]
+
+    def build_console_command_table(self):
+        if Table is None or box is None:
+            return None
+        table = Table(box=box.SIMPLE_HEAVY, expand=True, pad_edge=False)
+        table.add_column("Command", style=f"bold {rich_style_name('light_yellow')}", width=30)
+        table.add_column("Use", ratio=1)
+        for group_index, (category, commands) in enumerate(self.console_command_groups()):
+            if group_index:
+                table.add_section()
+            table.add_row(self.rich_text(category, "light_aqua", bold=True), "")
+            for command, description in commands:
+                table.add_row(self.rich_text(command, "light_yellow", bold=True), description)
+        return table
+
+    def console_command_terminal_renderable(self):
+        if Group is None or Panel is None or Text is None or box is None:
+            return None
+        table = self.build_console_command_table()
+        if table is None:
+            return None
+        prompt = Text()
+        prompt.append("console", style=f"bold {rich_style_name('light_green')}")
+        prompt.append("> ", style=f"bold {rich_style_name('light_green')}")
+        prompt.append("Type a command, or ")
+        prompt.append("back", style=f"bold {rich_style_name('light_yellow')}")
+        prompt.append(" to return.")
+        return Panel(
+            Group(table, prompt),
+            title=self.rich_text("Developer Console", "light_yellow", bold=True),
+            border_style=rich_style_name("light_green"),
+            box=box.ROUNDED,
+            padding=(0, 1),
+        )
+
+    def emit_console_command_reference_rich(self) -> bool:
+        if not self.should_use_rich_ui():
+            return False
+        renderable = self.console_command_terminal_renderable()
+        if renderable is None:
+            return False
+        if self.emit_rich(renderable, width=self.safe_rich_render_width()):
+            self.output_fn("")
+            return True
+        return False
+
+    def show_console_command_reference_plain(self) -> None:
+        self.banner("Console Commands")
+        self.output_fn("Available console commands:")
+        for category, commands in self.console_command_groups():
+            self.output_fn("")
+            self.output_fn(f"{category}:")
+            for command, description in commands:
+                self.output_fn(f"  {command} - {description}")
+
+    def show_console_command_reference(self) -> None:
+        if self.emit_console_command_reference_rich():
+            return
+        self.show_console_command_reference_plain()
+
+    def open_console_commands_menu(self) -> bool:
+        while True:
+            raw = self.read_resize_aware_input(
+                self.show_console_command_reference,
+                prompt="console> ",
+            ).strip()
+            if raw.lower() in {"", "back", "exit", "quit"}:
+                return False
+            if self.execute_console_command(raw):
+                return True
+
+    def active_console_state_available(self) -> bool:
+        if self.state is not None:
+            return True
+        self.say("Start or load an adventure before using console commands.")
+        return False
+
+    def parse_console_quantity(self, token: str | None, *, default: int) -> int | None:
+        if token is None:
+            return default
+        try:
+            quantity = int(token)
+        except ValueError:
+            self.say("Quantity must be a positive whole number.")
+            return None
+        if quantity <= 0:
+            self.say("Quantity must be at least 1.")
+            return None
+        return quantity
+
+    def execute_console_command(self, raw: str) -> bool:
+        tokens = raw.split()
+        if not tokens:
+            return False
+        command = tokens[0].lower()
+        if command == "give":
+            return self.execute_give_console_command(tokens)
+        if command == "god":
+            if self.active_console_state_available():
+                self.toggle_god_mode()
+            return False
+        if command == "heal":
+            if self.active_console_state_available():
+                self.console_heal_party()
+            return False
+        if command == "revive":
+            if self.active_console_state_available():
+                self.console_revive_party()
+            return False
+        if command == "rest":
+            if self.active_console_state_available():
+                self.console_long_rest()
+            return False
+        if command == "clearconditions":
+            if self.active_console_state_available():
+                self.console_clear_party_conditions()
+            return False
+        if command == "levelup":
+            if self.active_console_state_available():
+                self.level_up_party_instantly()
+            return False
+        if command == "instantact2":
+            if self.active_console_state_available():
+                return self.jump_to_act2_developer_start()
+            return False
+        if command == "passallchecks":
+            if self.active_console_state_available():
+                self.toggle_pass_every_dice_check()
+            return False
+        if command == "failallchecks":
+            if self.active_console_state_available():
+                self.toggle_fail_every_dice_check()
+            return False
+        if command == "instantkill":
+            if self.active_console_state_available():
+                self.toggle_instant_kill()
+            return False
+        if command == "unlockmap":
+            if self.active_console_state_available():
+                self.console_unlock_current_map()
+            return False
+        if command == "unlockallmaps":
+            if self.active_console_state_available():
+                self.console_unlock_all_maps()
+            return False
+        if command == "setscene":
+            return self.execute_setscene_console_command(tokens)
+        if command == "setflag":
+            return self.execute_setflag_console_command(tokens)
+        if command == "spawn":
+            return self.execute_spawn_console_command(tokens)
+        if command == "killall":
+            if self.active_console_state_available():
+                self.console_kill_all_active_enemies()
+            return False
+        if command == "identify":
+            self.execute_identify_console_command(tokens)
+            return False
+        if command == "helpconsole":
+            self.show_console_command_reference()
+            return False
+        self.say(f"Unknown console command: {command}.")
+        return False
+
+    def execute_give_console_command(self, tokens: list[str]) -> bool:
+        if len(tokens) < 2 or len(tokens) > 3:
+            self.say("Usage: give <item id> [quantity] or give gold [quantity].")
+            return False
+        if not self.active_console_state_available():
+            return False
+        target = tokens[1]
+        if target.lower() in {"gold", "marks"}:
+            quantity = self.parse_console_quantity(tokens[2] if len(tokens) == 3 else None, default=1_000)
+            if quantity is None:
+                return False
+            self.state.gold += quantity
+            self.say(f"Console grants {quantity:,} gold. Total gold: {self.state.gold:,}.")
+            return False
+        quantity = self.parse_console_quantity(tokens[2] if len(tokens) == 3 else None, default=1)
+        if quantity is None:
+            return False
+        try:
+            item = get_item(target)
+        except KeyError:
+            self.say(f"Unknown item id: {target}.")
+            return False
+        inventory = self.inventory_dict()
+        inventory[item.item_id] = inventory.get(item.item_id, 0) + quantity
+        self.say(f"Console grants {item.name} [{item.item_id}] x{quantity}.")
+        return False
+
+    def console_heal_party(self) -> None:
+        assert self.state is not None
+        healed = 0
+        skipped_dead = 0
+        for member in self.state.party_members():
+            if member.dead:
+                skipped_dead += 1
+                continue
+            member.current_hp = member.max_hp
+            member.stable = False
+            member.death_successes = 0
+            member.death_failures = 0
+            healed += 1
+        message = f"Console heals {healed} active party member{'s' if healed != 1 else ''} to full HP."
+        if skipped_dead:
+            message += " Dead party members still need `revive`."
+        self.say(message)
+
+    def console_revive_party(self) -> None:
+        assert self.state is not None
+        revived = 0
+        for member in self.state.party_members():
+            if not member.dead and member.current_hp > 0:
+                continue
+            member.dead = False
+            member.current_hp = max(1, min(member.max_hp, 1))
+            member.stable = False
+            member.death_successes = 0
+            member.death_failures = 0
+            revived += 1
+        self.say(f"Console revives {revived} active party member{'s' if revived != 1 else ''} at 1 HP.")
+
+    def console_long_rest(self) -> None:
+        assert self.state is not None
+        self.complete_long_rest_recovery()
+        self.say("Console completes a free long rest. Supplies were not consumed.")
+
+    def console_clear_party_conditions(self) -> None:
+        assert self.state is not None
+        cleared = 0
+        for member in self.state.party_members():
+            cleared += sum(1 for value in member.conditions.values() if value != 0)
+            member.conditions.clear()
+        self.say(f"Console clears {cleared} condition{'s' if cleared != 1 else ''} from the active party.")
+
+    def append_unique_strings(self, target: list[str], values) -> int:
+        existing = set(target)
+        added = 0
+        for value in values:
+            if not isinstance(value, str) or value in existing:
+                continue
+            target.append(value)
+            existing.add(value)
+            added += 1
+        return added
+
+    def unlock_map_payload(self, blueprint, payload: dict) -> tuple[int, int]:
+        node_count = self.append_unique_strings(payload["visited_nodes"], blueprint.nodes.keys())
+        room_ids = [room_id for dungeon in blueprint.dungeons.values() for room_id in dungeon.rooms]
+        room_count = self.append_unique_strings(payload["cleared_rooms"], room_ids)
+        story_count = self.append_unique_strings(payload["seen_story_beats"], [beat.beat_id for beat in blueprint.story_beats])
+        return node_count, room_count + story_count
+
+    def clear_console_map_cache(self) -> None:
+        clear_map_cache = getattr(self, "_clear_map_view_cache", None)
+        if callable(clear_map_cache):
+            clear_map_cache()
+        self._compact_hud_last_scene_key = None
+
+    def console_unlock_act1_map(self) -> tuple[int, int]:
+        payload = self._map_state_payload()
+        return self.unlock_map_payload(ACT1_HYBRID_MAP, payload)
+
+    def console_unlock_act2_map(self) -> tuple[int, int]:
+        payload = self._act2_map_state_payload()
+        return self.unlock_map_payload(ACT2_ENEMY_DRIVEN_MAP, payload)
+
+    def console_current_scene_is_act2_map(self) -> bool:
+        assert self.state is not None
+        return self.state.current_scene in {node.scene_key for node in ACT2_ENEMY_DRIVEN_MAP.nodes.values()}
+
+    def console_unlock_current_map(self) -> None:
+        assert self.state is not None
+        if self.state.current_act >= 2 or self.console_current_scene_is_act2_map():
+            label = "Act II"
+            nodes, details = self.console_unlock_act2_map()
+        else:
+            label = "Act I"
+            nodes, details = self.console_unlock_act1_map()
+        self.clear_console_map_cache()
+        self.say(f"Console unlocks the {label} map: {nodes} new node(s), {details} new room/story marker(s).")
+
+    def console_unlock_all_maps(self) -> None:
+        assert self.state is not None
+        act1_nodes, act1_details = self.console_unlock_act1_map()
+        act2_nodes, act2_details = self.console_unlock_act2_map()
+        self.clear_console_map_cache()
+        self.say(
+            "Console unlocks all maps: "
+            f"{act1_nodes + act2_nodes} new node(s), {act1_details + act2_details} new room/story marker(s)."
+        )
+
+    def infer_console_scene_act(self, scene_id: str) -> int:
+        scene_id = runtime_scene_id(scene_id) or scene_id
+        if scene_id.startswith("act3_"):
+            return 3
+        act2_scenes = {
+            "act2_claims_council",
+            "act2_expedition_hub",
+            "hushfen_pale_circuit",
+            "greywake_survey_camp",
+            "stonehollow_dig",
+            "glasswater_intake",
+            "siltlock_counting_house",
+            "act2_midpoint_convergence",
+            "broken_prospect",
+            "south_adit",
+            "resonant_vault_outer_galleries",
+            "blackglass_causeway",
+            "blackglass_relay_house",
+            "meridian_forge",
+            "act2_scaffold_complete",
+        }
+        return 2 if scene_id in act2_scenes else 1
+
+    def execute_setscene_console_command(self, tokens: list[str]) -> bool:
+        if len(tokens) != 2:
+            self.say("Usage: setscene <scene id>.")
+            return False
+        if not self.active_console_state_available():
+            return False
+        scene_id = runtime_scene_id(tokens[1]) or tokens[1]
+        if scene_id not in self._scene_handlers:
+            self.say(f"Unknown scene id: {scene_id}.")
+            return False
+        self.state.current_scene = scene_id
+        self.state.current_act = self.infer_console_scene_act(scene_id)
+        self._compact_hud_last_scene_key = None
+        refresh_scene_music = getattr(self, "refresh_scene_music", None)
+        if callable(refresh_scene_music):
+            refresh_scene_music()
+        self.say(f"Console jumps to scene `{scene_id}`.")
+        return True
+
+    def normalize_legacy_scene_key(self) -> None:
+        if self.state is None:
+            return
+        self.state.current_scene = runtime_scene_id(self.state.current_scene) or self.state.current_scene
+
+    def parse_console_bool(self, token: str) -> bool | None:
+        lowered = token.strip().lower()
+        if lowered in {"true", "t", "1", "yes", "y", "on"}:
+            return True
+        if lowered in {"false", "f", "0", "no", "n", "off"}:
+            return False
+        self.say("Flag value must be true or false.")
+        return None
+
+    def execute_setflag_console_command(self, tokens: list[str]) -> bool:
+        if len(tokens) != 3:
+            self.say("Usage: setflag <flag> <true|false>.")
+            return False
+        if not self.active_console_state_available():
+            return False
+        value = self.parse_console_bool(tokens[2])
+        if value is None:
+            return False
+        self.state.flags[tokens[1]] = value
+        self.say(f"Console sets flag `{tokens[1]}` to {value}.")
+        return False
+
+    def execute_spawn_console_command(self, tokens: list[str]) -> bool:
+        if len(tokens) < 2 or len(tokens) > 3:
+            self.say("Usage: spawn <enemy id> [quantity].")
+            return False
+        if not self.active_console_state_available():
+            return False
+        if getattr(self, "_in_combat", False):
+            self.say("Finish the current combat before spawning a new encounter.")
+            return False
+        quantity = self.parse_console_quantity(tokens[2] if len(tokens) == 3 else None, default=1)
+        if quantity is None:
+            return False
+        if quantity > 20:
+            self.say("Spawn quantity cannot exceed 20 enemies at once.")
+            return False
+        try:
+            enemies = [create_enemy(tokens[1]) for _ in range(quantity)]
+        except KeyError:
+            self.say(f"Unknown enemy id: {tokens[1]}.")
+            return False
+        label = enemies[0].name if quantity == 1 else f"{enemies[0].name} x{quantity}"
+        encounter = Encounter(
+            title=f"Console Spawn: {label}",
+            description=f"The console folds {label} into the current scene for a test fight.",
+            enemies=enemies,
+            allow_flee=True,
+            allow_parley=False,
+            allow_post_combat_random_encounter=False,
+        )
+        result = self.run_encounter(encounter)
+        self.say(f"Console spawn encounter ended: {result}.")
+        return False
+
+    def console_kill_all_active_enemies(self) -> None:
+        enemies = list(getattr(self, "_active_combat_enemies", []) or [])
+        living_enemies = [enemy for enemy in enemies if "enemy" in getattr(enemy, "tags", []) and enemy.is_conscious()]
+        if not getattr(self, "_in_combat", False) or not living_enemies:
+            self.say("There are no active combat enemies to kill.")
+            return
+        for enemy in living_enemies:
+            enemy.temp_hp = 0
+            enemy.current_hp = 0
+            enemy.dead = True
+        self.say(f"Console kills {len(living_enemies)} active enem{'y' if len(living_enemies) == 1 else 'ies'}.")
+
+    def execute_identify_console_command(self, tokens: list[str]) -> None:
+        if len(tokens) != 2:
+            self.say("Usage: identify <item id>.")
+            return
+        try:
+            item = get_item(tokens[1])
+        except KeyError:
+            self.say(f"Unknown item id: {tokens[1]}.")
+            return
+        rules = item_rules_text(item) or "No special field rules."
+        self.banner(f"Identify: {item.name}")
+        self.say(f"ID: {item.item_id}")
+        if item.legacy_id:
+            self.say(f"Legacy ID: {item.legacy_id}")
+        self.say(f"Category: {item_category_label(item.category)} / {item_type_label(item.item_type)}")
+        self.say(f"Rarity: {item.rarity_title}")
+        self.say(f"Value: {marks_label(item.value)} | Supplies: {item.supply_label()}")
+        self.say(f"Description: {item.description}")
+        self.say(f"Rules: {rules}")
+        self.say(f"Source: {item.source}")
+
+    def open_developer_tools_menu(self) -> bool:
+        if self.state is None:
+            self.say("Start or load an adventure before using developer tools.")
+            return False
+        while True:
+            self.banner("Developer Tools")
+            self.say("These tools affect the current run immediately and any save made afterward will keep the changes.")
+            options = [
+                f"Toggle god mode for the party [{'ON' if self.god_mode_enabled() else 'OFF'}]",
+                f"Toggle pass every dice check [{'ON' if self.always_pass_dice_checks_enabled() else 'OFF'}]",
+                "Add 10,000 gold instantly",
+                "Level up the company instantly",
+                "Jump to the start of Act II with a level 4 test company",
+                "Back",
+            ]
+            choice = self.choose("Choose a developer tool.", options, allow_meta=False, show_hud=False)
+            if choice == 1:
+                self.toggle_god_mode()
+            elif choice == 2:
+                self.toggle_pass_every_dice_check()
+            elif choice == 3:
+                self.add_developer_gold()
+            elif choice == 4:
+                self.level_up_party_instantly()
+            elif choice == 5:
+                if self.jump_to_act2_developer_start():
+                    return True
+            else:
+                return False
+
     def show_global_commands(self) -> None:
+        command_groups = [
+            (
+                "Navigation And Status",
+                [
+                    ("map / maps / map menu", "Open the map menu, including Travel Ledger, overworld, and current-site views when available."),
+                    ("journal", "Open the journal and clues log."),
+                    ("party", "Review quick party combat stats, statuses, and roster state."),
+                ],
+            ),
+            (
+                "Inventory And Rest",
+                [
+                    ("inventory / backpack / bag", "Open the shared inventory and item management view."),
+                    ("equipment / gear", "Open the full equipment manager for any company member."),
+                    ("sheet / sheets", "Open full character sheets for the company."),
+                    ("camp", "Open camp when you are not in combat."),
+                ],
+            ),
+            (
+                "Save And Load",
+                [
+                    ("save", "Save the current run to a named slot."),
+                    ("load", "Load another save slot immediately and continue from there."),
+                    ("saves / save files", "Open the Save Files manager to load or delete save slots."),
+                ],
+            ),
+            (
+                "Settings And Help",
+                [
+                    ("settings", "Open the settings menu for audio and presentation toggles."),
+                    ("help", "Show the list of global commands and what they do."),
+                    ("helpconsole", "Show the console command reference without opening the console prompt."),
+                ],
+            ),
+            (
+                "Advanced",
+                [
+                    ("~ / console", "Open the console commands menu for give, god, levelup, Act II jump, and dice-check toggles."),
+                ],
+            ),
+            (
+                "Exit",
+                [
+                    ("quit", "Return to the main menu, or close the program if you are already there."),
+                ],
+            ),
+        ]
+        if self.should_use_rich_ui() and Group is not None and Panel is not None and Table is not None and box is not None:
+            table = Table(box=box.SIMPLE_HEAVY, expand=True, pad_edge=False)
+            table.add_column("Command", style=f"bold {rich_style_name('light_yellow')}", width=24)
+            table.add_column("Use", ratio=1)
+            for group_index, (category, commands) in enumerate(command_groups):
+                if group_index:
+                    table.add_section()
+                table.add_row(self.rich_text(category, "light_aqua", bold=True), "")
+                for command, description in commands:
+                    table.add_row(self.rich_text(command, "light_yellow", bold=True), description)
+            guidance = self.rich_text(
+                "Type any of these at most prompts. `map`, `maps`, and `map menu` all open the same map menu, and `~` opens the console commands menu.",
+                "cyan",
+            )
+            if self.emit_rich(
+                Panel(
+                    Group(table, guidance),
+                    title=self.rich_text("Global Commands", "light_yellow", bold=True),
+                    border_style=rich_style_name("light_yellow"),
+                    box=box.ROUNDED,
+                    padding=(0, 1),
+                )
+            ):
+                self.output_fn("")
+                return
         self.banner("Global Commands")
         self.say("These commands can be typed at most prompts.")
-        commands = [
-            ("help", "Show the list of global commands and what they do."),
-            ("save", "Save the current run to a named slot."),
-            ("load", "Load another save slot immediately and continue from there."),
-            ("saves / save files", "Open the Save Files manager to load or delete save slots."),
-            ("party", "Review quick party combat stats, statuses, and roster state."),
-            ("journal", "Open the journal and clues log."),
-            ("inventory / backpack / bag", "Open the shared inventory and item management view."),
-            ("equipment / gear", "Open the full equipment manager for any company member."),
-            ("sheet / sheets", "Open full character sheets for the company."),
-            ("camp", "Open camp when you are not in combat."),
-        ]
-        for command, description in commands:
-            self.output_fn(f"- {command}: {description}")
+        for category, commands in command_groups:
+            self.output_fn(f"{category}:")
+            for command, description in commands:
+                self.output_fn(f"- {command}: {description}")
+            self.output_fn("")
+
+    def refresh_presentation_bundle_preference(self) -> None:
+        self._animations_and_delays_preference = bool(
+            getattr(self, "_dice_animations_preference", self.animate_dice)
+            and getattr(self, "_typed_dialogue_preference", self.type_dialogue)
+            and getattr(self, "_pacing_pauses_preference", self.pace_output)
+            and getattr(self, "_staggered_reveals_preference", getattr(self, "staggered_reveals_enabled", False))
+        )
+
+    def apply_dice_animation_preference(self) -> None:
+        self.apply_dice_animation_mode_profile()
+        if self.animate_dice:
+            try:
+                setattr(self.rng, "dice_roll_animator", self.animate_dice_roll)
+            except Exception:
+                self.animate_dice = False
+                self._dice_animation_mode_preference = "off"
+                self._dice_animations_preference = False
+                self.apply_dice_animation_mode_profile()
+        else:
+            try:
+                delattr(self.rng, "dice_roll_animator")
+            except AttributeError:
+                pass
+
+    def apply_typed_dialogue_preference(self) -> None:
+        self.type_dialogue = bool(
+            getattr(self, "_typed_dialogue_preference", self.type_dialogue)
+            and self.output_fn is print
+            and not getattr(self, "_presentation_forced_off", False)
+        )
+
+    def apply_pacing_preference(self) -> None:
+        self.pace_output = bool(
+            getattr(self, "_pacing_pauses_preference", self.pace_output)
+            and not getattr(self, "_presentation_forced_off", False)
+        )
+
+    def apply_staggered_reveal_preference(self) -> None:
+        self.staggered_reveals_enabled = bool(
+            getattr(self, "_staggered_reveals_preference", getattr(self, "staggered_reveals_enabled", False))
+            and not getattr(self, "_presentation_forced_off", False)
+        )
+
+    def set_dice_animations_enabled(self, enabled: bool) -> None:
+        self.set_dice_animation_mode("full" if enabled else "off")
+
+    def toggle_dice_animations(self) -> None:
+        self.set_dice_animations_enabled(not getattr(self, "_dice_animations_preference", self.animate_dice))
+
+    def set_dice_animation_mode(self, mode: str) -> None:
+        selected = mode if mode in self.DICE_ANIMATION_MODES else "off"
+        self._dice_animation_mode_preference = selected
+        self._dice_animations_preference = selected != "off"
+        self.apply_dice_animation_preference()
+        self.refresh_presentation_bundle_preference()
+        self.persist_settings()
+        self.say(f"Dice animation style set to {self.dice_animation_mode_label(selected)}.")
+
+    def open_dice_animation_settings(self) -> None:
+        while True:
+            options = [
+                f"Off ({'Current' if self.current_dice_animation_mode() == 'off' else 'Set'})",
+                f"Minimal ({'Current' if self.current_dice_animation_mode() == 'minimal' else 'Set'})",
+                f"Full ({'Current' if self.current_dice_animation_mode() == 'full' else 'Set'})",
+                "Back",
+            ]
+            choice = self.choose("Dice animation style", options, allow_meta=False)
+            if choice == 4:
+                return
+            self.set_dice_animation_mode(self.DICE_ANIMATION_MODES[choice - 1])
+            return
+
+    def set_typed_dialogue_enabled(self, enabled: bool) -> None:
+        self._typed_dialogue_preference = bool(enabled)
+        self.apply_typed_dialogue_preference()
+        self.refresh_presentation_bundle_preference()
+        self.persist_settings()
+        state_label = "enabled" if self.type_dialogue else "disabled"
+        self.say(f"Typed dialogue and narration {state_label}.")
+
+    def toggle_typed_dialogue(self) -> None:
+        self.set_typed_dialogue_enabled(not getattr(self, "_typed_dialogue_preference", self.type_dialogue))
+
+    def set_pacing_pauses_enabled(self, enabled: bool) -> None:
+        self._pacing_pauses_preference = bool(enabled)
+        self.apply_pacing_preference()
+        self.refresh_presentation_bundle_preference()
+        self.persist_settings()
+        self.say("Pacing pauses enabled." if self.pace_output else "Pacing pauses disabled.")
+
+    def toggle_pacing_pauses(self) -> None:
+        self.set_pacing_pauses_enabled(not getattr(self, "_pacing_pauses_preference", self.pace_output))
+
+    def set_staggered_reveals_enabled(self, enabled: bool) -> None:
+        self._staggered_reveals_preference = bool(enabled)
+        self.apply_staggered_reveal_preference()
+        self.refresh_presentation_bundle_preference()
+        self.persist_settings()
+        state_label = "enabled" if self.staggered_reveals_enabled else "disabled"
+        self.say(f"Staggered option reveals {state_label}.")
+
+    def toggle_staggered_reveals(self) -> None:
+        self.set_staggered_reveals_enabled(
+            not getattr(self, "_staggered_reveals_preference", getattr(self, "staggered_reveals_enabled", False))
+        )
+
+    def set_animations_and_delays_enabled(self, enabled: bool) -> None:
+        self._dice_animation_mode_preference = "full" if enabled else "off"
+        self._dice_animations_preference = bool(enabled)
+        self._typed_dialogue_preference = bool(enabled)
+        self._pacing_pauses_preference = bool(enabled)
+        self._staggered_reveals_preference = bool(enabled)
+        self.apply_dice_animation_preference()
+        self.apply_typed_dialogue_preference()
+        self.apply_pacing_preference()
+        self.apply_staggered_reveal_preference()
+        self.refresh_presentation_bundle_preference()
+        self.persist_settings()
+        self.say("Animations and delays enabled." if enabled else "Animations and delays disabled.")
+
+    def toggle_animations_and_delays(self) -> None:
+        self.set_animations_and_delays_enabled(
+            not bool(
+                getattr(self, "_dice_animations_preference", self.animate_dice)
+                and getattr(self, "_typed_dialogue_preference", self.type_dialogue)
+                and getattr(self, "_pacing_pauses_preference", self.pace_output)
+                and getattr(self, "_staggered_reveals_preference", getattr(self, "staggered_reveals_enabled", False))
+            )
+        )
+
+    def settings_toggle_label(self, enabled: bool, *, unavailable: bool = False) -> str:
+        if unavailable:
+            return "Unavailable"
+        return "On" if enabled else "Off"
+
+    def open_settings_menu(self) -> None:
+        while True:
+            music_available = bool(getattr(self, "_music_assets_ready", False))
+            options = [
+                f"Toggle sound effects ({self.settings_toggle_label(getattr(self, 'sound_effects_enabled', False))})",
+                (
+                    f"Toggle music ({self.settings_toggle_label(getattr(self, 'music_enabled', False), unavailable=not music_available)})"
+                ),
+                f"Dice animation style ({self.dice_animation_mode_label()})",
+                f"Toggle typed dialogue and narration ({self.settings_toggle_label(getattr(self, '_typed_dialogue_preference', self.type_dialogue))})",
+                f"Toggle pacing pauses ({self.settings_toggle_label(getattr(self, '_pacing_pauses_preference', self.pace_output))})",
+                f"Toggle staggered option reveals ({self.settings_toggle_label(getattr(self, '_staggered_reveals_preference', getattr(self, 'staggered_reveals_enabled', False)))})",
+                "Back",
+            ]
+            choice = self.choose("Settings", options, allow_meta=False)
+            if choice == 1:
+                toggle_sound_effects = getattr(self, "toggle_sound_effects", None)
+                if callable(toggle_sound_effects):
+                    toggle_sound_effects()
+                else:
+                    self.say("Sound effects are not supported in this build.")
+                continue
+            if choice == 2:
+                toggle_music = getattr(self, "toggle_music", None)
+                if callable(toggle_music):
+                    toggle_music()
+                else:
+                    self.say("Music playback is not supported in this build.")
+                continue
+            if choice == 3:
+                self.open_dice_animation_settings()
+                continue
+            if choice == 4:
+                self.toggle_typed_dialogue()
+                continue
+            if choice == 5:
+                self.toggle_pacing_pauses()
+                continue
+            if choice == 6:
+                self.toggle_staggered_reveals()
+                continue
+            return
 
     def emit_dialogue_line(self, speaker_name: str, text: str, *, color: str, typed: bool = True) -> None:
-        styled_name = self.style_text(speaker_name, color)
+        styled_name = self.style_text(self.public_character_name(speaker_name), color)
         if typed and self.type_dialogue:
             self.typewrite_dialogue_line(styled_name, text)
             return
         self.output_fn("")
-        self.say(f'{styled_name}: "{text}"')
+        dialogue_lines = getattr(self, "dialogue_terminal_lines", None)
+        if getattr(self, "_interactive_output", False) and callable(dialogue_lines):
+            for line in dialogue_lines(styled_name, text):
+                self.output_fn(line)
+        else:
+            self.say(f'{styled_name}: "{text}"')
         self.output_fn("")
 
     def speaker(self, name: str, text: str) -> None:
         self.introduce_character(name)
         self.emit_dialogue_line(name, text, color="green", typed=True)
 
+    def active_party_leader(self):
+        if self.state is None:
+            return None
+        party = self.state.party_members()
+        for member in party:
+            if member.is_conscious():
+                return member
+        for member in party:
+            if not member.dead:
+                return member
+        return self.state.player
+
     def player_speaker(self, text: str) -> None:
-        speaker_name = self.state.player.name if self.state is not None else "You"
+        leader = self.active_party_leader()
+        speaker_name = leader.name if leader is not None else "You"
         self.emit_dialogue_line(speaker_name, text, color="blue", typed=False)
         self.pause_for_choice_resolution()
 
@@ -840,46 +3181,53 @@ class GameBase:
         else:
             self.player_speaker(cleaned.strip('"'))
 
+    def character_intro_name(self, subject) -> str:
+        return str(subject.name if hasattr(subject, "name") else subject)
+
+    def character_intro_key(self, subject) -> str:
+        return self.public_character_name(self.character_intro_name(subject))
+
     def should_introduce_character(self, subject) -> bool:
         if self.state is None:
             return False
-        name = subject.name if hasattr(subject, "name") else str(subject)
+        name = self.character_intro_name(subject)
+        intro_key = self.character_intro_key(subject)
         seen = set(self.state.flags.get("introduced_characters", []))
-        return name not in seen
+        return name not in seen and intro_key not in seen
 
-    def mark_character_introduced(self, name: str) -> None:
+    def mark_character_introduced(self, subject) -> None:
         assert self.state is not None
+        name = self.character_intro_name(subject)
+        intro_key = self.character_intro_key(subject)
         seen = set(self.state.flags.get("introduced_characters", []))
-        if name in seen:
+        if name in seen or intro_key in seen:
             return
-        seen.add(name)
+        seen.add(intro_key)
         self.state.flags["introduced_characters"] = sorted(seen)
 
     def character_intro_text(self, subject) -> str:
+        name = self.character_intro_name(subject)
+        public_name = self.public_character_name(name)
+        if name in self.NAMED_CHARACTER_INTROS:
+            return self.NAMED_CHARACTER_INTROS[name]
+        if public_name in self.NAMED_CHARACTER_INTROS:
+            return self.NAMED_CHARACTER_INTROS[public_name]
         if hasattr(subject, "name"):
-            name = subject.name
-            if name in self.NAMED_CHARACTER_INTROS:
-                return self.NAMED_CHARACTER_INTROS[name]
             notes = list(getattr(subject, "notes", []))
             if notes:
                 return notes[0]
             if getattr(subject, "tags", None) and "leader" in subject.tags:
                 return (
-                    f"{name} stands out immediately: a {subject.race.lower()} {subject.class_name.lower()} "
+                    f"{name} stands out immediately: a {race_label(subject.race).lower()} {class_label(subject.class_name).lower()} "
                     f"carrying themselves like the center of the whole fight."
                 )
-        else:
-            name = str(subject)
-            if name in self.NAMED_CHARACTER_INTROS:
-                return self.NAMED_CHARACTER_INTROS[name]
         return ""
 
     def introduce_character(self, subject) -> None:
         if not self.should_introduce_character(subject):
             return
-        name = subject.name if hasattr(subject, "name") else str(subject)
         intro = self.character_intro_text(subject)
-        self.mark_character_introduced(name)
+        self.mark_character_introduced(subject)
         if intro:
             self.say(intro, typed=True)
 
@@ -895,7 +3243,7 @@ class GameBase:
                 self.introduce_character(enemy)
 
     def format_feature_name(self, feature: str) -> str:
-        return feature.replace("_", " ").title()
+        return feature_label(feature)
 
     def lore_menu_label(self, name: str, entry: dict[str, str]) -> str:
         display_name = entry.get("label", name).strip() or name
@@ -1032,7 +3380,7 @@ class GameBase:
             self.say(
                 "Under the hood, the game still uses an SRD-derived d20 chassis for ability checks, "
                 "proficiency, initiative, strike checks, resist checks, channel difficulty, conditions, "
-                "weapon damage, healing, draughts, and death saves, while compressing positioning and "
+                "weapon damage, healing, consumables, and death saves, while compressing positioning and "
                 "encounter flow to fit a text adventure."
             )
             self.say(

@@ -147,7 +147,7 @@ class DungeonMap:
     height: int
     rooms: dict[str, DungeonRoom]
     completion_flags: tuple[str, ...] = ()
-    exit_to_node_id: str = "phandalin_hub"
+    exit_to_node_id: str = "iron_hollow_hub"
     boss_room_id: str | None = None
     summary: str = ""
 

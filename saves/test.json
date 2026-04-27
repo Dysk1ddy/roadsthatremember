@@ -197,7 +197,7 @@
       },
       "notes": [
         "Veteran's kit: +1 to Athletics and Intimidation checks.",
-        "A dragonborn sworn to protect caravans on the road south of Neverwinter.",
+        "A dragonborn sworn to protect caravans on the road south of Greywake.",
         "A dragonborn oathsworn who treats duty like a living thing that must be fed by action."
       ],
       "tags": [
@@ -314,7 +314,7 @@
       },
       "notes": [
         "Healer's satchel: +1 to Medicine and Religion checks.",
-        "A priestess of Tymora tending the frontier faithful in Phandalin.",
+        "A priestess of Tymora tending the frontier faithful in Iron Hollow.",
         "A priestess of Tymora whose compassion is sharpened, not softened, by the frontier's cruelty."
       ],
       "tags": [
@@ -360,17 +360,17 @@
   "flags": {
     "act1_started": true,
     "map_state": {
-      "current_node_id": "high_road_ambush",
+      "current_node_id": "emberway_ambush",
       "current_dungeon_id": null,
       "current_room_id": null,
       "visited_nodes": [
-        "high_road_ambush",
-        "neverwinter_briefing"
+        "emberway_ambush",
+        "greywake_briefing"
       ],
       "cleared_rooms": [],
       "seen_story_beats": [],
       "node_history": [
-        "neverwinter_briefing"
+        "greywake_briefing"
       ],
       "room_history": []
     },
@@ -382,67 +382,67 @@
     ],
     "background_prologue_completed": "Soldier",
     "briefing_seen": true,
-    "neverwinter_preparation_done": true,
+    "greywake_preparation_done": true,
     "early_companion_recruited": "Rhogar Valeguard",
-    "neverwinter_tymora_shrine_seen": true,
-    "neverwinter_elira_met": true,
-    "elira_neverwinter_recruited": true,
+    "greywake_tymora_shrine_seen": true,
+    "greywake_elira_met": true,
+    "elira_greywake_recruited": true,
     "shrine_recruit_attempted": true,
-    "neverwinter_high_road_milehouse_seen": true,
-    "neverwinter_pilgrims_guarded": true,
+    "greywake_emberway_milehouse_seen": true,
+    "greywake_pilgrims_guarded": true,
     "blackwake_gallows_copse_lead": true,
-    "neverwinter_milehouse_secured": true,
-    "neverwinter_signal_cairn_seen": true,
-    "neverwinter_signal_cairn_cleared": true,
-    "blackwake_neverwinter_rumor": true
+    "greywake_milehouse_secured": true,
+    "greywake_signal_cairn_seen": true,
+    "greywake_signal_cairn_cleared": true,
+    "blackwake_greywake_rumor": true
   },
   "clues": [
-    "A stolen dispatch confirms the attacks around Phandalin are organized enough to rattle Neverwinter's quartermasters.",
-    "A Neverwinter drover says forged river-cut inspections are bleeding southbound caravans before they ever reach the High Road."
+    "A stolen dispatch confirms the attacks around Iron Hollow are organized enough to rattle Greywake's quartermasters.",
+    "A Greywake drover says forged river-cut inspections are bleeding southbound caravans before they ever reach the Emberway."
   ],
   "journal": [
-    "Your soldier's opening leaves you with a live look at how hard Neverwinter is leaning on thin patrol lines and tired veterans to protect the road south.",
-    "Word reaches you that Mira Thann is quietly gathering capable hands in Neverwinter against a new bandit threat around Phandalin.",
+    "Your soldier's opening leaves you with a live look at how hard Greywake is leaning on thin patrol lines and tired veterans to protect the road south.",
+    "Word reaches you that Mira Thann is quietly gathering capable hands in Greywake against a new bandit threat around Iron Hollow.",
     "Reward from South Barracks Breakout: 50 XP, 8 gp.",
     "Looted Frontier Ale x1 from South Barracks Breakout.",
     "Looted Roadworn Shortsword x1 from South Barracks Breakout.",
     "Reward from holding the barracks line: 15 XP, 6 gp.",
-    "Clue: A stolen dispatch confirms the attacks around Phandalin are organized enough to rattle Neverwinter's quartermasters.",
-    "Your soldier prologue ends with the trail leading toward Mira Thann's private briefing in Neverwinter.",
+    "Clue: A stolen dispatch confirms the attacks around Iron Hollow are organized enough to rattle Greywake's quartermasters.",
+    "Your soldier prologue ends with the trail leading toward Mira Thann's private briefing in Greywake.",
     "Rhogar Valeguard joined the active party.",
     "Elira Dawnmantle joined the active party.",
-    "Reward from High Road Milehouse Intercept: 160 XP, 25 gp.",
-    "Looted Potion of Healing x1 from High Road Milehouse Intercept.",
-    "Looted Travel Biscuits x1 from High Road Milehouse Intercept.",
-    "Reward from securing the High Road milehouse: 20 XP, 5 gp.",
-    "You secured a Neverwinter-side milehouse and chose how the road south would open.",
-    "Reward from Neverwinter Wood Signal Cairn: 150 XP, 19 gp.",
-    "Looted Roasted Nut Mix x1 from Neverwinter Wood Signal Cairn.",
-    "Reward from silencing the Neverwinter Wood signal cairn: 15 XP, 4 gp.",
-    "You found and broke a signal cairn meant to harden the High Road ambush.",
-    "Mira Thann sent you south with a writ for Phandalin's steward.",
-    "Clue: A Neverwinter drover says forged river-cut inspections are bleeding southbound caravans before they ever reach the High Road."
+    "Reward from Emberway Milehouse Intercept: 160 XP, 25 gp.",
+    "Looted Potion of Healing x1 from Emberway Milehouse Intercept.",
+    "Looted Travel Biscuits x1 from Emberway Milehouse Intercept.",
+    "Reward from securing the Emberway milehouse: 20 XP, 5 gp.",
+    "You secured a Greywake-side milehouse and chose how the road south would open.",
+    "Reward from Greywake Wood Signal Cairn: 150 XP, 19 gp.",
+    "Looted Roasted Nut Mix x1 from Greywake Wood Signal Cairn.",
+    "Reward from silencing the Greywake Wood signal cairn: 15 XP, 4 gp.",
+    "You found and broke a signal cairn meant to harden the Emberway ambush.",
+    "Mira Thann sent you south with a writ for Iron Hollow's steward.",
+    "Clue: A Greywake drover says forged river-cut inspections are bleeding southbound caravans before they ever reach the Emberway."
   ],
   "quests": {},
   "completed_acts": [],
   "xp": 410,
   "gold": 87,
   "inventory": {
-    "potion_healing": 5,
-    "bread_round": 4,
-    "travel_biscuits": 5,
-    "dried_fish": 3,
-    "goat_cheese": 2,
-    "frontier_ale": 3,
-    "root_vegetables": 2,
-    "antitoxin_vial": 1,
-    "chain_mail_common": 2,
-    "longsword_common": 2,
-    "shield_common": 3,
-    "shortsword_common": 1,
-    "scale_mail_common": 1,
-    "mace_common": 1,
-    "nut_mix": 1
+    "C0011": 5,
+    "S0002": 4,
+    "S0021": 5,
+    "S0005": 3,
+    "S0007": 2,
+    "S0006": 3,
+    "S0016": 2,
+    "C0000": 1,
+    "E0004": 2,
+    "E0097": 2,
+    "E0060": 3,
+    "E0112": 1,
+    "E0012": 1,
+    "E0102": 1,
+    "S0013": 1
   },
   "short_rests_remaining": 2
 }

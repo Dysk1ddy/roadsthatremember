@@ -189,7 +189,7 @@
       },
       "notes": [
         "Veteran's kit: +1 to Athletics and Intimidation checks.",
-        "A dragonborn sworn to protect caravans on the road south of Neverwinter.",
+        "A dragonborn sworn to protect caravans on the road south of Greywake.",
         "A dragonborn oathsworn who treats duty like a living thing that must be fed by action."
       ],
       "tags": [
@@ -306,7 +306,7 @@
       },
       "notes": [
         "Veteran's kit: +1 to Athletics and Intimidation checks.",
-        "A caravan guard from Neverwinter with a shield wall mindset.",
+        "A caravan guard from Greywake with a shield wall mindset.",
         "A dwarven shield veteran who measures people by whether they hold the line when it matters."
       ],
       "tags": [
@@ -329,7 +329,7 @@
       "companion_id": "tolan_ironshield",
       "disposition": 0,
       "lore": [
-        "Tolan served on caravan routes out of Neverwinter for two decades, long enough to see three trade leagues fail and two rise in their place.",
+        "Tolan served on caravan routes out of Greywake for two decades, long enough to see three trade leagues fail and two rise in their place.",
         "He still carries a notched tower-shield rivet from the ambush that killed his older brother near the Mere of Dead Men.",
         "He trusts steady action more than speeches, but remembers every promise anyone makes in his hearing."
       ],
@@ -419,7 +419,7 @@
       },
       "notes": [
         "Healer's satchel: +1 to Medicine and Religion checks.",
-        "A priestess of Tymora tending the frontier faithful in Phandalin.",
+        "A priestess of Tymora tending the frontier faithful in Iron Hollow.",
         "A priestess of Tymora whose compassion is sharpened, not softened, by the frontier's cruelty."
       ],
       "tags": [
@@ -539,7 +539,7 @@
       "gear_bonuses": {},
       "notes": [
         "Thieves' tools: +1 to Stealth and Sleight of Hand checks.",
-        "A caravan scout who knows every shortcut between Phandalin and Neverwinter.",
+        "A caravan scout who knows every shortcut between Iron Hollow and Greywake.",
         "A halfling scout who hides anxiety behind wit, speed, and relentless observation."
       ],
       "tags": [
@@ -580,12 +580,12 @@
     }
   ],
   "current_act": 1,
-  "current_scene": "phandalin_hub",
+  "current_scene": "iron_hollow_hub",
   "flags": {
     "act1_started": true,
     "introduced_characters": [
       "Ashen Brand Runner",
-      "Barthen",
+      "Hadrik",
       "Bryn Underbough",
       "Elira Dawnmantle",
       "Linene Graywind",
@@ -596,23 +596,23 @@
     "background_prologue_completed": "Soldier",
     "briefing_seen": true,
     "briefing_q_brand": true,
-    "identity_neverwinter_briefing_class_fighter_map": true,
+    "identity_greywake_briefing_class_fighter_map": true,
     "early_companion_recruited": "Rhogar Valeguard",
-    "neverwinter_preparation_done": true,
+    "greywake_preparation_done": true,
     "map_state": {
-      "current_node_id": "phandalin_hub",
+      "current_node_id": "iron_hollow_hub",
       "current_dungeon_id": null,
       "current_room_id": null,
       "visited_nodes": [
-        "high_road_ambush",
-        "phandalin_hub"
+        "emberway_ambush",
+        "iron_hollow_hub"
       ],
       "cleared_rooms": [],
       "seen_story_beats": [],
       "room_history": []
     },
     "road_approach_chosen": true,
-    "phandalin_arrived": true,
+    "iron_hollow_arrived": true,
     "shrine_seen": true,
     "shrine_medicine_attempted": true,
     "elira_helped": true,
@@ -661,36 +661,36 @@
     "barthen_shortage_asked": true
   },
   "clues": [
-    "A stolen dispatch confirms the attacks around Phandalin are organized enough to rattle Neverwinter's quartermasters.",
+    "A stolen dispatch confirms the attacks around Iron Hollow are organized enough to rattle Greywake's quartermasters.",
     "Mira marks the switchback, likely scout perches, and the rough spacing the gang prefers when collapsing on a wagon.",
     "A scorched badge on the goblins marks the Ashen Brand.",
     "The raiders were working with a hobgoblin sergeant tied to Ashfall Watch.",
-    "Linene confirms the gang's raids are choking Phandalin's trade through Ashfall Watch."
+    "Linene confirms the gang's raids are choking Iron Hollow's trade through Ashfall Watch."
   ],
   "journal": [
-    "Your soldier's opening leaves you with a live look at how hard Neverwinter is leaning on thin patrol lines and tired veterans to protect the road south.",
-    "Word reaches you that Mira Thann is quietly gathering capable hands in Neverwinter against a new bandit threat around Phandalin.",
+    "Your soldier's opening leaves you with a live look at how hard Greywake is leaning on thin patrol lines and tired veterans to protect the road south.",
+    "Word reaches you that Mira Thann is quietly gathering capable hands in Greywake against a new bandit threat around Iron Hollow.",
     "Reward from South Barracks Breakout: 50 XP, 8 gp.",
     "Reward from holding the barracks line: 15 XP, 6 gp.",
-    "Clue: A stolen dispatch confirms the attacks around Phandalin are organized enough to rattle Neverwinter's quartermasters.",
-    "Your soldier prologue ends with the trail leading toward Mira Thann's private briefing in Neverwinter.",
+    "Clue: A stolen dispatch confirms the attacks around Iron Hollow are organized enough to rattle Greywake's quartermasters.",
+    "Your soldier prologue ends with the trail leading toward Mira Thann's private briefing in Greywake.",
     "Clue: Mira marks the switchback, likely scout perches, and the rough spacing the gang prefers when collapsing on a wagon.",
     "Reward from Fighter identity choice: 10 XP.",
     "You treated the contract like a fighter's field briefing and forced it into useful shape.",
     "Rhogar Valeguard joined the active party.",
     "Reward from working the rumor mill: 4 gp.",
-    "Mira Thann sent you south with a writ for Phandalin's steward.",
+    "Mira Thann sent you south with a writ for Iron Hollow's steward.",
     "Reward from Roadside Ambush: 100 XP, 11 gp.",
     "Looted Travel Biscuits x1 from Roadside Ambush.",
     "Clue: A scorched badge on the goblins marks the Ashen Brand.",
     "Clue: The raiders were working with a hobgoblin sergeant tied to Ashfall Watch.",
-    "Reward from saving the caravan guard on the High Road: 25 XP, 15 gp.",
+    "Reward from saving the caravan guard on the Emberway: 25 XP, 15 gp.",
     "Tolan Ironshield joined the active party.",
-    "You reached Phandalin, a hard-bitten frontier town under growing Ashen Brand pressure.",
+    "You reached Iron Hollow, a hard-bitten frontier town under growing Ashen Brand pressure.",
     "Reward from helping Elira treat the poisoned miner: 10 XP.",
     "Elira Dawnmantle joined the active party.",
     "Bryn Underbough joined your wider company and was sent to camp because the active party is full.",
-    "Clue: Linene confirms the gang's raids are choking Phandalin's trade through Ashfall Watch.",
+    "Clue: Linene confirms the gang's raids are choking Iron Hollow's trade through Ashfall Watch.",
     "Quest accepted: Reopen the Trade Lane.",
     "Quest accepted: Keep the Shelves Full."
   ],
@@ -703,12 +703,12 @@
         "Linene says the town is paying for the raiders in coin, delay, and fear."
       ]
     },
-    "restore_barthen_supplies": {
-      "quest_id": "restore_barthen_supplies",
+    "restore_hadrik_supplies": {
+      "quest_id": "restore_hadrik_supplies",
       "status": "active",
       "notes": [
-        "Barthen's request is practical to the point of pain: make the road safe enough that flour, bandages, and lamp oil stop feeling rarer than courage.",
-        "Barthen says the raiders are turning everyday provisions into rationed hope."
+        "Hadrik's request is practical to the point of pain: make the road safe enough that flour, bandages, and lamp oil stop feeling rarer than courage.",
+        "Hadrik says the raiders are turning everyday provisions into rationed hope."
       ]
     }
   },
@@ -716,21 +716,21 @@
   "xp": 210,
   "gold": 64,
   "inventory": {
-    "potion_healing": 6,
-    "bread_round": 4,
-    "travel_biscuits": 5,
-    "dried_fish": 3,
-    "goat_cheese": 2,
-    "frontier_ale": 2,
-    "root_vegetables": 2,
-    "antitoxin_vial": 1,
-    "chain_mail_common": 3,
-    "longsword_common": 3,
-    "shield_common": 4,
-    "scale_mail_common": 1,
-    "mace_common": 1,
-    "leather_armor_common": 1,
-    "shortsword_common": 1
+    "C0011": 6,
+    "S0002": 4,
+    "S0021": 5,
+    "S0005": 3,
+    "S0007": 2,
+    "S0006": 2,
+    "S0016": 2,
+    "C0000": 1,
+    "E0004": 3,
+    "E0097": 3,
+    "E0060": 4,
+    "E0012": 1,
+    "E0102": 1,
+    "E0009": 1,
+    "E0112": 1
   },
   "short_rests_remaining": 2
 }

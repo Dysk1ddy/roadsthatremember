@@ -57,8 +57,8 @@ ACT_1_QUESTS: dict[str, QuestDefinition] = {
             "who believes tomorrow's wagons might actually arrive."
         ),
     ),
-    "restore_barthen_supplies": QuestDefinition(
-        quest_id="restore_barthen_supplies",
+    "restore_hadrik_supplies": QuestDefinition(
+        quest_id="restore_hadrik_supplies",
         title="Keep the Shelves Full",
         giver="Hadrik",
         location="Hadrik's Provisions",
@@ -240,7 +240,7 @@ ACT_1_QUESTS: dict[str, QuestDefinition] = {
             xp=75,
             gold=24,
             items={"kestrel_ledger_clasp": 1},
-            flags={"quest_reward_neverwinter_private_room_access": True},
+            flags={"quest_reward_greywake_private_room_access": True},
         ),
         accepted_text=(
             "Sabra is not asking you to stop the whole network tonight. She just wants one clean manifest lie pinned to the wall before it can keep pretending it is routine paperwork."
@@ -250,8 +250,8 @@ ACT_1_QUESTS: dict[str, QuestDefinition] = {
             "Sabra lines your three details together, exhales once, and finally lets herself call the thing by its proper shape: a forged manifest circuit feeding false road authority south."
         ),
     ),
-    "silence_old_owl_well": QuestDefinition(
-        quest_id="silence_old_owl_well",
+    "silence_blackglass_well": QuestDefinition(
+        quest_id="silence_blackglass_well",
         title="Silence Blackglass Well",
         giver="Halia Vey",
         location="Delvers' Exchange",
@@ -260,7 +260,7 @@ ACT_1_QUESTS: dict[str, QuestDefinition] = {
         ),
         objective="Break the operation at Blackglass Well and return to Halia Vey.",
         turn_in="Return to Halia Vey at the Delvers' Exchange.",
-        completion_flags=("old_owl_well_cleared",),
+        completion_flags=("blackglass_well_cleared",),
         reward=QuestReward(
             xp=100,
             gold=45,
@@ -275,8 +275,8 @@ ACT_1_QUESTS: dict[str, QuestDefinition] = {
             "Halia's expression barely changes, but the room around her seems to unclench all the same. Even polished pragmatism has room for relief when missing crews stop becoming permanent."
         ),
     ),
-    "break_wyvern_tor_raiders": QuestDefinition(
-        quest_id="break_wyvern_tor_raiders",
+    "break_red_mesa_raiders": QuestDefinition(
+        quest_id="break_red_mesa_raiders",
         title="Break the Red Mesa Raiders",
         giver="Daran Orchard",
         location="Orchard Wall",
@@ -285,7 +285,7 @@ ACT_1_QUESTS: dict[str, QuestDefinition] = {
         ),
         objective="Clear Red Mesa Hold and report back to Daran Orchard.",
         turn_in="Return to Daran Orchard at the Orchard Wall.",
-        completion_flags=("wyvern_tor_cleared",),
+        completion_flags=("red_mesa_hold_cleared",),
         reward=QuestReward(
             xp=100,
             gold=40,

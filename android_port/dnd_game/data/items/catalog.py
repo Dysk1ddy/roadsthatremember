@@ -17,6 +17,28 @@ RARITY_TITLES = {
     "epic": "Epic",
     "legendary": "Legendary",
 }
+CATALOG_ID_CATEGORY_PREFIXES = {
+    "consumable": "C",
+    "scroll": "C",
+    "weapon": "E",
+    "armor": "E",
+    "equipment": "E",
+    "supply": "S",
+    "trinket": "M",
+}
+CATALOG_ID_PREFIX_DESCRIPTIONS = (
+    ("C", "consumables and scrolls"),
+    ("E", "equipment, weapons, and armor"),
+    ("S", "supply items"),
+    ("M", "miscellaneous items and trinkets"),
+)
+CATALOG_ID_PREFIX_ORDER = {prefix: index for index, (prefix, _) in enumerate(CATALOG_ID_PREFIX_DESCRIPTIONS)}
+ITEM_ID_ALIASES = {
+    "agathas_truth_lantern": "pale_witness_lantern",
+}
+CATALOG_SORT_ID_ALIASES = {
+    "pale_witness_lantern": "agathas_truth_lantern",
+}
 
 
 @dataclass(slots=True)
@@ -30,6 +52,8 @@ class Item:
     source: str
     weight: float
     value: int
+    catalog_id: str = ""
+    legacy_id: str = ""
     slot: str | None = None
     properties: list[str] | None = None
     supply_points: int = 0
@@ -45,7 +69,11 @@ class Item:
     skill_bonuses: dict[str, int] | None = None
     save_bonuses: dict[str, int] | None = None
     ac_bonus: int = 0
+    defense_percent: int = 0
+    defense_cap_percent: int = 0
     shield_bonus: int = 0
+    shield_defense_percent: int = 0
+    raised_shield_defense_percent: int = 0
     attack_bonus: int = 0
     damage_bonus: int = 0
     initiative_bonus: int = 0
@@ -91,6 +119,62 @@ class Item:
         return f"{self.supply_points} supply" if self.supply_points else "no supply value"
 
 
+class ItemCatalogDict(dict[str, Item]):
+    def _canonical_key(self, key: object) -> object:
+        if isinstance(key, str):
+            resolved = resolve_item_id(key)
+            if resolved is not None:
+                return resolved
+        return key
+
+    def __contains__(self, key: object) -> bool:
+        return dict.__contains__(self, self._canonical_key(key))
+
+    def __getitem__(self, key: str) -> Item:
+        return dict.__getitem__(self, self._canonical_key(key))
+
+    def get(self, key: str, default=None):
+        return dict.get(self, self._canonical_key(key), default)
+
+
+class CanonicalItemIdDict(dict[str, int]):
+    def _canonical_key(self, key: object) -> object:
+        if isinstance(key, str):
+            resolved = resolve_item_id(key)
+            if resolved is not None:
+                return resolved
+        return key
+
+    def __contains__(self, key: object) -> bool:
+        return dict.__contains__(self, self._canonical_key(key))
+
+    def __getitem__(self, key: str) -> int:
+        return dict.__getitem__(self, self._canonical_key(key))
+
+    def __setitem__(self, key: str, value: int) -> None:
+        dict.__setitem__(self, self._canonical_key(key), value)
+
+    def get(self, key: str, default=None):
+        return dict.get(self, self._canonical_key(key), default)
+
+    def pop(self, key: str, default=...):
+        resolved_key = self._canonical_key(key)
+        if default is ...:
+            return dict.pop(self, resolved_key)
+        return dict.pop(self, resolved_key, default)
+
+    def setdefault(self, key: str, default: int | None = None):
+        return dict.setdefault(self, self._canonical_key(key), default)
+
+    def update(self, other=None, /, **kwargs) -> None:
+        if other is not None:
+            items = other.items() if hasattr(other, "items") else other
+            for key, value in items:
+                self[key] = value
+        for key, value in kwargs.items():
+            self[key] = value
+
+
 @dataclass(slots=True)
 class LootEntry:
     item_id: str
@@ -113,6 +197,8 @@ RARITY_ARMOR_BONUS = {
     "epic": 2,
     "legendary": 3,
 }
+RARITY_ARMOR_DEFENSE_BONUS = {rarity: bonus * 5 for rarity, bonus in RARITY_ARMOR_BONUS.items()}
+RARITY_SHIELD_DEFENSE_BONUS = RARITY_ARMOR_DEFENSE_BONUS
 RARITY_PREFIX = {
     "common": "Roadworn",
     "uncommon": "Ash-Kissed",
@@ -121,11 +207,11 @@ RARITY_PREFIX = {
     "legendary": "Mythwake",
 }
 RARITY_SOURCE = {
-    "common": "General stores, starter kits, goblin packs, roadside scavengers, and ordinary frontier trade.",
-    "uncommon": "Trusted traders, veteran scouts, shrine caches, and better-provisioned raider lieutenants.",
-    "rare": "Hidden manor vaults, named enemy stashes, defended strongholds, and expensive specialist merchants.",
+    "common": "General stores, starter kits, raider packs, roadside scavengers, and ordinary frontier trade.",
+    "uncommon": "Trusted traders, veteran scouts, lantern caches, and better-provisioned route lieutenants.",
+    "rare": "Hidden vaults, named enemy stashes, defended strongholds, and specialist merchants.",
     "epic": "Deep relic chambers, late-act boss hoards, and secrets guarded by major story threats.",
-    "legendary": "Mythic relic sites, endgame bosses, and unique Aethrune wonders almost never seen in trade.",
+    "legendary": "Mythic relic sites, endgame bosses, and unique Meridian-era wonders almost never seen in trade.",
 }
 RARITY_VALUE_MULTIPLIERS = {
     "common": 0.6,
@@ -238,7 +324,7 @@ WEAPON_BASES = [
         "weapon_type": "mace",
         "weight": 4.0,
         "value": 5,
-        "description": "A simple blunt weapon used by guards and priests alike.",
+        "description": "A simple blunt weapon used by guards and keepers alike.",
     },
     {
         "slug": "quarterstaff",
@@ -308,6 +394,8 @@ ARMOR_BASES = [
         "armor_type": "clothing",
         "dex_cap": None,
         "heavy": False,
+        "defense_percent": 0,
+        "defense_cap_percent": 45,
         "weight": 4.0,
         "value": 1,
         "description": "Layered clothes and a padded coat with no real armor plates.",
@@ -319,6 +407,8 @@ ARMOR_BASES = [
         "armor_type": "light",
         "dex_cap": None,
         "heavy": False,
+        "defense_percent": 10,
+        "defense_cap_percent": 45,
         "weight": 8.0,
         "value": 5,
         "description": "Quilted layers that protect better than plain clothes.",
@@ -330,6 +420,8 @@ ARMOR_BASES = [
         "armor_type": "light",
         "dex_cap": None,
         "heavy": False,
+        "defense_percent": 10,
+        "defense_cap_percent": 45,
         "weight": 10.0,
         "value": 10,
         "description": "Tough boiled leather worn by scouts and rogues.",
@@ -341,6 +433,8 @@ ARMOR_BASES = [
         "armor_type": "light",
         "dex_cap": None,
         "heavy": False,
+        "defense_percent": 15,
+        "defense_cap_percent": 45,
         "weight": 13.0,
         "value": 45,
         "description": "Leather reinforced with rivets and hidden plates.",
@@ -352,6 +446,8 @@ ARMOR_BASES = [
         "armor_type": "medium",
         "dex_cap": 2,
         "heavy": False,
+        "defense_percent": 20,
+        "defense_cap_percent": 75,
         "weight": 20.0,
         "value": 50,
         "description": "Close-fitting mail that balances defense and mobility.",
@@ -363,6 +459,8 @@ ARMOR_BASES = [
         "armor_type": "medium",
         "dex_cap": 2,
         "heavy": False,
+        "defense_percent": 25,
+        "defense_cap_percent": 75,
         "stealth_disadvantage": True,
         "weight": 45.0,
         "value": 50,
@@ -375,6 +473,8 @@ ARMOR_BASES = [
         "armor_type": "medium",
         "dex_cap": 2,
         "heavy": False,
+        "defense_percent": 30,
+        "defense_cap_percent": 75,
         "weight": 20.0,
         "value": 400,
         "description": "A polished cuirass that protects without slowing the wearer much.",
@@ -386,6 +486,8 @@ ARMOR_BASES = [
         "armor_type": "heavy",
         "dex_cap": 0,
         "heavy": True,
+        "defense_percent": 35,
+        "defense_cap_percent": 75,
         "stealth_disadvantage": True,
         "weight": 55.0,
         "value": 75,
@@ -398,6 +500,8 @@ ARMOR_BASES = [
         "armor_type": "heavy",
         "dex_cap": 0,
         "heavy": True,
+        "defense_percent": 45,
+        "defense_cap_percent": 75,
         "stealth_disadvantage": True,
         "weight": 60.0,
         "value": 200,
@@ -413,8 +517,10 @@ SHIELD_BASES = [
         "item_type": "shield",
         "weight": 6.0,
         "value": 10,
-        "description": "A standard shield that adds 2 Defense when your other hand is free.",
+        "description": "A standard shield that catches the first bite of a weapon when your other hand is free.",
         "shield_bonus": 2,
+        "shield_defense_percent": 5,
+        "raised_shield_defense_percent": 10,
         "properties": ["shield"],
     }
 ]
@@ -422,16 +528,21 @@ SHIELD_BASES = [
 GEAR_BASES = [
     {"slug": "traveler_hood", "name": "Traveler's Hood", "slot": "head", "item_type": "helmet", "weight": 1.0, "value": 5, "description": "A practical hood and cap for road dust.", "skill_bonuses": {"Perception": 1}, "rarities": {"common", "uncommon"}},
     {"slug": "iron_cap", "name": "Iron Cap", "slot": "head", "item_type": "helmet", "weight": 2.0, "value": 12, "description": "A metal cap favored by caravan guards.", "ac_bonus": 1, "rarities": {"common", "uncommon", "rare"}},
+    {"slug": "delver_lantern_hood", "name": "Delver Lantern Hood", "slot": "head", "item_type": "helmet", "weight": 1.2, "value": 18, "description": "A miner's hood stitched around a shuttered crystal lantern and polished brow mirror.", "skill_bonuses": {"Investigation": 1, "Perception": 1}, "rarities": {"uncommon", "rare"}, "source": "Resonant Vault side chambers, expedition quartermasters, and recovered survey caches."},
     {"slug": "wayfarer_boots", "name": "Wayfarer Boots", "slot": "boots", "item_type": "boots", "weight": 2.0, "value": 8, "description": "Boots made for trail miles and rocky ground.", "skill_bonuses": {"Survival": 1}, "rarities": {"common", "uncommon"}},
     {"slug": "silent_step_boots", "name": "Silent Step Boots", "slot": "boots", "item_type": "boots", "weight": 2.0, "value": 18, "description": "Soft-soled boots stitched for scouts and burglars.", "skill_bonuses": {"Stealth": 1}, "rarities": {"uncommon", "rare", "epic"}},
+    {"slug": "echostep_boots", "name": "Echostep Boots", "slot": "boots", "item_type": "boots", "weight": 2.0, "value": 22, "description": "Soft boots wrapped in resonant thread that help the wearer place each step with uncanny care.", "skill_bonuses": {"Acrobatics": 1}, "rarities": {"uncommon", "rare"}, "source": "Hushfen ruins, Meridian survey lockers, and stealth-minded expedition spoils."},
     {"slug": "work_gloves", "name": "Work Gloves", "slot": "gloves", "item_type": "gloves", "weight": 1.0, "value": 4, "description": "Tough gloves that help with climbing and hauling.", "skill_bonuses": {"Athletics": 1}, "rarities": {"common", "uncommon"}},
     {"slug": "scribe_gloves", "name": "Scribe Gloves", "slot": "gloves", "item_type": "gloves", "weight": 0.5, "value": 10, "description": "Fine gloves marked with ink-proof sigils.", "skill_bonuses": {"Arcana": 1, "Investigation": 1}, "rarities": {"uncommon", "rare"}},
+    {"slug": "forgehand_gauntlets", "name": "Forgehand Gauntlets", "slot": "gloves", "item_type": "gloves", "weight": 2.0, "value": 20, "description": "Rune-etched work gauntlets built for hauling ore, bracing shields, and striking through sparks.", "skill_bonuses": {"Athletics": 1}, "rarities": {"uncommon", "rare"}, "source": "Collapsed smithies, Compact work camps, and Resonant Vault tool lockers."},
     {"slug": "reinforced_breeches", "name": "Reinforced Cloak", "slot": "cape", "item_type": "cloak", "weight": 2.0, "value": 7, "description": "A travel cloak with patchwork reinforcement stitched into the lining.", "ac_bonus": 1, "rarities": {"common", "uncommon"}},
     {"slug": "trail_leggings", "name": "Trail Mantle", "slot": "cape", "item_type": "cloak", "weight": 1.5, "value": 9, "description": "A flexible mantle cut to stay out of the way on rough roads.", "skill_bonuses": {"Acrobatics": 1}, "rarities": {"common", "uncommon"}},
     {"slug": "copper_ring", "name": "Copper Ring", "slot": "ring", "item_type": "ring", "weight": 0.1, "value": 6, "description": "A cheap ring carried for luck or sentiment.", "skill_bonuses": {"Persuasion": 1}, "rarities": {"common", "uncommon"}},
     {"slug": "watcher_ring", "name": "Watcher's Ring", "slot": "ring", "item_type": "ring", "weight": 0.1, "value": 20, "description": "A ring etched with tiny all-seeing eyes.", "skill_bonuses": {"Insight": 1, "Perception": 1}, "rarities": {"uncommon", "rare", "epic"}},
+    {"slug": "sigil_anchor_ring", "name": "Sigil Anchor Ring", "slot": "ring", "item_type": "ring", "weight": 0.1, "value": 32, "description": "A narrow band inscribed with counter-sigils meant to keep strange influences from taking easy root.", "skill_bonuses": {"Arcana": 1}, "save_bonuses": {"WIS_save": 1}, "rarities": {"rare", "epic"}, "source": "Choir reliquaries, Blackglass sanctums, and the deepest Meridian vaults."},
     {"slug": "amber_amulet", "name": "Amber Amulet", "slot": "neck", "item_type": "amulet", "weight": 0.2, "value": 15, "description": "A warm amber charm worn for steady nerves.", "save_bonuses": {"WIS_save": 1}, "rarities": {"uncommon", "rare"}},
     {"slug": "soldiers_amulet", "name": "Soldier's Amulet", "slot": "neck", "item_type": "amulet", "weight": 0.2, "value": 12, "description": "A campaign token often worn by veterans.", "save_bonuses": {"CON_save": 1}, "rarities": {"common", "uncommon", "rare"}},
+    {"slug": "choirward_amulet", "name": "Choirward Amulet", "slot": "neck", "item_type": "amulet", "weight": 0.2, "value": 28, "description": "A hammered silver charm engraved with a broken circle, worn by those who expect whisper-pressure to answer back.", "save_bonuses": {"WIS_save": 1}, "rarities": {"uncommon", "rare"}, "source": "Lantern sanctums, rescued prisoners, and caches hidden from the Quiet Choir."},
 ]
 
 WEAPON_RARITY_AVAILABILITY = {
@@ -460,25 +571,27 @@ TRINKET_RARITY_COUNTS = {
 
 SUPPLY_ITEMS = [
     ("bread_round", "Bread Round", "A dense travel loaf baked to last several days.", 0.5, 2, 1, "Common pantry food sold in Greywake and Iron Hollow."),
-    ("dried_fish", "Dried Fish", "Salted river fish wrapped for road use.", 0.5, 3, 2, "Fishing stalls, caravan stores, and goblin satchels."),
+    ("miners_ration_tin", "Miner's Ration Tin", "A square tin packed with hard cheese, smoked mushrooms, and dense black bread for a long shift underground.", 0.9, 6, 3, "Resonant Vault expedition wagons, Compact waystations, and reclaimed survey packs."),
+    ("mushroom_broth_flask", "Mushroom Broth Flask", "A stoppered flask of salty mushroom broth that stays warm longer than it should.", 0.8, 5, 2, "Hushfen kitchens, miner camps, and late-night watchfires."),
+    ("dried_fish", "Dried Fish", "Salted river fish wrapped for road use.", 0.5, 3, 2, "Fishing stalls, caravan stores, and raider satchels."),
     ("goat_cheese", "Goat Cheese", "Sharp frontier cheese that keeps well in cloth.", 0.5, 4, 2, "Farmsteads, inn kitchens, and pack saddles."),
-    ("smoked_ham", "Smoked Ham Slice", "A rich cured cut that can sustain a full meal.", 1.0, 6, 3, "Inn stores, bandit camps, and merchant wagons."),
-    ("camp_stew_jar", "Camp Stew Jar", "A sealed clay jar of thick traveling stew.", 1.5, 8, 4, "Stonehill Inn kitchens and quartermaster stores."),
-    ("frontier_ale", "Frontier Ale", "Cheap ale in a sealed skin for the road.", 1.0, 3, 1, "Taverns, patrol wagons, and idle bandit crates."),
+    ("smoked_ham", "Smoked Ham Slice", "A rich cured cut that can sustain a full meal.", 1.0, 6, 3, "Inn stores, raider camps, and merchant wagons."),
+    ("camp_stew_jar", "Camp Stew Jar", "A sealed clay jar of thick traveling stew.", 1.5, 8, 4, "Ashlamp Inn kitchens and quartermaster stores."),
+    ("frontier_ale", "Frontier Ale", "Cheap ale in a sealed skin for the road.", 1.0, 3, 1, "Taverns, patrol wagons, and idle raider crates."),
     ("red_wine", "Red Wine", "A bottle of decent red meant for officers or merchants.", 1.0, 8, 2, "Steward gifts, manor cellars, and noble stores."),
-    ("dried_apple", "Dried Apple Pouch", "Sweet dried fruit easy to ration out in camp.", 0.5, 3, 1, "General stores and shrine pantries."),
+    ("dried_apple", "Dried Apple Pouch", "Sweet dried fruit easy to ration out in camp.", 0.5, 3, 1, "General stores and lantern pantries."),
     ("nut_mix", "Roasted Nut Mix", "A cloth pouch of roasted nuts and herbs.", 0.3, 3, 1, "Scouts, hunters, and roadside traders."),
     ("salt_pork", "Salt Pork", "A greasy but dependable protein for campfire meals.", 1.0, 5, 3, "Caravan barrels and military stores."),
-    ("berry_tart", "Berry Tart", "A fragile but morale-boosting sweet wrapped in wax cloth.", 0.4, 4, 1, "Stonehill Inn and festival vendors."),
+    ("berry_tart", "Berry Tart", "A fragile but morale-boosting sweet wrapped in wax cloth.", 0.4, 4, 1, "Ashlamp Inn and festival vendors."),
     ("travel_biscuits", "Travel Biscuits", "Hard biscuits made for soldiers and explorers.", 0.5, 2, 1, "Quartermaster kits and supply sacks."),
-    ("mushroom_skewer", "Mushroom Skewer", "Charred mushrooms brushed with herb oil.", 0.4, 4, 1, "Shrine gardens, campfires, and druid caches."),
-    ("spiced_sausage", "Spiced Sausage", "A cured sausage with enough salt to keep for days.", 0.7, 5, 2, "Hunter camps, taverns, and bandit stores."),
-    ("honey_cake", "Honey Cake", "A compact sweet cake with surprisingly good shelf life.", 0.4, 5, 1, "Temple kitchens and holiday markets."),
+    ("mushroom_skewer", "Mushroom Skewer", "Charred mushrooms brushed with herb oil.", 0.4, 4, 1, "Lantern gardens, campfires, and wildlander caches."),
+    ("spiced_sausage", "Spiced Sausage", "A cured sausage with enough salt to keep for days.", 0.7, 5, 2, "Hunter camps, taverns, and raider stores."),
+    ("honey_cake", "Honey Cake", "A compact sweet cake with surprisingly good shelf life.", 0.4, 5, 1, "Sanctum kitchens and holiday markets."),
     ("root_vegetables", "Root Vegetable Bundle", "A tied bundle of onions, carrots, and turnips.", 1.2, 4, 2, "Farm plots and kitchen cellars."),
     ("black_tea", "Black Tea Tin", "A small tin of bitter black tea leaves.", 0.2, 6, 1, "Merchant caravans and refined provisions."),
-    ("herbal_tea", "Herbal Tea Satchel", "Calming herbs brewed to steady nerves at camp.", 0.2, 5, 1, "Shrines, apothecaries, and ranger packs."),
+    ("herbal_tea", "Herbal Tea Satchel", "Calming herbs brewed to steady nerves at camp.", 0.2, 5, 1, "Lantern sanctums, apothecaries, and ranger packs."),
     ("river_clams", "River Clam Basket", "Fresh clams packed in damp reeds.", 1.5, 7, 2, "Fishers and riverbank stalls."),
-    ("spirit_bottle", "Strong Spirit Bottle", "Clear grain spirit used for drink, trade, and sterilizing wounds.", 1.0, 7, 2, "Bandit stores, surgeons, and caravan packs."),
+    ("spirit_bottle", "Strong Spirit Bottle", "Clear grain spirit used for drink, trade, and sterilizing wounds.", 1.0, 7, 2, "Raider stores, surgeons, and caravan packs."),
 ]
 
 CONSUMABLE_ITEMS = [
@@ -487,7 +600,7 @@ CONSUMABLE_ITEMS = [
         "name": "Potion of Healing",
         "rarity": "common",
         "description": "A frontier-standard recovery blend carried by scouts, quartermasters, and anyone expecting blood on the road.",
-        "source": "Starter kits, shrine aid packs, goblin satchels, and common loot drops.",
+        "source": "Starter kits, lantern aid packs, raider satchels, and common loot drops.",
         "weight": 0.5,
         "value": 15,
         "heal_dice": "2d4",
@@ -499,12 +612,34 @@ CONSUMABLE_ITEMS = [
         "name": "Greater Healing Draught",
         "rarity": "uncommon",
         "description": "A heavier recovery draught used by veteran crews after the kind of fight that empties a whole watchline.",
-        "source": "Ashfall Watch stores, shrine caches, and uncommon treasure rolls.",
+        "source": "Watch stores, lantern caches, and uncommon treasure rolls.",
         "weight": 0.5,
         "value": 38,
         "heal_dice": "4d4",
         "heal_bonus": 4,
         "notes": ["Restores 4d4 + 4 hit points."],
+    },
+    {
+        "item_id": "delvers_amber",
+        "name": "Delver's Amber",
+        "rarity": "uncommon",
+        "description": "A honey-thick tonic brewed to steady breath and nerve in collapsing tunnels.",
+        "source": "Stonehollow survey stores, dwarven quartermasters, and careful expedition caches.",
+        "weight": 0.4,
+        "value": 34,
+        "temp_hp": 6,
+        "notes": ["Grants 6 temporary hit points and calms panic before a hard descent."],
+    },
+    {
+        "item_id": "resonance_tonic",
+        "name": "Resonance Tonic",
+        "rarity": "uncommon",
+        "description": "A mineral tonic that sharpens focus when the air starts humming with old resonance.",
+        "source": "Pale Witness caches, Meridian research chests, and Resonant Vault side chambers.",
+        "weight": 0.3,
+        "value": 30,
+        "spell_slot_restore": 1,
+        "notes": ["Restores 4 MP and helps shake off rattled footing."],
     },
     {
         "item_id": "superior_healing_elixir",
@@ -546,7 +681,7 @@ CONSUMABLE_ITEMS = [
         "name": "Warding Tonic",
         "rarity": "common",
         "description": "A simple tonic that grants temporary durability before a fight.",
-        "source": "General stores, caravan alchemists, and common bandit loot.",
+        "source": "General stores, caravan alchemists, and common raider loot.",
         "weight": 0.4,
         "value": 10,
         "temp_hp": 4,
@@ -562,6 +697,28 @@ CONSUMABLE_ITEMS = [
         "value": 220,
         "temp_hp": 10,
         "notes": ["Grants temporary hit points and a brief surge of battle edge."],
+    },
+    {
+        "item_id": "forge_blessing_elixir",
+        "name": "Forgeward Elixir",
+        "rarity": "rare",
+        "description": "A copper-bright elixir distilled from soot-black herbs and lingering forge pressure.",
+        "source": "Resonant Vault reliquaries, Meridian Forge galleries, and named Choir lieutenants.",
+        "weight": 0.4,
+        "value": 95,
+        "temp_hp": 8,
+        "notes": ["Grants 8 temporary hit points and a brief surge of courage."],
+    },
+    {
+        "item_id": "thoughtward_draught",
+        "name": "Thoughtward Draught",
+        "rarity": "rare",
+        "description": "A bitter blue draught prepared by hunters of cursed lore to push back invasive whispers.",
+        "source": "Cult-breaking kits, hidden lantern lockers, and Blackglass escape satchels.",
+        "weight": 0.3,
+        "value": 82,
+        "temp_hp": 4,
+        "notes": ["Clears mental pressure and leaves behind 4 temporary hit points."],
     },
     {
         "item_id": "blessed_salve",
@@ -581,7 +738,7 @@ CONSUMABLE_ITEMS = [
         "name": "Antitoxin Vial",
         "rarity": "common",
         "description": "A bitter counteragent brewed to neutralize venom fast, even if it leaves the tongue numb for an hour.",
-        "source": "Apothecaries, shrine stores, and caravan medicine kits.",
+        "source": "Apothecaries, lantern stores, and caravan medicine kits.",
         "weight": 0.2,
         "value": 14,
         "cure_poison": True,
@@ -592,11 +749,11 @@ CONSUMABLE_ITEMS = [
         "name": "Focus Ink",
         "rarity": "uncommon",
         "description": "Tuned ink and herbs steeped to restore a flicker of channeling stamina.",
-        "source": "Wizard caches, rare scribes, and magical loot tables.",
+        "source": "Scribe caches, rare copyists, and relic loot tables.",
         "weight": 0.2,
         "value": 26,
         "spell_slot_restore": 1,
-        "notes": ["Restores 1 spent charge band."],
+        "notes": ["Restores 4 MP."],
     },
     {
         "item_id": "moonmint_drops",
@@ -625,8 +782,8 @@ CONSUMABLE_ITEMS = [
         "item_id": "fireward_elixir",
         "name": "Fireward Elixir",
         "rarity": "uncommon",
-        "description": "A resistance draught inspired by official Potions of Resistance.",
-        "source": "Shrine braziers, dragon-hunter packs, and uncommon magical stores.",
+        "description": "A resistance draught mixed for crews bracing against open flame and ruin-fire flareups.",
+        "source": "Lantern braziers, ash-hunter packs, and uncommon relic stores.",
         "weight": 0.3,
         "value": 34,
         "notes": ["Grants fire resistance for several rounds."],
@@ -635,8 +792,8 @@ CONSUMABLE_ITEMS = [
         "item_id": "dust_of_disappearance",
         "name": "Dust of Disappearance",
         "rarity": "rare",
-        "description": "A pinch of gray dust based on the official Dust of Disappearance.",
-        "source": "Wizard vaults, covert operatives, and hidden manor stores.",
+        "description": "A pinch of gray dust that bends light away for a few heartbeats when scattered right.",
+        "source": "Mage vaults, covert operatives, and hidden manor stores.",
         "weight": 0.1,
         "value": 180,
         "notes": ["Makes the target invisible for a short span."],
@@ -649,26 +806,353 @@ def rarity_value(base_value: int, rarity: str) -> int:
 
 
 SCROLL_EFFECTS = [
-    ("scroll_mending_word", "Scroll of Mending Word", "common", "A simple healing prayer written for quick use.", "Shrines, hedge mages, and healer caches.", "1d6", 2, 0, 0, False),
-    ("scroll_lesser_restoration", "Scroll of Lesser Restoration", "uncommon", "A clean restorative script that breaks poison and weakness.", "Shrine archives and rare support caches.", None, 0, 0, 0, True),
-    ("scroll_revivify", "Scroll of Revivify", "uncommon", "A tightly warded resurrection script for camp rites after a fresh battlefield death.", "Rarely stocked by frontier traders and occasionally recovered from hard-fought battles.", None, 0, 0, 0, False),
-    ("scroll_arcane_refresh", "Scroll of Arcane Refresh", "rare", "An elegant sigil-chain that restores a spent spell slot.", "Wizard satchels, hidden libraries, and rare arcane drops.", None, 0, 0, 1, False),
-    ("scroll_guardian_light", "Scroll of Guardian Light", "uncommon", "A radiant seal that wraps the reader in a protective glow.", "Temple vaults, priestly gifts, and divine loot pools.", None, 0, 6, 0, False),
-    ("scroll_ember_ward", "Scroll of Ember Ward", "rare", "An ashen ward-scroll that leaves shimmering protection in its wake.", "Ashfall Watch stores and hidden Emberhall shelves.", None, 0, 8, 0, False),
-    ("scroll_surge_of_life", "Scroll of Surge of Life", "epic", "A difficult script that can haul a fallen ally back with a gasp.", "Later-act relic troves and named boss caches.", None, 0, 0, 0, False),
-    ("scroll_clarity", "Scroll of Clarity", "common", "A script of calm focus and measured breathing.", "Libraries, sages, and reward satchels.", "1d4", 1, 0, 0, False),
-    ("scroll_battle_psalm", "Scroll of Battle Psalm", "uncommon", "A hymn-scroll that hardens the spirit before battle.", "Temple vaults, marshal chapels, and divine support caches.", None, 0, 4, 0, False),
-    ("scroll_starlit_rest", "Scroll of Starlit Rest", "rare", "A rare scroll of restful sigils used by experienced camp leaders.", "Secret ranger caches and rare restful rewards.", "2d6", 3, 0, 0, False),
-    ("scroll_resurgent_flame", "Scroll of Resurgent Flame", "epic", "A blazing script said to rekindle nearly spent life.", "Future acts and mythic relic bundles.", None, 0, 12, 0, False),
+    ("scroll_mending_word", "Script of Mending Pulse", "common", "A quick field script that releases a compact healing pulse.", "Lantern posts, hedge channelers, and healer caches.", "1d6", 2, 0, 0, False),
+    ("scroll_lesser_restoration", "Restoration Script", "uncommon", "A clean restorative script that breaks poison and weakness.", "Lantern archives and rare support caches.", None, 0, 0, 0, True),
+    ("scroll_revivify", "Revival Script", "uncommon", "A tightly warded revival script for camp rites after a fresh battlefield death.", "Rarely stocked by frontier traders and occasionally recovered from hard-fought battles.", None, 0, 0, 0, False),
+    ("scroll_arcane_refresh", "Channeler's Refresh Script", "rare", "An elegant sigil-chain that restores a surge of MP.", "Scholar satchels, hidden libraries, and rare resonance drops.", None, 0, 0, 1, False),
+    ("scroll_echo_step", "Echostep Script", "rare", "A delicate step-script that blurs the reader between falling dust and reflected sound.", "Resonant Vault script tubes, hidden survey lockers, and expert scout caches.", None, 0, 0, 0, False),
+    ("scroll_counter_cadence", "Counter-Cadence Script", "uncommon", "A prison-smudged script of wrong-beat notations that turns the Choir's first settling whisper back on itself.", "South Adit caches, freed augur notes, and prisoner escape kits kept against the Quiet Choir.", None, 0, 0, 0, False),
+    ("scroll_quell_the_deep", "Deep-Quell Script", "rare", "A warding script copied by keepers and delvers who learned that some caverns answer back.", "Sanctum satchels, ruined lantern halls, and counter-Choir ward caches.", "2d6", 2, 0, 0, False),
+    ("scroll_forge_shelter", "Forge Shelter Script", "rare", "A layered sigil-sheet that kindles a protective halo like banked coals around the reader.", "Meridian Forge annexes, Compact vault doors, and late-act expedition rewards.", None, 0, 8, 0, False),
+    ("scroll_guardian_light", "Watchlight Script", "uncommon", "A bright seal that wraps the reader in a protective glow.", "Lantern vaults, keeper gifts, and support caches.", None, 0, 6, 0, False),
+    ("scroll_ember_ward", "Ember Ward Script", "rare", "An ashen ward-script that leaves shimmering protection in its wake.", "Ashfall Watch stores and hidden Emberhall shelves.", None, 0, 8, 0, False),
+    ("scroll_surge_of_life", "Life-Surge Script", "epic", "A difficult script that can haul a fallen ally back with a gasp.", "Later-act relic troves and named boss caches.", None, 0, 0, 0, False),
+    ("scroll_clarity", "Focus Script", "common", "A script of calm focus and measured breathing.", "Libraries, sages, and reward satchels.", "1d4", 1, 0, 0, False),
+    ("scroll_battle_psalm", "Battle Cadence Script", "uncommon", "A cadence script that hardens the spirit before battle.", "Lantern vaults, marshal halls, and support caches.", None, 0, 4, 0, False),
+    ("scroll_starlit_rest", "Starlit Rest Script", "rare", "A rare script of restful sigils used by experienced camp leaders.", "Secret ranger caches and rare restful rewards.", "2d6", 3, 0, 0, False),
+    ("scroll_resurgent_flame", "Resurgent Flame Script", "epic", "A blazing script said to rekindle nearly spent life.", "Future acts and mythic relic bundles.", None, 0, 12, 0, False),
+]
+
+UNIQUE_REWARD_ITEMS = [
+    {
+        "item_id": "miras_blackwake_seal",
+        "name": "Mira's Blackwake Seal",
+        "item_type": "ring",
+        "rarity": "uncommon",
+        "description": "A dark steel signet stamped with Greywake watch authority and a private route cipher.",
+        "source": "Quest reward from Embers Before the Road.",
+        "weight": 0.1,
+        "value": 80,
+        "slot": "ring_1",
+        "properties": ["ring", "quest_reward"],
+        "skill_bonuses": {"Investigation": 1, "Persuasion": 1},
+        "initiative_bonus": 1,
+        "notes": ["Marks the party as trusted enough to cite Mira's Blackwake proof in later negotiations."],
+    },
+    {
+        "item_id": "roadwarden_cloak",
+        "name": "Roadwarden Cloak",
+        "item_type": "cloak",
+        "rarity": "uncommon",
+        "description": "A weather-treated frontier cloak bearing Tessa Harrow's field stitch inside the hem.",
+        "source": "Quest reward from Stop the Watchtower Raids.",
+        "weight": 1.4,
+        "value": 90,
+        "slot": "cape",
+        "properties": ["cloak", "quest_reward"],
+        "skill_bonuses": {"Survival": 1},
+        "ac_bonus": 1,
+        "notes": ["A practical badge of road service that helps the wearer travel and keep their guard up."],
+    },
+    {
+        "item_id": "barthen_resupply_token",
+        "name": "Hadrik's Resupply Token",
+        "item_type": "ring",
+        "rarity": "uncommon",
+        "description": "A brass trade token on a leather loop, good for a knowing nod at honest provision counters.",
+        "source": "Quest reward from Keep the Shelves Full.",
+        "weight": 0.1,
+        "value": 65,
+        "slot": "ring_1",
+        "properties": ["ring", "quest_reward"],
+        "skill_bonuses": {"Persuasion": 1},
+        "save_bonuses": {"CON_save": 1},
+        "notes": ["A reminder that full shelves can matter as much as full quivers."],
+    },
+    {
+        "item_id": "lionshield_quartermaster_badge",
+        "name": "Ironbound Quartermaster Badge",
+        "item_type": "ring",
+        "rarity": "uncommon",
+        "description": "A clipped steel badge used by Ironbound factors to identify reliable caravan hands.",
+        "source": "Quest reward from Reopen the Trade Lane.",
+        "weight": 0.1,
+        "value": 75,
+        "slot": "ring_1",
+        "properties": ["ring", "quest_reward"],
+        "skill_bonuses": {"Investigation": 1, "Persuasion": 1},
+        "initiative_bonus": 1,
+        "notes": ["The Ironbound mark makes later logistics arguments easier to win."],
+    },
+    {
+        "item_id": "gravequiet_amulet",
+        "name": "Gravequiet Amulet",
+        "item_type": "amulet",
+        "rarity": "uncommon",
+        "description": "A dull silver charm etched with a closed eye and old warding numerals.",
+        "source": "Quest reward from Silence Blackglass Well.",
+        "weight": 0.2,
+        "value": 95,
+        "slot": "neck",
+        "properties": ["amulet", "quest_reward"],
+        "skill_bonuses": {"Religion": 1},
+        "save_bonuses": {"WIS_save": 1},
+        "healing_bonus": 1,
+        "notes": ["Made for crews who learned that some graves dislike being robbed."],
+    },
+    {
+        "item_id": "edermath_scout_buckle",
+        "name": "Daran Orchard Scout Buckle",
+        "item_type": "boots",
+        "rarity": "uncommon",
+        "description": "A battered boot-buckle from an old adventuring harness, polished back to use.",
+        "source": "Quest reward from Break the Red Mesa Raiders.",
+        "weight": 0.3,
+        "value": 85,
+        "slot": "boots",
+        "properties": ["boots", "quest_reward"],
+        "skill_bonuses": {"Perception": 1, "Survival": 1},
+        "initiative_bonus": 1,
+        "notes": ["Daran gives it only to people he trusts to read dangerous ground before it reads them."],
+    },
+    {
+        "item_id": "edermath_cache_compass",
+        "name": "Orchard Wall Cache Compass",
+        "item_type": "amulet",
+        "rarity": "uncommon",
+        "description": "A palm-sized trail compass in a dented brass case, its needle steadier near old field marks than ordinary north.",
+        "source": "Recovered from Daran Orchard's old route cache.",
+        "weight": 0.2,
+        "value": 100,
+        "slot": "neck",
+        "properties": ["amulet", "unique", "quest_reward"],
+        "skill_bonuses": {"Stealth": 1, "Survival": 1},
+        "initiative_bonus": 1,
+        "notes": ["Its scratched backplate marks a quiet orchard-to-highland route Daran no longer trusts to memory alone."],
+    },
+    {
+        "item_id": "bryns_cache_keyring",
+        "name": "Bryn's Cache Keyring",
+        "item_type": "ring",
+        "rarity": "uncommon",
+        "description": "A ring of old cache tags and tiny picks, each filed down until it looks harmless.",
+        "source": "Quest reward from Loose Ends.",
+        "weight": 0.1,
+        "value": 70,
+        "slot": "ring_1",
+        "properties": ["ring", "quest_reward"],
+        "skill_bonuses": {"Sleight of Hand": 1, "Stealth": 1},
+        "initiative_bonus": 1,
+        "notes": ["Bryn's old routes are closed, but the habits that kept them alive are still useful."],
+    },
+    {
+        "item_id": "dawnmantle_mercy_charm",
+        "name": "Lanternward Mercy Charm",
+        "item_type": "amulet",
+        "rarity": "uncommon",
+        "description": "A small dawnburst charm wrapped in field bandage thread and quiet lantern knots.",
+        "source": "Quest reward from Faith Under Ash.",
+        "weight": 0.2,
+        "value": 85,
+        "slot": "neck",
+        "properties": ["amulet", "quest_reward"],
+        "skill_bonuses": {"Medicine": 1},
+        "save_bonuses": {"WIS_save": 1},
+        "healing_bonus": 1,
+        "notes": ["Elira's answer to hard justice: carry mercy where it can still change the next choice."],
+    },
+    {
+        "item_id": "innkeeper_credit_token",
+        "name": "Ashlamp Credit Token",
+        "item_type": "ring",
+        "rarity": "uncommon",
+        "description": "A brass room token stamped by Mara Ashlamp after one night the common room did not break.",
+        "source": "Quest reward from The Marked Keg.",
+        "weight": 0.1,
+        "value": 72,
+        "slot": "ring_1",
+        "properties": ["ring", "quest_reward"],
+        "skill_bonuses": {"Insight": 1, "Persuasion": 1},
+        "save_bonuses": {"CON_save": 1},
+        "notes": ["Ashlamp's staff recognizes it as proof the wearer helped keep panic from turning into business."],
+    },
+    {
+        "item_id": "sella_ballad_token",
+        "name": "Sella's Ballad Token",
+        "item_type": "amulet",
+        "rarity": "uncommon",
+        "description": "A singer's token wrapped in blue thread, given to people who carried truth back before rumor could flatten it.",
+        "source": "Quest reward from Songs for the Missing.",
+        "weight": 0.2,
+        "value": 78,
+        "slot": "neck",
+        "properties": ["amulet", "quest_reward"],
+        "skill_bonuses": {"Insight": 1, "Performance": 1},
+        "initiative_bonus": 1,
+        "notes": ["Sella's token favors the moment when a room is about to listen, if someone brave enough speaks first."],
+    },
+    {
+        "item_id": "blackseal_taster_pin",
+        "name": "Blackseal Taster Pin",
+        "item_type": "ring",
+        "rarity": "uncommon",
+        "description": "A small dark pin once used by couriers to test whether a message room felt honest enough to survive.",
+        "source": "Quest reward from Quiet Table, Sharp Knives.",
+        "weight": 0.1,
+        "value": 84,
+        "slot": "ring_1",
+        "properties": ["ring", "quest_reward"],
+        "skill_bonuses": {"Deception": 1, "Perception": 1},
+        "initiative_bonus": 1,
+        "notes": ["Nera says the pin is for people who can hear the knife before it leaves the whisper."],
+    },
+    {
+        "item_id": "harl_road_knot",
+        "name": "Harl Road-Knot",
+        "item_type": "amulet",
+        "rarity": "uncommon",
+        "description": "A strip of Dain Harl's blue scarf rebound into a tight courier's knot and set on a simple neck cord.",
+        "source": "Quest reward from Bring Back Dain's Name.",
+        "weight": 0.2,
+        "value": 82,
+        "slot": "neck",
+        "properties": ["amulet", "quest_reward"],
+        "skill_bonuses": {"Insight": 1, "Survival": 1},
+        "save_bonuses": {"CON_save": 1},
+        "notes": ["Jerek says the knot is for people who bring truth back before the road can grind it flat."],
+    },
+    {
+        "item_id": "kestrel_ledger_clasp",
+        "name": "Kestrel Ledger Clasp",
+        "item_type": "ring",
+        "rarity": "uncommon",
+        "description": "A brass page-clasp cut with river-route notches and Sabra's precise habit of never wasting a mark.",
+        "source": "Quest reward from False Manifest Circuit.",
+        "weight": 0.1,
+        "value": 86,
+        "slot": "ring_1",
+        "properties": ["ring", "quest_reward"],
+        "skill_bonuses": {"Investigation": 1, "Perception": 1},
+        "initiative_bonus": 1,
+        "notes": ["Sabra only gives the clasp to people who notice corrections before the road has to pay for them."],
+    },
+    {
+        "item_id": "pact_waymap_case",
+        "name": "Meridian Waymap Case",
+        "item_type": "helmet",
+        "rarity": "rare",
+        "description": "A brow-slung map case with crystal tabs that align old Meridian survey marks.",
+        "source": "Quest reward from Recover the Meridian Waymap.",
+        "weight": 0.8,
+        "value": 180,
+        "slot": "head",
+        "properties": ["helmet", "quest_reward"],
+        "skill_bonuses": {"Investigation": 2, "Survival": 1},
+        "initiative_bonus": 1,
+        "notes": ["The case turns recovered route fragments into usable marching decisions."],
+    },
+    {
+        "item_id": "pale_witness_lantern",
+        "name": "Pale Witness Lantern",
+        "item_type": "helmet",
+        "rarity": "rare",
+        "description": "A shuttered spirit-lantern that burns cold when a story is being bent around a corpse.",
+        "source": "Quest reward from Ask the Pale Witness What Was Buried.",
+        "weight": 1.0,
+        "value": 165,
+        "slot": "head",
+        "properties": ["helmet", "quest_reward"],
+        "skill_bonuses": {"Insight": 2},
+        "save_bonuses": {"WIS_save": 1},
+        "notes": ["It does not reveal every lie, but it makes buried truth harder to ignore."],
+    },
+    {
+        "item_id": "stonehollow_survey_lantern",
+        "name": "Stonehollow Survey Lantern",
+        "item_type": "helmet",
+        "rarity": "uncommon",
+        "description": "A compact survey lamp repaired from Stonehollow field gear and marked with scholar initials.",
+        "source": "Quest reward from Bring Back the Survey Team.",
+        "weight": 1.1,
+        "value": 105,
+        "slot": "head",
+        "properties": ["helmet", "quest_reward"],
+        "skill_bonuses": {"Investigation": 1, "Perception": 1},
+        "initiative_bonus": 1,
+        "notes": ["A rescued team's work keeps helping long after the rescue is over."],
+    },
+    {
+        "item_id": "woodland_wayfinder_boots",
+        "name": "Woodland Wayfinder Boots",
+        "item_type": "boots",
+        "rarity": "rare",
+        "description": "Soft green-black boots stitched with route marks from Daran Orchard's oldest woodland charts.",
+        "source": "Quest reward from Break the Woodland Saboteurs.",
+        "weight": 2.0,
+        "value": 155,
+        "slot": "boots",
+        "properties": ["boots", "quest_reward"],
+        "skill_bonuses": {"Stealth": 1, "Survival": 2},
+        "initiative_bonus": 1,
+        "notes": ["They favor careful feet, clean approaches, and paths that stay found."],
+    },
+    {
+        "item_id": "claims_accord_brooch",
+        "name": "Claims Accord Brooch",
+        "item_type": "ring",
+        "rarity": "rare",
+        "description": "A silver-and-iron accord brooch stamped after the claims meeting survived its worst night.",
+        "source": "Quest reward from Hold the Claims Meeting Together.",
+        "weight": 0.1,
+        "value": 170,
+        "slot": "ring_1",
+        "properties": ["ring", "quest_reward"],
+        "skill_bonuses": {"Insight": 1, "Persuasion": 2},
+        "notes": ["Proof that the wearer helped keep Iron Hollow arguing in words instead of blades."],
+    },
+    {
+        "item_id": "freed_captive_prayer_beads",
+        "name": "Freed-Captive Mercy Beads",
+        "item_type": "amulet",
+        "rarity": "rare",
+        "description": "A string of mismatched beads, each tied on by someone who made it out of the South Adit alive.",
+        "source": "Quest reward from Free the South Adit Prisoners.",
+        "weight": 0.2,
+        "value": 160,
+        "slot": "neck",
+        "properties": ["amulet", "quest_reward"],
+        "skill_bonuses": {"Medicine": 1},
+        "save_bonuses": {"WIS_save": 1},
+        "healing_bonus": 2,
+        "notes": ["The beads steady the hand that has to help someone else stand back up."],
+    },
+    {
+        "item_id": "forgeheart_cinder",
+        "name": "Forgeheart Cinder",
+        "item_type": "ring",
+        "rarity": "epic",
+        "description": "A heatless ember sealed in dark glass, bright only when old forge pressure pushes back.",
+        "source": "Quest reward from Sever the Quiet Choir.",
+        "weight": 0.1,
+        "value": 320,
+        "slot": "ring_1",
+        "properties": ["ring", "quest_reward"],
+        "skill_bonuses": {"Arcana": 2},
+        "save_bonuses": {"WIS_save": 1},
+        "initiative_bonus": 1,
+        "spell_attack_bonus": 1,
+        "damage_resistances": ["psychic"],
+        "notes": ["A dangerous little victory: the Choir's pressure can still be felt, but now it has something to strike against."],
+    },
 ]
 
 TRINKET_PREFIXES = ["Ashen", "Silver", "Old", "Stone", "Moon", "Sun", "Gloom", "Star", "Iron", "River"]
 TRINKET_SUFFIXES = ["Token", "Seal", "Charm", "Icon", "Brooch", "Compass", "Cog", "Medallion"]
 TRINKET_THEMES = [
-    ("scout", "Useful to scouts and pathfinders."),
-    ("priest", "Favored by priests and shrine keepers."),
-    ("soldier", "Carried by veterans, guards, and mercenaries."),
-    ("bandit", "Common in raider packs and hidden caches."),
+    ("route token", "A route token traded between scouts, milefinders, and waykeepers."),
+    ("signal relic", "A signal relic kept by lantern attendants and hush-watch crews."),
+    ("memory piece", "A memory piece passed through survivor camps and witness caches."),
+    ("faction mark", "A faction mark carried by contract hands, guards, and road crews."),
 ]
 
 ARMOR_RESISTANCE_TYPES = {
@@ -697,6 +1181,46 @@ def format_bonus_map(bonuses: dict[str, int] | None, *, suffix: str = "") -> lis
     return [f"{name.replace('_', ' ')} +{value}{suffix}".replace(" save", " save") for name, value in bonuses.items()]
 
 
+PUBLIC_ITEM_CATEGORY_LABELS = {
+    "consumable": "consumable",
+    "scroll": "script",
+    "equipment": "gear",
+    "trinket": "relic",
+}
+
+PUBLIC_ITEM_TYPE_LABELS = {
+    "potion": "potion",
+    "scroll": "script",
+    "trinket": "relic",
+}
+
+DISPLAY_CONDITION_LABELS = {
+    "blessed": "aligned",
+}
+
+
+def item_category_label(category: str) -> str:
+    return PUBLIC_ITEM_CATEGORY_LABELS.get(category, category.replace("_", " "))
+
+
+def item_type_label(item_type: str) -> str:
+    return PUBLIC_ITEM_TYPE_LABELS.get(item_type, item_type.replace("_", " "))
+
+
+def marks_label(value: int) -> str:
+    return f"{value} gold"
+
+
+def save_bonus_label(name: str) -> str:
+    if name.endswith("_save"):
+        return name.removesuffix("_save").upper()
+    return name.replace("_", " ")
+
+
+def condition_label(name: str) -> str:
+    return DISPLAY_CONDITION_LABELS.get(name, name.replace("_", " "))
+
+
 def weapon_enchantment_for(base: dict[str, object], rarity: str) -> dict[str, object]:
     if rarity == "common":
         return {}
@@ -705,7 +1229,7 @@ def weapon_enchantment_for(base: dict[str, object], rarity: str) -> dict[str, ob
             "enchantment": "Warning",
             "initiative_bonus": 1,
             "notes": [
-                "Roadwatch fittings grant +1 initiative while equipped.",
+                "A tuned warning lattice grants +1 initiative while equipped.",
             ],
         }
     if rarity == "rare":
@@ -713,7 +1237,7 @@ def weapon_enchantment_for(base: dict[str, object], rarity: str) -> dict[str, ob
             "enchantment": "Vicious",
             "crit_extra_damage_dice": "2d6",
             "notes": [
-                "A cruel edge makes critical hits deal an extra 2d6 damage.",
+                "A tuned edge makes critical hits deal an extra 2d6 damage.",
             ],
         }
     if rarity == "epic":
@@ -724,7 +1248,7 @@ def weapon_enchantment_for(base: dict[str, object], rarity: str) -> dict[str, ob
                 "extra_damage_type": "force",
                 "initiative_bonus": 1,
                 "notes": [
-                    "A seeking string adds 1d8 force damage on each hit.",
+                    "High-tension stringwork adds 1d8 force damage on each hit and sharpens initiative.",
                 ],
             }
         return {
@@ -732,7 +1256,7 @@ def weapon_enchantment_for(base: dict[str, object], rarity: str) -> dict[str, ob
             "extra_damage_dice": "2d6",
             "extra_damage_type": "fire",
             "notes": [
-                "A cinder-tongued edge adds 2d6 fire damage on each hit.",
+                "Each hit adds 2d6 fire damage.",
             ],
         }
     return {
@@ -742,7 +1266,7 @@ def weapon_enchantment_for(base: dict[str, object], rarity: str) -> dict[str, ob
         "crit_extra_damage_dice": "2d8",
         "initiative_bonus": 2,
         "notes": [
-            "A mythic oathblade adds 2d6 radiant damage on each hit and another 2d8 radiant damage on critical hits.",
+            "Each hit adds 2d6 radiant damage and critical hits add another 2d8 radiant.",
         ],
     }
 
@@ -753,16 +1277,16 @@ def armor_enchantment_for(base: dict[str, object], rarity: str) -> dict[str, obj
     if rarity == "uncommon":
         if bool(base.get("stealth_disadvantage", False)):
             return {
-                "enchantment": "Mithral Weave",
+                "enchantment": "Lightwoven Alloy",
                 "stealth_disadvantage": False,
                 "notes": [
-                    "Quiet metallic weave removes this suit's normal Stealth strain.",
+                    "This suit sheds its usual stealth strain despite the weight of its plating.",
                 ],
             }
         return {
             "enchantment": "Tempered Links",
             "notes": [
-                "Tempered fittings improve the armor's reliability.",
+                "Tuned fittings reinforce the guard plating without changing its silhouette.",
             ],
         }
     if rarity == "rare":
@@ -770,7 +1294,7 @@ def armor_enchantment_for(base: dict[str, object], rarity: str) -> dict[str, obj
             "enchantment": "Adamantine Ward",
             "crit_immunity": True,
             "notes": [
-                "Impact-dulling plates turn critical hits against you into normal hits.",
+                "Critical hits against you become normal hits.",
             ],
         }
     resistance = ARMOR_RESISTANCE_TYPES.get(str(base["slug"]), "fire")
@@ -779,7 +1303,7 @@ def armor_enchantment_for(base: dict[str, object], rarity: str) -> dict[str, obj
             "enchantment": f"{resistance.title()} Resistance",
             "damage_resistances": [resistance],
             "notes": [
-                f"Resonant plating grants resistance to {resistance} damage while worn.",
+                f"You resist {resistance} damage while wearing it.",
             ],
         }
     return {
@@ -788,7 +1312,7 @@ def armor_enchantment_for(base: dict[str, object], rarity: str) -> dict[str, obj
         "crit_immunity": True,
         "save_bonuses": {"CON_save": 1},
         "notes": [
-            f"Legendary plating grants {resistance} resistance, +1 Constitution saves, and turns critical hits into normal hits.",
+            f"Legendary plating grants {resistance} resistance, +1 Constitution resist checks, and turns critical hits into normal hits.",
         ],
     }
 
@@ -798,37 +1322,70 @@ def shield_enchantment_for(rarity: str) -> dict[str, object]:
         return {}
     if rarity == "uncommon":
         return {
-            "enchantment": "Sentinel",
+            "enchantment": "Watchguard Pattern",
             "initiative_bonus": 1,
             "skill_bonuses": {"Perception": 1},
             "notes": [
-                "A watchmark face grants +1 initiative and +1 Perception.",
+                "The bearer gains +1 initiative and +1 Perception.",
             ],
         }
     return {
-        "enchantment": "Arrow-Catching",
+        "enchantment": "Intercept Matrix",
         "initiative_bonus": 1,
         "save_bonuses": {"DEX_save": 1},
         "notes": [
-            "Angled warding grants +1 initiative and +1 Dexterity saves.",
+            "The bearer gains +1 initiative and +1 Dexterity resist checks.",
         ],
     }
 
 
 def gear_enchantment_for(base: dict[str, object], rarity: str) -> dict[str, object]:
     slug = str(base["slug"])
+    if slug == "delver_lantern_hood" and rarity == "rare":
+        return {
+            "enchantment": "Lantern Eye",
+            "initiative_bonus": 1,
+            "notes": [
+                "Built from Meridian survey gear, the hood's mirrored lamp catches danger a heartbeat early.",
+            ],
+        }
+    if slug == "echostep_boots" and rarity == "rare":
+        return {
+            "enchantment": "Surestep",
+            "initiative_bonus": 1,
+            "notes": [
+                "These boots were tuned for unstable caverns and help the wearer move before panic turns to a cave-in.",
+            ],
+        }
+    if slug == "forgehand_gauntlets" and rarity == "rare":
+        return {
+            "enchantment": "Stonegrip",
+            "save_bonuses": {"STR_save": 1},
+            "notes": [
+                "Runes along the knuckles help the wearer brace against shock, weight, and sudden violent force.",
+            ],
+        }
     if slug == "silent_step_boots":
         return {
-            "enchantment": "Elvenkind",
+            "enchantment": "Silentstep Weave",
             "stealth_advantage": True,
             "notes": [
-                "Soft-stepping soles grant edge on Stealth checks.",
+                "These grant edge on Stealth checks.",
+            ],
+        }
+    if slug == "sigil_anchor_ring":
+        bonus = 1 if rarity == "rare" else 2
+        return {
+            "enchantment": "Mind Anchor",
+            "initiative_bonus": bonus,
+            "notes": [
+                "Etched to resist invasive whisper-magic, this ring helps the wearer act before alien pressure can settle in.",
             ],
         }
     if slug == "watcher_ring":
         bonus = 1 if rarity == "uncommon" else 2 if rarity == "epic" else 1
         return {
-            "enchantment": "Protection",
+            "enchantment": "Warding Loop",
             "initiative_bonus": bonus,
             "save_bonuses": {"WIS_save": 1} if rarity in {"rare", "epic"} else None,
             "notes": [
@@ -843,11 +1400,50 @@ def gear_enchantment_for(base: dict[str, object], rarity: str) -> dict[str, obje
                 "Healing effects on the wearer restore 2 extra HP.",
             ],
         }
+    if slug == "choirward_amulet" and rarity == "rare":
+        return {
+            "enchantment": "Quiet Mercy",
+            "save_bonuses": {"CHA_save": 1},
+            "notes": [
+                "Designed by keepers who expected hostile whispers, this amulet lets the wearer turn aside the first fear or whisper-borne effect each combat.",
+            ],
+        }
     return {}
 
 
 def normalize_item_id(name: str) -> str:
     return re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_")
+
+
+def catalog_prefix_for_category(category: str) -> str:
+    normalized = re.sub(r"[^a-z]+", "", category.lower())
+    if normalized in CATALOG_ID_CATEGORY_PREFIXES:
+        return CATALOG_ID_CATEGORY_PREFIXES[normalized]
+    return normalized[:1].upper() if normalized else "M"
+
+
+def catalog_sort_key(item: Item) -> tuple[int, str, str]:
+    prefix = catalog_prefix_for_category(item.category)
+    stable_item_id = CATALOG_SORT_ID_ALIASES.get(item.item_id, item.item_id)
+    return (CATALOG_ID_PREFIX_ORDER.get(prefix, len(CATALOG_ID_PREFIX_ORDER)), item.category, stable_item_id)
+
+
+def assign_catalog_ids(items: list[Item]) -> None:
+    next_number_by_prefix: dict[str, int] = {}
+    seen_catalog_ids: set[str] = set()
+    for item in sorted(items, key=catalog_sort_key):
+        prefix = catalog_prefix_for_category(item.category)
+        number = next_number_by_prefix.get(prefix, 0)
+        if number > 9999:
+            raise ValueError(f"Catalog prefix {prefix} exceeded the supported four-digit range.")
+        catalog_id = f"{prefix}{number:04d}"
+        if catalog_id in seen_catalog_ids:
+            raise ValueError(f"Duplicate catalog id assigned: {catalog_id}")
+        item.legacy_id = item.item_id
+        item.catalog_id = catalog_id
+        item.item_id = catalog_id
+        seen_catalog_ids.add(catalog_id)
+        next_number_by_prefix[prefix] = number + 1
 
 
 def build_weapon_item(base: dict[str, object], rarity: str) -> Item:
@@ -873,7 +1469,7 @@ def build_weapon_item(base: dict[str, object], rarity: str) -> Item:
         item_type=str(base.get("weapon_type", base["slug"])),
         rarity=rarity,
         description=f"{base['description']} Its {RARITY_TITLES[rarity].lower()} craftsmanship improves its battlefield edge.",
-        source=RARITY_SOURCE[rarity],
+        source=str(base.get("source", RARITY_SOURCE[rarity])),
         weight=float(base["weight"]),
         value=rarity_value(int(base["value"]), rarity),
         slot="main_hand",
@@ -892,15 +1488,17 @@ def build_weapon_item(base: dict[str, object], rarity: str) -> Item:
 
 
 def build_armor_item(base: dict[str, object], rarity: str) -> Item:
-    armor_bonus = RARITY_ARMOR_BONUS[rarity]
+    defense_bonus = RARITY_ARMOR_DEFENSE_BONUS[rarity]
     magic = armor_enchantment_for(base, rarity)
     armor = Armor(
         name=f"{RARITY_PREFIX[rarity]} {base['name']}",
-        base_ac=int(base["base_ac"]) + armor_bonus,
+        base_ac=int(base["base_ac"]),
         armor_type=str(base.get("armor_type", "light")),
         dex_cap=base["dex_cap"],
         heavy=bool(base["heavy"]),
         stealth_disadvantage=bool(magic.get("stealth_disadvantage", base.get("stealth_disadvantage", False))),
+        defense_percent=int(base.get("defense_percent", 0)) + defense_bonus,
+        defense_cap_percent=int(base.get("defense_cap_percent", 75 if base.get("armor_type") in {"medium", "heavy"} else 45)),
     )
     return Item(
         item_id=f"{base['slug']}_{rarity}",
@@ -925,6 +1523,7 @@ def build_armor_item(base: dict[str, object], rarity: str) -> Item:
 
 def build_shield_item(base: dict[str, object], rarity: str) -> Item:
     ac_bonus = 0 if rarity == "common" else 1 if rarity in {"uncommon", "rare"} else 2 if rarity == "epic" else 3
+    defense_bonus = RARITY_SHIELD_DEFENSE_BONUS[rarity]
     magic = shield_enchantment_for(rarity)
     return Item(
         item_id=f"{base['slug']}_{rarity}",
@@ -939,6 +1538,8 @@ def build_shield_item(base: dict[str, object], rarity: str) -> Item:
         slot=str(base["slot"]),
         properties=list(base.get("properties", [])),
         shield_bonus=int(base["shield_bonus"]) + ac_bonus,
+        shield_defense_percent=int(base.get("shield_defense_percent", 5)) + defense_bonus,
+        raised_shield_defense_percent=int(base.get("raised_shield_defense_percent", 10)),
         enchantment=magic.get("enchantment"),
         initiative_bonus=int(magic.get("initiative_bonus", 0)),
         skill_bonuses=dict(magic.get("skill_bonuses") or {}) or None,
@@ -961,6 +1562,7 @@ def build_gear_item(base: dict[str, object], rarity: str) -> Item:
         save_bonuses[first_key] += 1
     if rarity_scale >= 4:
         ac_bonus += 1
+    defense_percent = int(base.get("defense_percent", 0)) + ac_bonus * 5
     for key, bonus in dict(magic.get("skill_bonuses") or {}).items():
         skill_bonuses[key] = skill_bonuses.get(key, 0) + bonus
     for key, bonus in dict(magic.get("save_bonuses") or {}).items():
@@ -972,7 +1574,7 @@ def build_gear_item(base: dict[str, object], rarity: str) -> Item:
         item_type=str(base["item_type"]),
         rarity=rarity,
         description=f"{base['description']} Frontier rumor says this {RARITY_TITLES[rarity].lower()} piece was hard won.",
-        source=RARITY_SOURCE[rarity],
+        source=str(base.get("source", RARITY_SOURCE[rarity])),
         weight=float(base["weight"]),
         value=rarity_value(int(base["value"]), rarity),
         slot="ring_1" if base["slot"] == "ring" else str(base["slot"]),
@@ -980,6 +1582,8 @@ def build_gear_item(base: dict[str, object], rarity: str) -> Item:
         skill_bonuses=skill_bonuses or None,
         save_bonuses=save_bonuses or None,
         ac_bonus=ac_bonus,
+        defense_percent=defense_percent,
+        defense_cap_percent=int(base.get("defense_cap_percent", 0)),
         initiative_bonus=int(magic.get("initiative_bonus", 0)),
         healing_bonus=int(magic.get("healing_bonus", 0)),
         enchantment=magic.get("enchantment"),
@@ -1044,11 +1648,19 @@ def build_consumables() -> list[Item]:
         "blessed_salve": {"clear_conditions": ["poisoned", "blinded"]},
         "antitoxin_vial": {"clear_conditions": ["poisoned"], "apply_conditions": {"resist_poison": 5}},
         "moonmint_drops": {"clear_conditions": ["deafened", "frightened"]},
+        "delvers_amber": {"clear_conditions": ["frightened"]},
+        "resonance_tonic": {"clear_conditions": ["reeling"]},
         "potion_heroism": {"apply_conditions": {"blessed": 3}},
+        "forge_blessing_elixir": {"apply_conditions": {"blessed": 3}},
+        "thoughtward_draught": {"clear_conditions": ["charmed", "frightened"]},
         "fireward_elixir": {"apply_conditions": {"resist_fire": 5}},
         "dust_of_disappearance": {"apply_conditions": {"invisible": 3}},
         "scroll_lesser_restoration": {"clear_conditions": ["blinded", "deafened", "paralyzed", "poisoned"]},
         "scroll_clarity": {"clear_conditions": ["charmed", "frightened", "deafened"]},
+        "scroll_echo_step": {"clear_conditions": ["restrained"], "apply_conditions": {"invisible": 2}},
+        "scroll_counter_cadence": {"clear_conditions": ["charmed", "frightened", "incapacitated"], "apply_conditions": {"blessed": 2}},
+        "scroll_quell_the_deep": {"clear_conditions": ["charmed", "frightened", "incapacitated"]},
+        "scroll_forge_shelter": {"apply_conditions": {"blessed": 2}},
         "scroll_guardian_light": {"apply_conditions": {"blessed": 3}},
         "scroll_ember_ward": {"apply_conditions": {"invisible": 2}},
         "scroll_surge_of_life": {"clear_conditions": ["incapacitated", "stunned"]},
@@ -1062,6 +1674,14 @@ def build_consumables() -> list[Item]:
             continue
         item.clear_conditions = list(overrides.get("clear_conditions", [])) or None
         item.apply_conditions = dict(overrides.get("apply_conditions", {})) or None
+    return items
+
+
+def build_unique_reward_items() -> list[Item]:
+    items: list[Item] = []
+    for data in UNIQUE_REWARD_ITEMS:
+        payload = dict(data)
+        items.append(Item(category="equipment", **payload))
     return items
 
 
@@ -1080,8 +1700,8 @@ def build_trinkets() -> list[Item]:
                     category="trinket",
                     item_type="trinket",
                     rarity=rarity,
-                    description=f"{theme_description} This {RARITY_TITLES[rarity].lower()} trinket is more valuable than practical.",
-                    source=RARITY_SOURCE[rarity].replace("relic", f"{theme_name} relic"),
+                    description=f"{theme_description} This {RARITY_TITLES[rarity].lower()} find is mostly valuable for the story of who carried it.",
+                    source=RARITY_SOURCE[rarity],
                     weight=0.2,
                     value=rarity_value(8, rarity),
                     properties=["trinket"],
@@ -1112,11 +1732,15 @@ def build_catalog() -> dict[str, Item]:
             items.append(build_gear_item(base, rarity))
     items.extend(build_supply_items())
     items.extend(build_consumables())
+    items.extend(build_unique_reward_items())
     items.extend(build_trinkets())
+    assign_catalog_ids(items)
     return {item.item_id: item for item in items}
 
 
-ITEMS = build_catalog()
+ITEMS = ItemCatalogDict(build_catalog())
+ITEMS_BY_CATALOG_ID = dict(ITEMS)
+ITEMS_BY_LEGACY_ID = {item.legacy_id: item for item in ITEMS.values() if item.legacy_id}
 
 MERCHANT_STOCKS = {
     "linene_graywind": {
@@ -1194,6 +1818,11 @@ LOOT_TABLES = {
         LootEntry("dried_fish", 0.4),
         LootEntry("travel_biscuits", 0.25),
     ],
+    "worg": [
+        LootEntry("smoked_ham", 0.45),
+        LootEntry("travel_biscuits", 0.35),
+        LootEntry("spiced_sausage", 0.25),
+    ],
     "bandit": [
         LootEntry("potion_healing", 0.4),
         LootEntry("scroll_revivify", 0.02),
@@ -1207,6 +1836,48 @@ LOOT_TABLES = {
         LootEntry("shortbow_common", 0.25),
         LootEntry("nut_mix", 0.4),
     ],
+    "brand_saboteur": [
+        LootEntry("antitoxin_vial", 0.25),
+        LootEntry("travel_biscuits", 0.35),
+        LootEntry("dagger_common", 0.2),
+    ],
+    "skeletal_sentry": [
+        LootEntry("blessed_salve", 0.18),
+        LootEntry("mace_common", 0.14),
+        LootEntry("soldiers_amulet_common", 0.06),
+    ],
+    "orc_raider": [
+        LootEntry("potion_healing", 0.3),
+        LootEntry("battleaxe_common", 0.25),
+        LootEntry("shield_common", 0.15),
+        LootEntry("salt_pork", 0.45),
+        LootEntry("travel_biscuits", 0.35),
+    ],
+    "orc_bloodchief": [
+        LootEntry("greater_healing_draught", 0.6),
+        LootEntry("battleaxe_uncommon", 0.3),
+        LootEntry("scale_mail_uncommon", 0.18),
+        LootEntry("potion_heroism", 0.25),
+        LootEntry("spiced_sausage", 1.0, 2, 3),
+    ],
+    "ogre_brute": [
+        LootEntry("camp_stew_jar", 0.5),
+        LootEntry("bread_round", 1.0, 1, 3),
+        LootEntry("warhammer_common", 0.18),
+    ],
+    "gravecaller": [
+        LootEntry("scroll_clarity", 0.45),
+        LootEntry("scroll_lesser_restoration", 0.3),
+        LootEntry("amber_amulet_uncommon", 0.18),
+        LootEntry("blessed_salve", 0.35),
+        LootEntry("black_tea", 0.6),
+    ],
+    "nothic": [
+        LootEntry("watcher_ring_uncommon", 0.18),
+        LootEntry("amber_amulet_uncommon", 0.18),
+        LootEntry("scroll_arcane_refresh", 0.25),
+        LootEntry("red_wine", 0.8),
+    ],
     "rukhar": [
         LootEntry("greater_healing_draught", 0.8),
         LootEntry("scroll_revivify", 0.05),
@@ -1216,6 +1887,12 @@ LOOT_TABLES = {
         LootEntry("scroll_guardian_light", 0.35),
         LootEntry("smoked_ham", 1.0, 2, 3),
     ],
+    "sereth_vane": [
+        LootEntry("potion_healing", 0.65),
+        LootEntry("scroll_clarity", 0.35),
+        LootEntry("shortsword_uncommon", 0.25),
+        LootEntry("red_wine", 0.8),
+    ],
     "varyn": [
         LootEntry("superior_healing_elixir", 0.8),
         LootEntry("scroll_revivify", 0.05),
@@ -1224,6 +1901,190 @@ LOOT_TABLES = {
         LootEntry("dust_of_disappearance", 0.2),
         LootEntry("scroll_arcane_refresh", 0.35),
         LootEntry("camp_stew_jar", 1.0, 2, 4),
+    ],
+    "cult_lookout": [
+        LootEntry("potion_healing", 0.25),
+        LootEntry("moonmint_drops", 0.35),
+        LootEntry("shortbow_uncommon", 0.12),
+        LootEntry("leather_armor_uncommon", 0.12),
+        LootEntry("dagger_uncommon", 0.08),
+        LootEntry("dust_of_disappearance", 0.04),
+        LootEntry("travel_biscuits", 0.6, 1, 2),
+    ],
+    "choir_adept": [
+        LootEntry("resonance_tonic", 0.22),
+        LootEntry("thoughtward_draught", 0.08),
+        LootEntry("choirward_amulet_uncommon", 0.09),
+        LootEntry("dagger_uncommon", 0.12),
+        LootEntry("scroll_clarity", 0.3),
+        LootEntry("scroll_lesser_restoration", 0.18),
+        LootEntry("herbal_tea", 0.7, 1, 2),
+    ],
+    "expedition_reaver": [
+        LootEntry("delvers_amber", 0.18),
+        LootEntry("battleaxe_uncommon", 0.1),
+        LootEntry("shortsword_uncommon", 0.12),
+        LootEntry("leather_armor_uncommon", 0.16),
+        LootEntry("forgehand_gauntlets_uncommon", 0.07),
+        LootEntry("miners_ration_tin", 0.75, 1, 2),
+    ],
+    "grimlock_tunneler": [
+        LootEntry("delvers_amber", 0.12),
+        LootEntry("potion_healing", 0.18),
+        LootEntry("dagger_common", 0.16),
+        LootEntry("leather_armor_common", 0.08),
+        LootEntry("mushroom_broth_flask", 0.55, 1, 2),
+    ],
+    "starblighted_miner": [
+        LootEntry("resonance_tonic", 0.16),
+        LootEntry("thoughtward_draught", 0.06),
+        LootEntry("warhammer_uncommon", 0.12),
+        LootEntry("delver_lantern_hood_uncommon", 0.08),
+        LootEntry("miners_ration_tin", 0.85, 1, 2),
+        LootEntry("mushroom_broth_flask", 0.45),
+    ],
+    "animated_armor": [
+        LootEntry("shield_uncommon", 0.12),
+        LootEntry("chain_mail_uncommon", 0.09),
+        LootEntry("forgehand_gauntlets_uncommon", 0.1),
+        LootEntry("fireward_elixir", 0.14),
+        LootEntry("scroll_guardian_light", 0.16),
+    ],
+    "spectral_foreman": [
+        LootEntry("greater_healing_draught", 0.35),
+        LootEntry("warhammer_uncommon", 0.22),
+        LootEntry("chain_mail_uncommon", 0.14),
+        LootEntry("delver_lantern_hood_uncommon", 0.16),
+        LootEntry("scroll_guardian_light", 0.22),
+        LootEntry("resonance_tonic", 0.2),
+    ],
+    "blacklake_pincerling": [
+        LootEntry("fireward_elixir", 0.2),
+        LootEntry("antitoxin_vial", 0.25),
+        LootEntry("thoughtward_draught", 0.08),
+        LootEntry("sigil_anchor_ring_rare", 0.05),
+        LootEntry("studded_leather_uncommon", 0.08),
+        LootEntry("mushroom_broth_flask", 0.5),
+    ],
+    "caldra_voss": [
+        LootEntry("superior_healing_elixir", 0.85),
+        LootEntry("scroll_revivify", 0.08),
+        LootEntry("sigil_anchor_ring_rare", 0.35),
+        LootEntry("choirward_amulet_rare", 0.22),
+        LootEntry("rapier_rare", 0.18),
+        LootEntry("thoughtward_draught", 0.35),
+        LootEntry("scroll_ember_ward", 0.28),
+        LootEntry("resonance_tonic", 0.5, 1, 2),
+    ],
+    "false_map_skirmisher": [
+        LootEntry("potion_healing", 0.22),
+        LootEntry("delvers_amber", 0.15),
+        LootEntry("dagger_uncommon", 0.14),
+        LootEntry("leather_armor_uncommon", 0.12),
+        LootEntry("dust_of_disappearance", 0.05),
+        LootEntry("miners_ration_tin", 0.7, 1, 2),
+    ],
+    "claimbinder_notary": [
+        LootEntry("scroll_clarity", 0.28),
+        LootEntry("thoughtward_draught", 0.08),
+        LootEntry("warhammer_uncommon", 0.14),
+        LootEntry("chain_shirt_uncommon", 0.12),
+        LootEntry("delvers_amber", 0.2),
+        LootEntry("herbal_tea", 0.65, 1, 2),
+    ],
+    "echo_sapper": [
+        LootEntry("fireward_elixir", 0.18),
+        LootEntry("warhammer_uncommon", 0.16),
+        LootEntry("forgehand_gauntlets_uncommon", 0.08),
+        LootEntry("resonance_tonic", 0.14),
+        LootEntry("miners_ration_tin", 0.75, 1, 2),
+    ],
+    "pact_archive_warden": [
+        LootEntry("shield_uncommon", 0.14),
+        LootEntry("chain_mail_uncommon", 0.1),
+        LootEntry("scroll_guardian_light", 0.2),
+        LootEntry("delver_lantern_hood_uncommon", 0.08),
+        LootEntry("fireward_elixir", 0.16),
+    ],
+    "blackglass_listener": [
+        LootEntry("thoughtward_draught", 0.18),
+        LootEntry("resonance_tonic", 0.18),
+        LootEntry("choirward_amulet_uncommon", 0.08),
+        LootEntry("dagger_uncommon", 0.1),
+        LootEntry("mushroom_broth_flask", 0.45),
+    ],
+    "choir_cartographer": [
+        LootEntry("delvers_amber", 0.22),
+        LootEntry("scroll_clarity", 0.28),
+        LootEntry("studded_leather_uncommon", 0.12),
+        LootEntry("dagger_uncommon", 0.1),
+        LootEntry("thoughtward_draught", 0.08),
+        LootEntry("miners_ration_tin", 0.75, 1, 2),
+    ],
+    "resonance_leech": [
+        LootEntry("resonance_tonic", 0.24),
+        LootEntry("thoughtward_draught", 0.1),
+        LootEntry("sigil_anchor_ring_rare", 0.03),
+        LootEntry("delver_lantern_hood_uncommon", 0.07),
+        LootEntry("mushroom_broth_flask", 0.55),
+    ],
+    "survey_chain_revenant": [
+        LootEntry("warhammer_uncommon", 0.16),
+        LootEntry("chain_mail_uncommon", 0.12),
+        LootEntry("delver_lantern_hood_uncommon", 0.12),
+        LootEntry("scroll_guardian_light", 0.18),
+        LootEntry("greater_healing_draught", 0.2),
+    ],
+    "censer_horror": [
+        LootEntry("fireward_elixir", 0.22),
+        LootEntry("scroll_guardian_light", 0.2),
+        LootEntry("forgehand_gauntlets_uncommon", 0.1),
+        LootEntry("shield_uncommon", 0.1),
+        LootEntry("resonance_tonic", 0.16),
+    ],
+    "memory_taker_adept": [
+        LootEntry("dust_of_disappearance", 0.12),
+        LootEntry("thoughtward_draught", 0.12),
+        LootEntry("dagger_uncommon", 0.14),
+        LootEntry("studded_leather_uncommon", 0.12),
+        LootEntry("scroll_clarity", 0.2),
+        LootEntry("moonmint_drops", 0.45),
+    ],
+    "obelisk_chorister": [
+        LootEntry("resonance_tonic", 0.28),
+        LootEntry("choirward_amulet_rare", 0.12),
+        LootEntry("choirward_amulet_uncommon", 0.14),
+        LootEntry("scroll_clarity", 0.28),
+        LootEntry("scroll_lesser_restoration", 0.16),
+        LootEntry("dagger_uncommon", 0.1),
+    ],
+    "blacklake_adjudicator": [
+        LootEntry("sigil_anchor_ring_rare", 0.1),
+        LootEntry("shield_rare", 0.08),
+        LootEntry("chain_mail_uncommon", 0.14),
+        LootEntry("scroll_guardian_light", 0.2),
+        LootEntry("fireward_elixir", 0.2),
+    ],
+    "forge_echo_stalker": [
+        LootEntry("thoughtward_draught", 0.18),
+        LootEntry("resonance_tonic", 0.22),
+        LootEntry("dust_of_disappearance", 0.12),
+        LootEntry("delver_lantern_hood_uncommon", 0.08),
+        LootEntry("mushroom_broth_flask", 0.45),
+    ],
+    "covenant_breaker_wight": [
+        LootEntry("superior_healing_elixir", 0.45),
+        LootEntry("chain_mail_rare", 0.14),
+        LootEntry("sigil_anchor_ring_rare", 0.12),
+        LootEntry("scroll_guardian_light", 0.22),
+        LootEntry("resonance_tonic", 0.22),
+    ],
+    "hollowed_survey_titan": [
+        LootEntry("breastplate_rare", 0.16),
+        LootEntry("forgehand_gauntlets_rare", 0.1),
+        LootEntry("scroll_arcane_refresh", 0.18),
+        LootEntry("fireward_elixir", 0.18),
+        LootEntry("miners_ration_tin", 0.8, 1, 3),
     ],
 }
 
@@ -1298,12 +2159,49 @@ STARTER_ARMOR_IDS = {
 }
 
 
+def resolve_item_id(item_id: str | None) -> str | None:
+    if item_id is None:
+        return None
+    token = str(item_id).strip()
+    if not token:
+        return token
+    token = ITEM_ID_ALIASES.get(token, token)
+    upper = token.upper()
+    if upper in ITEMS_BY_CATALOG_ID:
+        return upper
+    item = ITEMS_BY_LEGACY_ID.get(token)
+    if item is not None:
+        return item.item_id
+    return token
+
+
+def canonicalize_item_mapping(mapping: dict[str, int] | None) -> CanonicalItemIdDict:
+    if isinstance(mapping, CanonicalItemIdDict):
+        return mapping
+    normalized = CanonicalItemIdDict()
+    for raw_key, raw_value in dict(mapping or {}).items():
+        try:
+            quantity = int(raw_value)
+        except (TypeError, ValueError):
+            continue
+        if quantity == 0:
+            continue
+        key = raw_key if not isinstance(raw_key, str) else resolve_item_id(raw_key)
+        if isinstance(key, str):
+            normalized[key] = normalized.get(key, 0) + quantity
+    return normalized
+
+
 def get_item(item_id: str) -> Item:
-    return ITEMS[item_id]
+    return ITEMS[resolve_item_id(item_id) or item_id]
+
+
+def get_item_by_catalog_id(catalog_id: str) -> Item:
+    return ITEMS_BY_CATALOG_ID[(resolve_item_id(catalog_id) or catalog_id).upper()]
 
 
 def initial_merchant_stock(merchant_id: str, *, rng: random.Random | None = None) -> dict[str, int]:
-    stock = dict(MERCHANT_STOCKS.get(merchant_id, {}))
+    stock = canonicalize_item_mapping(MERCHANT_STOCKS.get(merchant_id, {}))
     if rng is not None:
         for item_id, quantity, chance in RARE_MERCHANT_OFFERS.get(merchant_id, []):
             if rng.random() <= chance:
@@ -1312,7 +2210,7 @@ def initial_merchant_stock(merchant_id: str, *, rng: random.Random | None = None
 
 
 def inventory_supply_points(inventory: dict[str, int]) -> int:
-    return sum(ITEMS[item_id].supply_points * quantity for item_id, quantity in inventory.items() if item_id in ITEMS)
+    return sum(get_item(item_id).supply_points * quantity for item_id, quantity in inventory.items() if item_id in ITEMS)
 
 
 def roll_loot_for_enemy(enemy: Character, rng: random.Random) -> dict[str, int]:
@@ -1320,7 +2218,8 @@ def roll_loot_for_enemy(enemy: Character, rng: random.Random) -> dict[str, int]:
     for entry in LOOT_TABLES.get(enemy.archetype, []):
         if rng.random() <= entry.chance:
             quantity = rng.randint(entry.minimum, entry.maximum)
-            drops[entry.item_id] = drops.get(entry.item_id, 0) + quantity
+            item_id = resolve_item_id(entry.item_id) or entry.item_id
+            drops[item_id] = drops.get(item_id, 0) + quantity
     return drops
 
 
@@ -1330,7 +2229,7 @@ def ability_label_for_weapon(item: Item) -> str:
     if item.weapon.ability == "FINESSE" or item.weapon.finesse:
         return "Str or Dex"
     if item.weapon.ability == "SPELL":
-        return "Spellcasting ability"
+        return "Channeling ability"
     return item.weapon.ability.title()
 
 
@@ -1343,47 +2242,59 @@ def item_rules_text(item: Item) -> str:
         if item.range_text:
             damage_text += f", range {item.range_text}"
         rules.append(damage_text)
-        rules.append(f"attack stat {ability_label_for_weapon(item)}")
+        rules.append(f"strike stat {ability_label_for_weapon(item)}")
         if item.weapon.to_hit_bonus or item.weapon.damage_bonus:
-            rules.append(f"magic +{item.weapon.to_hit_bonus} hit / +{item.weapon.damage_bonus} damage")
+            rules.append(f"tuned +{item.weapon.to_hit_bonus} strike / +{item.weapon.damage_bonus} damage")
     if item.armor is not None:
-        armor_bits = [f"Defense {item.armor.base_ac}"]
+        defense = item.armor.defense_percent
+        if defense is None:
+            defense = max(0, (item.armor.base_ac - 10) * 5)
+        armor_bits = [f"Defense {defense}%"]
+        if item.armor.defense_cap_percent:
+            armor_bits.append(f"cap {item.armor.defense_cap_percent}%")
         if item.armor.dex_cap is None and item.item_type != "clothing":
             armor_bits.append("full Dex")
         elif item.armor.dex_cap is not None:
             armor_bits.append(f"Dex cap +{item.armor.dex_cap}")
         if item.armor.stealth_disadvantage:
-            armor_bits.append("Stealth disadvantage")
+            armor_bits.append("Stealth strain")
         rules.append(", ".join(armor_bits))
-    if item.shield_bonus:
-        rules.append(f"+{item.shield_bonus} Defense")
-    if item.ac_bonus:
-        rules.append(f"Defense +{item.ac_bonus}")
+    if item.shield_defense_percent:
+        shield_text = f"shield Defense +{item.shield_defense_percent}%"
+        if item.raised_shield_defense_percent:
+            shield_text += f", raised +{item.raised_shield_defense_percent}%"
+        rules.append(shield_text)
+    if item.shield_bonus and not item.shield_defense_percent:
+        rules.append(f"legacy shield AC +{item.shield_bonus}")
+    if item.defense_percent:
+        rules.append(f"Defense +{item.defense_percent}%")
+    elif item.ac_bonus:
+        rules.append(f"Defense +{item.ac_bonus * 5}%")
     if item.heal_dice is not None:
-        rules.append(f"heals {item.heal_dice}+{item.heal_bonus}")
+        rules.append(f"restores {item.heal_dice}+{item.heal_bonus}")
     if item.revive_hp:
         if item.revive_dead:
-            rules.append(f"resurrects a dead ally at {item.revive_hp} HP when used at camp")
+            rules.append(f"restores a dead ally to {item.revive_hp} HP when used at camp")
         else:
             rules.append(f"revives at {item.revive_hp} HP")
     if item.temp_hp:
         rules.append(f"{item.temp_hp} temp HP")
     if item.spell_slot_restore:
-        rules.append(f"restores {item.spell_slot_restore} spell slot")
+        rules.append(f"restores {item.spell_slot_restore * 4} MP")
     if item.skill_bonuses:
         rules.append("skills " + ", ".join(f"{name} +{value}" for name, value in item.skill_bonuses.items()))
     if item.save_bonuses:
-        rules.append("saves " + ", ".join(f"{name.replace('_', ' ')} +{value}" for name, value in item.save_bonuses.items()))
+        rules.append("resist checks " + ", ".join(f"{save_bonus_label(name)} +{value}" for name, value in item.save_bonuses.items()))
     if item.attack_bonus:
-        rules.append(f"attack +{item.attack_bonus}")
+        rules.append(f"strike +{item.attack_bonus}")
     if item.damage_bonus:
         rules.append(f"damage +{item.damage_bonus}")
     if item.initiative_bonus:
         rules.append(f"initiative +{item.initiative_bonus}")
     if item.spell_attack_bonus:
-        rules.append(f"spell attack +{item.spell_attack_bonus}")
+        rules.append(f"channeling strike +{item.spell_attack_bonus}")
     if item.spell_damage_bonus:
-        rules.append(f"spell damage +{item.spell_damage_bonus}")
+        rules.append(f"channeling damage +{item.spell_damage_bonus}")
     if item.healing_bonus:
         rules.append(f"received healing +{item.healing_bonus}")
     if item.enchantment:
@@ -1397,11 +2308,11 @@ def item_rules_text(item: Item) -> str:
     if item.crit_immunity:
         rules.append("critical hits become normal hits")
     if item.stealth_advantage:
-        rules.append("advantage on Stealth")
+        rules.append("edge on Stealth")
     if item.clear_conditions:
-        rules.append("clears " + ", ".join(condition.replace("_", " ") for condition in item.clear_conditions))
+        rules.append("clears " + ", ".join(condition_label(condition) for condition in item.clear_conditions))
     if item.apply_conditions:
-        applied = ", ".join(f"{condition.replace('_', ' ')} {duration}r" for condition, duration in item.apply_conditions.items())
+        applied = ", ".join(f"{condition_label(condition)} {duration}r" for condition, duration in item.apply_conditions.items())
         rules.append("applies " + applied)
     if item.notes:
         rules.extend(item.notes)
@@ -1409,13 +2320,13 @@ def item_rules_text(item: Item) -> str:
 
 
 def format_inventory_line(item_id: str, quantity: int) -> str:
-    item = ITEMS[item_id]
+    item = get_item(item_id)
     item_name = colorize(item.name, rarity_color(item.rarity))
     rarity_title = colorize(item.rarity_title, rarity_color(item.rarity))
     rules = item_rules_text(item)
     return (
         f"{item_name} x{quantity} [{rarity_title}] "
-        f"({item.category}/{item.item_type}, {item.supply_label()}, {item.value} gp each) "
+        f"({item_category_label(item.category)}/{item_type_label(item.item_type)}, {item.supply_label()}, {marks_label(item.value)} each) "
         + (f"- {rules}" if rules else "")
     ).strip()
 
@@ -1448,7 +2359,12 @@ def write_item_catalog(destination: Path) -> None:
         "",
         f"Total items: {len(ITEMS)}",
         "",
-        "Each entry lists rarity, category, combat rules, supply value, and where it is obtained.",
+        "Catalog ID prefixes: "
+        + ", ".join(f"`{prefix}` = {description}" for prefix, description in CATALOG_ID_PREFIX_DESCRIPTIONS)
+        + ".",
+        "Four-digit counters run from `0000` through `9999` within each prefix.",
+        "",
+        "Each entry lists catalog ID, internal item key, rarity, player-facing category, combat rules, supply value, and where it is obtained.",
         "",
     ]
     for rarity in RARITY_ORDER:
@@ -1457,10 +2373,10 @@ def write_item_catalog(destination: Path) -> None:
         rarity_items = [item for item in ITEMS.values() if item.rarity == rarity]
         rarity_items.sort(key=lambda item: (item.category, item.name))
         for item in rarity_items:
-            rules = item_rules_text(item) or "No special combat rules."
+            rules = item_rules_text(item) or "No special field rules."
             lines.append(
-                f"- **{item.name}** (`{item.item_id}`) [{item.category}] "
-                f"{item.supply_label()}, {item.value} gp, type `{item.item_type}`. "
+                f"- **{item.name}** (`{item.item_id}`, legacy key `{item.legacy_id}`) [{item_category_label(item.category)}] "
+                f"{item.supply_label()}, {marks_label(item.value)}, type `{item_type_label(item.item_type)}`. "
                 f"{item.description} Rules: {rules}. Obtain from: {item.source}"
             )
         lines.append("")

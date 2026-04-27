@@ -1,17 +1,81 @@
 from __future__ import annotations
 
+from datetime import datetime
 import json
 from pathlib import Path
 import re
+import shutil
+import sys
 import textwrap
 import time
 
+try:
+    import msvcrt
+except ImportError:  # pragma: no cover - Windows-only keyboard support
+    msvcrt = None
+
+from ..data.id_aliases import runtime_scene_id
+from ..data.story.public_terms import marks_label, skill_option_label
 from ..models import GameState
-from ..ui.colors import ANSI_RE, colorize, rarity_color
+from ..ui.colors import ANSI_RE, colorize, rarity_color, rich_style_name, strip_ansi
+from ..ui.rich_render import Columns, Console, Group, Live, Panel, RICH_AVAILABLE, Table, Text, box, render_rich_lines, text_from_ansi
 from .constants import MENU_PAGE_SIZE
 
 
 class GameIOMixin:
+    COMMAND_SHELF_COMMANDS = ("map", "journal", "party", "inventory", "camp", "save", "settings")
+
+    def stdio_is_interactive(self) -> bool:
+        try:
+            stdin_ready = not hasattr(sys.stdin, "isatty") or sys.stdin.isatty()
+            stdout_ready = not hasattr(sys.stdout, "isatty") or sys.stdout.isatty()
+        except Exception:
+            return False
+        return bool(stdin_ready and stdout_ready)
+
+    def presentation_output_is_interactive(self) -> bool:
+        return bool(getattr(self, "_interactive_output", False) and self.stdio_is_interactive())
+
+    def output_supports_unicode(self) -> bool:
+        if bool(getattr(self, "_plain_output", False)):
+            return False
+        if self.output_fn is not print:
+            return True
+        encoding = getattr(sys.stdout, "encoding", None) or "utf-8"
+        try:
+            "┌─│└█".encode(encoding)
+        except (LookupError, UnicodeEncodeError):
+            return False
+        return True
+
+    def can_emit_rich_output(self) -> bool:
+        return bool(
+            self.rich_enabled()
+            and not getattr(self, "_presentation_forced_off", False)
+            and self.output_supports_unicode()
+        )
+
+    def command_shelf_commands(self) -> tuple[str, ...]:
+        has_state = self.state is not None
+        in_combat = bool(getattr(self, "_in_combat", False))
+        commands: list[str] = []
+        if has_state and not in_combat:
+            commands.append("map")
+        if has_state:
+            commands.extend(["journal", "party", "inventory"])
+        if has_state and not in_combat:
+            commands.append("camp")
+        if has_state:
+            commands.append("save")
+        commands.append("settings")
+        return tuple(commands)
+
+    def command_shelf_text(self) -> str:
+        return "Commands: " + " | ".join(self.command_shelf_commands())
+
+    def render_command_shelf(self, *, allow_meta: bool = True) -> None:
+        self.output_fn(self.style_text(self.command_shelf_text(), "light_aqua"))
+
     def style_text(self, text: object, color: str) -> str:
         return colorize(text, color)
 
@@ -22,7 +86,7 @@ class GameIOMixin:
         return self.style_text(amount, "light_green")
 
     def style_skill_label(self, skill: str) -> str:
-        return self.style_text(skill, "light_yellow")
+        return self.style_text(skill_option_label(skill), "light_yellow")
 
     def style_rarity_text(self, text: str, rarity: str) -> str:
         return self.style_text(text, rarity_color(rarity))
@@ -33,12 +97,13 @@ class GameIOMixin:
         name = subject.name
         if self.state is not None and subject is self.state.player:
             return self.style_text(name, "aqua")
+        public_name = self.public_character_name(name) if hasattr(self, "public_character_name") else name
         tags = set(getattr(subject, "tags", []))
         if "enemy" in tags:
-            return self.style_text(name, "light_red")
+            return self.style_text(public_name, "light_red")
         if getattr(subject, "companion_id", "") or "companion" in tags:
-            return self.style_text(name, "light_aqua")
-        return name
+            return self.style_text(public_name, "light_aqua")
+        return public_name
 
     def format_option_text(self, option: str) -> str:
         match = re.match(r"^(\[[^\]]+\])(\s*)(.*)$", option)
@@ -47,12 +112,383 @@ class GameIOMixin:
         tag, spacing, rest = match.groups()
         return f"{self.style_text(tag, 'light_yellow')}{spacing}{rest}"
 
+    def rich_enabled(self) -> bool:
+        return RICH_AVAILABLE and all(component is not None for component in (Group, Panel, Text, box))
+
+    def should_use_rich_ui(self) -> bool:
+        return self.can_emit_rich_output() and bool(getattr(self, "_interactive_output", False))
+
+    def rich_console_width(self) -> int:
+        fallback = 108 if getattr(self, "_interactive_output", False) else 100
+        try:
+            return max(88, min(shutil.get_terminal_size((fallback, 30)).columns, 132))
+        except OSError:
+            return fallback
+
+    def detected_terminal_width(self) -> int:
+        fallback = 108 if getattr(self, "_interactive_output", False) else 100
+        try:
+            return max(1, shutil.get_terminal_size((fallback, 30)).columns)
+        except OSError:
+            return fallback
+
+    def terminal_render_width(self, requested_width: int | None = None) -> int:
+        requested = self.rich_console_width() if requested_width is None else requested_width
+        try:
+            requested = int(requested)
+        except (TypeError, ValueError):
+            requested = self.rich_console_width()
+        terminal_width = self.detected_terminal_width()
+        if terminal_width > 1:
+            terminal_width -= 1
+        return max(1, min(max(1, requested), terminal_width))
+
+    def safe_rich_render_width(self) -> int:
+        return self.terminal_render_width(self.rich_console_width())
+
+    def plain_text_wrap_width(self) -> int:
+        terminal_width = self.detected_terminal_width()
+        if terminal_width > 1:
+            terminal_width -= 1
+        return max(1, min(88, terminal_width))
+
+    def wrap_plain_paragraph(self, text: str) -> str:
+        return textwrap.fill(
+            text,
+            width=self.plain_text_wrap_width(),
+            break_long_words=False,
+            break_on_hyphens=False,
+        )
+
+    def dialogue_terminal_lines(self, speaker_name: str, text: str) -> list[str]:
+        prefix = f'{speaker_name}: "'
+        wrap_width = self.plain_text_wrap_width()
+        prefix_width = len(strip_ansi(prefix))
+        body_width = max(1, wrap_width - prefix_width - 1)
+        body_lines = textwrap.wrap(
+            text,
+            width=body_width,
+            break_long_words=False,
+            break_on_hyphens=False,
+        ) or [""]
+        indent = " " * min(prefix_width, max(0, wrap_width - 1))
+        lines = [f"{prefix}{body_lines[0]}", *(f"{indent}{line}" for line in body_lines[1:])]
+        lines[-1] = f'{lines[-1]}"'
+        return lines
+
+    def emit_rich(self, renderable, *, width: int | None = None) -> bool:
+        if not self.can_emit_rich_output():
+            return False
+        render_width = self.terminal_render_width(width)
+        rendered_lines = render_rich_lines(
+            renderable,
+            width=render_width,
+            force_terminal=getattr(self, "_interactive_output", False),
+        )
+        if not rendered_lines:
+            return False
+        for line in rendered_lines:
+            self.output_fn(line)
+        return True
+
+    def rich_panel_row_renderable(
+        self,
+        panels: list[object],
+        *,
+        ratios: list[int] | None = None,
+        padding: tuple[int, int] = (0, 1),
+    ):
+        if not panels or Table is None:
+            return None
+        resolved_ratios = ratios or [1] * len(panels)
+        if len(resolved_ratios) != len(panels):
+            raise ValueError("Panel ratios must match the number of panels.")
+        row = Table.grid(expand=True, padding=padding)
+        for ratio in resolved_ratios:
+            row.add_column(ratio=ratio, vertical="top")
+        row.add_row(*panels)
+        return row
+
+    def emit_rich_panel_row(
+        self,
+        panels: list[object],
+        *,
+        ratios: list[int] | None = None,
+        width: int | None = None,
+        padding: tuple[int, int] = (0, 1),
+    ) -> bool:
+        renderable = self.rich_panel_row_renderable(panels, ratios=ratios, padding=padding)
+        if renderable is None:
+            return False
+        return self.emit_rich(renderable, width=width or self.safe_rich_render_width())
+
+    def begin_keyboard_choice_session(self) -> bool:
+        show_instructions = not bool(getattr(self, "_keyboard_choice_instructions_seen", False))
+        self._keyboard_choice_instructions_seen = True
+        return show_instructions
+
+    def keyboard_choice_menu_width(self) -> int:
+        return self.terminal_render_width(min(120, self.rich_console_width()))
+
+    def keyboard_choice_key_ready(self) -> bool:
+        reader = getattr(self, "read_keyboard_choice_key")
+        if getattr(reader, "__func__", None) is not GameIOMixin.read_keyboard_choice_key:
+            return True
+        if msvcrt is None or not self.stdio_is_interactive():
+            return False
+        try:
+            return bool(msvcrt.kbhit())
+        except Exception:
+            return False
+
+    def refresh_keyboard_choice_live_if_resized(self, live, console, renderable_factory, width_factory) -> bool:
+        next_width = width_factory()
+        try:
+            current_width = int(console.width)
+        except (TypeError, ValueError):
+            current_width = next_width
+        if next_width == current_width:
+            return False
+        live_render = getattr(live, "_live_render", None)
+        previous_shape = getattr(live_render, "_shape", None)
+        if live_render is not None and previous_shape is not None:
+            previous_width, previous_height = previous_shape
+            previous_width = max(1, int(max(previous_width, current_width, next_width)))
+            previous_height = max(1, int(previous_height))
+            narrow_width = max(1, min(current_width, next_width))
+            reflow_factor = max(1, (previous_width + narrow_width - 1) // narrow_width)
+            live_render._shape = (max(1, next_width), previous_height * reflow_factor)
+        console.width = next_width
+        return True
+
+    def read_keyboard_choice_key_with_resize_poll(self, live, console, renderable_factory, width_factory) -> tuple[str, str | None]:
+        while True:
+            if self.refresh_keyboard_choice_live_if_resized(live, console, renderable_factory, width_factory):
+                return ("resize", None)
+            if self.keyboard_choice_key_ready():
+                return self.read_keyboard_choice_key()
+            time.sleep(float(getattr(self, "_keyboard_choice_resize_poll_seconds", 0.05)))
+
+    def rich_text(self, text: object, color: str | None = None, *, bold: bool = False, dim: bool = False):
+        content = strip_ansi(str(text))
+        if not self.rich_enabled():
+            return content
+        style_bits: list[str] = []
+        if color is not None:
+            style_bits.append(rich_style_name(color))
+        if bold:
+            style_bits.append("bold")
+        if dim:
+            style_bits.append("dim")
+        style = " ".join(style_bits) or None
+        return Text(content, style=style)
+
+    def rich_from_ansi(self, text: str):
+        if not self.rich_enabled():
+            return strip_ansi(text)
+        return text_from_ansi(text)
+
+    def rich_title_screen_enabled(self) -> bool:
+        return self.can_emit_rich_output() and Columns is not None and Table is not None
+
+    def title_screen_save_summary(self) -> tuple[str, str]:
+        saves = self.loadable_save_paths()
+        if not saves:
+            return ("No save files yet", "Forge a new hero to create your first journal entry.")
+        save_label = "save" if len(saves) == 1 else "saves"
+        return (f"{len(saves)} {save_label} available", f"Latest: {self.save_display_label(saves[0])}")
+
+    def title_screen_audio_summary(self) -> str:
+        sound_label = "On" if getattr(self, "sound_effects_enabled", False) else "Off"
+        music_ready = bool(getattr(self, "_music_assets_ready", False))
+        if not music_ready:
+            music_label = "Unavailable"
+        else:
+            music_label = "On" if getattr(self, "music_enabled", False) else "Off"
+        return f"SFX {sound_label} | Music {music_label}"
+
+    def title_screen_presentation_summary(self) -> str:
+        presentation = "On" if getattr(self, "_animations_and_delays_preference", False) else "Off"
+        dice_mode_label = (
+            self.dice_animation_mode_label()
+            if callable(getattr(self, "dice_animation_mode_label", None))
+            else ("On" if getattr(self, "_dice_animations_preference", False) else "Off")
+        )
+        typed = "On" if getattr(self, "_typed_dialogue_preference", getattr(self, "type_dialogue", False)) else "Off"
+        return f"Animations {presentation} | Dice {dice_mode_label} | Typed text {typed}"
+
+    def title_screen_campaign_summary(self) -> str:
+        return "Acts I and II are playable now, with later acts scaffolded for expansion."
+
+    def build_title_screen_header_panel(self, title: str, subtitle: str, intro_text: str):
+        header = Text(justify="center")
+        header.append(f"{title}\n", style="bold bright_yellow")
+        header.append(f"{subtitle}\n", style="bold bright_cyan")
+        header.append("Frontier roads. Hard bargains. Consequences that travel.\n", style="white")
+        header.append(intro_text, style="dim")
+        return Panel(
+            header,
+            border_style=rich_style_name("light_yellow"),
+            box=box.DOUBLE,
+            padding=(1, 2),
+            title=self.rich_text("Aethrune", "light_yellow", bold=True),
+        )
+
+    def build_title_screen_status_panel(
+        self,
+        *,
+        campaign_summary: str,
+        save_summary: str,
+        save_detail: str,
+    ):
+        status_table = Table.grid(expand=True, padding=(0, 1))
+        status_table.add_column(style="bold bright_yellow", ratio=1)
+        status_table.add_column(ratio=3)
+        status_table.add_row("Campaign", campaign_summary)
+        status_table.add_row("Saves", save_summary)
+        status_table.add_row("", save_detail)
+        status_table.add_row("Audio", self.title_screen_audio_summary())
+        status_table.add_row("Presentation", self.title_screen_presentation_summary())
+        return Panel(
+            status_table,
+            title=self.rich_text("Campaign Ledger", "light_aqua", bold=True),
+            border_style=rich_style_name("light_aqua"),
+            box=box.ROUNDED,
+            padding=(0, 1),
+        )
+
+    def build_title_screen_options_panel(
+        self,
+        options: list[str],
+        option_details: dict[str, str],
+    ):
+        options_table = Table.grid(expand=True, padding=(0, 1))
+        options_table.add_column(style="bold bright_yellow", width=3)
+        options_table.add_column(style="bold")
+        options_table.add_column(style="dim", ratio=1)
+        for index, option in enumerate(options, start=1):
+            options_table.add_row(f"{index}.", strip_ansi(option), option_details.get(option, ""))
+        return Panel(
+            options_table,
+            title=self.rich_text("What Would You Like To Do?", "light_green", bold=True),
+            border_style=rich_style_name("light_green"),
+            box=box.ROUNDED,
+            padding=(0, 1),
+        )
+
+    def build_title_screen_menu_body(self, status_panel, options_panel, *, render_width: int):
+        if render_width >= 108:
+            return Columns([status_panel, options_panel], expand=True, equal=False)
+        return Group(status_panel, options_panel)
+
+    def render_title_screen_plain(
+        self,
+        *,
+        title: str,
+        subtitle: str,
+        intro_text: str,
+        options: list[str],
+        campaign_summary: str,
+        save_summary: str,
+        save_detail: str,
+    ) -> None:
+        self.output_fn(f"=== {title} ===")
+        self.output_fn(subtitle)
+        self.say("Frontier roads. Hard bargains. Consequences that travel.")
+        self.say(intro_text)
+        self.say(f"Campaign: {campaign_summary}")
+        self.say(f"Saves: {save_summary}")
+        self.say(save_detail)
+        self.say(f"Audio: {self.title_screen_audio_summary()}")
+        self.say(f"Presentation: {self.title_screen_presentation_summary()}")
+        self.output_fn("")
+        self.say("What would you like to do?")
+        self.render_choice_options(options, staggered=False)
+
+    def render_title_screen(
+        self,
+        title: str,
+        subtitle: str,
+        intro_text: str,
+        options: list[str],
+        option_details: dict[str, str] | None = None,
+    ) -> None:
+        option_details = option_details or {}
+        self.output_fn("")
+        save_summary, save_detail = self.title_screen_save_summary()
+        campaign_summary = self.title_screen_campaign_summary()
+
+        if self.rich_title_screen_enabled():
+            render_width = self.safe_rich_render_width()
+            rendered = self.emit_rich(
+                Group(
+                    self.build_title_screen_header_panel(title, subtitle, intro_text),
+                    self.build_title_screen_menu_body(
+                        self.build_title_screen_status_panel(
+                            campaign_summary=campaign_summary,
+                            save_summary=save_summary,
+                            save_detail=save_detail,
+                        ),
+                        self.build_title_screen_options_panel(options, option_details),
+                        render_width=render_width,
+                    ),
+                ),
+                width=render_width,
+            )
+            if rendered:
+                return
+
+        self.render_title_screen_plain(
+            title=title,
+            subtitle=subtitle,
+            intro_text=intro_text,
+            options=options,
+            campaign_summary=campaign_summary,
+            save_summary=save_summary,
+            save_detail=save_detail,
+        )
+
+    def choose_title_menu(
+        self,
+        title: str,
+        subtitle: str,
+        intro_text: str,
+        options: list[str],
+        *,
+        option_details: dict[str, str] | None = None,
+    ) -> int:
+        while True:
+            raw = self.read_resize_aware_input(
+                lambda: self.render_title_screen(title, subtitle, intro_text, options, option_details),
+                prompt="> ",
+            ).strip()
+            lowered = raw.lower()
+            if lowered == "quit":
+                if self.confirm("Quit the program and close the main menu?"):
+                    from .base import QuitProgram
+
+                    raise QuitProgram()
+                self.say("You remain at the main menu.")
+                continue
+            if lowered in {"load", "saves", "save files"}:
+                if self.open_save_files_menu():
+                    from .base import ResumeLoadedGame
+
+                    raise ResumeLoadedGame()
+                continue
+            if raw.isdigit():
+                value = int(raw)
+                if 1 <= value <= len(options):
+                    return value
+            self.say("Please enter a listed number.")
+
     def choose(
         self,
         prompt: str,
         options: list[str],
         *,
         allow_meta: bool = True,
+        show_hud: bool = True,
         sticky_trailing_options: int = 0,
     ) -> int:
         clear_pending_story_check_choice_attempt = getattr(self, "clear_pending_story_check_choice_attempt", None)
@@ -63,6 +499,7 @@ class GameIOMixin:
             options,
             allow_meta=allow_meta,
             staggered=False,
+            show_hud=show_hud,
             sticky_trailing_options=sticky_trailing_options,
         )
 
@@ -72,8 +509,13 @@ class GameIOMixin:
         options: list[str],
         *,
         allow_meta: bool = True,
+        show_hud: bool = True,
         sticky_trailing_options: int = 0,
+        echo_selection: bool = False,
     ) -> int:
+        clear_pending_scaled_check_reward = getattr(self, "clear_pending_scaled_check_reward", None)
+        if callable(clear_pending_scaled_check_reward):
+            clear_pending_scaled_check_reward()
         clear_pending_story_check_choice_attempt = getattr(self, "clear_pending_story_check_choice_attempt", None)
         if callable(clear_pending_story_check_choice_attempt):
             clear_pending_story_check_choice_attempt()
@@ -93,13 +535,339 @@ class GameIOMixin:
             visible_options,
             allow_meta=allow_meta,
             staggered=True,
+            show_hud=show_hud,
             sticky_trailing_options=sticky_trailing_options,
         )
         original_index, selected_option = indexed_options[choice - 1]
+        if echo_selection:
+            player_choice_output = getattr(self, "player_choice_output", None)
+            if callable(player_choice_output):
+                player_choice_output(selected_option)
         queue_story_check_choice_attempt = getattr(self, "queue_story_check_choice_attempt", None)
         if callable(queue_story_check_choice_attempt):
             queue_story_check_choice_attempt(prompt, selected_option)
         return original_index
+
+    def keyboard_choice_menu_supported(self) -> bool:
+        if not self.should_use_rich_ui():
+            return False
+        if Console is None or Live is None or msvcrt is None:
+            return False
+        try:
+            stdin_ready = not hasattr(sys.stdin, "isatty") or sys.stdin.isatty()
+            stdout_ready = not hasattr(sys.stdout, "isatty") or sys.stdout.isatty()
+        except Exception:
+            return False
+        return bool(stdin_ready and stdout_ready)
+
+    def should_use_keyboard_choice_menu(self) -> bool:
+        return self.keyboard_choice_menu_supported()
+
+    def resize_aware_input_supported(self) -> bool:
+        return bool(getattr(self, "_interactive_output", False) and self.stdio_is_interactive() and msvcrt is not None)
+
+    def clear_interactive_screen(self, *, clear_scrollback: bool = False) -> None:
+        if self.output_fn is print:
+            scrollback_sequence = "\x1b[3J" if clear_scrollback else ""
+            print(f"\x1b[2J{scrollback_sequence}\x1b[H", end="", flush=True)
+
+    def output_interactive_prompt(self, prompt: str) -> None:
+        if self.output_fn is print:
+            print(prompt, end="", flush=True)
+        else:
+            self.output_fn(prompt)
+
+    def read_resize_aware_input(self, render_screen, *, prompt: str = "> ") -> str:
+        if not self.resize_aware_input_supported():
+            render_screen()
+            return self.read_input(prompt)
+
+        typed_buffer = ""
+        last_width = self.safe_rich_render_width()
+        pending_width: int | None = None
+        pending_render_at: float | None = None
+        debounce_seconds = max(0.0, float(getattr(self, "_resize_aware_input_debounce_seconds", 0.08)))
+
+        def render(*, clear: bool, clear_scrollback: bool = False) -> None:
+            if clear:
+                self.clear_interactive_screen(clear_scrollback=clear_scrollback)
+            render_screen()
+            cursor = "_" if typed_buffer else ""
+            self.output_interactive_prompt(f"{prompt}{typed_buffer}{cursor}")
+
+        render(clear=False)
+        while True:
+            width = self.safe_rich_render_width()
+            if width != last_width:
+                pending_width = width
+                pending_render_at = time.monotonic() + debounce_seconds
+            if pending_render_at is not None and time.monotonic() >= pending_render_at:
+                last_width = pending_width or width
+                pending_width = None
+                pending_render_at = None
+                render(clear=True, clear_scrollback=True)
+            if self.keyboard_choice_key_ready():
+                action, payload = self.read_keyboard_choice_key()
+                if action == "enter":
+                    self.output_fn("")
+                    return typed_buffer
+                if action == "backspace":
+                    typed_buffer = typed_buffer[:-1]
+                    render(clear=True)
+                elif action == "escape":
+                    typed_buffer = ""
+                    render(clear=True)
+                elif action == "char" and payload is not None:
+                    typed_buffer += payload
+                    render(clear=True)
+                continue
+            time.sleep(float(getattr(self, "_keyboard_choice_resize_poll_seconds", 0.05)))
+
+    def keyboard_choice_menu_title(self) -> str:
+        if self.state is None:
+            return "Choice Menu"
+        current_scene = str(self.state.current_scene)
+        scene_label = getattr(self, "SCENE_LABELS", {}).get(current_scene)
+        if scene_label:
+            return scene_label
+        return "Choice Menu"
+
+    def build_keyboard_choice_menu(
+        self,
+        prompt: str,
+        options: list[str],
+        *,
+        title: str,
+        selected_index: int,
+        typed_buffer: str,
+        feedback: str | None,
+        show_instructions: bool,
+    ):
+        show_command_shelf = bool(getattr(self, "_keyboard_choice_show_command_shelf", True))
+        prompt_block = Text()
+        if prompt:
+            prompt_block.append(prompt, style="bold bright_white")
+        if show_instructions:
+            if prompt:
+                prompt_block.append("\n", style="dim")
+            prompt_block.append("Arrows move. Enter confirms. ", style="dim")
+            if len(options) <= 9:
+                prompt_block.append("1-9 jumps. ", style="dim")
+            prompt_block.append("Type a number or command. Esc clears.", style="dim")
+
+        option_table = Table.grid(expand=True, padding=(0, 0))
+        option_table.add_column(width=2)
+        option_table.add_column(width=3)
+        option_table.add_column(ratio=1)
+        for index, option in enumerate(options, start=1):
+            active = index - 1 == selected_index
+            marker = self.rich_text("> ", "light_green", bold=True) if active else self.rich_text("  ", dim=True)
+            number = self.rich_text(f"{index}.", "light_yellow" if active else "white", bold=active)
+            label = self.rich_from_ansi(self.format_option_text(option))
+            if Text is not None and isinstance(label, Text) and active:
+                label.stylize("bold")
+            row_style = "on rgb(28,36,46)" if active else None
+            option_table.add_row(marker, number, label, style=row_style)
+
+        if typed_buffer:
+            input_line = self.rich_text(f"> {typed_buffer}_", "light_green", bold=True)
+        else:
+            input_line = self.rich_text("> ", "white")
+
+        footer_items = [input_line]
+        if feedback:
+            footer_items.append(self.rich_text(feedback, "light_red"))
+
+        group_items = []
+        if prompt or show_instructions:
+            group_items.extend([prompt_block, self.rich_text("", dim=True)])
+        group_items.extend([option_table, self.rich_text("", dim=True)])
+        if show_command_shelf:
+            group_items.append(self.rich_text(self.command_shelf_text(), "light_aqua", dim=True))
+        group_items.extend(footer_items)
+
+        return Panel(
+            Group(*group_items),
+            title=self.rich_text(title, "light_yellow", bold=True),
+            subtitle=self.rich_text("Keyboard Choice Menu", "light_aqua", bold=True),
+            border_style=rich_style_name("light_green"),
+            box=box.ROUNDED,
+            padding=(0, 1),
+        )
+
+    def read_keyboard_choice_wchar(self) -> str:
+        assert msvcrt is not None
+        try:
+            key = msvcrt.getwch()
+        except KeyboardInterrupt as exc:
+            self.output_fn("")
+            from .base import GameInterrupted
+
+            raise GameInterrupted() from exc
+        if key == "\x03":
+            self.output_fn("")
+            from .base import GameInterrupted
+
+            raise GameInterrupted()
+        return key
+
+    def read_keyboard_choice_key(self) -> tuple[str, str | None]:
+        assert msvcrt is not None
+        key = self.read_keyboard_choice_wchar()
+        if key in {"\x00", "\xe0"}:
+            extended = self.read_keyboard_choice_wchar()
+            keymap = {
+                "H": "up",
+                "P": "down",
+            }
+            return (keymap.get(extended, "noop"), None)
+        if key == "\r":
+            return ("enter", None)
+        if key == "\x08":
+            return ("backspace", None)
+        if key == "\x1b":
+            return ("escape", None)
+        if key == "\t":
+            return ("down", None)
+        if key.isprintable():
+            return ("char", key)
+        return ("noop", None)
+
+    def build_live_choice_console(self, width: int):
+        return Console(
+            force_terminal=True,
+            color_system="truecolor",
+            legacy_windows=False,
+            highlight=False,
+            width=width,
+        )
+
+    def run_live_keyboard_choice_session(
+        self,
+        *,
+        option_count: int,
+        renderable_builder,
+        width_factory,
+        resolve_selection,
+        live_cls=None,
+        invalid_feedback: str = "Type a listed number, use the arrows, or enter a global command.",
+        allow_meta: bool = True,
+    ):
+        live_cls = Live if live_cls is None else live_cls
+        if option_count <= 0 or Console is None or live_cls is None:
+            return None
+
+        selected_index = 0
+        typed_buffer = ""
+        feedback: str | None = None
+        show_instructions = self.begin_keyboard_choice_session()
+        console = self.build_live_choice_console(width_factory())
+
+        while True:
+            submitted_text: str | None = None
+            resize_requested = False
+            renderable_factory = lambda: renderable_builder(
+                selected_index=selected_index,
+                typed_buffer=typed_buffer,
+                feedback=feedback,
+                show_instructions=show_instructions,
+            )
+            with live_cls(
+                renderable_factory(),
+                console=console,
+                transient=True,
+                auto_refresh=False,
+            ) as live:
+                while True:
+                    action, payload = self.read_keyboard_choice_key_with_resize_poll(
+                        live,
+                        console,
+                        renderable_factory,
+                        width_factory,
+                    )
+                    hide_instructions_after_update = show_instructions
+                    if action == "up":
+                        selected_index = (selected_index - 1) % option_count
+                        feedback = None
+                    elif action == "down":
+                        selected_index = (selected_index + 1) % option_count
+                        feedback = None
+                    elif action == "backspace":
+                        typed_buffer = typed_buffer[:-1]
+                        feedback = None
+                    elif action == "escape":
+                        typed_buffer = ""
+                        feedback = None
+                    elif action == "char" and payload is not None:
+                        if not typed_buffer and option_count <= 9 and payload.isdigit():
+                            value = int(payload)
+                            if 1 <= value <= option_count:
+                                return resolve_selection(value - 1)
+                        typed_buffer += payload
+                        feedback = None
+                    elif action == "enter":
+                        if typed_buffer.strip():
+                            submitted_text = typed_buffer.strip()
+                            typed_buffer = ""
+                            show_instructions = False
+                            break
+                        return resolve_selection(selected_index)
+                    elif action == "resize":
+                        resize_requested = True
+                        break
+                    if hide_instructions_after_update:
+                        show_instructions = False
+                    live.update(renderable_factory(), refresh=True)
+
+            if resize_requested:
+                continue
+            if submitted_text is None:
+                continue
+            if submitted_text.isdigit():
+                value = int(submitted_text)
+                if 1 <= value <= option_count:
+                    return resolve_selection(value - 1)
+            if self.handle_meta_command(submitted_text):
+                feedback = None
+                continue
+            feedback = invalid_feedback
+
+    def run_keyboard_choice_menu(
+        self,
+        prompt: str,
+        options: list[str],
+        *,
+        title: str | None = None,
+        allow_meta: bool = True,
+    ) -> int | None:
+        if not options or not self.should_use_keyboard_choice_menu():
+            return None
+
+        resolved_title = title or self.keyboard_choice_menu_title()
+        sentinel = object()
+        previous_shelf = getattr(self, "_keyboard_choice_show_command_shelf", sentinel)
+        self._keyboard_choice_show_command_shelf = True
+        try:
+            return self.run_live_keyboard_choice_session(
+                option_count=len(options),
+                renderable_builder=lambda **state: self.build_keyboard_choice_menu(
+                    prompt,
+                    options,
+                    title=resolved_title,
+                    **state,
+                ),
+                width_factory=self.keyboard_choice_menu_width,
+                resolve_selection=lambda selected_index: selected_index + 1,
+                allow_meta=allow_meta,
+            )
+        finally:
+            if previous_shelf is sentinel:
+                try:
+                    delattr(self, "_keyboard_choice_show_command_shelf")
+                except AttributeError:
+                    pass
+            else:
+                self._keyboard_choice_show_command_shelf = previous_shelf
 
     def render_choice_options(self, options: list[str], *, staggered: bool) -> None:
         pause = getattr(self, "pause_for_option_reveal", None)
@@ -108,6 +876,128 @@ class GameIOMixin:
             if staggered and index < len(options) and callable(pause):
                 pause()
 
+    def compact_hud_scene_key(self) -> tuple[int, str] | None:
+        if self.state is None or getattr(self, "_in_combat", False):
+            return None
+        return (id(self.state), str(self.state.current_scene))
+
+    def should_render_compact_hud(self) -> bool:
+        return self.compact_hud_scene_key() is not None
+
+    def request_compact_hud(self) -> None:
+        self._compact_hud_requested = True
+
+    def hud_act_label(self) -> str:
+        assert self.state is not None
+        act_labels = getattr(self, "ACT_LABELS", {})
+        return f"Act {act_labels.get(self.state.current_act, self.state.current_act)}"
+
+    def hud_location_label(self) -> str:
+        assert self.state is not None
+        scene_labels = getattr(self, "SCENE_LABELS", {})
+        current_scene = str(self.state.current_scene)
+        return scene_labels.get(current_scene, current_scene.replace("_", " ").title())
+
+    def hud_objective_label(self) -> str:
+        assert self.state is not None
+        refresh_quest_statuses = getattr(self, "refresh_quest_statuses", None)
+        if callable(refresh_quest_statuses):
+            refresh_quest_statuses(announce=False)
+        ready_quests = getattr(self, "quest_entries_by_status", lambda status: [])("ready_to_turn_in")
+        if ready_quests:
+            return f"Turn in {ready_quests[0][0].title}"
+        active_quests = getattr(self, "quest_entries_by_status", lambda status: [])("active")
+        quest_focused_scenes = set(getattr(self, "HUD_QUEST_FOCUSED_SCENES", set()))
+        if self.state.current_scene in quest_focused_scenes and active_quests:
+            return active_quests[0][0].title
+        scene_objectives = getattr(self, "SCENE_OBJECTIVES", {})
+        current_scene = str(self.state.current_scene)
+        if current_scene in scene_objectives:
+            return str(scene_objectives[current_scene])
+        if active_quests:
+            return active_quests[0][0].title
+        return "Press on."
+
+    def hud_short_name(self, member) -> str:
+        name = self.public_character_name(getattr(member, "name", "")) if hasattr(self, "public_character_name") else str(getattr(member, "name", ""))
+        fallback = self.public_character_name(getattr(member, "name", "Party")) if hasattr(self, "public_character_name") else str(getattr(member, "name", "Party"))
+        return name.split()[0] or fallback
+
+    def hud_member_health_text(self, member) -> str:
+        if getattr(member, "dead", False):
+            return self.style_text("DEAD", "light_red")
+        if getattr(member, "current_hp", 0) <= 0:
+            return self.style_text("DOWN", "light_red")
+        health = f"{member.current_hp}/{member.max_hp}"
+        styled = self.style_text(health, self.health_bar_color(member.current_hp, member.max_hp))
+        if getattr(member, "temp_hp", 0):
+            styled += self.style_text(f"+{member.temp_hp}t", "light_aqua")
+        return styled
+
+    def hud_member_magic_text(self, member) -> str:
+        return self.format_member_magic_bar(member, width=6) or ""
+
+    def hud_party_summary(self) -> str:
+        assert self.state is not None
+        summaries: list[str] = []
+        for member in self.state.party_members():
+            magic = self.hud_member_magic_text(member)
+            magic_text = f" {magic}" if magic else ""
+            summaries.append(f"{self.hud_short_name(member)} {self.hud_member_health_text(member)}{magic_text}")
+        return " | ".join(summaries)
+
+    def render_compact_hud(self) -> None:
+        scene_key = self.compact_hud_scene_key()
+        if scene_key is None:
+            return
+        objective = textwrap.shorten(self.hud_objective_label(), width=40, placeholder="...")
+        header_line = (
+            f"{self.style_text(f'[{self.hud_act_label()}]', 'light_yellow')} "
+            f"{self.style_text(self.hud_location_label(), 'light_aqua')} | "
+            f"{self.style_text('Objective:', 'light_yellow')} {objective}"
+        )
+        resources_line = (
+            f"{self.style_text('Resources:', 'light_yellow')} {marks_label(self.state.gold)} | "
+            f"Short rests: {self.state.short_rests_remaining} | "
+            f"Supplies: {self.current_supply_points()}"
+        )
+        party_line = f"{self.style_text('Party:', 'light_yellow')} {self.hud_party_summary()}"
+        if not self.emit_rich(
+            Panel(
+                Group(
+                    self.rich_from_ansi(header_line),
+                    self.rich_from_ansi(resources_line),
+                    self.rich_from_ansi(party_line),
+                ),
+                title=self.rich_text("Travel Ledger", "light_yellow", bold=True),
+                border_style=rich_style_name("light_yellow"),
+                box=box.ROUNDED,
+                padding=(0, 1),
+            )
+        ):
+            self.output_fn(header_line)
+            self.output_fn(resources_line)
+            self.output_fn(party_line)
+        self.output_fn("")
+        self._compact_hud_last_scene_key = scene_key
+
+    def maybe_render_compact_hud(self, *, show_hud: bool) -> bool:
+        if not show_hud:
+            return False
+        if not getattr(self, "_compact_hud_requested", False):
+            return False
+        scene_key = self.compact_hud_scene_key()
+        if scene_key is None:
+            self._compact_hud_requested = False
+            return False
+        self.render_compact_hud()
+        self._compact_hud_requested = False
+        return True
+
+    def replay_prompt_context(self, lines: tuple[str, ...]) -> None:
+        for line in lines:
+            self.output_fn(line)
+
     def choose_with_display_mode(
         self,
         prompt: str,
@@ -115,10 +1005,12 @@ class GameIOMixin:
         *,
         allow_meta: bool = True,
         staggered: bool = False,
+        show_hud: bool = True,
         sticky_trailing_options: int = 0,
     ) -> int:
         if not options:
             raise ValueError("Choice lists must contain at least one option.")
+        prompt_context_lines = tuple(getattr(self, "_latest_narration_lines", ()))
         sticky_count = max(0, min(sticky_trailing_options, len(options) - 1))
         sticky_options = options[-sticky_count:] if sticky_count else []
         paged_options = options[:-sticky_count] if sticky_count else options
@@ -141,8 +1033,25 @@ class GameIOMixin:
                     labels.append("Next page")
                     nav_map[len(labels)] = "next"
                 self.output_fn("")
-                self.say(f"{prompt} (page {page + 1})")
+                if self.maybe_render_compact_hud(show_hud=show_hud) and prompt_context_lines:
+                    self.replay_prompt_context(prompt_context_lines)
+                paged_prompt = f"{prompt} (page {page + 1})" if prompt else f"Page {page + 1}"
+                if self.should_use_keyboard_choice_menu():
+                    selected = self.run_keyboard_choice_menu(paged_prompt, labels)
+                    if selected is None:
+                        continue
+                    if selected in nav_map:
+                        page = page - 1 if nav_map[selected] == "prev" else page + 1
+                        continue
+                    if selected in sticky_map:
+                        return sticky_map[selected]
+                    if 1 <= selected <= len(visible):
+                        return start + selected
+                    self.say("Please enter a listed number.")
+                    continue
+                self.say(paged_prompt)
                 self.render_choice_options(labels, staggered=staggered)
+                self.render_command_shelf()
                 raw = self.read_input("> ").strip()
                 if self.handle_meta_command(raw):
                     continue
@@ -158,8 +1067,17 @@ class GameIOMixin:
                 self.say("Please enter a listed number.")
         while True:
             self.output_fn("")
-            self.say(prompt)
+            if self.maybe_render_compact_hud(show_hud=show_hud) and prompt_context_lines:
+                self.replay_prompt_context(prompt_context_lines)
+            if self.should_use_keyboard_choice_menu():
+                selected = self.run_keyboard_choice_menu(prompt, options)
+                if selected is not None:
+                    return selected
+                continue
+            if prompt:
+                self.say(prompt)
             self.render_choice_options(options, staggered=staggered)
+            self.render_command_shelf()
             raw = self.read_input("> ").strip()
             if self.handle_meta_command(raw):
                 continue
@@ -170,7 +1088,7 @@ class GameIOMixin:
             self.say("Please enter a listed number.")
 
     def confirm(self, prompt: str) -> bool:
-        return self.choose(prompt, ["Yes", "No"], allow_meta=False) == 1
+        return self.choose(prompt, ["Yes", "No"], allow_meta=False, show_hud=False) == 1
 
     def ask_text(self, prompt: str) -> str:
         while True:
@@ -185,24 +1103,30 @@ class GameIOMixin:
     def banner(self, title: str) -> None:
         self.output_fn("")
         self.output_fn(f"=== {title} ===")
+        self.maybe_render_compact_hud(show_hud=True)
 
     def say(self, text: str, *, typed: bool = False) -> None:
         if not text:
             self.output_fn("")
             return
         narrator = getattr(self, "typewrite_narration", None)
+        rendered_lines: list[str] = []
         for paragraph in text.split("\n"):
             if not paragraph.strip():
                 self.output_fn("")
                 continue
             if ANSI_RE.search(paragraph):
                 self.output_fn(paragraph)
+                rendered_lines.append(paragraph)
                 continue
-            wrapped = textwrap.fill(paragraph, width=88)
+            wrapped = self.wrap_plain_paragraph(paragraph)
             if typed and callable(narrator) and getattr(self, "type_dialogue", False):
                 narrator(wrapped)
             else:
                 self.output_fn(wrapped)
+            rendered_lines.append(wrapped)
+        if rendered_lines:
+            self._latest_narration_lines = rendered_lines
 
     def inline_save(self) -> None:
         if self.state is None:
@@ -230,19 +1154,199 @@ class GameIOMixin:
         self.state.playtime_seconds = max(0.0, float(getattr(self.state, "playtime_seconds", 0.0) or 0.0) + elapsed)
         self._playtime_checkpoint = now
 
+    def format_playtime(self, seconds: object) -> str:
+        try:
+            total_seconds = max(0, int(float(seconds)))
+        except (TypeError, ValueError):
+            total_seconds = 0
+        hours, remainder = divmod(total_seconds, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        if hours:
+            return f"{hours}h {minutes:02d}m"
+        if minutes:
+            return f"{minutes}m {seconds:02d}s"
+        return f"{seconds}s"
+
+    def party_level_from_save_data(self, data: dict[str, object]) -> int:
+        companions = data.get("companions", [])
+        members = [data.get("player"), *(companions if isinstance(companions, list) else [])]
+        levels: list[int] = []
+        for member in members:
+            if not isinstance(member, dict):
+                continue
+            try:
+                levels.append(int(member.get("level", 1)))
+            except (TypeError, ValueError):
+                continue
+        return max(levels or [1])
+
+    def scene_label_from_key(self, scene_key: object) -> str:
+        raw_scene = str(scene_key or "")
+        scene_labels = getattr(self, "SCENE_LABELS", {})
+        runtime_scene = runtime_scene_id(raw_scene) or raw_scene
+        return scene_labels.get(runtime_scene, scene_labels.get(raw_scene, raw_scene.replace("_", " ").title() or "Unknown"))
+
+    def act_label_from_number(self, act_number: object) -> str:
+        try:
+            numeric = int(act_number)
+        except (TypeError, ValueError):
+            numeric = 1
+        act_labels = getattr(self, "ACT_LABELS", {})
+        return f"Act {act_labels.get(numeric, numeric)}"
+
+    def current_save_metadata(self, *, slot_name: str) -> dict[str, object]:
+        assert self.state is not None
+        scene_key = self.state.current_scene
+        objective = ""
+        objective_getter = getattr(self, "hud_objective_label", None)
+        if callable(objective_getter):
+            objective = str(objective_getter())
+        if not objective:
+            objective = str(getattr(self, "SCENE_OBJECTIVES", {}).get(scene_key, "Press on."))
+        return {
+            "kind": "autosave" if slot_name.startswith(getattr(self, "AUTOSAVE_PREFIX", "autosave__")) else "manual",
+            "saved_at": datetime.now().isoformat(timespec="seconds"),
+            "act": self.state.current_act,
+            "act_label": self.act_label_from_number(self.state.current_act),
+            "scene": scene_key,
+            "scene_label": self.scene_label_from_key(scene_key),
+            "party_level": max(member.level for member in self.state.party_members()),
+            "playtime_seconds": int(float(getattr(self.state, "playtime_seconds", 0.0) or 0.0)),
+            "last_objective": objective,
+        }
+
     def save_game(self, *, slot_name: str) -> Path:
         assert self.state is not None
         self.refresh_playtime_seconds()
         path = self.save_path_for_slot_name(slot_name)
+        payload = self.state.to_dict()
+        payload["save_metadata"] = self.current_save_metadata(slot_name=slot_name)
         with path.open("w", encoding="utf-8") as handle:
-            json.dump(self.state.to_dict(), handle, indent=2)
+            json.dump(payload, handle, indent=2)
+        return path
+
+    def is_autosave_path(self, path: Path) -> bool:
+        return path.stem.startswith(getattr(self, "AUTOSAVE_PREFIX", "autosave__"))
+
+    def autosave_paths(self) -> list[Path]:
+        settings_path = getattr(self, "settings_path", None)
+        candidates = [
+            path
+            for path in self.save_dir.glob(f"{getattr(self, 'AUTOSAVE_PREFIX', 'autosave__')}*.json")
+            if path != settings_path
+        ]
+        return sorted(candidates, key=lambda path: path.stat().st_mtime, reverse=True)
+
+    def autosave_slot_name(self, label: str) -> str:
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        safe_label = re.sub(r"[^A-Za-z0-9_-]+", "_", label).strip("_") or "autosave"
+        return f"{getattr(self, 'AUTOSAVE_PREFIX', 'autosave__')}{stamp}_{safe_label}"
+
+    def prune_old_autosaves(self) -> None:
+        limit = int(getattr(self, "AUTOSAVE_LIMIT", 15))
+        for stale_path in self.autosave_paths()[limit:]:
+            try:
+                stale_path.unlink(missing_ok=True)
+            except OSError:
+                continue
+
+    def create_autosave(self, *, label: str) -> Path | None:
+        if self.state is None or not getattr(self, "autosaves_enabled", True):
+            return None
+        path = self.save_game(slot_name=self.autosave_slot_name(label))
+        self.prune_old_autosaves()
         return path
 
     def loadable_save_paths(self) -> list[Path]:
-        return sorted(self.save_dir.glob("*.json"))
+        settings_path = getattr(self, "settings_path", None)
+        saves = sorted(
+            (path for path in self.save_dir.glob("*.json") if path != settings_path),
+            key=lambda path: path.stat().st_mtime,
+            reverse=True,
+        )
+        manual_saves = [path for path in saves if not self.is_autosave_path(path)]
+        autosaves = [path for path in saves if self.is_autosave_path(path)]
+        return [*manual_saves, *autosaves]
 
     def save_display_label(self, path: Path) -> str:
-        return path.stem
+        if not self.is_autosave_path(path):
+            return path.stem
+        prefix = getattr(self, "AUTOSAVE_PREFIX", "autosave__")
+        stem = path.stem[len(prefix):]
+        match = re.match(r"^(?P<date>\d{8})_(?P<time>\d{6})_(?P<micro>\d{6})_(?P<label>.+)$", stem)
+        if match is None:
+            return f"[Autosave] {stem.replace('_', ' ')}"
+        date_code = match.group("date")
+        time_code = match.group("time")
+        label = match.group("label").replace("_", " ").strip() or "autosave"
+        timestamp = (
+            f"{date_code[:4]}-{date_code[4:6]}-{date_code[6:8]} "
+            f"{time_code[:2]}:{time_code[2:4]}:{time_code[4:6]}"
+        )
+        return f"[Autosave] {label.title()} | {timestamp}"
+
+    def read_save_data_for_preview(self, path: Path) -> dict[str, object]:
+        try:
+            with path.open("r", encoding="utf-8") as handle:
+                data = json.load(handle)
+        except (OSError, json.JSONDecodeError):
+            return {}
+        return data if isinstance(data, dict) else {}
+
+    def save_preview_payload(self, path: Path) -> dict[str, object]:
+        data = self.read_save_data_for_preview(path)
+        metadata = data.get("save_metadata", {})
+        if not isinstance(metadata, dict):
+            metadata = {}
+        scene_key = metadata.get("scene", data.get("current_scene", ""))
+        runtime_scene_key = runtime_scene_id(str(scene_key)) or str(scene_key)
+        act = metadata.get("act", data.get("current_act", 1))
+        objective = (
+            metadata.get("last_objective")
+            or getattr(self, "SCENE_OBJECTIVES", {}).get(runtime_scene_key, "Press on.")
+        )
+        playtime_seconds = metadata.get("playtime_seconds", data.get("playtime_seconds", 0))
+        try:
+            party_level = int(metadata.get("party_level") or self.party_level_from_save_data(data))
+        except (TypeError, ValueError):
+            party_level = self.party_level_from_save_data(data)
+        return {
+            "label": self.save_display_label(path),
+            "kind": str(metadata.get("kind") or ("autosave" if self.is_autosave_path(path) else "manual")).title(),
+            "act_label": str(metadata.get("act_label") or self.act_label_from_number(act)),
+            "scene_label": str(metadata.get("scene_label") or self.scene_label_from_key(scene_key)),
+            "party_level": party_level,
+            "playtime": self.format_playtime(playtime_seconds),
+            "objective": str(objective),
+        }
+
+    def save_preview_menu_label(self, path: Path) -> str:
+        preview = self.save_preview_payload(path)
+        kind = str(preview["kind"])
+        kind_tag = "[Auto]" if kind.lower() == "autosave" else f"[{kind}]"
+        label = str(preview["label"])
+        for prefix in (kind_tag, "[Autosave]", "[Manual]"):
+            if label.startswith(prefix):
+                label = label[len(prefix):].strip()
+                break
+        if kind.lower() == "autosave" and " | " in label:
+            label = label.split(" | ", 1)[0].strip()
+        return (
+            f"{kind_tag} {label} | {preview['act_label']} | "
+            f"{preview['scene_label']} | Lv {preview['party_level']} | "
+            f"{preview['playtime']}"
+        )
+
+    def save_preview_detail(self, path: Path) -> str:
+        preview = self.save_preview_payload(path)
+        return (
+            f"Type: {preview['kind']}\n"
+            f"Act: {preview['act_label']}\n"
+            f"Scene: {preview['scene_label']}\n"
+            f"Party level: {preview['party_level']}\n"
+            f"Playtime: {preview['playtime']}\n"
+            f"Last objective: {preview['objective']}"
+        )
 
     def load_save_path(self, path: Path) -> None:
         with path.open("r", encoding="utf-8") as handle:
@@ -250,6 +1354,10 @@ class GameIOMixin:
         self.state = GameState.from_dict(data)
         self._playtime_checkpoint = time.monotonic()
         self.ensure_state_integrity()
+        self._compact_hud_last_scene_key = None
+        refresh_scene_music = getattr(self, "refresh_scene_music", None)
+        if callable(refresh_scene_music):
+            refresh_scene_music()
         self.say(f"Loaded {self.save_display_label(path)}.")
 
     def delete_save_path(self, path: Path) -> bool:
@@ -273,7 +1381,7 @@ class GameIOMixin:
                 return False
             choice = self.choose(
                 "Save Files",
-                [self.save_display_label(path) for path in saves] + ["Back"],
+                [self.save_preview_menu_label(path) for path in saves] + ["Back"],
                 allow_meta=False,
                 sticky_trailing_options=1,
             )
@@ -281,6 +1389,7 @@ class GameIOMixin:
                 return False
             selected = saves[choice - 1]
             label = self.save_display_label(selected)
+            self.say(self.save_preview_detail(selected))
             action = self.choose(
                 f"{label}",
                 [

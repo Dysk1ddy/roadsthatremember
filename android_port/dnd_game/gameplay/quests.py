@@ -1,21 +1,85 @@
 from __future__ import annotations
 
-from ..data.quests import QUESTS, QUEST_ORDER, QuestDefinition, QuestLogEntry
+from ..data.quests import QUESTS, QUEST_ORDER, QuestDefinition, QuestLogEntry, resolve_quest_id
+from ..data.story.public_terms import marks_label
 from ..items import get_item
+from ..ui.colors import rich_style_name
+from ..ui.rich_render import Panel, Table, box
 
 
 class QuestMixin:
+    QUEST_STATUS_PRECEDENCE = {
+        "active": 1,
+        "ready_to_turn_in": 2,
+        "completed": 3,
+    }
+
+    def render_new_quest_panel(self, definition: QuestDefinition) -> bool:
+        if not (
+            callable(getattr(self, "should_use_rich_ui", None))
+            and self.should_use_rich_ui()
+            and Panel is not None
+            and Table is not None
+            and box is not None
+        ):
+            return False
+        table = Table.grid(expand=True, padding=(0, 1))
+        table.add_column(style=f"bold {rich_style_name('light_yellow')}", width=11)
+        table.add_column(ratio=1)
+        table.add_row("Quest", definition.title)
+        table.add_row("Giver", definition.giver)
+        table.add_row("Location", definition.location)
+        table.add_row("Objective", definition.objective)
+        table.add_row("Turn in", definition.turn_in)
+        table.add_row("Rewards", self.quest_reward_summary(definition.quest_id))
+        if definition.accepted_text:
+            table.add_row("Brief", definition.accepted_text)
+        return self.emit_rich(
+            Panel(
+                table,
+                title=self.rich_text("Quest Added", "light_yellow", bold=True),
+                border_style=rich_style_name("light_yellow"),
+                box=box.DOUBLE,
+                padding=(0, 1),
+            ),
+            width=max(100, self.rich_console_width()),
+        )
+
     def ensure_quest_log(self) -> None:
         if self.state is None:
             return
         self.state.quests = dict(self.state.quests)
+        self.normalize_quest_log_ids()
         self.refresh_quest_statuses(announce=False)
 
+    def canonical_quest_id(self, quest_id: str) -> str:
+        return resolve_quest_id(quest_id) or quest_id
+
+    def normalize_quest_log_ids(self) -> None:
+        if self.state is None:
+            return
+        normalized: dict[str, QuestLogEntry] = {}
+        for raw_quest_id, entry in list(self.state.quests.items()):
+            quest_id = self.canonical_quest_id(str(raw_quest_id))
+            entry.quest_id = quest_id
+            existing = normalized.get(quest_id)
+            if existing is None:
+                normalized[quest_id] = entry
+                continue
+            if self.QUEST_STATUS_PRECEDENCE.get(entry.status, 0) > self.QUEST_STATUS_PRECEDENCE.get(existing.status, 0):
+                existing.status = entry.status
+            for note in entry.notes:
+                if note not in existing.notes:
+                    existing.notes.append(note)
+        self.state.quests = normalized
+
     def get_quest_definition(self, quest_id: str) -> QuestDefinition:
+        quest_id = self.canonical_quest_id(quest_id)
         return QUESTS[quest_id]
 
     def get_quest_entry(self, quest_id: str) -> QuestLogEntry | None:
         assert self.state is not None
+        quest_id = self.canonical_quest_id(quest_id)
         return self.state.quests.get(quest_id)
 
     def has_quest(self, quest_id: str) -> bool:
@@ -36,17 +100,20 @@ class QuestMixin:
     def append_quest_note(self, quest_id: str, note: str) -> None:
         if not note:
             return
+        quest_id = self.canonical_quest_id(quest_id)
         entry = self.get_quest_entry(quest_id)
         if entry is not None and note not in entry.notes:
             entry.notes.append(note)
 
     def quest_objective_met(self, quest_id: str) -> bool:
         assert self.state is not None
+        quest_id = self.canonical_quest_id(quest_id)
         definition = self.get_quest_definition(quest_id)
         return all(bool(self.state.flags.get(flag)) for flag in definition.completion_flags)
 
     def refresh_quest_statuses(self, *, announce: bool = True) -> None:
         assert self.state is not None
+        self.normalize_quest_log_ids()
         for quest_id in QUEST_ORDER:
             entry = self.state.quests.get(quest_id)
             if entry is None or entry.status == "completed":
@@ -64,15 +131,54 @@ class QuestMixin:
                 entry.status = "active"
 
     def quest_reward_summary(self, quest_id: str) -> str:
+        quest_id = self.canonical_quest_id(quest_id)
         definition = self.get_quest_definition(quest_id)
         parts: list[str] = []
         if definition.reward.xp:
             parts.append(f"{definition.reward.xp} XP")
         if definition.reward.gold:
-            parts.append(f"{definition.reward.gold} gp")
+            parts.append(marks_label(definition.reward.gold))
         for item_id, quantity in definition.reward.items.items():
             parts.append(f"{get_item(item_id).name} x{quantity}")
+        if definition.reward.flags:
+            parts.append("story unlocks")
+        if definition.reward.merchant_attitudes:
+            parts.append("better trade terms")
+        if definition.reward.act2_metrics:
+            parts.append("campaign momentum")
         return ", ".join(parts) if parts else "No listed reward."
+
+    def quest_reward_flag_label(self, flag: str) -> str:
+        cleaned = flag
+        for prefix in ("quest_reward_", "act2_", "act3_"):
+            if cleaned.startswith(prefix):
+                cleaned = cleaned[len(prefix) :]
+                break
+        return cleaned.replace("_", " ").title()
+
+    def apply_quest_unlock_rewards(self, definition: QuestDefinition) -> None:
+        assert self.state is not None
+        reward = definition.reward
+        unlock_labels: list[str] = []
+        for flag, value in reward.flags.items():
+            self.state.flags[flag] = value
+            unlock_labels.append(self.quest_reward_flag_label(flag))
+        if unlock_labels:
+            unlock_line = ", ".join(unlock_labels)
+            self.say(f"Story reward unlocked: {unlock_line}.")
+            self.add_journal(f"Story reward from {definition.title}: {unlock_line}.")
+
+        for merchant_id, amount in reward.merchant_attitudes.items():
+            self.adjust_merchant_attitude(merchant_id, amount, reason=f"{definition.giver}'s gratitude")
+
+        shift_metric = getattr(self, "act2_shift_metric", None)
+        metric_names = getattr(self, "ACT2_METRIC_NAMES", {})
+        for metric_key, delta in reward.act2_metrics.items():
+            if callable(shift_metric) and metric_key in metric_names:
+                shift_metric(metric_key, delta, f"{definition.title} turned in")
+                continue
+            current = int(self.state.flags.get(metric_key, 0) or 0)
+            self.state.flags[metric_key] = current + delta
 
     def quest_entries_by_status(self, status: str) -> list[tuple[QuestDefinition, QuestLogEntry]]:
         assert self.state is not None
@@ -86,6 +192,7 @@ class QuestMixin:
 
     def grant_quest(self, quest_id: str, *, note: str = "") -> bool:
         assert self.state is not None
+        quest_id = self.canonical_quest_id(quest_id)
         existing = self.state.quests.get(quest_id)
         if existing is not None:
             self.append_quest_note(quest_id, note)
@@ -95,20 +202,25 @@ class QuestMixin:
         self.append_quest_note(quest_id, definition.accepted_text)
         self.append_quest_note(quest_id, note)
         self.add_journal(f"Quest accepted: {definition.title}.")
-        self.banner(f"Quest Added: {definition.title}")
-        self.say(definition.accepted_text)
-        self.say(f"Objective: {definition.objective}")
-        self.say(f"Rewards: {self.quest_reward_summary(quest_id)}.")
+        if not self.render_new_quest_panel(definition):
+            self.banner(f"Quest Added: {definition.title}")
+            self.say(definition.accepted_text)
+            self.say(f"Objective: {definition.objective}")
+            self.say(f"Rewards: {self.quest_reward_summary(quest_id)}.")
         self.refresh_quest_statuses(announce=False)
         return True
 
-    def turn_in_quest(self, quest_id: str) -> bool:
+    def turn_in_quest(self, quest_id: str, *, giver: str) -> bool:
         assert self.state is not None
+        quest_id = self.canonical_quest_id(quest_id)
         self.refresh_quest_statuses(announce=False)
         entry = self.state.quests.get(quest_id)
         if entry is None or entry.status != "ready_to_turn_in":
             return False
         definition = self.get_quest_definition(quest_id)
+        if giver != definition.giver:
+            self.say(f"{definition.title} has to be turned in to {definition.giver}.")
+            return False
         entry.status = "completed"
         self.append_quest_note(quest_id, definition.turn_in_text)
         self.add_journal(f"Quest completed: {definition.title}.")
@@ -125,4 +237,5 @@ class QuestMixin:
                 reward_line = ", ".join(received_parts)
                 self.say(f"Additional quest reward: {reward_line}.")
                 self.add_journal(f"Quest reward from {definition.title}: {reward_line}.")
+        self.apply_quest_unlock_rewards(definition)
         return True

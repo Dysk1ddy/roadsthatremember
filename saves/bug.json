@@ -187,7 +187,7 @@
       },
       "notes": [
         "Veteran's kit: +1 to Athletics and Intimidation checks.",
-        "A dragonborn sworn to protect caravans on the road south of Neverwinter.",
+        "A dragonborn sworn to protect caravans on the road south of Greywake.",
         "A dragonborn oathsworn who treats duty like a living thing that must be fed by action."
       ],
       "tags": [
@@ -237,9 +237,9 @@
       "current_dungeon_id": "blackwake_crossing_branch",
       "current_room_id": "charred_tollhouse",
       "visited_nodes": [
-        "neverwinter_briefing",
-        "high_road_ambush",
-        "phandalin_hub"
+        "greywake_briefing",
+        "emberway_ambush",
+        "iron_hollow_hub"
       ],
       "cleared_rooms": [
         "charred_tollhouse"
@@ -254,13 +254,13 @@
     ],
     "background_prologue_completed": "Soldier",
     "briefing_seen": true,
-    "briefing_q_neverwinter": true,
-    "briefing_q_phandalin": true,
+    "briefing_q_greywake": true,
+    "briefing_q_iron_hollow": true,
     "briefing_q_brand": true,
-    "identity_neverwinter_briefing_class_fighter_map": true,
-    "neverwinter_preparation_done": true,
+    "identity_greywake_briefing_class_fighter_map": true,
+    "greywake_preparation_done": true,
     "early_companion_recruited": "Rhogar Valeguard",
-    "blackwake_neverwinter_rumor": true,
+    "blackwake_greywake_rumor": true,
     "blackwake_started": true,
     "blackwake_return_destination": "undecided",
     "act1_town_fear": 2,
@@ -269,28 +269,28 @@
     "blackwake_tollhouse_investigated": true
   },
   "clues": [
-    "A stolen dispatch confirms the attacks around Phandalin are organized enough to rattle Neverwinter's quartermasters.",
+    "A stolen dispatch confirms the attacks around Iron Hollow are organized enough to rattle Greywake's quartermasters.",
     "Mira marks the switchback, likely scout perches, and the rough spacing the gang prefers when collapsing on a wagon.",
     "Dockside rumors say the Ashen Brand sells stolen ore through quiet middlemen.",
-    "A Neverwinter drover says forged river-cut inspections are bleeding southbound caravans before they ever reach the High Road."
+    "A Greywake drover says forged river-cut inspections are bleeding southbound caravans before they ever reach the Emberway."
   ],
   "journal": [
-    "Your soldier's opening leaves you with a live look at how hard Neverwinter is leaning on thin patrol lines and tired veterans to protect the road south.",
-    "Word reaches you that Mira Thann is quietly gathering capable hands in Neverwinter against a new bandit threat around Phandalin.",
+    "Your soldier's opening leaves you with a live look at how hard Greywake is leaning on thin patrol lines and tired veterans to protect the road south.",
+    "Word reaches you that Mira Thann is quietly gathering capable hands in Greywake against a new bandit threat around Iron Hollow.",
     "Reward from South Barracks Breakout: 50 XP, 8 gp.",
     "Looted Potion of Healing x1 from South Barracks Breakout.",
     "Looted Roadworn Shortsword x1 from South Barracks Breakout.",
     "Reward from holding the barracks line: 15 XP, 6 gp.",
-    "Clue: A stolen dispatch confirms the attacks around Phandalin are organized enough to rattle Neverwinter's quartermasters.",
-    "Your soldier prologue ends with the trail leading toward Mira Thann's private briefing in Neverwinter.",
+    "Clue: A stolen dispatch confirms the attacks around Iron Hollow are organized enough to rattle Greywake's quartermasters.",
+    "Your soldier prologue ends with the trail leading toward Mira Thann's private briefing in Greywake.",
     "Clue: Mira marks the switchback, likely scout perches, and the rough spacing the gang prefers when collapsing on a wagon.",
     "Reward from Fighter identity choice: 10 XP.",
     "You treated the contract like a fighter's field briefing and forced it into useful shape.",
     "Clue: Dockside rumors say the Ashen Brand sells stolen ore through quiet middlemen.",
     "Reward from working the rumor mill: 15 XP, 12 gp.",
     "Rhogar Valeguard joined the active party.",
-    "Mira Thann sent you south with a writ for Phandalin's steward.",
-    "Clue: A Neverwinter drover says forged river-cut inspections are bleeding southbound caravans before they ever reach the High Road.",
+    "Mira Thann sent you south with a writ for Iron Hollow's steward.",
+    "Clue: A Greywake drover says forged river-cut inspections are bleeding southbound caravans before they ever reach the Emberway.",
     "Quest accepted: Embers Before the Road.",
     "You turned off toward Blackwake Crossing to trace smoke, forged toll seals, and missing caravans.",
     "Reward from Charred Tollhouse Breakout: 110 XP, 16 gp.",
@@ -303,8 +303,8 @@
       "quest_id": "trace_blackwake_cell",
       "status": "active",
       "notes": [
-        "The road to Phandalin can wait long enough to answer one ugly question: why are caravans vanishing before they even reach the wider High Road?",
-        "Smoke outside Neverwinter points toward Blackwake Crossing before the wider High Road opens."
+        "The road to Iron Hollow can wait long enough to answer one ugly question: why are caravans vanishing before they even reach the wider Emberway?",
+        "Smoke outside Greywake points toward Blackwake Crossing before the wider Emberway opens."
       ]
     }
   },
@@ -312,19 +312,19 @@
   "xp": 215,
   "gold": 68,
   "inventory": {
-    "potion_healing": 4,
-    "bread_round": 4,
-    "travel_biscuits": 4,
-    "dried_fish": 3,
-    "goat_cheese": 2,
-    "frontier_ale": 3,
-    "root_vegetables": 2,
-    "antitoxin_vial": 1,
-    "chain_mail_common": 2,
-    "longsword_common": 2,
-    "shield_common": 2,
-    "shortsword_common": 1,
-    "leather_armor_common": 1
+    "C0011": 4,
+    "S0002": 4,
+    "S0021": 4,
+    "S0005": 3,
+    "S0007": 2,
+    "S0006": 3,
+    "S0016": 2,
+    "C0000": 1,
+    "E0004": 2,
+    "E0097": 2,
+    "E0060": 2,
+    "E0112": 1,
+    "E0009": 1
   },
   "short_rests_remaining": 2
 }

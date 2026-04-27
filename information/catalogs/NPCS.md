@@ -29,13 +29,13 @@ This file documents the non-player cast currently surfaced by the game, includin
 
 | NPC | Companion ID | Race / Class | Recruitment | Combat sheet | Relationship and story role |
 | --- | --- | --- | --- | --- | --- |
-| Kaelis Starling | `kaelis_starling` | Astral Elf Rogue / Assassin | Optional Greywake contract companion before the Emberway | Level 1, 11 HP, AC 15, Longbow `1d8`, attack +6 | Scout and ambush reader. Great: `+1 Perception`, `+1 initiative`; Exceptional: `+1 attack`. Supports `road_ambush`, `wyvern_tor`, and `blackwake_crossing`. |
+| Kaelis Starling | `kaelis_starling` | Astral Elf Rogue / Assassin | Optional Greywake contract companion before the Emberway | Level 1, 11 HP, AC 15, Longbow `1d8`, attack +6 | Scout and ambush reader. Great: `+1 Perception`, `+1 initiative`; Exceptional: `+1 attack`. Supports `road_ambush`, `red_mesa_hold`, and `blackwake_crossing`. |
 | Rhogar Valeguard | `rhogar_valeguard` | Forged Warrior / Bloodreaver | Optional Greywake contract companion before the Emberway | Level 1, 11 HP, AC 18, Longsword `1d8`, attack +5 | Oathsworn caravan guardian. Great: `+1 damage`; Exceptional: `+1 AC`. Supports `ashfall_watch` and `blackwake_crossing`. |
 | Tolan Ironshield | `tolan_ironshield` | Dwarf Warrior / Juggernaut | Joins after the Emberway ambush, or later from Ashlamp Inn if not recruited immediately | Level 1, 13 HP, AC 18, Longsword `1d8`, attack +4 | Shield-wall caravan veteran. Great: `+1 AC`; Exceptional: `+1 CON save`. Supports `ashfall_watch` and `blackwake_crossing`. |
-| Bryn Underbough | `bryn_underbough` | Halfling Rogue / Shadowguard | Recruited at Ashlamp Inn through Persuasion or Insight | Level 1, 9 HP, AC 14, Shortsword `1d6`, attack +5 | Trail scout, rumor-reader, and old smuggling contact. Great: `+1 Stealth`, `+1 initiative`; Exceptional: `+1 Perception`. Supports `old_owl_well`, `emberhall_cellars`, and `blackwake_crossing`; unlocks `Loose Ends`. |
+| Bryn Underbough | `bryn_underbough` | Halfling Rogue / Shadowguard | Recruited at Ashlamp Inn through Persuasion or Insight | Level 1, 9 HP, AC 14, Shortsword `1d6`, attack +5 | Trail scout, rumor-reader, and old smuggling contact. Great: `+1 Stealth`, `+1 initiative`; Exceptional: `+1 Perception`. Supports `blackglass_well`, `emberhall_cellars`, and `blackwake_crossing`; unlocks `Loose Ends`. |
 | Elira Lanternward | `elira_dawnmantle` | Human Mage / Aethermancer | Met at Wayside or Iron Hollow's shrine; easier to recruit after helping her | Level 1, 10 HP, AC 17, Mace `1d6`, attack +2 | Lantern priestess and field healer. Great: `+1 healing`; Exceptional: `+1 WIS save`. Supports `camp_rest` and `blackwake_crossing`; unlocks `Faith Under Ash`. |
-| Nim Ardentglass | `nim_ardentglass` | Unrecorded Mage / Arcanist | Act 2 recruit around Stonehollow Dig or early-route convergence | Level 1, 7 HP, AC 11, Quarterstaff `1d6`, attack +1 | Meridian Compact cartographer and ruin scholar. Great: `+1 Arcana`, `+1 Investigation`; Exceptional: `+1 spell attack`. Supports `stonehollow_dig` and `wave_echo_outer_galleries`. |
-| Irielle Ashwake | `irielle_ashwake` | Fire-Blooded Mage / Elementalist | Freed and recruited during South Adit | Level 1, 9 HP, AC 12, Quarterstaff `1d6`, attack +1 | Escaped Quiet Choir augur and witness against the cult. Great: `+1 spell damage`, `+1 Insight`; Exceptional: `+1 WIS save`. Supports `south_adit` and `forge_of_spells`. |
+| Nim Ardentglass | `nim_ardentglass` | Unrecorded Mage / Arcanist | Act 2 recruit around Stonehollow Dig or early-route convergence | Level 1, 7 HP, AC 11, Quarterstaff `1d6`, attack +1 | Meridian Compact cartographer and ruin scholar. Great: `+1 Arcana`, `+1 Investigation`; Exceptional: `+1 spell attack`. Supports `stonehollow_dig` and `resonant_vault_outer_galleries`. |
+| Irielle Ashwake | `irielle_ashwake` | Fire-Blooded Mage / Elementalist | Freed and recruited during South Adit | Level 1, 9 HP, AC 12, Quarterstaff `1d6`, attack +1 | Escaped Quiet Choir augur and witness against the cult. Great: `+1 spell damage`, `+1 Insight`; Exceptional: `+1 WIS save`. Supports `south_adit` and `meridian_forge`. |
 
 ### Companion Relationship Thresholds
 
@@ -110,9 +110,9 @@ Every row below is a unique `create_enemy()` template currently present in `dnd_
 | `grimlock_tunneler` | Grimlock Tunneler | Monstrosity Tunneler | 2 | 20 / 14 | Stonehollow, South Adit, Resonant Vaults tunnels | Blind sense and grapple drag pressure. |
 | `stirge_swarm` | Stirge Swarm | Beast Swarm | 2 | 17 / 17 | Act 2 cramped cave nuisance | Latch-on grapple and follow-up drain damage. |
 | `ochre_slime` | Ochre Slime | Ooze Slime | 2 | 28 / 6 | Stonehollow, Resonant Vaults, side-route chokepoints | Slow acid body / ooze hazard. |
-| `animated_armor` | Meridian Sentinel Armor | Construct Sentinel | 2 | 26 / 15 | Broken Prospect and Black Lake old Compact guardians | Construct guardian. |
+| `animated_armor` | Meridian Sentinel Armor | Construct Sentinel | 2 | 26 / 15 | Broken Prospect and Blackglass old Compact guardians | Construct guardian. |
 | `spectral_foreman` | Spectral Foreman | Undead Foreman | 3 | 31 / 15 | Broken Prospect command unit | Dead-shift and hammer-order leader pressure. |
-| `starblighted_miner` | Starblighted Miner | Humanoid Miner | 3 | 29 / 13 | South Adit, Black Lake, Caldra support | Whisper-static victim with `whisper_glare`. |
+| `starblighted_miner` | Starblighted Miner | Humanoid Miner | 3 | 29 / 13 | South Adit, Blackglass, Caldra support | Whisper-static victim with `whisper_glare`. |
 | `caldra_voss` | Sister Caldra Voss | Human Cult Agent | 5 | 54 / 16 | Act 2 final boss at the Meridian Forge | Obelisk whisper, shard veil, Choir rally, echo step. |
 | `cinder_kobold` | Cinder Kobold Sneak | Kobold Sneak | 1 | 7 / 13 | Prologue / Emberway threat and Cinderfall support | Pack tactics and cinder pot. |
 | `briar_twig` | Briar Twig Ambusher | Plant Ambusher | 1 | 8 / 13 | Blackglass Well optional route pressure | False appearance and thorn burst. |
@@ -129,16 +129,16 @@ Every row below is a unique `create_enemy()` template currently present in `dnd_
 | `stonegaze_skulker` | Stonegaze Skulker | Monstrosity Skulker | 3 | 36 / 15 | Duskmere optional support | Petrifying gaze and stone hide. |
 | `cliff_harpy` | Shrieking Cliff Harpy | Monstrosity Harpy | 3 | 32 / 14 | Red Mesa Hold optional ridge threat | Luring song and swoop. |
 | `whispermaw_blob` | Whispermaw Blob | Aberration Blob | 3 | 42 / 7 | Resonant Vaults / high-whisper Act 2 pressure | Gibbering field, warped ground, blinding spittle. |
-| `blacklake_pincerling` | Blacklake Pincerling | Aberration Pincerling | 4 | 40 / 15 | Black Lake Causeway | Grapple-lock hunter with shock spines. |
+| `blacklake_pincerling` | Blacklake Pincerling | Aberration Pincerling | 4 | 40 / 15 | Blackglass Causeway | Grapple-lock hunter with shock spines. |
 | `graveblade_wight` | Graveblade Wight | Undead Captain | 4 | 45 / 15 | Blackglass Well boss support and undead route pressure | Life drain and sunken command. |
 | `cinderflame_skull` | Cinderflame Skull | Undead Flameskull | 4 | 38 / 15 | Emberhall and late Act 1 support | Fire burst and rekindle. |
 | `obelisk_eye` | Eye of the Obelisk | Aberration Sentinel | 4 | 44 / 15 | Forge shard-channel route | Eye rays, levitation, allseeing pressure. |
 | `iron_prayer_horror` | Iron Prayer Horror | Construct Horror | 5 | 52 / 16 | Broken Prospect and late Act 2 construct pressure | Spellward plating and relentless march. |
-| `hookclaw_burrower` | Hookclaw Burrower | Monstrosity Burrower | 5 | 54 / 16 | Stonehollow, Resonant Vaults, Black Lake tunnel pressure | Blind sense, echo locator, cave drag. |
+| `hookclaw_burrower` | Hookclaw Burrower | Monstrosity Burrower | 5 | 54 / 16 | Stonehollow, Resonant Vaults, Blackglass tunnel pressure | Blind sense, echo locator, cave drag. |
 | `thunderroot_mound` | Thunderroot Mound | Plant Mound | 5 | 62 / 12 | Act 2 Hushfen / wilderness scaffold threat | Grasping vines, engulf, lightning feed. |
 | `oathbroken_revenant` | Oathbroken Revenant | Undead Revenant | 6 | 58 / 16 | South Adit / Act 2 vengeance pressure | Vengeance mark and relentless return. |
 | `choir_executioner` | Choir Executioner | Human Executioner | 6 | 64 / 16 | Forge and elite Quiet Choir pressure | Hush command, finishing stroke, dark devotion. |
-| `duskmire_matriarch` | Duskmire Matriarch | Monstrosity Matriarch | 6 | 72 / 17 | Black Lake / apex monster support | Shadow web, brood command, widow venom. |
+| `duskmire_matriarch` | Duskmire Matriarch | Monstrosity Matriarch | 6 | 72 / 17 | Blackglass / apex monster support | Shadow web, brood command, widow venom. |
 
 ## Named Enemy Variants And Aliases
 

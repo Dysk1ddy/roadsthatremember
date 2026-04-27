@@ -197,7 +197,7 @@
       },
       "notes": [
         "Veteran's kit: +1 to Athletics and Intimidation checks.",
-        "A dragonborn sworn to protect caravans on the road south of Neverwinter.",
+        "A dragonborn sworn to protect caravans on the road south of Greywake.",
         "A dragonborn oathsworn who treats duty like a living thing that must be fed by action."
       ],
       "tags": [
@@ -318,7 +318,7 @@
       },
       "notes": [
         "Veteran's kit: +1 to Athletics and Intimidation checks.",
-        "A caravan guard from Neverwinter with a shield wall mindset.",
+        "A caravan guard from Greywake with a shield wall mindset.",
         "A dwarven shield veteran who measures people by whether they hold the line when it matters."
       ],
       "tags": [
@@ -341,7 +341,7 @@
       "companion_id": "tolan_ironshield",
       "disposition": 0,
       "lore": [
-        "Tolan served on caravan routes out of Neverwinter for two decades, long enough to see three trade leagues fail and two rise in their place.",
+        "Tolan served on caravan routes out of Greywake for two decades, long enough to see three trade leagues fail and two rise in their place.",
         "He still carries a notched tower-shield rivet from the ambush that killed his older brother near the Mere of Dead Men.",
         "He trusts steady action more than speeches, but remembers every promise anyone makes in his hearing."
       ],
@@ -435,7 +435,7 @@
       },
       "notes": [
         "Healer's satchel: +1 to Medicine and Religion checks.",
-        "A priestess of Tymora tending the frontier faithful in Phandalin.",
+        "A priestess of Tymora tending the frontier faithful in Iron Hollow.",
         "A priestess of Tymora whose compassion is sharpened, not softened, by the frontier's cruelty."
       ],
       "tags": [
@@ -477,16 +477,16 @@
   ],
   "camp_companions": [],
   "current_act": 1,
-  "current_scene": "old_owl_well",
+  "current_scene": "blackglass_well",
   "flags": {
     "act1_started": true,
     "map_state": {
-      "current_node_id": "old_owl_well",
-      "current_dungeon_id": "old_owl_well_dig",
+      "current_node_id": "blackglass_well",
+      "current_dungeon_id": "blackglass_well_dig",
       "current_room_id": "gravecaller_lip",
       "visited_nodes": [
-        "phandalin_hub",
-        "old_owl_well"
+        "iron_hollow_hub",
+        "blackglass_well"
       ],
       "cleared_rooms": [
         "well_ring",
@@ -512,12 +512,12 @@
     ],
     "background_prologue_completed": "Soldier",
     "briefing_seen": true,
-    "neverwinter_preparation_done": true,
-    "identity_neverwinter_briefing_class_fighter_map": true,
-    "briefing_q_neverwinter": true,
+    "greywake_preparation_done": true,
+    "identity_greywake_briefing_class_fighter_map": true,
+    "briefing_q_greywake": true,
     "early_companion_recruited": "Rhogar Valeguard",
     "road_approach_chosen": true,
-    "phandalin_arrived": true,
+    "iron_hollow_arrived": true,
     "steward_seen": true,
     "steward_pressure_asked": true,
     "steward_vow_made": true,
@@ -534,54 +534,54 @@
     "miners_exchange_lead": true,
     "miners_exchange_ledgers_checked": true,
     "miners_exchange_dispute_resolved": true,
-    "old_owl_well_seen": true,
-    "old_owl_ring_cleared": true,
-    "old_owl_notes_found": true
+    "blackglass_well_seen": true,
+    "blackglass_well_ring_cleared": true,
+    "blackglass_well_notes_found": true
   },
   "clues": [
-    "A stolen dispatch confirms the attacks around Phandalin are organized enough to rattle Neverwinter's quartermasters.",
+    "A stolen dispatch confirms the attacks around Iron Hollow are organized enough to rattle Greywake's quartermasters.",
     "Mira marks the switchback, likely scout perches, and the rough spacing the gang prefers when collapsing on a wagon.",
     "A scorched badge on the goblins marks the Ashen Brand.",
     "The raiders were working with a hobgoblin sergeant tied to Ashfall Watch.",
-    "Phandalin's fear points in three directions: the east road, the old manor hill, and the few locals still holding the place together.",
+    "Iron Hollow's fear points in three directions: the east road, the old manor hill, and the few locals still holding the place together.",
     "Steward Harrow ties the gang to Ashfall Watch and cellar routes under old ruins.",
-    "Halia Thornton ties missing crews and salvage thefts to Old Owl Well."
+    "Halia Thornton ties missing crews and salvage thefts to Blackglass Well."
   ],
   "journal": [
-    "Your soldier's opening leaves you with a live look at how hard Neverwinter is leaning on thin patrol lines and tired veterans to protect the road south.",
-    "Word reaches you that Mira Thann is quietly gathering capable hands in Neverwinter against a new bandit threat around Phandalin.",
+    "Your soldier's opening leaves you with a live look at how hard Greywake is leaning on thin patrol lines and tired veterans to protect the road south.",
+    "Word reaches you that Mira Thann is quietly gathering capable hands in Greywake against a new bandit threat around Iron Hollow.",
     "Reward from South Barracks Breakout: 50 XP, 8 gp.",
     "Looted Frontier Ale x1 from South Barracks Breakout.",
     "Looted Roadworn Shortsword x1 from South Barracks Breakout.",
     "Reward from holding the barracks line: 15 XP, 6 gp.",
-    "Clue: A stolen dispatch confirms the attacks around Phandalin are organized enough to rattle Neverwinter's quartermasters.",
-    "Your soldier prologue ends with the trail leading toward Mira Thann's private briefing in Neverwinter.",
+    "Clue: A stolen dispatch confirms the attacks around Iron Hollow are organized enough to rattle Greywake's quartermasters.",
+    "Your soldier prologue ends with the trail leading toward Mira Thann's private briefing in Greywake.",
     "Reward from working the rumor mill: 4 gp.",
     "Clue: Mira marks the switchback, likely scout perches, and the rough spacing the gang prefers when collapsing on a wagon.",
     "Reward from Fighter identity choice: 10 XP.",
     "You treated the contract like a fighter's field briefing and forced it into useful shape.",
     "Rhogar Valeguard joined the active party.",
-    "Mira Thann sent you south with a writ for Phandalin's steward.",
+    "Mira Thann sent you south with a writ for Iron Hollow's steward.",
     "Reward from Roadside Ambush: 100 XP, 10 gp.",
     "Looted Bread Round x1 from Roadside Ambush.",
     "Looted Dried Fish x1 from Roadside Ambush.",
     "Looted Travel Biscuits x1 from Roadside Ambush.",
     "Clue: A scorched badge on the goblins marks the Ashen Brand.",
     "Clue: The raiders were working with a hobgoblin sergeant tied to Ashfall Watch.",
-    "Reward from saving the caravan guard on the High Road: 25 XP, 15 gp.",
+    "Reward from saving the caravan guard on the Emberway: 25 XP, 15 gp.",
     "Tolan Ironshield joined the active party.",
-    "You reached Phandalin, a hard-bitten frontier town under growing Ashen Brand pressure.",
-    "Clue: Phandalin's fear points in three directions: the east road, the old manor hill, and the few locals still holding the place together.",
-    "Reward from reading Phandalin's mood on arrival: 10 XP.",
+    "You reached Iron Hollow, a hard-bitten frontier town under growing Ashen Brand pressure.",
+    "Clue: Iron Hollow's fear points in three directions: the east road, the old manor hill, and the few locals still holding the place together.",
+    "Reward from reading Iron Hollow's mood on arrival: 10 XP.",
     "Clue: Steward Harrow ties the gang to Ashfall Watch and cellar routes under old ruins.",
     "Quest accepted: Stop the Watchtower Raids.",
     "Reward from helping Elira treat the poisoned miner: 10 XP.",
     "Elira Dawnmantle joined the active party.",
-    "Clue: Halia Thornton ties missing crews and salvage thefts to Old Owl Well.",
-    "Quest accepted: Silence Old Owl Well.",
-    "Reward from Old Owl Well Dig Ring: 200 XP, 18 gp.",
-    "Looted Frontier Ale x1 from Old Owl Well Dig Ring.",
-    "Looted Potion of Healing x1 from Old Owl Well Dig Ring."
+    "Clue: Halia Thornton ties missing crews and salvage thefts to Blackglass Well.",
+    "Quest accepted: Silence Blackglass Well.",
+    "Reward from Blackglass Well Dig Ring: 200 XP, 18 gp.",
+    "Looted Frontier Ale x1 from Blackglass Well Dig Ring.",
+    "Looted Potion of Healing x1 from Blackglass Well Dig Ring."
   ],
   "quests": {
     "secure_miners_road": {
@@ -592,12 +592,12 @@
         "Tessa says the watchtower is throttling miners, couriers, and every road-dependent family in town."
       ]
     },
-    "silence_old_owl_well": {
-      "quest_id": "silence_old_owl_well",
+    "silence_blackglass_well": {
+      "quest_id": "silence_blackglass_well",
       "status": "active",
       "notes": [
-        "Halia phrases it like a ledger problem, but the meaning is simple enough: Old Owl Well is swallowing people, and every day it stays active makes the town smaller.",
-        "Halia says Old Owl Well has become a grave-salvage site protected by both hired blades and something worse."
+        "Halia phrases it like a ledger problem, but the meaning is simple enough: Blackglass Well is swallowing people, and every day it stays active makes the town smaller.",
+        "Halia says Blackglass Well has become a grave-salvage site protected by both hired blades and something worse."
       ]
     }
   },
@@ -605,20 +605,20 @@
   "xp": 420,
   "gold": 81,
   "inventory": {
-    "potion_healing": 6,
-    "bread_round": 5,
-    "travel_biscuits": 5,
-    "dried_fish": 4,
-    "goat_cheese": 2,
-    "frontier_ale": 4,
-    "root_vegetables": 2,
-    "antitoxin_vial": 1,
-    "chain_mail_common": 3,
-    "longsword_common": 3,
-    "shield_common": 4,
-    "shortsword_common": 1,
-    "scale_mail_common": 1,
-    "mace_common": 1
+    "C0011": 6,
+    "S0002": 5,
+    "S0021": 5,
+    "S0005": 4,
+    "S0007": 2,
+    "S0006": 4,
+    "S0016": 2,
+    "C0000": 1,
+    "E0004": 3,
+    "E0097": 3,
+    "E0060": 4,
+    "E0112": 1,
+    "E0012": 1,
+    "E0102": 1
   },
   "short_rests_remaining": 1
 }

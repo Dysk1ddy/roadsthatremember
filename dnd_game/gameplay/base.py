@@ -21,6 +21,7 @@ from ..content import (
     create_enemy,
     create_tolan_ironshield,
 )
+from ..data.id_aliases import RUNTIME_SCENE_ID_ALIASES, canonicalize_flag_mapping, runtime_scene_id
 from ..data.story.lore import LORE_INTRO, TITLE_LORE_SECTIONS, manual_text_for_entry
 from ..data.story.public_terms import (
     class_label,
@@ -109,31 +110,31 @@ class GameBase:
         "wayside_luck_shrine": "Wayside Luck Shrine",
         "greywake_triage_yard": "Greywake Yard",
         "greywake_road_breakout": "Greywake Breakout",
-        "neverwinter_briefing": "Greywake",
+        "greywake_briefing": "Greywake",
         "road_ambush": "Emberway",
-        "high_road_liars_circle": "Liar's Circle",
-        "high_road_false_checkpoint": "False Checkpoint",
-        "high_road_false_tollstones": "False Tollstones",
-        "phandalin_hub": "Iron Hollow",
-        "old_owl_well": "Blackglass Well",
-        "wyvern_tor": "Red Mesa Hold",
+        "emberway_liars_circle": "Liar's Circle",
+        "emberway_false_checkpoint": "False Checkpoint",
+        "emberway_false_tollstones": "False Tollstones",
+        "iron_hollow_hub": "Iron Hollow",
+        "blackglass_well": "Blackglass Well",
+        "red_mesa_hold": "Red Mesa Hold",
         "ashfall_watch": "Ashfall Watch",
-        "tresendar_manor": "Duskmere Manor",
+        "duskmere_manor": "Duskmere Manor",
         "emberhall_cellars": "Emberhall Cellars",
         "act1_complete": "Iron Hollow",
         "act2_claims_council": "Ashlamp Claims Council",
         "act2_expedition_hub": "Act II Expedition Hub",
         "hushfen_pale_circuit": "Hushfen and the Pale Circuit",
-        "neverwinter_wood_survey_camp": "Greywake Wood",
+        "greywake_survey_camp": "Greywake Wood",
         "stonehollow_dig": "Stonehollow Dig",
         "siltlock_counting_house": "Siltlock Counting House",
         "act2_midpoint_convergence": "Sabotage Night",
         "broken_prospect": "Broken Prospect",
         "south_adit": "South Adit",
-        "wave_echo_outer_galleries": "Resonant Vaults",
-        "black_lake_causeway": "Blackglass Causeway",
+        "resonant_vault_outer_galleries": "Resonant Vaults",
+        "blackglass_causeway": "Blackglass Causeway",
         "blackglass_relay_house": "Blackglass Relay House",
-        "forge_of_spells": "Meridian Forge",
+        "meridian_forge": "Meridian Forge",
         "act2_scaffold_complete": "Resonant Vaults",
         "act3_ninth_ledger_opens": "Ninth Ledger",
         "act3_ninth_ledger_aftermath": "Ledger Aftermath",
@@ -144,42 +145,40 @@ class GameBase:
         "wayside_luck_shrine": "Meet Elira Lanternward and steady the first wounded travelers.",
         "greywake_triage_yard": "Stabilize Greywake Yard before the road pressure breaks open.",
         "greywake_road_breakout": "Protect the wounded or the proof when the Ashen Brand attacks.",
-        "neverwinter_briefing": "Hear Mira Thann out and take the road south.",
+        "greywake_briefing": "Hear Mira Thann out and take the road south.",
         "blackwake_crossing": "Trace the Blackwake supply cell before committing to the Emberway.",
         "road_decision_post_blackwake": "Choose whether to report back to Greywake or press south after Blackwake.",
         "road_ambush": "Survive the Emberway attack and reach Iron Hollow.",
-        "high_road_liars_circle": "Solve the four-statue liar's puzzle or leave the circle alone.",
-        "high_road_false_checkpoint": "Expose or outtalk the fake roadwardens demanding travel papers.",
-        "high_road_false_tollstones": "Break or outtalk the false roadwarden toll at the broken milemarker.",
-        "phandalin_hub": "Choose which pressure in Iron Hollow to answer next.",
-        "old_owl_well": "Break the grave-salvage line at Blackglass Well.",
-        "wyvern_tor": "Break the Red Mesa Hold raiders.",
+        "emberway_liars_circle": "Solve the four-statue liar's puzzle or leave the circle alone.",
+        "emberway_false_checkpoint": "Expose or outtalk the fake roadwardens demanding travel papers.",
+        "emberway_false_tollstones": "Break or outtalk the false roadwarden toll at the broken milemarker.",
+        "iron_hollow_hub": "Choose which pressure in Iron Hollow to answer next.",
+        "blackglass_well": "Break the grave-salvage line at Blackglass Well.",
+        "red_mesa_hold": "Break the Red Mesa Hold raiders.",
         "ashfall_watch": "Break Ashfall Watch and reopen the road.",
-        "tresendar_manor": "Push through Duskmere Manor.",
+        "duskmere_manor": "Push through Duskmere Manor.",
         "emberhall_cellars": "Finish the fight beneath Emberhall.",
         "act1_complete": "Close out Act I and prepare for the next march.",
         "act2_claims_council": "Hold the claims council together and set the expedition's direction.",
         "act2_expedition_hub": "Pick the next Act II lead and keep the expedition moving.",
         "hushfen_pale_circuit": "Learn what Hushfen's dead still remember.",
-        "neverwinter_wood_survey_camp": "Secure the survey route through the woods.",
+        "greywake_survey_camp": "Secure the survey route through the woods.",
         "stonehollow_dig": "Stabilize Stonehollow and recover the missing team.",
         "siltlock_counting_house": "Audit Siltlock's water permits, ration tags, and warning bell.",
         "act2_midpoint_convergence": "Keep Iron Hollow from tearing itself apart overnight.",
         "broken_prospect": "Push deeper toward the Resonant Vaults' broken claim.",
         "south_adit": "Free the prisoners from the South Adit.",
-        "wave_echo_outer_galleries": "Break into the deeper galleries safely.",
-        "black_lake_causeway": "Cross the Blackglass route and keep the line intact.",
+        "resonant_vault_outer_galleries": "Break into the deeper galleries safely.",
+        "blackglass_causeway": "Cross the Blackglass route and keep the line intact.",
         "blackglass_relay_house": "Ground the Blackglass relay before the Forge answers it.",
-        "forge_of_spells": "Break the Quiet Choir's hold on the Forge.",
+        "meridian_forge": "Break the Quiet Choir's hold on the Forge.",
         "act2_scaffold_complete": "Bring the truth back out of the Resonant Vaults.",
         "act3_ninth_ledger_opens": "Expose the route that Varyn did not design.",
         "act3_ninth_ledger_aftermath": "Track revealed Ledger pressure and unrecorded choices.",
     }
-    LEGACY_SCENE_ALIASES = {
-        "conyberry_agatha": "hushfen_pale_circuit",
-    }
+    LEGACY_SCENE_ALIASES = RUNTIME_SCENE_ID_ALIASES
     HUD_QUEST_FOCUSED_SCENES = {
-        "phandalin_hub",
+        "iron_hollow_hub",
         "act1_complete",
         "act2_claims_council",
         "act2_expedition_hub",
@@ -409,33 +408,33 @@ class GameBase:
             "wayside_luck_shrine": self.scene_wayside_luck_shrine,
             "greywake_triage_yard": self.scene_greywake_triage_yard,
             "greywake_road_breakout": self.scene_greywake_road_breakout,
-            "neverwinter_briefing": self.scene_neverwinter_briefing,
+            "greywake_briefing": self.scene_greywake_briefing,
             "blackwake_crossing": self.scene_blackwake_crossing,
             "road_decision_post_blackwake": self.scene_road_decision_post_blackwake,
             "road_ambush": self.scene_road_ambush,
-            "high_road_liars_circle": self.scene_high_road_liars_circle,
-            "high_road_false_checkpoint": self.scene_high_road_false_checkpoint,
-            "high_road_false_tollstones": self.scene_high_road_false_tollstones,
-            "phandalin_hub": self.scene_phandalin_hub,
-            "old_owl_well": self.scene_old_owl_well,
-            "wyvern_tor": self.scene_wyvern_tor,
+            "emberway_liars_circle": self.scene_emberway_liars_circle,
+            "emberway_false_checkpoint": self.scene_emberway_false_checkpoint,
+            "emberway_false_tollstones": self.scene_emberway_false_tollstones,
+            "iron_hollow_hub": self.scene_iron_hollow_hub,
+            "blackglass_well": self.scene_blackglass_well,
+            "red_mesa_hold": self.scene_red_mesa_hold,
             "ashfall_watch": self.scene_ashfall_watch,
-            "tresendar_manor": self.scene_tresendar_manor,
+            "duskmere_manor": self.scene_duskmere_manor,
             "emberhall_cellars": self.scene_emberhall_cellars,
             "act1_complete": self.scene_act1_complete,
             "act2_claims_council": self.scene_act2_claims_council,
             "act2_expedition_hub": self.scene_act2_expedition_hub,
             "hushfen_pale_circuit": self.scene_hushfen_pale_circuit,
-            "neverwinter_wood_survey_camp": self.scene_neverwinter_wood_survey_camp,
+            "greywake_survey_camp": self.scene_greywake_survey_camp,
             "stonehollow_dig": self.scene_stonehollow_dig,
             "siltlock_counting_house": self.scene_siltlock_counting_house,
             "act2_midpoint_convergence": self.scene_act2_midpoint_convergence,
             "broken_prospect": self.scene_broken_prospect,
             "south_adit": self.scene_south_adit,
-            "wave_echo_outer_galleries": self.scene_wave_echo_outer_galleries,
-            "black_lake_causeway": self.scene_black_lake_causeway,
+            "resonant_vault_outer_galleries": self.scene_resonant_vault_outer_galleries,
+            "blackglass_causeway": self.scene_blackglass_causeway,
             "blackglass_relay_house": self.scene_blackglass_relay_house,
-            "forge_of_spells": self.scene_forge_of_spells,
+            "meridian_forge": self.scene_meridian_forge,
             "act2_scaffold_complete": self.scene_act2_scaffold_complete,
             "act3_ninth_ledger_opens": self.scene_act3_ninth_ledger_opens,
             "act3_ninth_ledger_aftermath": self.scene_act3_ninth_ledger_aftermath,
@@ -1748,8 +1747,12 @@ class GameBase:
         if self.state is None:
             return
         self.normalize_legacy_scene_key()
+        self.state.flags = canonicalize_flag_mapping(self.state.flags)
         self.state.inventory = canonicalize_item_mapping(self.state.inventory)
         self.state.short_rests_remaining = max(0, self.state.short_rests_remaining)
+        normalize_map_state_ids = getattr(self, "normalize_map_state_ids", None)
+        if callable(normalize_map_state_ids):
+            normalize_map_state_ids()
         ensure_quest_log = getattr(self, "ensure_quest_log", None)
         if callable(ensure_quest_log):
             ensure_quest_log()
@@ -2322,7 +2325,7 @@ class GameBase:
         self.state.flags = {
             "act1_started": True,
             "briefing_seen": True,
-            "phandalin_council_seen": True,
+            "iron_hollow_council_seen": True,
             "steward_vow_made": True,
             "miners_exchange_dispute_resolved": True,
             "miners_exchange_ledgers_checked": True,
@@ -2704,20 +2707,24 @@ class GameBase:
         )
 
     def infer_console_scene_act(self, scene_id: str) -> int:
+        scene_id = runtime_scene_id(scene_id) or scene_id
         if scene_id.startswith("act3_"):
             return 3
         act2_scenes = {
             "act2_claims_council",
             "act2_expedition_hub",
             "hushfen_pale_circuit",
-            "neverwinter_wood_survey_camp",
+            "greywake_survey_camp",
             "stonehollow_dig",
+            "glasswater_intake",
+            "siltlock_counting_house",
             "act2_midpoint_convergence",
             "broken_prospect",
             "south_adit",
-            "wave_echo_outer_galleries",
-            "black_lake_causeway",
-            "forge_of_spells",
+            "resonant_vault_outer_galleries",
+            "blackglass_causeway",
+            "blackglass_relay_house",
+            "meridian_forge",
             "act2_scaffold_complete",
         }
         return 2 if scene_id in act2_scenes else 1
@@ -2728,7 +2735,7 @@ class GameBase:
             return False
         if not self.active_console_state_available():
             return False
-        scene_id = self.LEGACY_SCENE_ALIASES.get(tokens[1], tokens[1])
+        scene_id = runtime_scene_id(tokens[1]) or tokens[1]
         if scene_id not in self._scene_handlers:
             self.say(f"Unknown scene id: {scene_id}.")
             return False
@@ -2744,7 +2751,7 @@ class GameBase:
     def normalize_legacy_scene_key(self) -> None:
         if self.state is None:
             return
-        self.state.current_scene = self.LEGACY_SCENE_ALIASES.get(self.state.current_scene, self.state.current_scene)
+        self.state.current_scene = runtime_scene_id(self.state.current_scene) or self.state.current_scene
 
     def parse_console_bool(self, token: str) -> bool | None:
         lowered = token.strip().lower()

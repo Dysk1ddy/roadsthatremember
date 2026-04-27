@@ -682,7 +682,7 @@ class StoryIntroMixin:
         self.state.flags["wayside_luck_shrine_seen"] = True
         self.state.flags["wayside_luck_bell_seen"] = True
         self.state.flags["elira_first_contact"] = True
-        self.state.flags["neverwinter_elira_met"] = True
+        self.state.flags["greywake_elira_met"] = True
         self.banner("Wayside Luck Shrine")
         self.say(
             "The first bells of Greywake are still only a rumor when you find the shrine: a lucky-road marker under a black oak, "
@@ -758,8 +758,8 @@ class StoryIntroMixin:
                     context="to convince Elira the road needs her before Greywake",
                 ):
                     self.recruit_companion(create_elira_dawnmantle())
-                    self.state.flags["elira_pre_neverwinter_recruited"] = True
-                    self.state.flags["elira_neverwinter_recruited"] = True
+                    self.state.flags["elira_pre_greywake_recruited"] = True
+                    self.state.flags["elira_greywake_recruited"] = True
                     self.state.flags["elira_first_companion"] = True
                     self.wayside_apply_elira_trust()
                     self.speaker("Elira Lanternward", "Then I walk now. The Lantern can keep a shrine; people need hands.")
@@ -770,10 +770,10 @@ class StoryIntroMixin:
                     )
                 else:
                     self.state.flags["elira_wayside_recruit_failed"] = True
-                    self.state.flags["elira_phandalin_fallback_pending"] = True
+                    self.state.flags["elira_iron_hollow_fallback_pending"] = True
                     self.speaker("Elira Lanternward", "Not yet. I will not leave people bleeding because the road might need me more loudly.")
             else:
-                self.state.flags["elira_phandalin_fallback_pending"] = True
+                self.state.flags["elira_iron_hollow_fallback_pending"] = True
                 self.speaker("Elira Lanternward", "Then I will move the wounded toward the city and trust you to keep the road alive.")
         self.state.current_scene = "greywake_triage_yard"
 
@@ -886,15 +886,14 @@ class StoryIntroMixin:
                 if self.skill_check(self.state.player, "Persuasion", dc, context="to convince Elira to join before Greywake breaks"):
                     self.recruit_companion(create_elira_dawnmantle())
                     self.state.flags["elira_greywake_recruited"] = True
-                    self.state.flags["elira_neverwinter_recruited"] = True
                     self.state.flags["elira_first_companion"] = True
                     self.speaker("Elira Lanternward", "Then I stop waiting for the next wound to be carried to me.")
                 else:
                     self.state.flags["elira_greywake_recruit_failed"] = True
-                    self.state.flags["elira_phandalin_fallback_pending"] = True
+                    self.state.flags["elira_iron_hollow_fallback_pending"] = True
                     self.speaker("Elira Lanternward", "Not yet. If the Lantern is kind, you will find me in Iron Hollow before the next prayer turns into triage.")
             else:
-                self.state.flags["elira_phandalin_fallback_pending"] = True
+                self.state.flags["elira_iron_hollow_fallback_pending"] = True
                 self.speaker("Elira Lanternward", "Then I will keep this line breathing and follow the wounded south.")
         self.state.flags["greywake_attack_imminent"] = True
         self.say(
@@ -978,10 +977,10 @@ class StoryIntroMixin:
         if outcome == "fled":
             self.state.flags["greywake_manifest_destroyed"] = True
             self.state.flags["greywake_mira_evidence_kind"] = "burned_manifest_corner"
-            self.state.flags["elira_phandalin_fallback_pending"] = not self.has_companion("Elira Dawnmantle")
+            self.state.flags["elira_iron_hollow_fallback_pending"] = not self.has_companion("Elira Dawnmantle")
             self.add_clue("A burned Greywake manifest corner still shows an outcome mark beside a traveler's name.")
             self.say("You break clear of Greywake before the yard can become a trap, but the manifest burns behind you.")
-            self.state.current_scene = "neverwinter_briefing"
+            self.state.current_scene = "greywake_briefing"
             return
         self.state.flags["greywake_breakout_resolved"] = True
         if self.state.flags.get("greywake_manifest_preserved"):
@@ -989,10 +988,10 @@ class StoryIntroMixin:
         elif not self.state.flags.get("greywake_mira_evidence_kind"):
             self.state.flags["greywake_mira_evidence_kind"] = "yard_witnesses"
         if not self.has_companion("Elira Dawnmantle"):
-            self.state.flags["elira_phandalin_fallback_pending"] = True
+            self.state.flags["elira_iron_hollow_fallback_pending"] = True
         self.reward_party(xp=25, gold=8, reason="holding Greywake Yard before the Greywake briefing")
         self.add_journal("You held Greywake Yard long enough to carry its outcome-marked manifest pressure into Mira Thann's briefing.")
-        self.state.current_scene = "neverwinter_briefing"
+        self.state.current_scene = "greywake_briefing"
 
     def resolve_background_encounter(
         self,
@@ -1496,7 +1495,7 @@ class StoryIntroMixin:
         evidence_kind = self.state.flags.get("greywake_mira_evidence_kind", "yard_witnesses")
         self.state.flags["greywake_mira_reacted"] = True
         if self.has_companion("Elira Dawnmantle") and (
-            self.state.flags.get("elira_pre_neverwinter_recruited") or self.state.flags.get("elira_greywake_recruited")
+            self.state.flags.get("elira_pre_greywake_recruited") or self.state.flags.get("elira_greywake_recruited")
         ):
             self.speaker(
                 "Mira Thann",
@@ -1539,23 +1538,23 @@ class StoryIntroMixin:
         flags = self.state.flags
         if flags.get("varyn_body_defeated_act1") or flags.get("act1_victory_tier"):
             return "post_act1_return"
-        if flags.get("tresendar_cleared") or flags.get("emberhall_revealed"):
+        if flags.get("duskmere_cleared") or flags.get("emberhall_revealed"):
             return "late_act1_return"
         if flags.get("ashfall_watch_cleared"):
             return "post_ashfall_return"
-        if flags.get("old_owl_well_cleared") or flags.get("wyvern_tor_cleared"):
+        if flags.get("blackglass_well_cleared") or flags.get("red_mesa_hold_cleared"):
             return "mid_act1_return"
-        if flags.get("phandalin_arrived"):
-            return "phandalin_return"
-        if flags.get("blackwake_completed") and flags.get("blackwake_return_destination") == "neverwinter":
+        if flags.get("iron_hollow_arrived"):
+            return "iron_hollow_return"
+        if flags.get("blackwake_completed") and flags.get("blackwake_return_destination") == "greywake":
             return "blackwake_return"
         return "initial_briefing"
 
     def mira_city_beneficiary_question_available(self) -> bool:
         assert self.state is not None
         return bool(
-            self.state.flags.get("neverwinter_private_room_intel")
-            or self.state.flags.get("neverwinter_contract_house_political_callback")
+            self.state.flags.get("greywake_private_room_intel")
+            or self.state.flags.get("greywake_contract_house_political_callback")
             or self.has_quest("false_manifest_circuit")
             or self.quest_is_completed("false_manifest_circuit")
         )
@@ -1565,7 +1564,7 @@ class StoryIntroMixin:
         return bool(
             self.state.flags.get("greywake_manifest_preserved")
             or self.state.flags.get("blackwake_completed")
-            or self.state.flags.get("elira_pre_neverwinter_recruited")
+            or self.state.flags.get("elira_pre_greywake_recruited")
             or self.state.flags.get("elira_greywake_recruited")
             or self.has_companion("Elira Dawnmantle")
         )
@@ -1573,14 +1572,14 @@ class StoryIntroMixin:
     def mira_initial_question_options(self) -> list[tuple[str, str]]:
         assert self.state is not None
         options: list[tuple[str, str]] = []
-        if not self.state.flags.get("briefing_q_neverwinter"):
-            options.append(("neverwinter", "\"How is Greywake holding together these days?\""))
-        if not self.state.flags.get("briefing_q_phandalin"):
-            options.append(("phandalin", "\"Tell me what matters most about Iron Hollow before I ride.\""))
+        if not self.state.flags.get("briefing_q_greywake"):
+            options.append(("greywake_briefing", "\"How is Greywake holding together these days?\""))
+        if not self.state.flags.get("briefing_q_iron_hollow"):
+            options.append(("iron_hollow", "\"Tell me what matters most about Iron Hollow before I ride.\""))
         if not self.state.flags.get("briefing_q_brand"):
             options.append(("brand", "\"How dangerous is this Ashen Brand, really?\""))
-        options.extend(self.scene_identity_options("neverwinter_briefing"))
-        if not self.state.flags.get("neverwinter_preparation_done"):
+        options.extend(self.scene_identity_options("greywake_briefing"))
+        if not self.state.flags.get("greywake_preparation_done"):
             options.append(("prep", self.action_option("Make one more stop in Greywake before riding out.")))
         options.append(("inn", self.action_option("Stop by Oren Vale's contract house.")))
         options.append(("leave", self.action_option("Take the writ and head for the Emberway.")))
@@ -1603,22 +1602,22 @@ class StoryIntroMixin:
         flags = self.state.flags
         if flags.get("blackwake_completed") and not flags.get("mira_q_blackwake_return"):
             options.append(("blackwake_return", "\"Blackwake was worse than a side road.\""))
-        if flags.get("phandalin_arrived") and not flags.get("mira_q_phandalin_return"):
-            options.append(("phandalin_return", "\"Iron Hollow is worse than your reports.\""))
+        if flags.get("iron_hollow_arrived") and not flags.get("mira_q_iron_hollow_return"):
+            options.append(("iron_hollow_return", "\"Iron Hollow is worse than your reports.\""))
         if (
-            (flags.get("old_owl_well_cleared") or flags.get("wyvern_tor_cleared"))
+            (flags.get("blackglass_well_cleared") or flags.get("red_mesa_hold_cleared"))
             and not flags.get("mira_q_route_sites_return")
         ):
             options.append(("route_sites_return", "\"The outer sites are not random.\""))
         if flags.get("ashfall_watch_cleared") and not flags.get("mira_q_ashfall_return"):
             options.append(("ashfall_return", "\"Ashfall Watch is broken.\""))
-        if (flags.get("tresendar_cleared") or flags.get("emberhall_revealed")) and not flags.get("mira_q_cellars_return"):
+        if (flags.get("duskmere_cleared") or flags.get("emberhall_revealed")) and not flags.get("mira_q_cellars_return"):
             options.append(("cellars_return", "\"The manor is built over something active.\""))
         if (flags.get("varyn_body_defeated_act1") or flags.get("act1_victory_tier")) and not flags.get("mira_q_act1_after_report"):
             options.append(("act1_after_report", "\"Varyn is beaten.\""))
         if self.mira_city_beneficiary_question_available() and not flags.get("mira_q_city_return"):
             options.append(("city_return", "\"Who inside the city benefits from what we found?\""))
-        leave_text = "Return to Iron Hollow." if flags.get("phandalin_arrived") else "Take the road south."
+        leave_text = "Return to Iron Hollow." if flags.get("iron_hollow_arrived") else "Take the road south."
         options.append(("return_leave", self.action_option(leave_text)))
         return options
 
@@ -1636,7 +1635,7 @@ class StoryIntroMixin:
                 "she has moved two pins on the map and crossed out one tidy assumption.",
                 typed=True,
             )
-        elif stage == "phandalin_return":
+        elif stage == "iron_hollow_return":
             self.say(
                 "Mira's room has changed while you were south. The old Greywake map is still there, but Iron Hollow now sits "
                 "under three pins, two witness strings, and a charcoal note that says: town pressure is not collateral.",
@@ -1666,12 +1665,12 @@ class StoryIntroMixin:
                 typed=True,
             )
 
-    def mira_handle_neverwinter_question(self, *, return_context: bool = False) -> None:
+    def mira_handle_greywake_briefing_question(self, *, return_context: bool = False) -> None:
         assert self.state is not None
         if return_context:
-            self.state.flags["mira_q_neverwinter_return"] = True
+            self.state.flags["mira_q_greywake_return"] = True
         else:
-            self.state.flags["briefing_q_neverwinter"] = True
+            self.state.flags["briefing_q_greywake"] = True
         self.speaker(
             "Mira Thann",
             "Greywake is still functioning. The council calls that resilience. I call it a city holding itself together with wet rope, ledgers, and habit.",
@@ -1698,12 +1697,12 @@ class StoryIntroMixin:
             "I need capable hands that can move faster than permission and report back before the official version hardens around the wrong lie.",
         )
 
-    def mira_handle_phandalin_question(self, *, return_context: bool = False) -> None:
+    def mira_handle_iron_hollow_question(self, *, return_context: bool = False) -> None:
         assert self.state is not None
         if return_context:
-            self.state.flags["mira_q_phandalin_return"] = True
+            self.state.flags["mira_q_iron_hollow_return"] = True
         else:
-            self.state.flags["briefing_q_phandalin"] = True
+            self.state.flags["briefing_q_iron_hollow"] = True
         self.speaker(
             "Mira Thann",
             "Iron Hollow was built by people willing to stack fresh timber against old ruin stone and keep using both. That makes them practical, stubborn, and easy to shake if someone can make tomorrow's bread look uncertain.",
@@ -1714,7 +1713,7 @@ class StoryIntroMixin:
         )
         if self.state.flags.get("steward_vow_made"):
             self.speaker("Mira Thann", "Tessa Harrow will remember a vow. Be careful with that. Frontier towns live on promises, but they also keep score.")
-        if self.state.flags.get("phandalin_arrived") and self.state.flags.get("steward_seen"):
+        if self.state.flags.get("iron_hollow_arrived") and self.state.flags.get("steward_seen"):
             self.speaker("Mira Thann", "Now you have seen Tessa's room. Iron Hollow is spending itself to stay upright.")
         if self.state.flags.get("stonehill_instigator_unmasked"):
             self.speaker("Mira Thann", "The paid mouth at Ashlamp tells me the Brand is attacking the room before the road. That is cheaper than killing a caravan and usually cleaner.")
@@ -1741,9 +1740,9 @@ class StoryIntroMixin:
             self.speaker("Mira Thann", "Those false road marks you found near the shrine matter. The Brand is borrowing the shape of authority long enough to make honest people obey the wrong command.")
         if self.state.flags.get("greywake_outcome_sorting_seen"):
             self.speaker("Mira Thann", "Greywake makes the danger uglier. Someone is building the road to accept these losses as normal before the wagons even arrive.")
-        if self.state.flags.get("old_owl_notes_found") or self.state.flags.get("varyn_filter_logic_seen"):
+        if self.state.flags.get("blackglass_well_notes_found") or self.state.flags.get("varyn_filter_logic_seen"):
             self.speaker("Mira Thann", "Blackglass Well adds a filter to the pattern. They are sorting fear by type and choosing which version travels best.")
-        if self.state.flags.get("wyvern_beast_stampede") or self.state.flags.get("varyn_detour_logic_seen"):
+        if self.state.flags.get("red_mesa_beast_stampede") or self.state.flags.get("varyn_detour_logic_seen"):
             self.speaker("Mira Thann", "Red Mesa Hold shows the other hand: force the road to detour, then punish the detour until the detour feels inevitable.")
         if self.state.flags.get("cinderfall_relay_destroyed"):
             self.speaker("Mira Thann", "Cinderfall was a relay station. It carried messages, timing, and fallback orders. You burned a nerve out of the line.")
@@ -1793,7 +1792,7 @@ class StoryIntroMixin:
                 "Elira Lanternward",
                 "The wounded are people first. If their pain becomes proof, it is because someone tried to bury them with it.",
             )
-        elif self.state.flags.get("elira_phandalin_fallback_pending"):
+        elif self.state.flags.get("elira_iron_hollow_fallback_pending"):
             self.speaker(
                 "Mira Thann",
                 "Then she will move with the wounded. If the road lets her reach Iron Hollow, find her at the shrine. If the road does not, remember that delay has a body count.",
@@ -1809,7 +1808,7 @@ class StoryIntroMixin:
             self.speaker("Mira Thann", "Wary respect from a field healer beats praise from a comfortable officer.")
         elif trust == "reserved_kindness":
             self.speaker("Mira Thann", "She is kind, but do not confuse that for easy trust. People who work triage learn the cost of every delay.")
-        if self.state.flags.get("elira_phandalin_recruited"):
+        if self.state.flags.get("elira_iron_hollow_recruited"):
             self.speaker("Mira Thann", "So she waited until the town itself became the patient. That sounds like Dawnmantle. Do not waste what it cost her to leave.")
         if self.has_companion("Elira Dawnmantle"):
             self.speaker(
@@ -1831,7 +1830,7 @@ class StoryIntroMixin:
                 "Mira Thann",
                 "Oren's room, Sabra's manifest, Vessa's buyer phrase, and Garren's roadwarden cadence give me four corners of the same table. Now I can press without guessing where the legs are.",
             )
-        if self.state.flags.get("neverwinter_contract_house_blackwake_reported"):
+        if self.state.flags.get("greywake_contract_house_blackwake_reported"):
             self.speaker("Mira Thann", "Your Blackwake report gave those witnesses teeth. Before that, they were useful rumors. Now they are pressure.")
         self.speaker("Mira Thann", "I am asking you to bring back facts so clean that the officials expose themselves trying to explain them away.")
 
@@ -1870,13 +1869,13 @@ class StoryIntroMixin:
             self.speaker("Mira Thann", "Blackwake is too close to the city to dismiss as frontier noise.")
         if self.state.flags.get("blackwake_sereth_fate") == "escaped":
             self.speaker("Mira Thann", "Sereth Vane escaping means the road still has a clever coward in it. Clever cowards are dangerous because they learn.")
-        if self.state.flags.get("neverwinter_private_room_intel"):
+        if self.state.flags.get("greywake_private_room_intel"):
             self.speaker("Mira Thann", "Oren and Sabra can make this hurt in the city. Vessa will charge us for honesty. Garren will pretend he is not relieved to finally be useful. I can use all of that.")
         self.speaker("Mira Thann", "Go south. Iron Hollow needs the next answer before Greywake finishes arguing over the first.")
 
-    def mira_handle_phandalin_return_question(self) -> None:
+    def mira_handle_iron_hollow_return_question(self) -> None:
         assert self.state is not None
-        self.state.flags["mira_q_phandalin_return"] = True
+        self.state.flags["mira_q_iron_hollow_return"] = True
         if self.state.flags.get("steward_seen"):
             self.speaker("Mira Thann", "Tessa Harrow usually sounds tired in writing. If she looked tired in person, assume the town is closer to breaking than she wants Greywake to know.")
         if self.state.flags.get("steward_vow_made"):
@@ -1897,17 +1896,17 @@ class StoryIntroMixin:
     def mira_handle_route_sites_return_question(self) -> None:
         assert self.state is not None
         self.state.flags["mira_q_route_sites_return"] = True
-        old_owl = self.state.flags.get("old_owl_well_cleared")
-        wyvern = self.state.flags.get("wyvern_tor_cleared")
+        old_owl = self.state.flags.get("blackglass_well_cleared")
+        wyvern = self.state.flags.get("red_mesa_hold_cleared")
         if old_owl and wyvern:
             self.speaker("Mira Thann", "Blackglass Well and Red Mesa Hold are two jaws of the same trap. One teaches fear to linger. The other teaches traffic to move where the Brand wants it.")
         elif old_owl:
             self.speaker("Mira Thann", "Blackglass Well first. Then the Brand is willing to mix old dead things with new logistics. That is either desperation or doctrine. I dislike both.")
         elif wyvern:
             self.speaker("Mira Thann", "Red Mesa Hold first. Hill pressure, beast panic, and forced detours. That is a road commander's language.")
-        if self.state.flags.get("old_owl_notes_found"):
+        if self.state.flags.get("blackglass_well_notes_found"):
             self.speaker("Mira Thann", "Those notes matter. They read people as categories, not enemies. That matches Greywake too closely for comfort.")
-        if self.state.flags.get("wyvern_beast_stampede"):
+        if self.state.flags.get("red_mesa_beast_stampede"):
             self.speaker("Mira Thann", "A stampede is useful because nobody asks who ordered an animal to panic. Remember that.")
         if self.state.flags.get("hidden_route_unlocked") or self.state.flags.get("cinderfall_ruins_cleared"):
             self.speaker("Mira Thann", "Cinderfall was the missing hinge. Routes do not bend by themselves. Something was relaying the pressure.")
@@ -1934,14 +1933,14 @@ class StoryIntroMixin:
             "Mira Thann",
             "Old stone gives criminals privacy. Older stone gives worse things patience. If the Brand used Duskmere for shelter and work, then Iron Hollow has been standing over part of the answer since the beginning.",
         )
-        route = self.state.flags.get("tresendar_nothic_route")
+        route = self.state.flags.get("duskmere_nothic_route")
         if route == "kill":
             self.speaker("Mira Thann", "You killed the thing in the dark. That is sometimes the only clean sentence a report gets.")
         elif route == "trade":
             self.speaker("Mira Thann", "You traded with it. I will not scold you until I know whether the price follows you home.")
         elif route == "deceive":
             self.speaker("Mira Thann", "You lied to a thing built to eat truths. Brave, foolish, or useful. I will decide after you survive the consequences.")
-        if self.state.flags.get("tresendar_nothic_wave_echo_lore"):
+        if self.state.flags.get("duskmere_nothic_resonant_vault_lore"):
             self.speaker("Mira Thann", "Resonant Vaults again. That name keeps appearing where ordinary banditry should have run out of imagination.")
         self.speaker("Mira Thann", "Officially? No. Unofficially? You are already the intervention.")
 
@@ -1964,11 +1963,11 @@ class StoryIntroMixin:
         self.speaker("Mira Thann", "Privately, I start tracking every route that behaved like it had a memory. The next enemy may not call itself the Ashen Brand. It may not need to.")
 
     def mira_handle_question(self, selection_key: str, stage: str) -> bool:
-        if selection_key == "neverwinter":
-            self.mira_handle_neverwinter_question()
+        if selection_key in {"greywake_briefing", "neverwinter"}:
+            self.mira_handle_greywake_briefing_question()
             return True
-        if selection_key == "phandalin":
-            self.mira_handle_phandalin_question()
+        if selection_key in {"iron_hollow", "phandalin"}:
+            self.mira_handle_iron_hollow_question()
             return True
         if selection_key == "brand":
             self.mira_handle_brand_question()
@@ -1988,8 +1987,8 @@ class StoryIntroMixin:
         if selection_key == "blackwake_return":
             self.mira_handle_blackwake_return_question()
             return True
-        if selection_key == "phandalin_return":
-            self.mira_handle_phandalin_return_question()
+        if selection_key == "iron_hollow_return":
+            self.mira_handle_iron_hollow_return_question()
             return True
         if selection_key == "route_sites_return":
             self.mira_handle_route_sites_return_question()
@@ -2010,12 +2009,12 @@ class StoryIntroMixin:
 
     def mira_leave_return_briefing(self) -> None:
         assert self.state is not None
-        if self.state.flags.get("phandalin_arrived"):
-            self.return_to_phandalin("You leave Mira's counting room and take the long road back to Iron Hollow's unfinished arguments.")
+        if self.state.flags.get("iron_hollow_arrived"):
+            self.return_to_iron_hollow("You leave Mira's counting room and take the long road back to Iron Hollow's unfinished arguments.")
             return
-        self.handle_neverwinter_departure_fork()
+        self.handle_greywake_departure_fork()
 
-    def scene_neverwinter_briefing(self) -> None:
+    def scene_greywake_briefing(self) -> None:
         assert self.state is not None
         self.banner("Act I: Ashes on the Emberway")
         stage = self.mira_dialogue_stage()
@@ -2045,23 +2044,23 @@ class StoryIntroMixin:
             choice = self.scenario_choice("Choose your response to Mira.", [text for _, text in options])
             selection_key, selection = options[choice - 1]
             if selection_key.startswith(("class:", "race:")):
-                if self.handle_scene_identity_action("neverwinter_briefing", selection_key):
+                if self.handle_scene_identity_action("greywake_briefing", selection_key):
                     continue
             self.player_choice_output(selection)
             if self.mira_handle_question(selection_key, stage):
                 continue
             if selection_key == "prep":
-                self.handle_neverwinter_prep()
+                self.handle_greywake_prep()
             elif selection_key == "inn":
-                self.visit_neverwinter_contract_house()
+                self.visit_greywake_contract_house()
             elif selection_key == "return_leave":
                 self.mira_leave_return_briefing()
                 return
             else:
-                self.handle_neverwinter_departure_fork()
+                self.handle_greywake_departure_fork()
                 return
 
-    def handle_neverwinter_prep(self) -> None:
+    def handle_greywake_prep(self) -> None:
         assert self.state is not None
         choice = self.scenario_choice(
             "Pick one last preparation before you leave Greywake.",
@@ -2103,55 +2102,55 @@ class StoryIntroMixin:
                 self.reward_party(gold=4, reason="working the rumor mill")
         else:
             self.say("You keep your focus on the road ahead.")
-        self.state.flags["neverwinter_preparation_done"] = True
+        self.state.flags["greywake_preparation_done"] = True
 
-    def neverwinter_has_oren_interactions(self) -> bool:
+    def greywake_has_oren_interactions(self) -> bool:
         assert self.state is not None
         return bool(
-            not self.state.flags.get("neverwinter_oren_met")
+            not self.state.flags.get("greywake_oren_met")
             or (self.has_quest("false_manifest_circuit") and not self.state.flags.get("false_manifest_oren_detail"))
-            or not self.state.flags.get("neverwinter_oren_room_asked")
-            or not self.state.flags.get("neverwinter_oren_mira_asked")
+            or not self.state.flags.get("greywake_oren_room_asked")
+            or not self.state.flags.get("greywake_oren_mira_asked")
             or (
-                self.state.flags.get("quest_reward_neverwinter_private_room_access")
-                and not self.state.flags.get("neverwinter_private_room_scene_done")
+                self.state.flags.get("quest_reward_greywake_private_room_access")
+                and not self.state.flags.get("greywake_private_room_scene_done")
             )
         )
 
-    def neverwinter_has_sabra_interactions(self) -> bool:
+    def greywake_has_sabra_interactions(self) -> bool:
         assert self.state is not None
         return bool(
-            not self.state.flags.get("neverwinter_sabra_met")
+            not self.state.flags.get("greywake_sabra_met")
             or self.quest_is_ready("false_manifest_circuit")
             or (not self.has_quest("false_manifest_circuit") and not self.quest_is_completed("false_manifest_circuit"))
             or (self.has_quest("false_manifest_circuit") and not self.quest_is_completed("false_manifest_circuit"))
-            or not self.state.flags.get("neverwinter_sabra_fear_asked")
+            or not self.state.flags.get("greywake_sabra_fear_asked")
         )
 
-    def neverwinter_has_vessa_interactions(self) -> bool:
+    def greywake_has_vessa_interactions(self) -> bool:
         assert self.state is not None
         has_blessing = self.has_story_skill_modifier(self.state.player, self.LIARS_BLESSING_MODIFIER_ID)
         return bool(
-            not self.state.flags.get("neverwinter_vessa_met")
+            not self.state.flags.get("greywake_vessa_met")
             or (self.has_quest("false_manifest_circuit") and not self.state.flags.get("false_manifest_vessa_detail"))
-            or not self.state.flags.get("neverwinter_vessa_cards_played")
-            or (has_blessing and not self.state.flags.get("neverwinter_smuggler_phrase_known"))
-            or not self.state.flags.get("neverwinter_vessa_smoke_asked")
+            or not self.state.flags.get("greywake_vessa_cards_played")
+            or (has_blessing and not self.state.flags.get("greywake_smuggler_phrase_known"))
+            or not self.state.flags.get("greywake_vessa_smoke_asked")
         )
 
-    def neverwinter_has_garren_interactions(self) -> bool:
+    def greywake_has_garren_interactions(self) -> bool:
         assert self.state is not None
         return bool(
-            not self.state.flags.get("neverwinter_garren_met")
+            not self.state.flags.get("greywake_garren_met")
             or (self.has_quest("false_manifest_circuit") and not self.state.flags.get("false_manifest_garren_detail"))
-            or not self.state.flags.get("neverwinter_garren_route_asked")
-            or not self.state.flags.get("neverwinter_garren_pressed")
+            or not self.state.flags.get("greywake_garren_route_asked")
+            or not self.state.flags.get("greywake_garren_pressed")
         )
 
-    def visit_neverwinter_contract_house(self) -> None:
+    def visit_greywake_contract_house(self) -> None:
         assert self.state is not None
-        if not self.state.flags.get("neverwinter_contract_house_seen"):
-            self.state.flags["neverwinter_contract_house_seen"] = True
+        if not self.state.flags.get("greywake_contract_house_seen"):
+            self.state.flags["greywake_contract_house_seen"] = True
             self.banner("Oren Vale's Contract House")
             self.introduce_character("Oren Vale")
             self.say(
@@ -2165,19 +2164,19 @@ class StoryIntroMixin:
             )
         while True:
             self.refresh_quest_statuses(announce=False)
-            if self.state.flags.get("neverwinter_ash_in_the_ale_ready"):
-                self.neverwinter_resolve_ash_in_the_ale()
+            if self.state.flags.get("greywake_ash_in_the_ale_ready"):
+                self.greywake_resolve_ash_in_the_ale()
                 continue
             options: list[tuple[str, str]] = []
-            if self.state.flags.get("quest_reward_neverwinter_private_room_access") and not self.state.flags.get("neverwinter_private_room_scene_done"):
+            if self.state.flags.get("quest_reward_greywake_private_room_access") and not self.state.flags.get("greywake_private_room_scene_done"):
                 options.append(("private_room", self.action_option("Take Oren's offer and use the upstairs private room.")))
-            if self.neverwinter_has_oren_interactions():
+            if self.greywake_has_oren_interactions():
                 options.append(("oren", "\"Oren Vale looks like he already priced this conversation.\""))
-            if self.neverwinter_has_sabra_interactions():
+            if self.greywake_has_sabra_interactions():
                 options.append(("sabra", "\"Let me see the ledgers Sabra Kestrel keeps glaring at.\""))
-            if self.neverwinter_has_vessa_interactions():
+            if self.greywake_has_vessa_interactions():
                 options.append(("vessa", "\"Sit in on Vessa Marr's card table.\""))
-            if self.neverwinter_has_garren_interactions():
+            if self.greywake_has_garren_interactions():
                 options.append(("garren", "\"Ask Garren Flint how false roadwarden seals keep getting obeyed.\""))
             options.extend(
                 [
@@ -2193,24 +2192,24 @@ class StoryIntroMixin:
             )
             selection_key, _ = options[choice - 1]
             if selection_key == "private_room":
-                self.neverwinter_use_private_room()
+                self.greywake_use_private_room()
             elif selection_key == "oren":
-                self.neverwinter_talk_oren()
+                self.greywake_talk_oren()
             elif selection_key == "sabra":
-                self.neverwinter_talk_sabra()
+                self.greywake_talk_sabra()
             elif selection_key == "vessa":
-                self.neverwinter_talk_vessa()
+                self.greywake_talk_vessa()
             elif selection_key == "garren":
-                self.neverwinter_talk_garren()
+                self.greywake_talk_garren()
             elif selection_key == "rest":
                 self.paid_inn_long_rest("Oren Vale's contract house")
             else:
                 return
 
-    def neverwinter_talk_oren(self) -> None:
+    def greywake_talk_oren(self) -> None:
         assert self.state is not None
-        if not self.state.flags.get("neverwinter_oren_met"):
-            self.state.flags["neverwinter_oren_met"] = True
+        if not self.state.flags.get("greywake_oren_met"):
+            self.state.flags["greywake_oren_met"] = True
             self.speaker(
                 "Oren Vale",
                 "I do not mind dangerous people. I mind loud ones. Dangerous and quiet can still finish a meal.",
@@ -2228,11 +2227,11 @@ class StoryIntroMixin:
                         ),
                     )
                 )
-            if not self.state.flags.get("neverwinter_oren_room_asked"):
+            if not self.state.flags.get("greywake_oren_room_asked"):
                 options.append(("room", "\"What kind of business hides in a room like this?\""))
-            if not self.state.flags.get("neverwinter_oren_mira_asked"):
+            if not self.state.flags.get("greywake_oren_mira_asked"):
                 options.append(("mira", "\"What does Mira actually buy from you besides quiet tables?\""))
-            if self.state.flags.get("quest_reward_neverwinter_private_room_access") and not self.state.flags.get("neverwinter_private_room_scene_done"):
+            if self.state.flags.get("quest_reward_greywake_private_room_access") and not self.state.flags.get("greywake_private_room_scene_done"):
                 options.append(("access", self.action_option("Ask whether the upstairs room is ready.")))
             options.append(("leave", self.action_option("Leave Oren to his careful hospitality.")))
             choice = self.scenario_choice("Choose what you say to Oren Vale.", [text for _, text in options], allow_meta=False)
@@ -2249,14 +2248,14 @@ class StoryIntroMixin:
                 else:
                     self.speaker("Oren Vale", "Closer. The lie is in the confidence, not the handwriting.")
             elif selection_key == "room":
-                self.state.flags["neverwinter_oren_room_asked"] = True
+                self.state.flags["greywake_oren_room_asked"] = True
                 self.player_speaker("What kind of business hides in a room like this?")
                 self.speaker(
                     "Oren Vale",
                     "Mostly the sort that wants a witness without wanting a crowd. Contracts, reconciliations, and people deciding whether a bad truth is cheaper than a useful lie.",
                 )
             elif selection_key == "mira":
-                self.state.flags["neverwinter_oren_mira_asked"] = True
+                self.state.flags["greywake_oren_mira_asked"] = True
                 self.player_speaker("What does Mira actually buy from you besides quiet tables?")
                 self.speaker(
                     "Oren Vale",
@@ -2268,16 +2267,16 @@ class StoryIntroMixin:
                     "Oren Vale",
                     "You bought enough truth to merit better walls. Use the back room before somebody poorer in judgment realizes what Sabra just learned.",
                 )
-                self.neverwinter_use_private_room()
+                self.greywake_use_private_room()
                 return
             else:
                 self.player_action("You leave Oren to his careful hospitality.")
                 return
 
-    def neverwinter_talk_sabra(self) -> None:
+    def greywake_talk_sabra(self) -> None:
         assert self.state is not None
-        if not self.state.flags.get("neverwinter_sabra_met"):
-            self.state.flags["neverwinter_sabra_met"] = True
+        if not self.state.flags.get("greywake_sabra_met"):
+            self.state.flags["greywake_sabra_met"] = True
             self.speaker(
                 "Sabra Kestrel",
                 "Missing cargo would bother me less if it stayed missing honestly. These ledgers are being corrected by someone who expects not to be checked.",
@@ -2291,7 +2290,7 @@ class StoryIntroMixin:
                 options.append(("quest", "\"Which ledger line is wrong enough to matter before I ride?\""))
             elif self.has_quest("false_manifest_circuit") and not self.quest_is_completed("false_manifest_circuit"):
                 options.append(("reminder", "\"Whose detail are you still missing from the manifest line?\""))
-            if not self.state.flags.get("neverwinter_sabra_fear_asked"):
+            if not self.state.flags.get("greywake_sabra_fear_asked"):
                 options.append(("fear", "\"Which caravan frightens you most?\""))
             options.append(("leave", self.action_option("Leave Sabra to her ledgers and ink stains.")))
             choice = self.scenario_choice("Choose what you say to Sabra Kestrel.", [text for _, text in options], allow_meta=False)
@@ -2333,7 +2332,7 @@ class StoryIntroMixin:
                         "That is the whole shape of it, then. Bring it back before the room talks itself into forgetting how obvious it now feels.",
                     )
             elif selection_key == "fear":
-                self.state.flags["neverwinter_sabra_fear_asked"] = True
+                self.state.flags["greywake_sabra_fear_asked"] = True
                 self.player_speaker("Which caravan frightens you most?")
                 self.speaker(
                     "Sabra Kestrel",
@@ -2344,11 +2343,11 @@ class StoryIntroMixin:
                 self.player_action("You leave Sabra to her ledgers and ink stains.")
                 return
 
-    def neverwinter_talk_vessa(self) -> None:
+    def greywake_talk_vessa(self) -> None:
         assert self.state is not None
         has_blessing = self.has_story_skill_modifier(self.state.player, self.LIARS_BLESSING_MODIFIER_ID)
-        if not self.state.flags.get("neverwinter_vessa_met"):
-            self.state.flags["neverwinter_vessa_met"] = True
+        if not self.state.flags.get("greywake_vessa_met"):
+            self.state.flags["greywake_vessa_met"] = True
             self.speaker(
                 "Vessa Marr",
                 "Everyone lies at cards. The interesting part is what they choose not to lie about.",
@@ -2366,9 +2365,9 @@ class StoryIntroMixin:
                         ),
                     )
                 )
-            if not self.state.flags.get("neverwinter_vessa_cards_played"):
+            if not self.state.flags.get("greywake_vessa_cards_played"):
                 options.append(("cards", self.quoted_option("SLEIGHT OF HAND", "Sit for one hand and make the table show its tells.")))
-            if has_blessing and not self.state.flags.get("neverwinter_smuggler_phrase_known"):
+            if has_blessing and not self.state.flags.get("greywake_smuggler_phrase_known"):
                 options.append(
                     (
                         "blessing",
@@ -2378,7 +2377,7 @@ class StoryIntroMixin:
                         ),
                     )
                 )
-            if not self.state.flags.get("neverwinter_vessa_smoke_asked"):
+            if not self.state.flags.get("greywake_vessa_smoke_asked"):
                 options.append(("smoke", "\"What does the river-cut smoke mean to the people who profit from it?\""))
             options.append(("leave", self.action_option("Leave Vessa Marr to the cards and the gold.")))
             choice = self.scenario_choice("Choose what you say to Vessa Marr.", [text for _, text in options], allow_meta=False)
@@ -2395,10 +2394,10 @@ class StoryIntroMixin:
                 else:
                     self.speaker("Vessa Marr", "Pretty read. Wrong heartbeat.")
             elif selection_key == "cards":
-                self.state.flags["neverwinter_vessa_cards_played"] = True
+                self.state.flags["greywake_vessa_cards_played"] = True
                 self.player_speaker("Sit for one hand and make the table show its tells.")
                 if self.skill_check(self.state.player, "Sleight of Hand", 12, context="to stay ahead of Vessa's card table without becoming the room's punchline"):
-                    self.state.flags["neverwinter_smuggler_phrase_known"] = True
+                    self.state.flags["greywake_smuggler_phrase_known"] = True
                     self.reward_party(xp=10, gold=8, reason="surviving Vessa Marr's card table")
                     self.speaker(
                         "Vessa Marr",
@@ -2406,18 +2405,18 @@ class StoryIntroMixin:
                     )
                 else:
                     self.say("A loaded cup hits the wall before the hand is even fully called. Too many bruised egos decide they would rather be righteous than lucky.")
-                    self.state.flags["neverwinter_ash_in_the_ale_ready"] = True
+                    self.state.flags["greywake_ash_in_the_ale_ready"] = True
                     return
             elif selection_key == "blessing":
                 self.player_action("Name the false buyer Vessa is expecting and let the table correct you.")
-                self.state.flags["neverwinter_smuggler_phrase_known"] = True
+                self.state.flags["greywake_smuggler_phrase_known"] = True
                 self.reward_party(xp=10, gold=4, reason="turning Liar's Blessing into a card-table passphrase")
                 self.speaker(
                     "Vessa Marr",
                     "Rain-marked? Gods, no. That phrase would get you robbed in three districts. The real buyers ask whether the load is blue before they ask whether it is legal.",
                 )
             elif selection_key == "smoke":
-                self.state.flags["neverwinter_vessa_smoke_asked"] = True
+                self.state.flags["greywake_vessa_smoke_asked"] = True
                 self.state.flags["blackwake_millers_ford_lead"] = True
                 self.player_speaker("What does the river-cut smoke mean to the people who profit from it?")
                 self.speaker(
@@ -2428,10 +2427,10 @@ class StoryIntroMixin:
                 self.player_action("You leave Vessa Marr to the cards and the gold.")
                 return
 
-    def neverwinter_talk_garren(self) -> None:
+    def greywake_talk_garren(self) -> None:
         assert self.state is not None
-        if not self.state.flags.get("neverwinter_garren_met"):
-            self.state.flags["neverwinter_garren_met"] = True
+        if not self.state.flags.get("greywake_garren_met"):
+            self.state.flags["greywake_garren_met"] = True
             self.speaker(
                 "Garren Flint",
                 "A fake seal only works if honest people are already tired enough to obey it.",
@@ -2449,9 +2448,9 @@ class StoryIntroMixin:
                         ),
                     )
                 )
-            if not self.state.flags.get("neverwinter_garren_route_asked"):
+            if not self.state.flags.get("greywake_garren_route_asked"):
                 options.append(("route", "\"How are the false seals getting traction at all?\""))
-            if not self.state.flags.get("neverwinter_garren_pressed"):
+            if not self.state.flags.get("greywake_garren_pressed"):
                 options.append(("pressure", self.quoted_option("INTIMIDATION", "Stop protecting whoever taught the Brand your cadence.")))
             options.append(("leave", self.action_option("Leave Garren Flint to his cooling temper.")))
             choice = self.scenario_choice("Choose what you say to Garren Flint.", [text for _, text in options], allow_meta=False)
@@ -2468,7 +2467,7 @@ class StoryIntroMixin:
                 else:
                     self.speaker("Garren Flint", "Ask me cleaner when the room sounds less thirsty for a spectacle.")
             elif selection_key == "route":
-                self.state.flags["neverwinter_garren_route_asked"] = True
+                self.state.flags["greywake_garren_route_asked"] = True
                 self.state.flags["blackwake_gallows_copse_lead"] = True
                 self.player_speaker("How are the false seals getting traction at all?")
                 self.speaker(
@@ -2476,7 +2475,7 @@ class StoryIntroMixin:
                     "Because the road has been tired for months. Too many hungry hands, not enough clean patrols, and one copied seal is all panic needs before it starts obeying the wrong man.",
                 )
             elif selection_key == "pressure":
-                self.state.flags["neverwinter_garren_pressed"] = True
+                self.state.flags["greywake_garren_pressed"] = True
                 self.player_speaker("Stop protecting whoever taught the Brand your cadence.")
                 if self.skill_check(self.state.player, "Intimidation", 12, context="to force the truth past Garren's pride without breaking the room"):
                     self.state.flags["blackwake_gallows_copse_lead"] = True
@@ -2486,15 +2485,15 @@ class StoryIntroMixin:
                     )
                 else:
                     self.say("A chair scrapes back too hard. One teamster thinks Garren has been accused of the thing he merely failed to stop, and the room starts choosing sides faster than sense can keep up.")
-                    self.state.flags["neverwinter_ash_in_the_ale_ready"] = True
+                    self.state.flags["greywake_ash_in_the_ale_ready"] = True
                     return
             else:
                 self.player_action("You leave Garren Flint to his cooling temper.")
                 return
 
-    def neverwinter_resolve_ash_in_the_ale(self) -> None:
+    def greywake_resolve_ash_in_the_ale(self) -> None:
         assert self.state is not None
-        self.state.flags["neverwinter_ash_in_the_ale_ready"] = False
+        self.state.flags["greywake_ash_in_the_ale_ready"] = False
         self.banner("Ash In The Ale")
         self.say(
             "A cup bursts against the wall hard enough to silence three nearby tables. One teamster is on his feet, another swears the cards or the road-talk were rigged, and the whole room has started deciding whose embarrassment deserves help.",
@@ -2530,10 +2529,10 @@ class StoryIntroMixin:
             success = self.skill_check(self.state.player, "Athletics", 12, context="to absorb the first tavern shove and own the space after it")
         else:
             self.player_action("Let the room settle itself.")
-        self.state.flags["neverwinter_ash_in_the_ale_resolved"] = True
+        self.state.flags["greywake_ash_in_the_ale_resolved"] = True
         if success:
-            self.state.flags["neverwinter_oren_trust"] = int(self.state.flags.get("neverwinter_oren_trust", 0)) + 1
-            self.state.flags["blackwake_neverwinter_rumor"] = True
+            self.state.flags["greywake_oren_trust"] = int(self.state.flags.get("greywake_oren_trust", 0)) + 1
+            self.state.flags["blackwake_greywake_rumor"] = True
             self.reward_party(xp=15, gold=6, reason="settling the contract-house flare-up before it became a brawl")
             self.speaker(
                 "Oren Vale",
@@ -2544,7 +2543,7 @@ class StoryIntroMixin:
             self.apply_status(self.state.player, "reeling", 1, source="the contract-house brawl")
             self.say("The room resolves itself with scraped knuckles, overturned cups, and one hard shove that reminds you why Oren charges for quiet.")
 
-    def neverwinter_use_private_room(self) -> None:
+    def greywake_use_private_room(self) -> None:
         assert self.state is not None
         self.banner("Upstairs Contract Room")
         self.say(
@@ -2601,7 +2600,7 @@ class StoryIntroMixin:
             self.player_action("Read which missing caravan line Sabra keeps watching when she thinks nobody sees.")
             if self.skill_check(self.state.player, "Insight", 12, context="to read Sabra's fear past the ledger ink"):
                 reward_xp = 15
-                self.state.flags["blackwake_neverwinter_rumor"] = True
+                self.state.flags["blackwake_greywake_rumor"] = True
                 self.say("Sabra never watches the most expensive cargo line. She watches the one that disappeared before it was supposed to exist on paper at all.")
             else:
                 self.say("You catch the fear, if not the neatest explanation behind it.")
@@ -2619,23 +2618,23 @@ class StoryIntroMixin:
             self.state.flags["blackwake_millers_ford_lead"] = True
             self.state.flags["road_patrol_writ"] = True
             self.say("The lie lands exactly badly enough. Sabra flinches, Oren corrects you on instinct, and the manifest chain all but writes itself into the silence.")
-        self.state.flags["neverwinter_private_room_scene_done"] = True
-        self.state.flags["neverwinter_private_room_intel"] = True
+        self.state.flags["greywake_private_room_scene_done"] = True
+        self.state.flags["greywake_private_room_intel"] = True
         self.add_clue("Oren and Sabra's upstairs room confirms that copied manifests, false room bookings, and fake roadwarden cadence are all part of one Greywake-side correction line feeding the frontier.")
         self.add_journal(
             "In Oren Vale's upstairs room, you tied Sabra's altered manifests to the same contract-house habits feeding false road authority toward the Emberway."
         )
         self.reward_party(xp=reward_xp, reason="working the private room above Oren Vale's contract house")
 
-    def handle_neverwinter_tymora_shrine(self) -> None:
+    def handle_greywake_tymora_shrine(self) -> None:
         assert self.state is not None
         if self.state.flags.get("greywake_breakout_resolved"):
-            self.state.flags["neverwinter_tymora_shrine_seen"] = True
+            self.state.flags["greywake_tymora_shrine_seen"] = True
             return
-        if self.state.flags.get("neverwinter_tymora_shrine_seen"):
+        if self.state.flags.get("greywake_tymora_shrine_seen"):
             return
-        self.state.flags["neverwinter_tymora_shrine_seen"] = True
-        self.state.flags["neverwinter_elira_met"] = True
+        self.state.flags["greywake_tymora_shrine_seen"] = True
+        self.state.flags["greywake_elira_met"] = True
         self.banner("South Gate Shrine of the Lantern")
         self.say(
             "Mira's writ takes you through Greywake's southern gate, where a temporary Lantern shrine has been lashed "
@@ -2663,7 +2662,7 @@ class StoryIntroMixin:
             helped_elira = self.skill_check(self.state.player, "Medicine", 8, context="to slow the ash-bitter poison")
             if helped_elira:
                 self.state.flags["elira_helped"] = True
-                self.state.flags["neverwinter_elira_helped"] = True
+                self.state.flags["greywake_elira_helped"] = True
                 self.state.flags["road_poison_pattern_known"] = True
                 self.add_clue("Elira identifies an ash-bitter poison reaching victims before Iron Hollow.")
                 self.reward_party(xp=10, reason="helping Elira stabilize a poisoned drover")
@@ -2676,7 +2675,7 @@ class StoryIntroMixin:
             self.add_inventory_item("blessed_salve", source="Elira's shrine satchel")
             if helped_elira:
                 self.state.flags["elira_helped"] = True
-                self.state.flags["neverwinter_elira_blessing"] = True
+                self.state.flags["greywake_elira_blessing"] = True
                 self.reward_party(xp=10, reason="steadying the South Gate shrine")
                 self.say("The prayer quiets the panic without softening the danger, which may be the Lantern road's cleanest kind of mercy.")
             else:
@@ -2686,7 +2685,7 @@ class StoryIntroMixin:
             helped_elira = self.skill_check(self.state.player, "Investigation", 8, context="to connect poison, harness marks, and forged authority")
             if helped_elira:
                 self.state.flags["elira_helped"] = True
-                self.state.flags["neverwinter_false_road_marks_found"] = True
+                self.state.flags["greywake_false_road_marks_found"] = True
                 self.state.flags["blackwake_millers_ford_lead"] = True
                 self.add_clue("Harness marks at Greywake's gate match false roadwarden inspections near Miller's Ford.")
                 self.reward_party(xp=10, reason="reading the poisoned road evidence")
@@ -2714,21 +2713,21 @@ class StoryIntroMixin:
                 context="to convince Elira the field needs her now",
             ):
                 self.recruit_companion(create_elira_dawnmantle())
-                self.state.flags["elira_neverwinter_recruited"] = True
+                self.state.flags["elira_greywake_recruited"] = True
                 self.state.flags["shrine_recruit_attempted"] = True
                 self.speaker("Elira Lanternward", "Then I walk now. The Lantern can keep a shrine; people need hands.")
             else:
-                self.state.flags["neverwinter_elira_recruit_failed"] = True
+                self.state.flags["greywake_elira_recruit_failed"] = True
                 self.speaker("Elira Lanternward", "Not yet. Earn the road's trust, and ask me again in Iron Hollow.")
         else:
-            self.state.flags["elira_neverwinter_available_in_phandalin"] = True
+            self.state.flags["elira_greywake_available_in_iron_hollow"] = True
             self.speaker("Elira Lanternward", "Then I will finish here and follow the wounded south. We may meet again before the day is done.")
 
-    def handle_neverwinter_high_road_milehouse(self) -> None:
+    def handle_greywake_emberway_milehouse(self) -> None:
         assert self.state is not None
-        if self.state.flags.get("neverwinter_high_road_milehouse_seen"):
+        if self.state.flags.get("greywake_emberway_milehouse_seen"):
             return
-        self.state.flags["neverwinter_high_road_milehouse_seen"] = True
+        self.state.flags["greywake_emberway_milehouse_seen"] = True
         self.banner("Emberway Milehouse")
         self.say(
             "Past the last Greywake stones, the Emberway narrows around a shuttered milehouse used by Lantern Hold pilgrims, "
@@ -2754,7 +2753,7 @@ class StoryIntroMixin:
         if choice == 1:
             self.player_action("Inspect the false roadwarden writs before anyone moves on.")
             if self.skill_check(self.state.player, "Investigation", 12, context="to expose forged roadwarden authority"):
-                self.state.flags["neverwinter_false_writs_spotted"] = True
+                self.state.flags["greywake_false_writs_spotted"] = True
                 self.state.flags["blackwake_millers_ford_lead"] = True
                 self.state.flags["road_patrol_writ"] = True
                 enemies[0].current_hp = max(1, enemies[0].current_hp - 3)
@@ -2764,7 +2763,7 @@ class StoryIntroMixin:
         elif choice == 2:
             self.player_action("Scout the Greywake Wood verge for the ambush line.")
             if self.skill_check(self.state.player, "Survival", 12, context="to read the woodline before the Brand springs it"):
-                self.state.flags["neverwinter_woodline_path"] = True
+                self.state.flags["greywake_woodline_path"] = True
                 self.state.flags["road_ambush_scouted"] = True
                 self.apply_status(enemies[0], "surprised", 1, source="your woodline scout")
                 hero_bonus += 1
@@ -2772,7 +2771,7 @@ class StoryIntroMixin:
         else:
             self.player_action("Organize the Lantern Hold pilgrims and refugee wagons into one guarded column.")
             if self.skill_check(self.state.player, "Persuasion", 12, context="to turn frightened travelers into an orderly column"):
-                self.state.flags["neverwinter_pilgrims_guarded"] = True
+                self.state.flags["greywake_pilgrims_guarded"] = True
                 self.state.flags["blackwake_gallows_copse_lead"] = True
                 hero_bonus += 1
                 elira = self.find_companion("Elira Dawnmantle")
@@ -2795,18 +2794,18 @@ class StoryIntroMixin:
             self.handle_defeat("The milehouse falls quiet, and the road south learns fear before your name.")
             return
         if outcome == "fled":
-            self.state.flags["neverwinter_milehouse_bypassed"] = True
+            self.state.flags["greywake_milehouse_bypassed"] = True
             self.say("You break away from the milehouse before the false roadwardens can pin the company in place.")
             return
-        self.state.flags["neverwinter_milehouse_secured"] = True
+        self.state.flags["greywake_milehouse_secured"] = True
         self.reward_party(xp=20, gold=5, reason="securing the Emberway milehouse")
         self.add_journal("You secured a Greywake-side milehouse and chose how the road south would open.")
 
-    def handle_neverwinter_signal_cairn(self) -> None:
+    def handle_greywake_signal_cairn(self) -> None:
         assert self.state is not None
-        if self.state.flags.get("neverwinter_signal_cairn_seen"):
+        if self.state.flags.get("greywake_signal_cairn_seen"):
             return
-        self.state.flags["neverwinter_signal_cairn_seen"] = True
+        self.state.flags["greywake_signal_cairn_seen"] = True
         self.banner("Greywake Wood Signal Cairn")
         self.say(
             "A little farther south, the road bends past an old signal cairn on the Greywake Wood side of the ditch. "
@@ -2868,25 +2867,25 @@ class StoryIntroMixin:
             self.handle_defeat("The signal fire climbs over the trees, and the Emberway closes around you before Iron Hollow ever sees your face.")
             return
         if outcome == "fled":
-            self.state.flags["neverwinter_signal_cairn_bypassed"] = True
+            self.state.flags["greywake_signal_cairn_bypassed"] = True
             self.say("You leave the cairn burning low behind you, knowing someone farther south may have seen enough.")
             return
-        self.state.flags["neverwinter_signal_cairn_cleared"] = True
+        self.state.flags["greywake_signal_cairn_cleared"] = True
         self.reward_party(xp=15, gold=4, reason="silencing the Greywake Wood signal cairn")
         self.add_journal("You found and broke a signal cairn meant to harden the Emberway ambush.")
 
-    def handle_neverwinter_departure_fork(self) -> None:
+    def handle_greywake_departure_fork(self) -> None:
         assert self.state is not None
         if not self.state.flags.get("early_companion_recruited"):
             self.offer_early_companion()
-        self.handle_neverwinter_tymora_shrine()
-        if self.state is None or self.state.current_scene != "neverwinter_briefing":
+        self.handle_greywake_tymora_shrine()
+        if self.state is None or self.state.current_scene != "greywake_briefing":
             return
-        self.handle_neverwinter_high_road_milehouse()
-        if self.state is None or self.state.current_scene != "neverwinter_briefing":
+        self.handle_greywake_emberway_milehouse()
+        if self.state is None or self.state.current_scene != "greywake_briefing":
             return
-        self.handle_neverwinter_signal_cairn()
-        if self.state is None or self.state.current_scene != "neverwinter_briefing":
+        self.handle_greywake_signal_cairn()
+        if self.state is None or self.state.current_scene != "greywake_briefing":
             return
         self.add_journal("Mira Thann sent you south with a writ for Iron Hollow's steward.")
 
@@ -2908,7 +2907,7 @@ class StoryIntroMixin:
             )
             if choice == 1:
                 self.player_action("Take the direct south road toward Iron Hollow.")
-                self.travel_to_act1_node("high_road_ambush")
+                self.travel_to_act1_node("emberway_ambush")
                 return
             if choice == 2:
                 self.player_action("Investigate the smoke and caravan panic near the river cut.")
@@ -2923,8 +2922,8 @@ class StoryIntroMixin:
                 return
 
             self.player_action("Circle back long enough to gather one more rumor in Greywake.")
-            if not self.state.flags.get("blackwake_neverwinter_rumor"):
-                self.state.flags["blackwake_neverwinter_rumor"] = True
+            if not self.state.flags.get("blackwake_greywake_rumor"):
+                self.state.flags["blackwake_greywake_rumor"] = True
                 self.add_clue(
                     "A Greywake drover says forged river-cut inspections are bleeding southbound caravans before they ever reach the Emberway."
                 )
@@ -2933,7 +2932,7 @@ class StoryIntroMixin:
                 )
             else:
                 self.say("The rumor loop has gone thin. The smoke east of the road is still the only fresh lead.")
-            self.state.current_scene = "neverwinter_briefing"
+            self.state.current_scene = "greywake_briefing"
             return
 
     def offer_early_companion(self) -> None:
@@ -2987,22 +2986,22 @@ class StoryIntroMixin:
         self.add_clue("A side trail near the Emberway ambush leads to a circle of four talking statues.")
         self.add_journal("A wilderness side trail from the Emberway leads to a statue puzzle called Liar's Circle.")
 
-    def high_road_tollstones_branch_available(self) -> bool:
+    def emberway_tollstones_branch_available(self) -> bool:
         assert self.state is not None
-        return bool(self.state.flags.get("high_road_tollstones_branch_available")) and not bool(
-            self.state.flags.get("high_road_tollstones_resolved")
+        return bool(self.state.flags.get("emberway_tollstones_branch_available")) and not bool(
+            self.state.flags.get("emberway_tollstones_resolved")
         )
 
-    def high_road_false_checkpoint_available(self) -> bool:
+    def emberway_false_checkpoint_available(self) -> bool:
         assert self.state is not None
-        return bool(self.state.flags.get("high_road_false_checkpoint_available")) and not bool(
-            self.state.flags.get("high_road_false_checkpoint_resolved")
+        return bool(self.state.flags.get("emberway_false_checkpoint_available")) and not bool(
+            self.state.flags.get("emberway_false_checkpoint_resolved")
         )
 
     def has_false_checkpoint_contract_proof(self) -> bool:
         assert self.state is not None
-        if self.state.flags.get("neverwinter_private_room_intel") or self.state.flags.get(
-            "quest_reward_neverwinter_private_room_access"
+        if self.state.flags.get("greywake_private_room_intel") or self.state.flags.get(
+            "quest_reward_greywake_private_room_access"
         ):
             return True
         return bool(
@@ -3011,12 +3010,12 @@ class StoryIntroMixin:
             and self.state.flags.get("false_manifest_garren_detail")
         )
 
-    def discover_high_road_tollstones_branch(self) -> None:
+    def discover_emberway_tollstones_branch(self) -> None:
         assert self.state is not None
-        if self.state.flags.get("high_road_tollstones_branch_discovered"):
+        if self.state.flags.get("emberway_tollstones_branch_discovered"):
             return
-        self.state.flags["high_road_tollstones_branch_discovered"] = True
-        self.state.flags["high_road_tollstones_branch_available"] = True
+        self.state.flags["emberway_tollstones_branch_discovered"] = True
+        self.state.flags["emberway_tollstones_branch_available"] = True
         self.say(
             "Beyond the wagon wreck, a second mark catches your eye: fresh black paint on a broken roadwarden milemarker, "
             "laid too neatly to be weather or accident."
@@ -3024,12 +3023,12 @@ class StoryIntroMixin:
         self.add_clue("A broken Emberway milemarker still carries fresh false-roadwarden paint.")
         self.add_journal("A broken milemarker near the Emberway ambush points to another false toll operation.")
 
-    def discover_high_road_false_checkpoint_branch(self) -> None:
+    def discover_emberway_false_checkpoint_branch(self) -> None:
         assert self.state is not None
-        if self.state.flags.get("high_road_false_checkpoint_discovered"):
+        if self.state.flags.get("emberway_false_checkpoint_discovered"):
             return
-        self.state.flags["high_road_false_checkpoint_discovered"] = True
-        self.state.flags["high_road_false_checkpoint_available"] = True
+        self.state.flags["emberway_false_checkpoint_discovered"] = True
+        self.state.flags["emberway_false_checkpoint_available"] = True
         self.say(
             "A little farther south, fresh bootlines and a canvas shade mark an improvised roadwarden checkpoint. "
             "The men under it stand too straight around borrowed authority and too loose around real danger."
@@ -3037,12 +3036,12 @@ class StoryIntroMixin:
         self.add_clue("Fake roadwardens have set an Emberway checkpoint demanding papers from southbound travelers.")
         self.add_journal("A false roadwarden checkpoint waits on the Emberway south of the ambush site.")
 
-    def discover_high_road_side_branches(self) -> None:
+    def discover_emberway_side_branches(self) -> None:
         self.discover_liars_circle_branch()
-        self.discover_high_road_tollstones_branch()
-        self.discover_high_road_false_checkpoint_branch()
+        self.discover_emberway_tollstones_branch()
+        self.discover_emberway_false_checkpoint_branch()
 
-    def scene_high_road_liars_circle(self) -> None:
+    def scene_emberway_liars_circle(self) -> None:
         assert self.state is not None
         self.banner("Liar's Circle")
         self.state.flags["liars_circle_seen"] = True
@@ -3055,7 +3054,7 @@ class StoryIntroMixin:
         if self.state.flags.get("liars_circle_locked"):
             self.say("The statues are locked in their chosen silence now. Whatever judgment they made will not be remade today.")
             self.travel_to_act1_node(
-                "phandalin_hub",
+                "iron_hollow_hub",
                 transition_text="You return to the Emberway and continue toward Iron Hollow.",
                 record_history=False,
             )
@@ -3113,7 +3112,7 @@ class StoryIntroMixin:
             break
 
         self.travel_to_act1_node(
-            "phandalin_hub",
+            "iron_hollow_hub",
             transition_text="You return to the Emberway and continue toward Iron Hollow.",
             record_history=False,
         )
@@ -3136,19 +3135,19 @@ class StoryIntroMixin:
         self.say("The ring snaps shut with a sound like a lock turning under your tongue.")
         self.apply_liars_curse()
 
-    def scene_high_road_false_checkpoint(self) -> None:
+    def scene_emberway_false_checkpoint(self) -> None:
         assert self.state is not None
         self.banner("False Roadwarden Checkpoint")
-        self.state.flags["high_road_false_checkpoint_seen"] = True
+        self.state.flags["emberway_false_checkpoint_seen"] = True
         self.say(
             "A canvas shade hangs over the road where no lawful checkpoint should be. Three men in borrowed roadwarden colors demand papers, "
             "one hand on a ledger and the other near a whistle meant for somebody hidden in the brush.",
             typed=True,
         )
-        if self.state.flags.get("high_road_false_checkpoint_resolved"):
+        if self.state.flags.get("emberway_false_checkpoint_resolved"):
             self.say("The false checkpoint has already folded. Only wheel ruts, cut rope, and a discarded paper seal remain.")
             self.travel_to_act1_node(
-                "phandalin_hub",
+                "iron_hollow_hub",
                 transition_text="You leave the false checkpoint behind and continue toward Iron Hollow.",
                 record_history=False,
             )
@@ -3182,38 +3181,38 @@ class StoryIntroMixin:
                 "Oren's room line, Sabra's corrected manifest, and Garren's forbidden cadence land like three nails through the same false seal. "
                 "The ledger man shuts the book before his own hands can betray him."
             )
-            self.resolve_high_road_false_checkpoint(success=True, method="proof")
+            self.resolve_emberway_false_checkpoint(success=True, method="proof")
         elif selection_key == "deception":
             success = self.skill_check(self.state.player, "Deception", 13, context="to impersonate the inspector the fake checkpoint expected")
-            self.resolve_high_road_false_checkpoint(success=success, method="deception")
+            self.resolve_emberway_false_checkpoint(success=success, method="deception")
         elif selection_key == "insight":
             success = self.skill_check(self.state.player, "Insight", 12, context="to expose the false roadwarden cadence in their demand")
-            self.resolve_high_road_false_checkpoint(success=success, method="insight")
+            self.resolve_emberway_false_checkpoint(success=success, method="insight")
         elif selection_key == "persuasion":
             success = self.skill_check(self.state.player, "Persuasion", 13, context="to talk the checkpoint hands out of copied authority")
-            self.resolve_high_road_false_checkpoint(success=success, method="persuasion")
+            self.resolve_emberway_false_checkpoint(success=success, method="persuasion")
         elif selection_key == "intimidation":
             success = self.skill_check(self.state.player, "Intimidation", 13, context="to make the false checkpoint abandon its papers")
-            self.resolve_high_road_false_checkpoint(success=success, method="intimidation")
+            self.resolve_emberway_false_checkpoint(success=success, method="intimidation")
         else:
-            self.resolve_high_road_false_checkpoint(success=False, method="compliance")
+            self.resolve_emberway_false_checkpoint(success=False, method="compliance")
 
         self.travel_to_act1_node(
-            "phandalin_hub",
+            "iron_hollow_hub",
             transition_text="You leave the false checkpoint behind and follow the Emberway south.",
             record_history=False,
         )
 
-    def resolve_high_road_false_checkpoint(self, *, success: bool, method: str) -> None:
+    def resolve_emberway_false_checkpoint(self, *, success: bool, method: str) -> None:
         assert self.state is not None
-        self.state.flags["high_road_false_checkpoint_resolved"] = True
-        self.state.flags["high_road_false_checkpoint_available"] = False
-        self.state.flags["high_road_false_checkpoint_resolution"] = method if success else "paid_fee"
+        self.state.flags["emberway_false_checkpoint_resolved"] = True
+        self.state.flags["emberway_false_checkpoint_available"] = False
+        self.state.flags["emberway_false_checkpoint_resolution"] = method if success else "paid_fee"
         if not success:
             fee = min(6, self.state.gold)
             if fee:
                 self.state.gold -= fee
-            self.state.flags["high_road_false_checkpoint_fee_paid"] = True
+            self.state.flags["emberway_false_checkpoint_fee_paid"] = True
             self.apply_status(self.state.player, "reeling", 1, source="a humiliating false checkpoint delay")
             self.say(
                 f"The checkpoint fails to find real leverage, but it wastes your time and extracts {marks_label(fee)} before waving you through with clerkly contempt."
@@ -3221,7 +3220,7 @@ class StoryIntroMixin:
             self.add_journal("You passed the false roadwarden checkpoint by paying its nuisance fee instead of exposing it.")
             return
 
-        self.state.flags["high_road_false_checkpoint_exposed"] = True
+        self.state.flags["emberway_false_checkpoint_exposed"] = True
         self.state.flags["blackwake_false_checkpoint_exposed"] = True
         self.state.flags["blackwake_millers_ford_lead"] = True
         self.state.flags["road_patrol_writ"] = True
@@ -3229,8 +3228,8 @@ class StoryIntroMixin:
         self.state.flags["varyn_route_pattern_seen"] = True
         self.add_clue("An Emberway false checkpoint uses the same roadwarden cadence tied to Miller's Ford and copied Greywake authority.")
         if method == "proof":
-            self.state.flags["high_road_false_checkpoint_contract_proof_used"] = True
-            self.state.flags["neverwinter_contract_house_checkpoint_pressure"] = True
+            self.state.flags["emberway_false_checkpoint_contract_proof_used"] = True
+            self.state.flags["greywake_contract_house_checkpoint_pressure"] = True
             self.state.flags["blackwake_gallows_copse_lead"] = True
             self.say(
                 "One fake warden bolts; another leaves the ledger behind. The names in it point toward Miller's Ford, Gallows Copse, and the same correction line Sabra feared."
@@ -3246,7 +3245,7 @@ class StoryIntroMixin:
             self.reward_party(xp=20, gold=8, reason="reading the false Emberway checkpoint's bad cadence")
             self.add_journal("You exposed the false roadwarden checkpoint by reading its wrong patrol cadence.")
         elif method == "persuasion":
-            self.state.flags["high_road_false_checkpoint_hands_spared"] = True
+            self.state.flags["emberway_false_checkpoint_hands_spared"] = True
             self.say("The checkpoint hands choose distance over loyalty. One leaves the ledger on the road and tells you which ford the papers came from.")
             self.reward_party(xp=20, gold=6, reason="talking down the false Emberway checkpoint")
             self.add_journal("You persuaded the false checkpoint hands to abandon their forged road authority.")
@@ -3255,19 +3254,19 @@ class StoryIntroMixin:
             self.reward_party(xp=20, gold=8, reason="intimidating the false Emberway checkpoint into retreat")
             self.add_journal("You intimidated the false roadwarden checkpoint into dropping its copied seals.")
 
-    def scene_high_road_false_tollstones(self) -> None:
+    def scene_emberway_false_tollstones(self) -> None:
         assert self.state is not None
         self.banner("False Tollstones")
-        self.state.flags["high_road_tollstones_seen"] = True
+        self.state.flags["emberway_tollstones_seen"] = True
         self.say(
             "The broken milemarker stands beside a narrow service path, its old roadwarden notches painted over with "
             "Ashen Brand ash-black lines. Two nervous spotters wait in the scrub with a ledger, a lockbox, and the wrong kind of confidence.",
             typed=True,
         )
-        if self.state.flags.get("high_road_tollstones_resolved"):
+        if self.state.flags.get("emberway_tollstones_resolved"):
             self.say("The false toll is already broken. Only trampled brush and a scraped-clean milemarker remain.")
             self.travel_to_act1_node(
-                "phandalin_hub",
+                "iron_hollow_hub",
                 transition_text="You leave the milemarker behind and follow the Emberway south.",
                 record_history=False,
             )
@@ -3301,7 +3300,7 @@ class StoryIntroMixin:
             self.player_choice_output(selection_text)
             self.say("You mark the painted stone for later and keep the party moving before the spotters find their nerve.")
             self.travel_to_act1_node(
-                "phandalin_hub",
+                "iron_hollow_hub",
                 transition_text="You leave the milemarker behind and follow the Emberway south.",
                 record_history=False,
             )
@@ -3313,7 +3312,7 @@ class StoryIntroMixin:
                 "You give them a courier's lie with a thief-statue's perfect angle. The ledger opens before either spotter realizes "
                 "they never asked for proof."
             )
-            self.resolve_high_road_tollstones(success=True, method="blessing")
+            self.resolve_emberway_tollstones(success=True, method="blessing")
         elif selection_key == "deception":
             dc = 12 if has_blessing else 14
             success = self.skill_check(
@@ -3322,7 +3321,7 @@ class StoryIntroMixin:
                 dc,
                 context="to pass as a courier collecting the false toll ledger",
             )
-            self.resolve_high_road_tollstones(success=success, method="deception")
+            self.resolve_emberway_tollstones(success=success, method="deception")
         else:
             dc = 11 if has_blessing else 13
             success = self.skill_check(
@@ -3331,33 +3330,33 @@ class StoryIntroMixin:
                 dc,
                 context="to convince the spotters that running now is wiser than dying loyal",
             )
-            self.resolve_high_road_tollstones(success=success, method="persuasion")
+            self.resolve_emberway_tollstones(success=success, method="persuasion")
 
         self.travel_to_act1_node(
-            "phandalin_hub",
+            "iron_hollow_hub",
             transition_text="You leave the milemarker behind and follow the Emberway south.",
             record_history=False,
         )
 
-    def resolve_high_road_tollstones(self, *, success: bool, method: str) -> None:
+    def resolve_emberway_tollstones(self, *, success: bool, method: str) -> None:
         assert self.state is not None
-        self.state.flags["high_road_tollstones_resolved"] = True
-        self.state.flags["high_road_tollstones_branch_available"] = False
-        self.state.flags["high_road_tollstones_resolution"] = method if success else "failed"
+        self.state.flags["emberway_tollstones_resolved"] = True
+        self.state.flags["emberway_tollstones_branch_available"] = False
+        self.state.flags["emberway_tollstones_resolution"] = method if success else "failed"
         if not success:
-            self.state.flags["high_road_tollstones_spotters_scattered"] = True
+            self.state.flags["emberway_tollstones_spotters_scattered"] = True
             self.apply_status(self.state.player, "reeling", 1, source="a false toll scramble")
             self.say("The spotters panic, scatter the ledger leaves into the brush, and leave you with only smoke, bootprints, and a foul mood.")
             self.add_journal("The false toll at the broken milemarker scattered before you could secure its ledger.")
             return
 
-        self.state.flags["high_road_tollstones_ledger_taken"] = True
+        self.state.flags["emberway_tollstones_ledger_taken"] = True
         self.state.flags["system_profile_seeded"] = True
         self.state.flags["varyn_route_pattern_seen"] = True
         self.add_inventory_item("antitoxin_vial", 1, source="the false toll lockbox")
         if method == "blessing":
-            self.state.flags["high_road_tollstones_blessing_used"] = True
-            self.state.flags["high_road_tollstones_passphrase_known"] = True
+            self.state.flags["emberway_tollstones_blessing_used"] = True
+            self.state.flags["emberway_tollstones_passphrase_known"] = True
             self.say(
                 "The lockbox yields a vial of antitoxin, a neat stack of toll coins, and a passphrase keyed to Ashen Brand patrols farther south."
             )
@@ -3365,7 +3364,7 @@ class StoryIntroMixin:
             self.reward_party(xp=25, gold=16, reason="turning Liar's Blessing against the false tollstones")
             self.add_journal("Liar's Blessing cracked the false tollstone operation and revealed an Ashen Brand passphrase.")
         elif method == "persuasion":
-            self.state.flags["high_road_tollstones_contact_spared"] = True
+            self.state.flags["emberway_tollstones_contact_spared"] = True
             self.say("One spotter drops the ledger and runs. The other leaves the lockbox behind after whispering where the next Brand patrol listens.")
             self.add_clue("A frightened tollstone spotter named a southern Ashen Brand listening post.")
             self.reward_party(xp=20, gold=10, reason="breaking the false tollstones without bloodshed")
@@ -3378,11 +3377,11 @@ class StoryIntroMixin:
 
     def scene_road_ambush(self) -> None:
         assert self.state is not None
-        self._sync_map_state_with_scene(force_node_id="high_road_ambush")
+        self._sync_map_state_with_scene(force_node_id="emberway_ambush")
         self.banner("Emberway")
-        if self.state.flags.get("road_ambush_cleared") or self.state.flags.get("phandalin_arrived"):
+        if self.state.flags.get("road_ambush_cleared") or self.state.flags.get("iron_hollow_arrived"):
             if self.state.flags.get("road_ambush_cleared"):
-                self.discover_high_road_side_branches()
+                self.discover_emberway_side_branches()
             self.render_act1_overworld_map(force=True)
             self.say(
                 "The ambush site has gone quiet: ash-dark wagon ribs, old hoof churn, and the track south toward Iron Hollow "
@@ -3401,14 +3400,14 @@ class StoryIntroMixin:
                         self.action_option("Follow the overgrown statue trail into the wilderness."),
                     )
                 )
-            if self.high_road_tollstones_branch_available():
+            if self.emberway_tollstones_branch_available():
                 options.append(
                     (
                         "tollstones",
                         self.action_option("Investigate the broken roadwarden milemarker."),
                     )
                 )
-            if self.high_road_false_checkpoint_available():
+            if self.emberway_false_checkpoint_available():
                 options.append(
                     (
                         "checkpoint",
@@ -3446,7 +3445,7 @@ class StoryIntroMixin:
                 )
                 return
             self.travel_to_act1_node(
-                "phandalin_hub",
+                "iron_hollow_hub",
                 transition_text="You turn south again, letting the familiar road carry you back to Iron Hollow's lanterns.",
             )
             return
@@ -3507,7 +3506,7 @@ class StoryIntroMixin:
                 enemies[-1].current_hp = max(1, enemies[-1].current_hp - 2)
                 parley_dc = max(10, parley_dc - 1)
                 self.say("The exposed roadwarden writ makes the raiders hesitate before committing to another false seizure.")
-            if self.state.flags.get("neverwinter_pilgrims_guarded"):
+            if self.state.flags.get("greywake_pilgrims_guarded"):
                 hero_bonus += 1
                 self.say("The Lantern Hold column keeps its nerve behind you, leaving fewer panicked bodies for the raiders to exploit.")
             if not self.state.flags.get("road_approach_chosen"):
@@ -3675,5 +3674,5 @@ class StoryIntroMixin:
             self.reward_party(xp=20, gold=7, reason="breaking the Emberway reserve wave")
 
         self.state.flags["road_ambush_cleared"] = True
-        self.discover_high_road_side_branches()
+        self.discover_emberway_side_branches()
         self.scene_road_ambush()

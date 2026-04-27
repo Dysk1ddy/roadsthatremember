@@ -9,7 +9,7 @@ This summary keeps the useful story map and drops the old module-style setting w
 - Act I is playable.
 - Act II is playable as a scaffolded expedition campaign.
 - Act III is roadmap content.
-- The live route uses the map system and several save-safe legacy scene ids.
+- The live route uses the map system with canonical Aethrune scene ids and compatibility aliases for older saves.
 - The journal now presents a decision ledger with major choices, current consequences, faction pressure, companion disposition, and unresolved clues.
 - Companion trust now has visible mechanical hooks: trusted assists, camp counsel, encounter openers, social tension, and refusal risk.
 - Terminal play now has context-aware command shelves, grouped combat actions, compact save previews, and pipe-safe output for scripted smoke tests.
@@ -27,20 +27,20 @@ This summary keeps the useful story map and drops the old module-style setting w
 - Act I threat: the Ashen Brand, using route control, forged authority, and supply pressure.
 - Act II threat: the Quiet Choir, using record control, listening systems, and obedience framed as peace.
 
-## Save-Safe Legacy Ids
+## Canonical Internal Ids
 
-These names may remain in code, saves, tests, and old flags until a migration exists. Do not treat them as player-facing canon.
+These ids are the current save-facing route names. Legacy ids are handled by compatibility aliases at load time.
 
 | Internal id | Public direction |
 | --- | --- |
-| `neverwinter_briefing` | Greywake briefing |
-| `phandalin_hub` | Iron Hollow hub |
-| `high_road_*` | Emberway side routes |
-| `old_owl_well` | Blackglass Well |
-| `wyvern_tor` | Red Mesa Hold |
-| `tresendar_manor` | Duskmere Manor |
-| `wave_echo_outer_galleries` | Resonant Vaults |
-| `forge_of_spells` | Meridian Forge |
+| `greywake_briefing` | Greywake briefing |
+| `iron_hollow_hub` | Iron Hollow hub |
+| `emberway_*` | Emberway side routes |
+| `blackglass_well` | Blackglass Well |
+| `red_mesa_hold` | Red Mesa Hold |
+| `duskmere_manor` | Duskmere Manor |
+| `resonant_vault_outer_galleries` | Resonant Vaults |
+| `meridian_forge` | Meridian Forge |
 
 ## Core Cast To Keep
 

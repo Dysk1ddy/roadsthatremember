@@ -30,7 +30,7 @@ class ProseLintTests(unittest.TestCase):
         path = Path.cwd() / "tests_output" / "prose_lint_sample.py"
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(
-            'SCENE_KEY = "neverwinter_briefing"\n'
+            'SCENE_KEY = "greywake_briefing"\n'
             'PUBLIC_LINE = "Phandalin keeps its gate shut."\n',
             encoding="utf-8",
         )

@@ -71,34 +71,34 @@ class StoryEndgameMixin:
             hero_initiative_bonus=encounter_bonus,
             allow_post_combat_random_encounter=False,
         )
-        outcome = self.run_encounter(first_encounter)
+        outcome = self.run_encounter_wave(first_encounter)
         if outcome == "defeat":
             self.handle_defeat("Ashfall Watch remains in enemy hands.")
             return
         if outcome == "fled":
-            self.state.current_scene = "phandalin_hub"
-            self.say("You fall back to Phandalin to rethink the assault.")
+            self.state.current_scene = "iron_hollow_hub"
+            self.say("You fall back to Iron Hollow to rethink the assault.")
             return
 
         self.say(
             "At the tower's heart, a hobgoblin in disciplined armor steps through the smoke. "
             "Rukhar Cinderfang studies you with the patience of a veteran who has already measured the dead."
         )
-        boss_enemies = [create_enemy("rukhar")]
+        boss_enemies = [create_enemy("rukhar"), create_enemy("bandit_archer", name="Ashen Brand Lookout")]
         if len(self.state.party_members()) >= 3:
             boss_enemies.append(create_enemy("bandit", name="Ashen Brand Enforcer"))
         bonus = 0
         choice = self.scenario_choice(
             "Rukhar taps the flat of his blade against his shield.",
             [
-                self.quoted_option("INTIMIDATION", "Surrender in Phandalin's name."),
+                self.quoted_option("INTIMIDATION", "Surrender in Iron Hollow's name."),
                 self.action_option("Face Rukhar cleanly and keep his soldiers out of it."),
                 self.action_option("Strike first and let steel do the talking."),
             ],
             allow_meta=False,
         )
         if choice == 1:
-            self.player_speaker("Surrender in Phandalin's name.")
+            self.player_speaker("Surrender in Iron Hollow's name.")
             success = self.skill_check(self.state.player, "Intimidation", 13, context="to break Rukhar's composure")
             if success:
                 boss_enemies[0].current_hp -= 4
@@ -126,29 +126,30 @@ class StoryEndgameMixin:
             allow_parley=True,
             parley_dc=14,
             hero_initiative_bonus=bonus,
+            allow_post_combat_random_encounter=False,
         )
         outcome = self.run_encounter(boss_encounter)
         if outcome == "defeat":
             self.handle_defeat("Rukhar drives the party from the tower in blood and smoke.")
             return
         if outcome == "fled":
-            self.state.current_scene = "phandalin_hub"
-            self.say("You escape the watchtower and retreat to Phandalin to regroup.")
+            self.state.current_scene = "iron_hollow_hub"
+            self.say("You escape the watchtower and retreat to Iron Hollow to regroup.")
             return
 
         self.add_clue("Rukhar carried a cellar map tied to Emberhall beneath an old manor ruin.")
-        self.add_journal("Ashfall Watch is broken, but the gang's captain is below Phandalin in Emberhall Cellars.")
+        self.add_journal("Ashfall Watch is broken, but the gang's captain is below Iron Hollow in Emberhall Cellars.")
         self.state.flags["ashfall_watch_cleared"] = True
         self.state.flags["emberhall_revealed"] = True
         refresh_quest_statuses = getattr(self, "refresh_quest_statuses", None)
         if callable(refresh_quest_statuses):
             refresh_quest_statuses(announce=False)
         self.say(
-            "Among Rukhar's orders you find a map to Emberhall Cellars, a hidden chamber beneath one of Phandalin's "
+            "Among Rukhar's orders you find a map to Emberhall Cellars, a hidden chamber beneath one of Iron Hollow's "
             "older ruins. The Ashen Brand's true captain is waiting below the town, but now you have time to carry "
-            "that news back through Phandalin before the final descent."
+            "that news back through Iron Hollow before the final descent."
         )
-        self.state.current_scene = "phandalin_hub"
+        self.state.current_scene = "iron_hollow_hub"
 
     def scene_emberhall_cellars(self) -> None:
         assert self.state is not None
@@ -207,52 +208,39 @@ class StoryEndgameMixin:
 
         encounter = Encounter(
             title="Boss: Varyn Sable",
-            description="The captain of the Ashen Brand stands between Phandalin and another season of fear.",
+            description="The captain of the Ashen Brand stands between Iron Hollow and another season of fear.",
             enemies=enemies,
             allow_flee=True,
             allow_parley=True,
             parley_dc=15,
             hero_initiative_bonus=hero_bonus,
+            allow_post_combat_random_encounter=False,
         )
         outcome = self.run_encounter(encounter)
         if outcome == "defeat":
             self.handle_defeat("The cellar banners remain standing above a fallen company.")
             return
         if outcome == "fled":
-            self.state.current_scene = "phandalin_hub"
+            self.state.current_scene = "iron_hollow_hub"
             self.say("You escape the cellars and return to the surface to recover.")
             return
 
         self.say(
-            "Varyn falls, the remaining brigands scatter, and the people above finally get a quiet night. "
-            "Among the captain's ledgers are references to older powers stirring beneath the Sword Mountains, "
-            "with whispers that tie back toward the lost wealth and buried secrets near Wave Echo Cave."
+            "Varyn falls, but not cleanly. Body, cloak, and blade hit the cellar stones while the route behind him folds the wrong way. "
+            "The remaining brigands scatter, the Ashen Brand breaks around that absence, and the people above finally get a quiet night. "
+            "Among the captain's ledgers are references to older powers stirring beneath the Vein of Glass, with whispers that tie back toward the Resonant Vaults."
         )
-        self.add_journal("You broke the Ashen Brand and secured Phandalin through the end of Act 1.")
-        self.reward_party(xp=250, gold=80, reason="securing Phandalin at the end of Act I")
+        self.state.flags["varyn_body_defeated_act1"] = True
+        self.state.flags["varyn_route_displaced"] = True
+        self.state.flags["act1_ashen_brand_broken"] = True
+        if self.state.flags.get("emberhall_ledger_read") or self.state.flags.get("emberhall_archive_tip"):
+            self.state.flags["emberhall_impossible_exit_seen"] = True
+            self.say("The exits you decoded before the fight all account for themselves except one: a route that appears in the ledger only after Varyn is gone.")
+        self.add_journal("You broke the Ashen Brand and secured Iron Hollow through the end of Act 1.")
+        self.reward_party(xp=250, gold=80, reason="securing Iron Hollow at the end of Act I")
         self.state.completed_acts.append(1)
         self.state.current_scene = "act1_complete"
         self.save_game(slot_name=f"{self.state.player.name}_act1_complete")
-
-    def scene_act1_complete(self) -> None:
-        assert self.state is not None
-        self.banner("Act I Complete")
-        self.say(
-            "Phandalin survives, your companions have names in town, and Act 1 ends with a clear path into a deeper "
-            "Forgotten Realms threat beneath the frontier. Acts 2 and 3 are scaffolded but not implemented yet.",
-            typed=True,
-        )
-        choice = self.choose(
-            "What next?",
-            [
-                "Review the party one last time",
-                "Return to the title screen",
-            ],
-            allow_meta=False,
-        )
-        if choice == 1:
-            self.show_party()
-        self.state = None
 
     def recruit_companion(self, companion: Character) -> None:
         assert self.state is not None

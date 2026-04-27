@@ -47,10 +47,10 @@ The summary sections at the top reflect the expanded Act 1 route and should be t
 
 ## Drafted Future Inserts
 
-- `information/Story/HIGH_ROAD_LIARS_CIRCLE_PUZZLE_DRAFT.md`: implemented post-ambush Emberway wilderness branch built around four lying statues, with `Liar's Blessing` or `Liar's Curse` social-skill consequences.
-- `information/Story/ACT1_PRE_NEVERWINTER_ELIRA_DRAFT.md`: legacy draft for the implemented Elira opening insert; keep only as historical implementation context.
-- `information/Story/MIRA_NEVERWINTER_DIALOGUE_DRAFT.md`: legacy draft for expanded Mira Thann briefing dialogue; keep only as historical implementation context.
-- `information/Story/COMPANION_CAMP_BANTER_DRAFT.md`: implemented companion-to-companion camp banter registry, Act 1 and Act 2 branching dialogue, gameplay and relationship consequences, and Act 3 secret-architect guardrails for keeping the second villain hidden until the planned midpoint reveal.
+- `information/Story/archive/legacy_drafts/HIGH_ROAD_LIARS_CIRCLE_PUZZLE_DRAFT.md`: implemented post-ambush Emberway wilderness branch built around four lying statues, with `Liar's Blessing` or `Liar's Curse` social-skill consequences.
+- `information/Story/archive/legacy_drafts/ACT1_PRE_NEVERWINTER_ELIRA_DRAFT.md`: legacy draft for the implemented Elira opening insert; keep only as historical implementation context.
+- `information/Story/archive/legacy_drafts/MIRA_NEVERWINTER_DIALOGUE_DRAFT.md`: legacy draft for expanded Mira Thann briefing dialogue; keep only as historical implementation context.
+- `information/Story/archive/legacy_drafts/COMPANION_CAMP_BANTER_DRAFT.md`: implemented companion-to-companion camp banter registry, Act 1 and Act 2 branching dialogue, gameplay and relationship consequences, and Act 3 secret-architect guardrails for keeping the second villain hidden until the planned midpoint reveal.
 
 ## Companion Reference
 
@@ -65,10 +65,10 @@ The summary sections at the top reflect the expanded Act 1 route and should be t
 ### Scene support hooks
 
 - Kaelis: `road_ambush`, gives hero bonus and player Invisible
-- Kaelis: `wyvern_tor`, gives hero bonus and party Emboldened
+- Kaelis: `red_mesa_hold`, gives hero bonus and party Emboldened
 - Tolan: `ashfall_watch`, gives hero bonus and player Blessed
 - Rhogar: `ashfall_watch`, gives hero bonus and player Blessed
-- Bryn: `old_owl_well`, gives hero bonus and player Invisible
+- Bryn: `blackglass_well`, gives hero bonus and player Invisible
 - Bryn: `emberhall_cellars`, gives hero bonus and player Invisible
 - Elira: `camp_rest`, gives player Blessed before rest
 
@@ -188,15 +188,15 @@ The summary sections at the top reflect the expanded Act 1 route and should be t
 | --- | --- | --- | --- | --- | --- |
 | `trace_blackwake_cell` | Embers Before the Road | Mira Thann | Blackwake Crossing | `blackwake_completed` | `90 XP`, `35 gp`, `miras_blackwake_seal x1`, `scroll_ember_ward x1` |
 | `secure_miners_road` | Stop the Watchtower Raids | Steward Tessa Harrow | Steward's Hall | `ashfall_watch_cleared` | `100 XP`, `50 gp`, `roadwarden_cloak x1`, `travel_biscuits x4` |
-| `restore_barthen_supplies` | Keep the Shelves Full | Hadrik | Hadrik's Provisions | `ashfall_watch_cleared` | `75 XP`, `35 gp`, `barthen_resupply_token x1`, `bread_round x4`, `camp_stew_jar x2` |
+| `restore_hadrik_supplies` | Keep the Shelves Full | Hadrik | Hadrik's Provisions | `ashfall_watch_cleared` | `75 XP`, `35 gp`, `barthen_resupply_token x1`, `bread_round x4`, `camp_stew_jar x2` |
 | `reopen_lionshield_trade` | Reopen the Trade Lane | Linene Ironward | Ironbound Trading Post | `ashfall_watch_cleared` | `85 XP`, `45 gp`, `lionshield_quartermaster_badge x1`, `potion_healing x2`, `antitoxin_vial x2` |
 | `marked_keg_investigation` | The Marked Keg | Mara Ashlamp | Ashlamp Inn | `marked_keg_resolved` | `70 XP`, `24 gp`, `innkeeper_credit_token x1` |
 | `songs_for_the_missing` | Songs for the Missing | Sella Quill | Ashlamp Inn | `songs_for_missing_jerek_detail`, `songs_for_missing_tam_detail`, `songs_for_missing_nera_detail` | `65 XP`, `18 gp`, `sella_ballad_token x1` |
 | `quiet_table_sharp_knives` | Quiet Table, Sharp Knives | Nera Doss | Ashlamp Inn | `quiet_table_knives_resolved` | `80 XP`, `28 gp`, `blackseal_taster_pin x1` |
 | `find_dain_harl` | Bring Back Dain's Name | Jerek Harl | Ashlamp Inn | `dain_harl_truth_found` | `85 XP`, `26 gp`, `harl_road_knot x1` |
 | `false_manifest_circuit` | False Manifest Circuit | Sabra Kestrel | Oren Vale's Contract House | `false_manifest_oren_detail`, `false_manifest_vessa_detail`, `false_manifest_garren_detail` | `75 XP`, `24 gp`, `kestrel_ledger_clasp x1` |
-| `silence_old_owl_well` | Silence Blackglass Well | Halia Vey | Delvers' Exchange | `old_owl_well_cleared` | `100 XP`, `45 gp`, `gravequiet_amulet x1`, `scroll_clarity x1`, `blessed_salve x1` |
-| `break_wyvern_tor_raiders` | Break the Red Mesa Raiders | Daran Orchard | Orchard Wall | `wyvern_tor_cleared` | `100 XP`, `40 gp`, `edermath_scout_buckle x1`, `greater_healing_draught x1` |
+| `silence_blackglass_well` | Silence Blackglass Well | Halia Vey | Delvers' Exchange | `blackglass_well_cleared` | `100 XP`, `45 gp`, `gravequiet_amulet x1`, `scroll_clarity x1`, `blessed_salve x1` |
+| `break_red_mesa_raiders` | Break the Red Mesa Raiders | Daran Orchard | Orchard Wall | `red_mesa_hold_cleared` | `100 XP`, `40 gp`, `edermath_scout_buckle x1`, `greater_healing_draught x1` |
 | `bryn_loose_ends` | Loose Ends | Bryn Underbough | personal / road chain | `bryn_loose_ends_resolved` | `80 XP`, `25 gp`, `bryns_cache_keyring x1`, `dust_of_disappearance x1` |
 | `elira_faith_under_ash` | Faith Under Ash | Elira Lanternward | personal / Ashfall field scene | `elira_faith_under_ash_resolved` | `80 XP`, `20 gp`, `dawnmantle_mercy_charm x1`, `blessed_salve x1` |
 
@@ -271,7 +271,7 @@ The summary sections at the top reflect the expanded Act 1 route and should be t
   - Kaelis Starling
   - Rhogar Valeguard
 - Elira may already be in the party before this choice; Mira's road companion can still be assigned afterward if party space allows.
-- If the player carries Greywake proof into the briefing, Mira reacts directly: the evidence proves the Ashen Brand is coordinating outcomes, not merely causing damage.
+- If the player carries Greywake proof into the briefing, Mira reacts directly: the evidence proves the Ashen Brand is coordinating outcomes, causing damage on purpose.
   - Early Elira recruitment prompts Mira to note that the road is already worse than her reports.
   - A preserved manifest is treated as a schedule, not a forged report.
   - A burned manifest shifts the plan to witness testimony.
@@ -304,7 +304,7 @@ The summary sections at the top reflect the expanded Act 1 route and should be t
 - Post-ambush side branches:
   - after the second wave, the cleared Emberway scene reopens instead of auto-entering Iron Hollow
   - unlocked side branches use plain action labels rather than redundant `[PUZZLE]`, `[PARLEY]`, or `[SOCIAL]` tags
-  - side-branch returns travel to `phandalin_hub` without recording the side detour as the next backtrack target
+  - side-branch returns travel to `iron_hollow_hub` without recording the side detour as the next backtrack target
   - Iron Hollow backtracking skips resolved Emberway side-detour nodes and points back to the main Emberway route
   - `Liar's Circle`: a four-statue logic puzzle that grants `Liar's Blessing` and `200 XP`, or applies `Liar's Curse`
   - `False Roadwarden Checkpoint`: a non-combat social stop with Deception, Insight, Persuasion, Intimidation, or Oren/Sabra/Garren proof
@@ -330,13 +330,13 @@ The summary sections at the top reflect the expanded Act 1 route and should be t
   - `Liar's Blessing` options in the keg, quiet-table, and quiet-room scenes
 - Ashlamp's inn rewards now echo into Act 2:
   - `Harl Road-Knot` opens a special route-reading option at Stonehollow Dig
-  - the quiet-room courier intel opens a special order-seizure option at Black Lake and is named during the claims council
+  - the quiet-room courier intel opens a special order-seizure option at Blackglass and is named during the claims council
 
 ### Shrine
 
 - If Elira was not recruited at Wayside or Greywake, she appears at Iron Hollow's Lantern Shrine.
 - Early failed recruitment attempts do not lock her out.
-- If `elira_phandalin_fallback_pending` is set, asking her to join in Iron Hollow recruits her without another skill gate.
+- If `elira_iron_hollow_fallback_pending` is set, asking her to join in Iron Hollow recruits her without another skill gate.
 - If the player has no early Elira fallback and has not helped her, the normal recruitment check remains Persuasion DC `8`.
 
 ## Post-Combat Random Encounter Chains
@@ -358,14 +358,14 @@ These flags show up repeatedly in Act 1 flow and are useful when debugging saves
 - `wayside_luck_shrine_seen`
 - `elira_first_contact`
 - `elira_wayside_recruit_attempted`
-- `elira_pre_neverwinter_recruited`
+- `elira_pre_greywake_recruited`
 - `greywake_triage_yard_seen`
 - `elira_greywake_recruit_attempted`
 - `elira_greywake_recruited`
 - `greywake_breakout_resolved`
 - `greywake_manifest_preserved`
-- `elira_phandalin_fallback_pending`
-- `elira_phandalin_recruited`
+- `elira_iron_hollow_fallback_pending`
+- `elira_iron_hollow_recruited`
 - `early_companion_recruited`
 - `road_approach_chosen`
 - `road_ambush_wave_one_cleared`
@@ -376,10 +376,10 @@ These flags show up repeatedly in Act 1 flow and are useful when debugging saves
 - `liars_circle_solved`
 - `liars_circle_failed`
 - `liars_circle_locked`
-- `high_road_false_checkpoint_available`
-- `high_road_false_checkpoint_resolved`
-- `high_road_tollstones_branch_available`
-- `high_road_tollstones_resolved`
+- `emberway_false_checkpoint_available`
+- `emberway_false_checkpoint_resolved`
+- `emberway_tollstones_branch_available`
+- `emberway_tollstones_resolved`
 - `tolan_waiting_at_inn`
 - `inn_recruit_bryn_attempted`
 - `shrine_recruit_attempted`
@@ -389,8 +389,8 @@ These flags show up repeatedly in Act 1 flow and are useful when debugging saves
 - `bryn_cache_found`
 - `edermath_old_cache_recovered`
 - `act2_edermath_cache_routework`
-- `high_road_false_checkpoint_exposed`
-- `neverwinter_contract_house_checkpoint_pressure`
+- `emberway_false_checkpoint_exposed`
+- `greywake_contract_house_checkpoint_pressure`
 - `bryn_ledger_burned`
 - `bryn_ledger_sold`
 - `elira_mercy_blessing`

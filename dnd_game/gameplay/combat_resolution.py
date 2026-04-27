@@ -236,7 +236,7 @@ class CombatResolutionMixin:
         room_role = self.current_act1_room_role()
         if room_role == "boss":
             return True
-        return self.state.current_scene in {"forge_of_spells"}
+        return self.state.current_scene in {"meridian_forge"}
 
     def in_hostile_skill_scene(self) -> bool:
         if self.state is None:
@@ -247,14 +247,14 @@ class CombatResolutionMixin:
         return self.state.current_scene in {
             "background_prologue",
             "road_ambush",
-            "neverwinter_wood_survey_camp",
+            "greywake_survey_camp",
             "stonehollow_dig",
             "act2_midpoint_convergence",
             "broken_prospect",
             "south_adit",
-            "wave_echo_outer_galleries",
-            "black_lake_causeway",
-            "forge_of_spells",
+            "resonant_vault_outer_galleries",
+            "blackglass_causeway",
+            "meridian_forge",
         }
 
     def skill_check_category(self, context: str) -> str:

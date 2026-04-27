@@ -24,24 +24,24 @@ It intentionally does not re-draft `Glasswater Intake`, because that location al
 
 ## Cross-Location Logic
 
-- `Conyberry and Agatha's Circuit` shapes how much the party understands sacred restraint, public warning, and what the old Pact was trying to prevent.
-- `Neverwinter Wood Survey Camp` determines how honest the expedition's map becomes before the midpoint.
+- `Hushfen Pale Circuit` shapes how much the party understands sacred restraint, public warning, and what the old Pact was trying to prevent.
+- `Greywake Survey Camp` determines how honest the expedition's map becomes before the midpoint.
 - `Stonehollow Dig` determines how much of the deeper route is understood through rescue, scholarship, or sealed loss.
-- `Broken Prospect` determines whether the expedition owns Wave Echo's threshold publicly, secretly, or not at all.
-- `Black Lake Causeway` sends the party to the Forge carrying one of three victories:
+- `Broken Prospect` determines whether the expedition owns the Resonant Vaults threshold publicly, secretly, or not at all.
+- `Blackglass Causeway` sends the party to the Forge carrying one of three victories:
   - cleaner, holier, and less informed
   - harsher, sharper, and more militarized
   - or strategically brilliant but spiritually compromised
 
-## Packet 1: Conyberry And Agatha's Circuit
+## Packet 1: Hushfen Pale Circuit
 
-Detailed expansion draft: `information/Story/ACT2_CONYBERRY_AGATHA_DRAFT.md`
+Detailed expansion draft: `information/Story/archive/legacy_drafts/ACT2_CONYBERRY_AGATHA_DRAFT.md`
 
 ### Packet Focus
 
-`Conyberry` carries warning, grief, and the politics of who gets to carry a truth that should frighten everyone.
+`Hushfen` carries warning, grief, and the politics of who gets to carry a truth that should frighten everyone.
 
-Agatha opens the packet. The lasting questions are:
+The Pale Witness opens the packet. The lasting questions are:
 
 - whether the truth becomes public warning, private leverage, or sacred restraint
 - whether Elira's mercy-oriented faith can survive contact with a place that was already abandoned badly
@@ -53,11 +53,11 @@ Agatha opens the packet. The lasting questions are:
 | --- | --- | --- | --- |
 | Entry response | protect pilgrims and steady the road | quietly isolate the most informed witness | shadow the wrongness to its source |
 | Sacred site handling | restore the chapel and carry warning outward | bargain for specific names and route facts | bind the warning to warding instead of public speech |
-| Final use of Agatha's truth | share it widely | keep it controlled | limit it to those who can bear it safely |
+| Final use of the Pale Witness's truth | share it widely | keep it controlled | limit it to those who can bear it safely |
 
 ### Phase 1: The Hushed Pilgrims
 
-The approach to Conyberry opens on a frightened cluster of travelers, shrine visitors, and rumor-carriers who have started editing their own story because they do not trust what they heard on the road.
+The approach to Hushfen opens on a frightened cluster of travelers, shrine visitors, and rumor-carriers who have started editing their own story because they do not trust what they heard on the road.
 
 Primary options:
 
@@ -78,9 +78,9 @@ Primary options:
 
 Suggested runtime flags:
 
-- `conyberry_pilgrims_steadied`
-- `conyberry_clean_witness_taken`
-- `conyberry_whisper_track_named`
+- `hushfen_pilgrims_steadied`
+- `hushfen_clean_witness_taken`
+- `hushfen_whisper_track_named`
 
 ### Phase 2: The Circuit Split
 
@@ -101,13 +101,13 @@ Key choices:
   - Gives anti-whisper leverage now, but weakens the town-facing sanctity of the site.
 - Leave the chapel sealed and untouched.
   - Strong containment route if the player wants to avoid spreading a damaged ward.
-  - Makes Conyberry feel more like a quarantined holy place than a reclaimed one.
+  - Makes Hushfen feel more like a quarantined holy place than a reclaimed one.
 
 Suggested follow-up flags:
 
-- `conyberry_chapel_relit`
-- `conyberry_field_lantern_taken`
-- `conyberry_chapel_quarantined`
+- `hushfen_chapel_relit`
+- `hushfen_field_lantern_taken`
+- `hushfen_chapel_quarantined`
 
 #### Branch 2B: Grave Ring
 
@@ -117,19 +117,19 @@ Key choices:
 
 - Read the grave markers historically.
   - Reveals the old Pact culture of distributed guardianship.
-  - Helps later `Broken Prospect` and `Black Lake shrine` reads.
+  - Helps later `Broken Prospect` and `Blackglass shrine` reads.
 - Name the dead aloud and stabilize the ring as memory rather than puzzle.
   - Best moral route.
   - Better for `Town Stability` style texture and camp digest.
 - Search the ring for hidden claimant marks and later additions.
   - Best leverage route.
-  - May expose that somebody in the modern claims race has already been using Conyberry as a place to hide ugly paperwork.
+  - May expose that somebody in the modern claims race has already been using Hushfen as a place to hide ugly paperwork.
 
 Suggested follow-up flags:
 
-- `conyberry_grave_history_read`
-- `conyberry_dead_named`
-- `conyberry_claim_marks_found`
+- `hushfen_grave_history_read`
+- `hushfen_dead_named`
+- `hushfen_claim_marks_found`
 
 #### Branch 2C: Defiled Sigil
 
@@ -149,44 +149,44 @@ Key choices:
 
 Suggested follow-up flags:
 
-- `conyberry_sigil_broken`
-- `conyberry_sigil_copied`
-- `conyberry_watcher_baited`
+- `hushfen_sigil_broken`
+- `hushfen_sigil_copied`
+- `hushfen_watcher_baited`
 
-### Phase 3: Agatha's Bargain
+### Phase 3: The Pale Witness's Bargain
 
-The player should not simply ask one generic lore question. The branch web should frame Agatha as someone who can give different kinds of truth, all costly in different ways.
+The player should not simply ask one generic lore question. The branch web should frame the Pale Witness as someone who can give different kinds of truth, all costly in different ways.
 
 Primary asks:
 
 1. Ask for the warning the town most needs.
    - This is the civic branch.
-   - Agatha gives a truth that is broad enough to protect people, but less precise than route hunters would like.
+   - The Pale Witness gives a truth that is broad enough to protect people, but less precise than route hunters would like.
    - Supports later public warning, shrine steadiness, and camp trust.
 2. Ask who is lying in the claims war.
    - This is the leverage branch.
-   - Agatha gives names, hidden motive, or buried transaction history.
+   - The Pale Witness gives names, hidden motive, or buried transaction history.
    - Strong for sponsor tension and later barracks/relay reads.
 3. Ask what the old Pact was actually afraid of.
    - This is the containment branch.
-   - Agatha gives less actionable route information and more structural truth about restraint, resonance, and why the Pact divided custody.
-   - Strong for later Black Lake and Forge spiritual reads.
+   - The Pale Witness gives less actionable route information and more structural truth about restraint, resonance, and why the Pact divided custody.
+   - Strong for later Blackglass and Forge spiritual reads.
 
 Conditional modifiers:
 
-- If `conyberry_chapel_relit`, Agatha is colder but clearer about civic warning.
-- If `conyberry_sigil_copied`, Agatha is more suspicious and may only answer leverage questions reluctantly.
-- If `conyberry_dead_named`, she treats the party like mourners and witnesses. The claimant cadence drops from her voice.
+- If `hushfen_chapel_relit`, the Pale Witness is colder but clearer about civic warning.
+- If `hushfen_sigil_copied`, the Pale Witness is more suspicious and may only answer leverage questions reluctantly.
+- If `hushfen_dead_named`, she treats the party like mourners and witnesses. The claimant cadence drops from her voice.
 
 Suggested follow-up flags:
 
-- `agatha_public_warning_known`
-- `agatha_claimant_names_known`
-- `agatha_pact_restraint_known`
+- `pale_witness_public_warning_known`
+- `pale_witness_claimant_names_known`
+- `pale_witness_pact_restraint_known`
 
 ### Phase 4: The Exit Decision
 
-The final branch decides how the truth leaves Conyberry and who has to carry it.
+The final branch decides how the truth leaves Hushfen and who has to carry it.
 
 Resolution families:
 
@@ -198,11 +198,11 @@ Resolution families:
 - Gives stronger council and camp language later.
 - Best later payoff:
   - shrine lane during `Sabotage Night`
-  - public trust if Black Lake goes badly
+  - public trust if Blackglass goes badly
 
 Suggested flag:
 
-- `agatha_warning_shared`
+- `pale_witness_warning_shared_publicly`
 
 #### Leverage Resolution: Keep The Sharpest Truth Controlled
 
@@ -213,7 +213,7 @@ Suggested flag:
 
 Suggested flag:
 
-- `agatha_warning_restricted`
+- `pale_witness_warning_restricted`
 
 #### Containment Resolution: Bind The Warning To Warding
 
@@ -224,21 +224,21 @@ Suggested flag:
 
 Suggested flags:
 
-- `agatha_warning_bound`
+- `pale_witness_warning_bound`
 - `elira_field_lantern`
 
 ### Later Payoff Hooks
 
-- `agatha_public_warning_known` can soften panic language in town and camp scenes.
-- `agatha_claimant_names_known` can expose later sponsor or barracks fraud without a hard skill gate.
-- `agatha_pact_restraint_known` can grant a special option at Black Lake shrine, Broken Prospect markers, or the Forge threshold.
-- `agatha_warning_bound` can create an anti-whisper special read in late Act 2 even if the town never fully understands why.
+- `pale_witness_public_warning_known` can soften panic language in town and camp scenes.
+- `pale_witness_claimant_names_known` can expose later sponsor or barracks fraud without a hard skill gate.
+- `pale_witness_pact_restraint_known` can grant a special option at Blackglass shrine, Broken Prospect markers, or the Forge threshold.
+- `pale_witness_warning_bound` can create an anti-whisper special read in late Act 2 even if the town never fully understands why.
 
-## Packet 2: Neverwinter Wood Survey Camp
+## Packet 2: Greywake Survey Camp
 
 ### Packet Focus
 
-`Neverwinter Wood Survey Camp` carries map truth, hidden routes, and the risk of learning dirty route logic too well.
+`Greywake Survey Camp` carries map truth, hidden routes, and the risk of learning dirty route logic too well.
 
 This packet turns on:
 
@@ -432,7 +432,7 @@ Suggested flags:
 ### Later Payoff Hooks
 
 - `wood_clean_map_published` improves town and worker morale during `Sabotage Night`.
-- `wood_counter_route_kept` can create a hidden angle during sabotage, Broken Prospect, or even Black Lake courier interception.
+- `wood_counter_route_kept` can create a hidden angle during sabotage, Broken Prospect, or even Blackglass courier interception.
 - `wood_double_runner_seeded` can become a powerful midpoint special option or a later betrayal scene.
 - `wood_tainted_lines_burned` can lower ambient contamination text later, even if it makes the claims race harder.
 
@@ -591,7 +591,7 @@ Suggested flags:
 
 ### Later Payoff Hooks
 
-- `stonehollow_route_truth_preserved` gives cleaner reads in `Broken Prospect`, `Wave Echo Outer Galleries`, or Forge subroutes.
+- `stonehollow_route_truth_preserved` gives cleaner reads in `Broken Prospect`, `Resonant Vault Outer Galleries`, or Forge subroutes.
 - `nim_countermeasure_notes` can open special late options but worsen contamination tone.
 - `stonehollow_archive_sealed` can lower late-act whisper flavor even when the act remains strategically harder.
 - `stonehollow_survivors_prioritized` improves town memory of the expedition, even if the route race stays messier.
@@ -704,7 +704,7 @@ Suggested flag:
 
 - Best containment route.
 - Nobody gets easy access.
-- The expedition reaches Wave Echo slower but cleaner.
+- The expedition reaches Resonant Vaults slower but cleaner.
 
 Suggested flag:
 
@@ -740,7 +740,7 @@ Suggested flags:
 
 - The player secures only what is necessary, then damages or seals the easy line.
 - Best `Whisper Pressure`.
-- Makes `Black Lake` or outer-gallery progression harsher but spiritually cleaner.
+- Makes `Blackglass Causeway` or outer-gallery progression harsher but spiritually cleaner.
 
 Suggested flags:
 
@@ -750,15 +750,15 @@ Suggested flags:
 ### Later Payoff Hooks
 
 - `broken_prospect_daylight_claim` helps town-facing legitimacy.
-- `broken_prospect_hidden_approach_kept` creates stronger tactical options in outer galleries or Black Lake.
+- `broken_prospect_hidden_approach_kept` creates stronger tactical options in outer galleries or Blackglass.
 - `broken_prospect_threshold_denied` improves contamination tone but keeps the route race costly.
 - Tolan's branch should explicitly color whether the expedition reads as morally practical or spiritually compromised.
 
-## Packet 5: Black Lake Causeway
+## Packet 5: Blackglass Causeway
 
 ### Packet Focus
 
-`Black Lake Causeway` is where the act finally asks what victory is for.
+`Blackglass Causeway` is where the act finally asks what victory is for.
 
 This packet turns on:
 
@@ -949,7 +949,7 @@ Suggested flag:
 
 This packet should remember earlier branches aggressively.
 
-- If `agatha_pact_restraint_known`, the shrine can be answered with a deeper Pact reading.
+- If `pale_witness_pact_restraint_known`, the shrine can be answered with a deeper Pact reading.
 - If `glasswater_relay_route_decoded`, barracks logic becomes easier to parse and false orders become a cleaner option.
 - If `act2_captive_outcome` is `many_saved`, a survivor witness can help interpret barracks movement without a hard skill gate.
 - If `nim_countermeasure_notes` survived, the anchors or far landing can be read as engineered resonance instead of pure haunting.
@@ -968,14 +968,14 @@ This packet should remember earlier branches aggressively.
 
 If these packets are used for actual content work, the cleanest order is:
 
-1. `Neverwinter Wood Survey Camp`
+1. `Greywake Survey Camp`
    - strongest midpoint payoff
    - ties directly into sabotage-night infiltration logic
 2. `Broken Prospect`
    - already live, already important, and benefits immediately from a more complex threshold identity
-3. `Black Lake Causeway`
+3. `Blackglass Causeway`
    - biggest late-act payoff, but best once earlier branch memories exist
-4. `Conyberry and Agatha's Circuit`
+4. `Hushfen Pale Circuit`
    - spiritually important and high-tone-setting, but easier to write once the later payoff destinations are settled
 5. `Stonehollow Dig`
    - especially strong once Nim's optional theorem logic is ready to propagate into the Forge and Act 3
@@ -986,6 +986,6 @@ These location packets should make Act 2 feel less like a line of good dungeons 
 
 Act 2 turns on three outcomes:
 
-- who reaches Wave Echo
+- who reaches Resonant Vaults
 - what habits, debts, and compromises they carry to the threshold
 - whether they keep resisting the Quiet Choir's worldview or start using its methods with steadier hands
