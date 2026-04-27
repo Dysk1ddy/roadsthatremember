@@ -457,6 +457,634 @@ class CombatResolverTests(unittest.TestCase):
         self.assertEqual(fighter.resources["ward"], 0)
         self.assertEqual(fighter.temp_hp, 8)
 
+    def test_shared_mage_starts_with_charge_focus_and_combat_options(self) -> None:
+        game, mage = build_game_with_player(
+            "Mage",
+            {"STR": 8, "DEX": 14, "CON": 13, "INT": 16, "WIS": 12, "CHA": 10},
+        )
+        enemy = create_enemy("bandit")
+        encounter = Encounter(title="Test", description="", enemies=[enemy], allow_flee=False)
+        game._in_combat = True
+        game.prepare_class_resources_for_combat(mage)
+
+        options = game.get_player_combat_options(mage, encounter, heroes=[mage])
+
+        self.assertEqual(mage.max_resources["mp"], 13)
+        self.assertEqual(mage.resources["mp"], 13)
+        self.assertEqual(mage.max_resources["focus"], 5)
+        self.assertEqual(mage.resources["focus"], 0)
+        self.assertIn("Minor Channel (1 MP)", options)
+        self.assertIn("Pattern Read", options)
+        self.assertIn("Ground", options)
+        self.assertEqual(game.combat_option_group("Pattern Read"), "Bonus Action")
+        self.assertEqual(game.combat_option_group("Ground"), "Bonus Action")
+
+    def test_pattern_read_marks_weakest_resist_lane_and_grants_focus_once(self) -> None:
+        game, mage = build_game_with_player(
+            "Mage",
+            {"STR": 8, "DEX": 14, "CON": 13, "INT": 16, "WIS": 12, "CHA": 10},
+        )
+        target = create_enemy("animated_armor")
+        game._in_combat = True
+        game.prepare_class_resources_for_combat(mage)
+
+        expected_ability, _ = game.mage_lowest_resist_lane(target)
+
+        self.assertTrue(game.use_pattern_read(mage, target))
+        self.assertTrue(game.target_is_pattern_read_by(mage, target))
+        self.assertEqual(target.bond_flags["mage_pattern_read_lowest_save"], expected_ability)
+        self.assertTrue(game.has_status(target, "pattern_read"))
+        self.assertEqual(mage.resources["focus"], 1)
+
+        self.assertTrue(game.use_pattern_read(mage, target))
+
+        self.assertEqual(mage.resources["focus"], 1)
+
+    def test_ground_trades_avoidance_for_resist_and_stability(self) -> None:
+        game, mage = build_game_with_player(
+            "Mage",
+            {"STR": 8, "DEX": 14, "CON": 13, "INT": 16, "WIS": 12, "CHA": 10},
+        )
+        game._in_combat = True
+        game.prepare_class_resources_for_combat(mage)
+        before_avoidance = game.effective_avoidance(mage)
+        before_stability = game.effective_stability(mage)
+
+        self.assertTrue(game.use_ground(mage))
+
+        self.assertTrue(game.has_status(mage, "grounded_channel"))
+        self.assertEqual(game.effective_avoidance(mage), before_avoidance - 1)
+        self.assertEqual(game.effective_stability(mage), before_stability + 1)
+        self.assertEqual(game.status_value(mage, "save_bonus"), 1)
+
+    def test_minor_channel_uses_pattern_read_save_lane_and_builds_focus(self) -> None:
+        game, mage = build_game_with_player(
+            "Mage",
+            {"STR": 8, "DEX": 14, "CON": 13, "INT": 16, "WIS": 12, "CHA": 10},
+        )
+        target = create_enemy("bandit")
+        game._in_combat = True
+        game._active_round_number = 1
+        game.prepare_class_resources_for_combat(mage)
+        game.use_pattern_read(mage, target)
+        captured: dict[str, int | str] = {}
+
+        def fail_save(actor, ability, dc, **kwargs):
+            captured["ability"] = ability
+            captured["dc"] = dc
+            return False
+
+        game.saving_throw = fail_save  # type: ignore[method-assign]
+        game.roll_with_display_bonus = lambda expression, *args, **kwargs: RollOutcome(expression, 5, [5], 0)  # type: ignore[method-assign]
+        before_hp = target.current_hp
+
+        self.assertTrue(game.use_minor_channel(mage, target))
+
+        self.assertEqual(mage.resources["mp"], 12)
+        self.assertEqual(captured["ability"], target.bond_flags["mage_pattern_read_lowest_save"])
+        self.assertEqual(captured["dc"], 13)
+        self.assertEqual(target.current_hp, before_hp - 5)
+        self.assertTrue(game.has_status(target, "reeling"))
+        self.assertEqual(mage.resources["focus"], 2)
+
+    def test_spellguard_training_adds_ward_and_combat_options(self) -> None:
+        game, mage = build_game_with_player(
+            "Mage",
+            {"STR": 8, "DEX": 14, "CON": 13, "INT": 16, "WIS": 12, "CHA": 10},
+        )
+        enemy = create_enemy("bandit")
+        encounter = Encounter(title="Test", description="", enemies=[enemy], allow_flee=False)
+
+        game.level_up_character(mage, 2)
+        game.level_up_character(mage, 3)
+        game.level_up_character(mage, 4)
+        game._in_combat = True
+        game.prepare_class_resources_for_combat(mage)
+        options = game.get_player_combat_options(mage, encounter, heroes=[mage])
+
+        self.assertIn("spellguard_ward", mage.features)
+        self.assertEqual(mage.max_resources["ward"], 15)
+        self.assertEqual(mage.resources["ward"], 0)
+        self.assertIn("Anchor Shell (3 MP)", options)
+        self.assertIn("Blue Glass Palm (1 MP)", options)
+        self.assertIn("Lockstep Field (3 MP)", options)
+        self.assertEqual(game.combat_option_group("Anchor Shell (3 MP)"), "Bonus Action")
+
+    def test_anchor_shell_grants_ward_defense_and_reels_when_broken(self) -> None:
+        game, mage = build_game_with_player(
+            "Mage",
+            {"STR": 8, "DEX": 14, "CON": 13, "INT": 16, "WIS": 12, "CHA": 10},
+        )
+        _, ally = build_game_with_player(
+            "Fighter",
+            {"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+        )
+        attacker = create_enemy("bandit")
+        mage.features.extend(["spellguard_ward", "anchor_shell"])
+        game.state.companions = [ally]
+        game._in_combat = True
+        game._active_round_number = 1
+        game._active_combat_heroes = [mage, ally]
+        game._active_combat_enemies = [attacker]
+        game.prepare_class_resources_for_combat(mage)
+        defense_before = game.effective_defense_percent(ally, damage_type="slashing")
+
+        self.assertTrue(game.use_anchor_shell(mage, ally))
+
+        self.assertEqual(mage.resources["mp"], 10)
+        self.assertEqual(ally.resources["ward"], 5)
+        self.assertTrue(game.has_status(ally, "anchor_shell"))
+        self.assertEqual(game.effective_defense_percent(ally, damage_type="slashing"), defense_before + 5)
+
+        actual = game.apply_damage(ally, 10, damage_type="slashing", source_actor=attacker, apply_defense=True)
+
+        self.assertEqual(actual, 0)
+        self.assertEqual(game.last_damage_resolution().ward_absorbed, 5)
+        self.assertEqual(ally.resources.get("ward", 0), 0)
+        self.assertFalse(game.has_status(ally, "anchor_shell"))
+        self.assertTrue(game.has_status(attacker, "reeling"))
+
+    def test_ward_shell_auto_reaction_spends_charge_before_temp_hp(self) -> None:
+        game, mage = build_game_with_player(
+            "Mage",
+            {"STR": 8, "DEX": 14, "CON": 13, "INT": 16, "WIS": 12, "CHA": 10},
+        )
+        attacker = create_enemy("bandit")
+        mage.features.append("ward_shell")
+        mage.temp_hp = 4
+        game._in_combat = True
+        game._active_round_number = 1
+        game.prepare_class_resources_for_combat(mage)
+        game.roll_with_display_bonus = lambda expression, *args, **kwargs: RollOutcome(expression, 6, [6], 0)  # type: ignore[method-assign]
+
+        actual = game.apply_damage(mage, 10, damage_type="slashing", source_actor=attacker, apply_defense=True)
+
+        self.assertEqual(actual, 0)
+        self.assertEqual(game.last_damage_resolution().ward_absorbed, 9)
+        self.assertEqual(game.last_damage_resolution().temp_hp_absorbed, 0)
+        self.assertEqual(mage.temp_hp, 4)
+        self.assertEqual(mage.resources["mp"], 11)
+        self.assertEqual(mage.bond_flags["class_reaction_used_round"], 1)
+
+    def test_lockstep_field_spends_charge_and_guards_allies(self) -> None:
+        game, mage = build_game_with_player(
+            "Mage",
+            {"STR": 8, "DEX": 14, "CON": 13, "INT": 16, "WIS": 12, "CHA": 10},
+        )
+        _, ally = build_game_with_player(
+            "Fighter",
+            {"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+        )
+        mage.features.append("lockstep_field")
+        game.state.companions = [ally]
+        game._in_combat = True
+        game._active_combat_heroes = [mage, ally]
+        game.prepare_class_resources_for_combat(mage)
+        ally_stability = game.effective_stability(ally)
+
+        self.assertTrue(game.use_lockstep_field(mage))
+
+        self.assertEqual(mage.resources["mp"], 10)
+        for target in (mage, ally):
+            self.assertTrue(game.has_status(target, "guarded"))
+            self.assertTrue(game.has_status(target, "lockstep_field"))
+        self.assertEqual(game.effective_stability(ally), ally_stability + 1)
+
+    def test_blue_glass_palm_spends_charge_damages_and_reels_on_failed_save(self) -> None:
+        game, mage = build_game_with_player(
+            "Mage",
+            {"STR": 8, "DEX": 14, "CON": 13, "INT": 16, "WIS": 12, "CHA": 10},
+        )
+        target = create_enemy("bandit")
+        mage.features.append("blue_glass_palm")
+        game._in_combat = True
+        game.prepare_class_resources_for_combat(mage)
+        game.saving_throw = lambda *args, **kwargs: False  # type: ignore[method-assign]
+        game.roll_with_display_bonus = lambda expression, *args, **kwargs: RollOutcome(expression, 4, [4], 0)  # type: ignore[method-assign]
+        before_hp = target.current_hp
+
+        self.assertTrue(game.use_blue_glass_palm(mage, target))
+
+        self.assertEqual(mage.resources["mp"], 12)
+        self.assertEqual(target.current_hp, before_hp - 4)
+        self.assertTrue(game.has_status(target, "reeling"))
+
+    def test_arcanist_training_adds_arc_pattern_charge_and_combat_options(self) -> None:
+        game, mage = build_game_with_player(
+            "Mage",
+            {"STR": 8, "DEX": 14, "CON": 13, "INT": 16, "WIS": 12, "CHA": 10},
+        )
+        enemy = create_enemy("bandit")
+        encounter = Encounter(title="Test", description="", enemies=[enemy], allow_flee=False)
+
+        game.level_up_character(mage, 2)
+        game.level_up_character(mage, 3)
+        game.level_up_character(mage, 4)
+        game._in_combat = True
+        game.prepare_class_resources_for_combat(mage)
+        options = game.get_player_combat_options(mage, encounter, heroes=[mage])
+
+        self.assertIn("arcanist_arc", mage.features)
+        self.assertIn("pattern_charge", mage.features)
+        self.assertEqual(mage.max_resources["arc"], 6)
+        self.assertEqual(mage.resources["arc"], 0)
+        self.assertIn("Arc Pulse (1 MP)", options)
+        self.assertIn("Marked Angle (1 MP)", options)
+        self.assertNotIn("Detonate Pattern (2 Arc)", options)
+
+        mage.resources["arc"] = 2
+        options = game.get_player_combat_options(mage, encounter, heroes=[mage])
+
+        self.assertIn("Detonate Pattern (2 Arc)", options)
+        self.assertEqual(game.combat_option_group("Marked Angle (1 MP)"), "Bonus Action")
+
+    def test_pattern_read_quiet_sum_and_marked_angle_build_arcanist_setup(self) -> None:
+        game, mage = build_game_with_player(
+            "Mage",
+            {"STR": 8, "DEX": 14, "CON": 13, "INT": 16, "WIS": 12, "CHA": 10},
+        )
+        target = create_enemy("bandit")
+        mage.features.extend(["arcanist_arc", "pattern_charge", "marked_angle", "quiet_sum"])
+        game._in_combat = True
+        game._active_round_number = 1
+        game.prepare_class_resources_for_combat(mage)
+
+        self.assertTrue(game.use_pattern_read(mage, target))
+
+        self.assertEqual(mage.resources["arc"], 1)
+
+        self.assertTrue(game.use_pattern_read(mage, target))
+
+        self.assertEqual(mage.resources["arc"], 1)
+
+        self.assertTrue(game.use_marked_angle(mage, target))
+
+        self.assertEqual(mage.resources["mp"], 12)
+        self.assertEqual(mage.resources["arc"], 2)
+        self.assertEqual(game.arcanist_pattern_charges(mage, target), 1)
+        self.assertIn("Pattern Charge 1", game.describe_combatant(target))
+
+    def test_arc_pulse_uses_save_damage_and_builds_pattern_charge_on_failed_save(self) -> None:
+        game, mage = build_game_with_player(
+            "Mage",
+            {"STR": 8, "DEX": 14, "CON": 13, "INT": 16, "WIS": 12, "CHA": 10},
+        )
+        target = create_enemy("bandit")
+        mage.features.extend(["arcanist_arc", "pattern_charge", "arc_pulse"])
+        game._in_combat = True
+        game.prepare_class_resources_for_combat(mage)
+        captured: dict[str, int | str] = {}
+
+        def fail_save(actor, ability, dc, **kwargs):
+            captured["ability"] = ability
+            captured["dc"] = dc
+            return False
+
+        game.saving_throw = fail_save  # type: ignore[method-assign]
+        game.roll_with_display_bonus = lambda expression, *args, **kwargs: RollOutcome(expression, 5, [5], 0)  # type: ignore[method-assign]
+        before_hp = target.current_hp
+
+        self.assertTrue(game.use_arc_pulse(mage, target))
+
+        self.assertEqual(mage.resources["mp"], 12)
+        self.assertEqual(captured["ability"], "DEX")
+        self.assertEqual(captured["dc"], 13)
+        self.assertEqual(target.current_hp, before_hp - 5)
+        self.assertEqual(mage.resources["arc"], 1)
+        self.assertEqual(game.arcanist_pattern_charges(mage, target), 1)
+
+    def test_detonate_pattern_spends_arc_consumes_charges_and_scales_damage(self) -> None:
+        game, mage = build_game_with_player(
+            "Mage",
+            {"STR": 8, "DEX": 14, "CON": 13, "INT": 16, "WIS": 12, "CHA": 10},
+        )
+        target = create_enemy("animated_armor")
+        mage.features.extend(["arcanist_arc", "pattern_charge", "detonate_pattern"])
+        game._in_combat = True
+        game.prepare_class_resources_for_combat(mage)
+        game.set_arcanist_pattern_charges(mage, target, 3)
+        mage.resources["arc"] = 2
+        game.saving_throw = lambda *args, **kwargs: False  # type: ignore[method-assign]
+        game.roll_with_display_bonus = lambda expression, *args, **kwargs: RollOutcome(expression, 12, [4, 4, 4], 0)  # type: ignore[method-assign]
+        before_hp = target.current_hp
+
+        self.assertTrue(game.use_detonate_pattern(mage, target))
+
+        self.assertEqual(mage.resources["arc"], 0)
+        self.assertEqual(game.arcanist_pattern_charges(mage, target), 0)
+        self.assertFalse(game.has_status(target, "pattern_charge"))
+        self.assertEqual(target.current_hp, before_hp - 12)
+
+    def test_minor_channel_failed_save_feeds_arcanist_pattern_charge(self) -> None:
+        game, mage = build_game_with_player(
+            "Mage",
+            {"STR": 8, "DEX": 14, "CON": 13, "INT": 16, "WIS": 12, "CHA": 10},
+        )
+        target = create_enemy("bandit")
+        mage.features.extend(["arcanist_arc", "pattern_charge"])
+        game._in_combat = True
+        game.prepare_class_resources_for_combat(mage)
+        game.saving_throw = lambda *args, **kwargs: False  # type: ignore[method-assign]
+        game.roll_with_display_bonus = lambda expression, *args, **kwargs: RollOutcome(expression, 5, [5], 0)  # type: ignore[method-assign]
+
+        self.assertTrue(game.use_minor_channel(mage, target))
+
+        self.assertEqual(mage.resources["arc"], 1)
+        self.assertEqual(game.arcanist_pattern_charges(mage, target), 1)
+
+    def test_elementalist_training_adds_attunement_fields_and_combat_options(self) -> None:
+        game, mage = build_game_with_player(
+            "Mage",
+            {"STR": 8, "DEX": 14, "CON": 13, "INT": 16, "WIS": 12, "CHA": 10},
+        )
+        enemy = create_enemy("bandit")
+        encounter = Encounter(title="Test", description="", enemies=[enemy], allow_flee=False)
+
+        game.level_up_character(mage, 2)
+        game.level_up_character(mage, 3)
+        game.level_up_character(mage, 4)
+        game._in_combat = True
+        game.prepare_class_resources_for_combat(mage)
+        options = game.get_player_combat_options(mage, encounter, heroes=[mage])
+
+        self.assertIn("elementalist_attunement", mage.features)
+        self.assertIn("elemental_weave", mage.features)
+        self.assertEqual(mage.max_resources["attunement"], 4)
+        self.assertEqual(mage.resources["attunement"], 0)
+        self.assertIn("Ember Lance (1 MP)", options)
+        self.assertIn("Frost Shard (1 MP)", options)
+        self.assertIn("Volt Grasp (1 MP)", options)
+        self.assertIn("Burning Line (4 MP)", options)
+        self.assertIn("Lockfrost (4 MP)", options)
+        self.assertIn("Change Weather", options)
+        self.assertEqual(game.combat_option_group("Change Weather"), "Bonus Action")
+
+    def test_elementalist_minor_channels_gain_attunement_and_apply_riders(self) -> None:
+        game, mage = build_game_with_player(
+            "Mage",
+            {"STR": 8, "DEX": 14, "CON": 13, "INT": 16, "WIS": 12, "CHA": 10},
+        )
+        fire_target = create_enemy("bandit")
+        cold_target = create_enemy("bandit")
+        shock_target = create_enemy("bandit")
+        mage.features.extend(["elementalist_attunement", "elemental_weave", "ember_lance", "frost_shard", "volt_grasp"])
+        game._in_combat = True
+        game._active_round_number = 1
+        game.prepare_class_resources_for_combat(mage)
+        game.saving_throw = lambda *args, **kwargs: False  # type: ignore[method-assign]
+        game.roll_with_display_bonus = lambda expression, *args, **kwargs: RollOutcome(expression, 5, [5], 0)  # type: ignore[method-assign]
+        fire_hp = fire_target.current_hp
+
+        self.assertTrue(game.use_ember_lance(mage, fire_target))
+
+        self.assertEqual(fire_target.current_hp, fire_hp - 5)
+        self.assertTrue(game.has_status(fire_target, "burning"))
+        self.assertEqual(game.elementalist_active_element(mage), "fire")
+        self.assertEqual(mage.resources["attunement"], 1)
+
+        self.assertTrue(game.use_frost_shard(mage, cold_target))
+
+        self.assertEqual(game.elementalist_active_element(mage), "cold")
+        self.assertEqual(game.elementalist_previous_element(mage), "fire")
+        self.assertEqual(mage.resources["attunement"], 1)
+        self.assertTrue(game.has_status(cold_target, "slowed"))
+        self.assertTrue(game.has_status(cold_target, "blinded"))
+
+        game._active_round_number = 2
+
+        self.assertTrue(game.use_volt_grasp(mage, shock_target))
+
+        self.assertEqual(game.elementalist_active_element(mage), "lightning")
+        self.assertEqual(game.elementalist_previous_element(mage), "cold")
+        self.assertEqual(mage.resources["attunement"], 1)
+        self.assertTrue(game.has_status(shock_target, "reeling"))
+        self.assertEqual(shock_target.bond_flags["class_reaction_used_round"], 2)
+
+    def test_change_weather_preserves_one_attunement_stack(self) -> None:
+        game, mage = build_game_with_player(
+            "Mage",
+            {"STR": 8, "DEX": 14, "CON": 13, "INT": 16, "WIS": 12, "CHA": 10},
+        )
+        mage.features.extend(["elementalist_attunement", "change_weather_hand"])
+        game._in_combat = True
+        game.prepare_class_resources_for_combat(mage)
+        mage.resources["attunement"] = 3
+        game.set_elementalist_active_element(mage, "fire")
+
+        self.assertTrue(game.use_change_weather_hand(mage, "cold"))
+
+        self.assertEqual(game.elementalist_active_element(mage), "cold")
+        self.assertEqual(game.elementalist_previous_element(mage), "fire")
+        self.assertEqual(mage.resources["attunement"], 1)
+
+    def test_burning_line_area_save_hits_multiple_targets_and_leaves_field(self) -> None:
+        game, mage = build_game_with_player(
+            "Mage",
+            {"STR": 8, "DEX": 14, "CON": 13, "INT": 16, "WIS": 12, "CHA": 10},
+        )
+        first = create_enemy("bandit")
+        second = create_enemy("ash_brand_enforcer")
+        mage.features.extend(["elementalist_attunement", "burning_line"])
+        game._in_combat = True
+        game._active_combat_heroes = [mage]
+        game._active_combat_enemies = [first, second]
+        game.prepare_class_resources_for_combat(mage)
+        game.saving_throw = lambda *args, **kwargs: False  # type: ignore[method-assign]
+        game.roll_with_display_bonus = lambda expression, *args, **kwargs: RollOutcome(expression, 4, [4], 0)  # type: ignore[method-assign]
+        first_hp = first.current_hp
+        second_hp = second.current_hp
+
+        self.assertTrue(game.use_burning_line(mage))
+
+        self.assertEqual(mage.resources["mp"], 9)
+        self.assertEqual(mage.resources["attunement"], 1)
+        self.assertEqual(first.current_hp, first_hp - 4)
+        self.assertEqual(second.current_hp, second_hp - 4)
+        for target in (first, second):
+            self.assertTrue(game.has_status(target, "burning_line"))
+            self.assertTrue(game.has_status(target, "burning"))
+
+    def test_lockfrost_area_save_slows_and_drops_already_slowed_targets(self) -> None:
+        game, mage = build_game_with_player(
+            "Mage",
+            {"STR": 8, "DEX": 14, "CON": 13, "INT": 16, "WIS": 12, "CHA": 10},
+        )
+        first = create_enemy("bandit")
+        second = create_enemy("ash_brand_enforcer")
+        mage.features.extend(["elementalist_attunement", "lockfrost"])
+        game._in_combat = True
+        game._active_combat_heroes = [mage]
+        game._active_combat_enemies = [first, second]
+        game.prepare_class_resources_for_combat(mage)
+        game.apply_status(first, "slowed", 1, source="test setup")
+        game.saving_throw = lambda *args, **kwargs: False  # type: ignore[method-assign]
+        game.roll_with_display_bonus = lambda expression, *args, **kwargs: RollOutcome(expression, 4, [4], 0)  # type: ignore[method-assign]
+        second_stability = game.effective_stability(second)
+
+        self.assertTrue(game.use_lockfrost(mage))
+
+        self.assertEqual(mage.resources["mp"], 9)
+        self.assertEqual(mage.resources["attunement"], 1)
+        self.assertEqual(game.elementalist_active_element(mage), "cold")
+        self.assertTrue(game.has_status(first, "prone"))
+        for target in (first, second):
+            self.assertTrue(game.has_status(target, "slowed"))
+            self.assertTrue(game.has_status(target, "lockfrost_field"))
+        self.assertEqual(game.effective_stability(second), second_stability - 3)
+
+    def test_aethermancer_training_adds_flow_healing_and_support_options(self) -> None:
+        game, mage = build_game_with_player(
+            "Mage",
+            {"STR": 8, "DEX": 14, "CON": 13, "INT": 16, "WIS": 12, "CHA": 10},
+        )
+        enemy = create_enemy("bandit")
+        encounter = Encounter(title="Test", description="", enemies=[enemy], allow_flee=False)
+
+        game.level_up_character(mage, 2)
+        game.level_up_character(mage, 3)
+        game.level_up_character(mage, 4)
+        game._in_combat = True
+        game.prepare_class_resources_for_combat(mage)
+        options = game.get_player_combat_options(mage, encounter, heroes=[mage])
+
+        self.assertIn("aethermancer_flow", mage.features)
+        self.assertIn("field_mend", mage.features)
+        self.assertEqual(mage.max_resources["flow"], 5)
+        self.assertEqual(mage.resources["flow"], 0)
+        self.assertIn("Field Mend (3 MP)", options)
+        self.assertIn("Triage Line (3 MP)", options)
+        self.assertIn("Clean Breath (2 MP)", options)
+        self.assertIn("Pulse Restore (4 MP)", options)
+        self.assertEqual(game.combat_option_group("Pulse Restore (4 MP)"), "Bonus Action")
+
+        mage.resources["flow"] = 1
+        options = game.get_player_combat_options(mage, encounter, heroes=[mage])
+
+        self.assertIn("Overflow Shell (1 Flow)", options)
+        self.assertEqual(game.combat_option_group("Overflow Shell (1 Flow)"), "Bonus Action")
+
+    def test_field_mend_heals_and_overflow_becomes_ward_and_flow(self) -> None:
+        game, mage = build_game_with_player(
+            "Mage",
+            {"STR": 8, "DEX": 14, "CON": 13, "INT": 16, "WIS": 12, "CHA": 10},
+        )
+        _, ally = build_game_with_player(
+            "Fighter",
+            {"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+        )
+        mage.features.extend(["aethermancer_flow", "field_mend"])
+        game._in_combat = True
+        game.prepare_class_resources_for_combat(mage)
+        ally.current_hp = ally.max_hp - 3
+        game.roll_with_display_bonus = lambda expression, *args, **kwargs: RollOutcome(expression, 8, [8], 0)  # type: ignore[method-assign]
+
+        self.assertTrue(game.use_field_mend(mage, ally))
+
+        self.assertEqual(mage.resources["mp"], 10)
+        self.assertEqual(ally.current_hp, ally.max_hp)
+        self.assertEqual(ally.resources.get("ward", 0), 4)
+        self.assertEqual(mage.resources["flow"], 1)
+
+    def test_field_mend_on_downed_ally_costs_extra_charge(self) -> None:
+        game, mage = build_game_with_player(
+            "Mage",
+            {"STR": 8, "DEX": 14, "CON": 13, "INT": 16, "WIS": 12, "CHA": 10},
+        )
+        _, ally = build_game_with_player(
+            "Fighter",
+            {"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+        )
+        mage.features.extend(["aethermancer_flow", "field_mend"])
+        game._in_combat = True
+        game.prepare_class_resources_for_combat(mage)
+        ally.current_hp = 0
+        ally.death_failures = 1
+        game.roll_with_display_bonus = lambda expression, *args, **kwargs: RollOutcome(expression, 4, [4], 0)  # type: ignore[method-assign]
+
+        self.assertTrue(game.use_field_mend(mage, ally))
+
+        self.assertEqual(mage.resources["mp"], 9)
+        self.assertEqual(ally.current_hp, 7)
+        self.assertEqual(ally.death_failures, 0)
+
+    def test_pulse_restore_bonus_heal_and_overflow_shell(self) -> None:
+        game, mage = build_game_with_player(
+            "Mage",
+            {"STR": 8, "DEX": 14, "CON": 13, "INT": 16, "WIS": 12, "CHA": 10},
+        )
+        _, ally = build_game_with_player(
+            "Fighter",
+            {"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+        )
+        mage.features.extend(["aethermancer_flow", "pulse_restore", "overflow_shell"])
+        game._in_combat = True
+        game.prepare_class_resources_for_combat(mage)
+        ally.current_hp = ally.max_hp - 2
+        game.roll_with_display_bonus = lambda expression, *args, **kwargs: RollOutcome(expression, 4, [4], 0)  # type: ignore[method-assign]
+
+        self.assertTrue(game.use_pulse_restore(mage, ally))
+
+        self.assertEqual(mage.resources["mp"], 9)
+        self.assertEqual(ally.current_hp, ally.max_hp)
+        self.assertEqual(ally.resources.get("ward", 0), 4)
+        self.assertEqual(mage.resources["flow"], 1)
+
+        self.assertTrue(game.use_overflow_shell(mage, ally))
+
+        self.assertEqual(mage.resources["flow"], 0)
+        self.assertEqual(ally.resources.get("ward", 0), 9)
+
+    def test_triage_line_heals_multiple_allies_and_grants_flow(self) -> None:
+        game, mage = build_game_with_player(
+            "Mage",
+            {"STR": 8, "DEX": 14, "CON": 13, "INT": 16, "WIS": 12, "CHA": 10},
+        )
+        _, first = build_game_with_player(
+            "Fighter",
+            {"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+        )
+        _, second = build_game_with_player(
+            "Rogue",
+            {"STR": 10, "DEX": 16, "CON": 13, "INT": 12, "WIS": 10, "CHA": 12},
+        )
+        mage.features.extend(["aethermancer_flow", "triage_line"])
+        game._in_combat = True
+        game.prepare_class_resources_for_combat(mage)
+        first.current_hp -= 5
+        second.current_hp -= 5
+        game.roll_with_display_bonus = lambda expression, *args, **kwargs: RollOutcome(expression, 3, [3], 0)  # type: ignore[method-assign]
+
+        self.assertTrue(game.use_triage_line(mage, [mage, first, second]))
+
+        self.assertEqual(mage.resources["mp"], 10)
+        self.assertEqual(first.current_hp, first.max_hp - 2)
+        self.assertEqual(second.current_hp, second.max_hp - 2)
+        for target in (mage, first, second):
+            self.assertTrue(game.has_status(target, "triage_line"))
+        self.assertEqual(mage.resources["flow"], 1)
+
+    def test_clean_breath_reduces_condition_heals_and_grants_flow(self) -> None:
+        game, mage = build_game_with_player(
+            "Mage",
+            {"STR": 8, "DEX": 14, "CON": 13, "INT": 16, "WIS": 12, "CHA": 10},
+        )
+        _, ally = build_game_with_player(
+            "Fighter",
+            {"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+        )
+        mage.features.extend(["aethermancer_flow", "clean_breath"])
+        game._in_combat = True
+        game.prepare_class_resources_for_combat(mage)
+        ally.current_hp -= 2
+        ally.conditions["poisoned"] = 2
+
+        self.assertTrue(game.use_clean_breath(mage, ally))
+
+        self.assertEqual(mage.resources["mp"], 11)
+        self.assertEqual(ally.conditions["poisoned"], 1)
+        self.assertEqual(ally.current_hp, ally.max_hp - 1)
+        self.assertEqual(mage.resources["flow"], 1)
+
     def test_rogue_mark_poison_and_wound_hooks_award_resources(self) -> None:
         game, rogue = build_game_with_player(
             "Rogue",
@@ -478,6 +1106,586 @@ class CombatResolverTests(unittest.TestCase):
         self.assertEqual(rogue.resources["edge"], 2)
         self.assertEqual(rogue.resources["toxin"], 1)
         self.assertEqual(target.bond_flags["class_mark_last_wounded_by"], rogue.name)
+
+    def test_shared_rogue_progression_adds_combat_actions(self) -> None:
+        game, rogue = build_game_with_player(
+            "Rogue",
+            {"STR": 10, "DEX": 16, "CON": 13, "INT": 12, "WIS": 10, "CHA": 12},
+        )
+        enemy = create_enemy("bandit")
+        encounter = Encounter(title="Test", description="", enemies=[enemy], allow_flee=False)
+
+        game.level_up_character(rogue, 2)
+        game.level_up_character(rogue, 3)
+        game._in_combat = True
+        game.prepare_class_resources_for_combat(rogue)
+        options = game.get_player_combat_options(rogue, encounter, heroes=[rogue])
+
+        self.assertIn("Tool Read", options)
+        self.assertIn("Skirmish", options)
+        self.assertIn("Feint", options)
+        self.assertIn("Dirty Trick", options)
+        self.assertIn("slip_away", rogue.features)
+
+    def test_tool_read_marks_exposes_and_grants_edge(self) -> None:
+        game, rogue = build_game_with_player(
+            "Rogue",
+            {"STR": 10, "DEX": 16, "CON": 13, "INT": 12, "WIS": 10, "CHA": 12},
+        )
+        target = create_enemy("bandit")
+        rogue.features.append("tool_read")
+        game._in_combat = True
+        game.prepare_class_resources_for_combat(rogue)
+        rogue.resources["edge"] = 0
+
+        self.assertTrue(game.use_tool_read(rogue, target))
+
+        self.assertTrue(game.target_is_marked_by(rogue, target))
+        self.assertTrue(game.target_is_tool_read_by(rogue, target))
+        self.assertTrue(game.has_status(target, "tool_read"))
+        self.assertTrue(game.rogue_target_is_exposed(rogue, target, [rogue]))
+        self.assertEqual(game.target_accuracy_modifier(target), 1)
+        self.assertEqual(rogue.resources["edge"], 1)
+
+    def test_feint_and_dirty_trick_create_exposed_rogue_openings(self) -> None:
+        game, rogue = build_game_with_player(
+            "Rogue",
+            {"STR": 10, "DEX": 16, "CON": 13, "INT": 12, "WIS": 10, "CHA": 12},
+        )
+        feint_target = create_enemy("bandit")
+        trick_target = create_enemy("ash_brand_enforcer")
+        rogue.features.extend(["rogue_feint", "dirty_trick"])
+        game._in_combat = True
+        game.prepare_class_resources_for_combat(rogue)
+        rogue.resources["edge"] = 0
+        game.roll_check_d20 = lambda *args, **kwargs: D20Outcome(kept=12, rolls=[12], rerolls=[], advantage_state=0)  # type: ignore[method-assign]
+
+        self.assertTrue(game.use_rogue_feint(rogue, feint_target))
+
+        self.assertTrue(game.has_status(feint_target, "reeling"))
+        self.assertTrue(game.has_status(feint_target, "exposed"))
+        self.assertEqual(rogue.resources["edge"], 1)
+
+        rogue.resources["edge"] = 0
+        game.roll_check_d20 = lambda *args, **kwargs: D20Outcome(kept=20, rolls=[20], rerolls=[], advantage_state=0)  # type: ignore[method-assign]
+
+        self.assertTrue(game.use_dirty_trick(rogue, trick_target, "seam"))
+
+        self.assertTrue(game.has_status(trick_target, "armor_broken"))
+        self.assertEqual(game.total_armor_break_percent(trick_target), 10)
+        self.assertEqual(rogue.resources["edge"], 1)
+
+    def test_skirmish_near_miss_and_slip_away_spend_edge_around_avoidance(self) -> None:
+        game, rogue = build_game_with_player(
+            "Rogue",
+            {"STR": 10, "DEX": 16, "CON": 13, "INT": 12, "WIS": 10, "CHA": 12},
+        )
+        attacker = create_enemy("bandit")
+        rogue.features.extend(["rogue_skirmish", "slip_away"])
+        game._in_combat = True
+        game._active_round_number = 1
+        game.prepare_class_resources_for_combat(rogue)
+
+        self.assertTrue(game.use_rogue_skirmish(rogue))
+
+        self.assertEqual(rogue.resources["edge"], 0)
+        self.assertEqual(game.current_combat_stance_key(rogue), "mobile")
+
+        game.clear_combat_stance(rogue)
+        target_number = game.effective_attack_target_number(rogue)
+        total_modifier = (
+            attacker.attack_bonus()
+            + game.ally_pressure_bonus(attacker, [attacker], ranged=attacker.weapon.ranged)
+            + game.status_accuracy_modifier(attacker)
+            + game.attack_focus_modifier(attacker, rogue)
+            + game.target_accuracy_modifier(rogue)
+        )
+        near_miss_roll = target_number - total_modifier - 1
+        game.roll_check_d20 = lambda *args, **kwargs: D20Outcome(kept=near_miss_roll, rolls=[near_miss_roll], rerolls=[], advantage_state=0)  # type: ignore[method-assign]
+
+        self.assertFalse(game.perform_enemy_attack(attacker, rogue, [rogue], [attacker], set()))
+        self.assertEqual(rogue.resources["edge"], 1)
+
+        game._active_round_number = 2
+        hit_by_one_roll = target_number - total_modifier + 1
+        game.roll_check_d20 = lambda *args, **kwargs: D20Outcome(kept=hit_by_one_roll, rolls=[hit_by_one_roll], rerolls=[], advantage_state=0)  # type: ignore[method-assign]
+        before_hp = rogue.current_hp
+
+        self.assertFalse(game.perform_enemy_attack(attacker, rogue, [rogue], [attacker], set()))
+
+        self.assertEqual(rogue.current_hp, before_hp)
+        self.assertEqual(rogue.resources["edge"], 0)
+        self.assertEqual(rogue.bond_flags["class_reaction_used_round"], 2)
+
+    def test_shadowguard_training_adds_shadow_resource_and_options(self) -> None:
+        game, rogue = build_game_with_player(
+            "Rogue",
+            {"STR": 10, "DEX": 16, "CON": 13, "INT": 12, "WIS": 10, "CHA": 12},
+        )
+        enemy = create_enemy("bandit")
+        encounter = Encounter(title="Test", description="", enemies=[enemy], allow_flee=False)
+
+        game.level_up_character(rogue, 2)
+        game.level_up_character(rogue, 3)
+        game.level_up_character(rogue, 4)
+        game._in_combat = True
+        game.prepare_class_resources_for_combat(rogue)
+        rogue.resources["shadow"] = 2
+        options = game.get_player_combat_options(rogue, encounter, heroes=[rogue])
+
+        self.assertEqual(rogue.max_resources["shadow"], 5)
+        self.assertIn("False Target", options)
+        self.assertIn("Smoke Pin", options)
+        self.assertIn("Cover The Healer", options)
+
+    def test_false_target_spends_edge_protects_ally_and_grants_shadow_on_miss(self) -> None:
+        game, rogue = build_game_with_player(
+            "Rogue",
+            {"STR": 10, "DEX": 16, "CON": 13, "INT": 12, "WIS": 10, "CHA": 12},
+        )
+        _, ally = build_game_with_player(
+            "Fighter",
+            {"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+        )
+        attacker = create_enemy("bandit")
+        rogue.features.extend(["shadowguard_shadow", "false_target"])
+        game.state.companions = [ally]
+        game._in_combat = True
+        game._active_round_number = 1
+        game._active_combat_heroes = [rogue, ally]
+        game._active_combat_enemies = [attacker]
+        game.prepare_class_resources_for_combat(rogue)
+
+        self.assertTrue(game.use_false_target(rogue, ally))
+
+        self.assertEqual(rogue.resources["edge"], 0)
+        self.assertTrue(game.has_status(ally, "false_target"))
+        self.assertEqual(game.target_accuracy_modifier(ally), -2)
+
+        target_number = game.effective_attack_target_number(ally)
+        total_modifier = (
+            attacker.attack_bonus()
+            + game.ally_pressure_bonus(attacker, [attacker], ranged=attacker.weapon.ranged)
+            + game.status_accuracy_modifier(attacker)
+            + game.attack_focus_modifier(attacker, ally)
+            + game.target_accuracy_modifier(ally)
+        )
+        near_miss_roll = target_number - total_modifier - 1
+        before_hp = ally.current_hp
+        game.roll_check_d20 = lambda *args, **kwargs: D20Outcome(kept=near_miss_roll, rolls=[near_miss_roll], rerolls=[], advantage_state=0)  # type: ignore[method-assign]
+
+        self.assertFalse(game.perform_enemy_attack(attacker, ally, [rogue, ally], [attacker], set()))
+
+        self.assertEqual(ally.current_hp, before_hp)
+        self.assertFalse(game.has_status(ally, "false_target"))
+        self.assertEqual(rogue.resources["shadow"], 1)
+        self.assertTrue(game.has_status(attacker, "reeling"))
+
+    def test_shadowguard_shadow_smoke_pin_and_cover_the_healer(self) -> None:
+        game, rogue = build_game_with_player(
+            "Rogue",
+            {"STR": 10, "DEX": 16, "CON": 13, "INT": 12, "WIS": 10, "CHA": 12},
+        )
+        _, ally = build_game_with_player(
+            "Cleric",
+            {"STR": 10, "DEX": 12, "CON": 13, "INT": 10, "WIS": 15, "CHA": 14},
+        )
+        attacker = create_enemy("bandit")
+        target = create_enemy("ash_brand_enforcer")
+        rogue.features.extend(["shadowguard_shadow", "smoke_pin", "cover_the_healer"])
+        game.state.companions = [ally]
+        game._in_combat = True
+        game._active_round_number = 1
+        game._active_combat_heroes = [rogue, ally]
+        game._active_combat_enemies = [attacker, target]
+        game.prepare_class_resources_for_combat(rogue)
+        rogue.resources["shadow"] = 0
+
+        target_number = game.effective_attack_target_number(rogue)
+        total_modifier = (
+            attacker.attack_bonus()
+            + game.ally_pressure_bonus(attacker, [attacker], ranged=attacker.weapon.ranged)
+            + game.status_accuracy_modifier(attacker)
+            + game.attack_focus_modifier(attacker, rogue)
+            + game.target_accuracy_modifier(rogue)
+        )
+        miss_roll = target_number - total_modifier - 5
+        game.roll_check_d20 = lambda *args, **kwargs: D20Outcome(kept=miss_roll, rolls=[miss_roll], rerolls=[], advantage_state=0)  # type: ignore[method-assign]
+
+        self.assertFalse(game.perform_enemy_attack(attacker, rogue, [rogue, ally], [attacker], set()))
+        self.assertEqual(rogue.resources["shadow"], 1)
+
+        game.roll_check_d20 = lambda *args, **kwargs: D20Outcome(kept=20, rolls=[20], rerolls=[], advantage_state=0)  # type: ignore[method-assign]
+
+        self.assertTrue(game.use_smoke_pin(rogue, target))
+
+        self.assertEqual(rogue.resources["shadow"], 0)
+        self.assertTrue(game.has_status(target, "blinded"))
+        self.assertTrue(game.has_status(target, "exposed"))
+        self.assertTrue(game.has_status(rogue, "invisible"))
+
+        rogue.resources["shadow"] = 2
+
+        self.assertTrue(game.use_cover_the_healer(rogue, ally))
+
+        self.assertEqual(rogue.resources["shadow"], 0)
+        self.assertTrue(game.has_status(ally, "false_target"))
+        self.assertTrue(game.has_status(ally, "guarded"))
+        self.assertTrue(game.has_status(ally, "shadow_lane"))
+
+    def test_assassin_training_adds_death_mark_and_combat_options(self) -> None:
+        game, rogue = build_game_with_player(
+            "Rogue",
+            {"STR": 10, "DEX": 16, "CON": 13, "INT": 12, "WIS": 10, "CHA": 12},
+        )
+        enemy = create_enemy("bandit")
+        encounter = Encounter(title="Test", description="", enemies=[enemy], allow_flee=False)
+
+        game.level_up_character(rogue, 2)
+        game.level_up_character(rogue, 3)
+        game.level_up_character(rogue, 4)
+        game._in_combat = True
+        game.prepare_class_resources_for_combat(rogue)
+        rogue.resources["edge"] = 3
+        options = game.get_player_combat_options(rogue, encounter, heroes=[rogue])
+
+        self.assertIn("Death Mark", options)
+        self.assertIn("Quiet Knife", options)
+        self.assertIn("Between Plates", options)
+        self.assertIn("Sudden End", options)
+
+    def test_death_mark_replaces_previous_mark_and_grants_assassin_accuracy(self) -> None:
+        game, rogue = build_game_with_player(
+            "Rogue",
+            {"STR": 10, "DEX": 16, "CON": 13, "INT": 12, "WIS": 10, "CHA": 12},
+        )
+        first = create_enemy("bandit")
+        second = create_enemy("ash_brand_enforcer")
+        rogue.features.append("death_mark")
+        game._in_combat = True
+        game._active_combat_heroes = [rogue]
+        game._active_combat_enemies = [first, second]
+
+        self.assertTrue(game.use_death_mark(rogue, first))
+        self.assertTrue(game.target_is_death_marked_by(rogue, first))
+
+        self.assertTrue(game.use_death_mark(rogue, second))
+
+        self.assertFalse(game.target_is_death_marked_by(rogue, first))
+        self.assertTrue(game.target_is_death_marked_by(rogue, second))
+        self.assertEqual(game.assassin_accuracy_modifier(rogue, second, [rogue]), 1)
+
+    def test_quiet_knife_uses_opener_and_first_death_mark_wound_damage(self) -> None:
+        game, rogue = build_game_with_player(
+            "Rogue",
+            {"STR": 10, "DEX": 16, "CON": 13, "INT": 12, "WIS": 10, "CHA": 12},
+        )
+        target = create_enemy("ash_brand_enforcer")
+        rogue.features.extend(["death_mark", "quiet_knife"])
+        game._in_combat = True
+        game._active_combat_heroes = [rogue]
+        game._active_combat_enemies = [target]
+        game.prepare_class_resources_for_combat(rogue)
+        game.use_death_mark(rogue, target)
+        game.apply_status(rogue, "invisible", 1, source="test setup")
+        game.roll_check_d20 = lambda *args, **kwargs: D20Outcome(kept=9, rolls=[9], rerolls=[], advantage_state=0)  # type: ignore[method-assign]
+        game.roll_with_display_bonus = lambda expression, *args, **kwargs: RollOutcome(expression, 4, [4], 0)  # type: ignore[method-assign]
+
+        self.assertTrue(game.use_quiet_knife(rogue, target, [rogue], [target], set()))
+
+        self.assertTrue(game.last_damage_caused_wound())
+        self.assertTrue(rogue.bond_flags[game.assassin_first_wound_key(target)])
+        self.assertEqual(target.bond_flags["assassin_death_mark_first_wounded_by"], rogue.name)
+        self.assertLess(target.current_hp, target.max_hp - 7)
+
+    def test_between_plates_spends_edge_and_ignores_defense(self) -> None:
+        game, rogue = build_game_with_player(
+            "Rogue",
+            {"STR": 10, "DEX": 16, "CON": 13, "INT": 12, "WIS": 10, "CHA": 12},
+        )
+        target = create_enemy("animated_armor")
+        rogue.features.extend(["death_mark", "between_plates"])
+        game._in_combat = True
+        game._active_combat_heroes = [rogue]
+        game._active_combat_enemies = [target]
+        game.prepare_class_resources_for_combat(rogue)
+        rogue.resources["edge"] = 2
+        game.use_death_mark(rogue, target)
+        game.roll_check_d20 = lambda *args, **kwargs: D20Outcome(kept=12, rolls=[12], rerolls=[], advantage_state=0)  # type: ignore[method-assign]
+        game.roll_with_display_bonus = lambda expression, *args, **kwargs: RollOutcome(expression, 4, [4], 0)  # type: ignore[method-assign]
+
+        self.assertTrue(game.use_between_plates(rogue, target, [rogue], [target], set()))
+
+        self.assertEqual(rogue.resources["edge"], 1)
+        self.assertGreaterEqual(game.last_damage_resolution().armor_break_percent, 10)
+
+    def test_sudden_end_spends_edge_for_execution_pressure(self) -> None:
+        game, rogue = build_game_with_player(
+            "Rogue",
+            {"STR": 10, "DEX": 16, "CON": 13, "INT": 12, "WIS": 10, "CHA": 12},
+        )
+        target = create_enemy("ogre_brute")
+        rogue.features.extend(["death_mark", "sudden_end"])
+        game._in_combat = True
+        game._active_combat_heroes = [rogue]
+        game._active_combat_enemies = [target]
+        game.prepare_class_resources_for_combat(rogue)
+        rogue.resources["edge"] = 3
+        target.current_hp = target.max_hp // 2
+        before_hp = target.current_hp
+        game.use_death_mark(rogue, target)
+        game.roll_check_d20 = lambda *args, **kwargs: D20Outcome(kept=9, rolls=[9], rerolls=[], advantage_state=0)  # type: ignore[method-assign]
+        game.roll_with_display_bonus = lambda expression, *args, **kwargs: RollOutcome(expression, 4, [4], 0)  # type: ignore[method-assign]
+
+        self.assertTrue(game.use_sudden_end(rogue, target, [rogue], [target], set()))
+
+        self.assertEqual(rogue.resources["edge"], 1)
+        self.assertTrue(game.last_damage_caused_wound())
+        self.assertLess(target.current_hp, before_hp - 7)
+
+    def test_poisoner_training_starts_with_toxin_and_combat_options(self) -> None:
+        game, rogue = build_game_with_player(
+            "Rogue",
+            {"STR": 10, "DEX": 16, "CON": 13, "INT": 12, "WIS": 10, "CHA": 12},
+        )
+        enemy = create_enemy("bandit")
+        encounter = Encounter(title="Test", description="", enemies=[enemy], allow_flee=False)
+
+        game.level_up_character(rogue, 2)
+        game.level_up_character(rogue, 3)
+        game.level_up_character(rogue, 4)
+        game._in_combat = True
+        game.prepare_class_resources_for_combat(rogue)
+        options = game.get_player_combat_options(rogue, encounter, heroes=[rogue])
+
+        self.assertEqual(rogue.max_resources["toxin"], 5)
+        self.assertEqual(rogue.resources["toxin"], 5)
+        self.assertIn("Black Drop", options)
+        self.assertIn("Green Needle", options)
+        self.assertIn("Bitter Cloud", options)
+        self.assertIn("Rot Thread", options)
+        self.assertIn("Bloom In The Blood", options)
+
+    def test_black_drop_spends_toxin_and_delivers_poison_on_next_wound(self) -> None:
+        game, rogue = build_game_with_player(
+            "Rogue",
+            {"STR": 10, "DEX": 16, "CON": 13, "INT": 12, "WIS": 10, "CHA": 12},
+        )
+        target = create_enemy("bandit")
+        rogue.features.extend(["poisoner_toxin", "black_drop"])
+        game._in_combat = True
+        game._active_combat_heroes = [rogue]
+        game._active_combat_enemies = [target]
+        game.prepare_class_resources_for_combat(rogue)
+        game.saving_throw = lambda *args, **kwargs: False  # type: ignore[method-assign]
+        game.roll_check_d20 = lambda *args, **kwargs: D20Outcome(kept=9, rolls=[9], rerolls=[], advantage_state=0)  # type: ignore[method-assign]
+        game.roll_with_display_bonus = lambda expression, *args, **kwargs: RollOutcome(expression, 4, [4], 0)  # type: ignore[method-assign]
+
+        self.assertTrue(game.use_black_drop(rogue))
+        self.assertEqual(rogue.resources["toxin"], 4)
+
+        game.perform_weapon_attack(rogue, target, [rogue], [target], set())
+
+        self.assertFalse(game.has_status(rogue, "black_drop"))
+        self.assertTrue(game.last_damage_caused_wound())
+        self.assertEqual(game.rogue_poison_stacks(rogue, target), 2)
+        self.assertTrue(game.has_status(target, "poisoned"))
+
+    def test_rogue_poison_stacks_tick_damage_and_fade(self) -> None:
+        game, rogue = build_game_with_player(
+            "Rogue",
+            {"STR": 10, "DEX": 16, "CON": 13, "INT": 12, "WIS": 10, "CHA": 12},
+        )
+        target = create_enemy("bandit")
+        rogue.features.append("poisoner_toxin")
+        game._in_combat = True
+        game._active_combat_heroes = [rogue]
+        game._active_combat_enemies = [target]
+        game.prepare_class_resources_for_combat(rogue)
+        game.add_rogue_poison_stack(rogue, target, 3, duration=3)
+        before_hp = target.current_hp
+
+        game.tick_conditions(target)
+
+        self.assertEqual(target.current_hp, before_hp - 3)
+        self.assertEqual(game.rogue_poison_stacks(rogue, target), 2)
+        self.assertTrue(game.has_status(target, "poisoned"))
+
+    def test_bitter_cloud_applies_poison_through_save_pressure(self) -> None:
+        game, rogue = build_game_with_player(
+            "Rogue",
+            {"STR": 10, "DEX": 16, "CON": 13, "INT": 12, "WIS": 10, "CHA": 12},
+        )
+        target = create_enemy("animated_armor")
+        rogue.features.extend(["poisoner_toxin", "bitter_cloud"])
+        game._in_combat = True
+        game._active_combat_heroes = [rogue]
+        game._active_combat_enemies = [target]
+        game.prepare_class_resources_for_combat(rogue)
+        game.saving_throw = lambda *args, **kwargs: False  # type: ignore[method-assign]
+        before_hp = target.current_hp
+
+        self.assertTrue(game.use_bitter_cloud(rogue, target))
+
+        self.assertEqual(rogue.resources["toxin"], 4)
+        self.assertEqual(game.rogue_poison_stacks(rogue, target), 2)
+        self.assertTrue(game.has_status(target, "reeling"))
+
+        game.tick_conditions(target)
+
+        self.assertEqual(target.current_hp, before_hp - 2)
+
+    def test_rot_thread_and_bloom_in_the_blood_work_around_armor(self) -> None:
+        game, rogue = build_game_with_player(
+            "Rogue",
+            {"STR": 10, "DEX": 16, "CON": 13, "INT": 12, "WIS": 10, "CHA": 12},
+        )
+        target = create_enemy("animated_armor")
+        rogue.features.extend(["poisoner_toxin", "rot_thread", "bloom_in_the_blood"])
+        game._in_combat = True
+        game._active_combat_heroes = [rogue]
+        game._active_combat_enemies = [target]
+        game.prepare_class_resources_for_combat(rogue)
+        rogue.resources["toxin"] = 4
+        game.add_rogue_poison_stack(rogue, target, 4, duration=3)
+
+        self.assertTrue(game.use_rot_thread(rogue, target))
+
+        self.assertTrue(game.has_status(target, "rot_thread"))
+        self.assertTrue(game.has_status(target, "armor_broken"))
+        self.assertGreaterEqual(game.total_armor_break_percent(target), 20)
+
+        before_hp = target.current_hp
+
+        self.assertTrue(game.use_bloom_in_the_blood(rogue, target))
+
+        self.assertEqual(target.current_hp, before_hp - 8)
+        self.assertEqual(game.rogue_poison_stacks(rogue, target), 2)
+
+    def test_alchemist_training_adds_satchel_options(self) -> None:
+        game, rogue = build_game_with_player(
+            "Rogue",
+            {"STR": 10, "DEX": 16, "CON": 13, "INT": 12, "WIS": 10, "CHA": 12},
+        )
+        enemy = create_enemy("bandit")
+        encounter = Encounter(title="Test", description="", enemies=[enemy], allow_flee=False)
+
+        game.level_up_character(rogue, 2)
+        game.level_up_character(rogue, 3)
+        game.level_up_character(rogue, 4)
+        game._in_combat = True
+        game.prepare_class_resources_for_combat(rogue)
+        options = game.get_player_combat_options(rogue, encounter, heroes=[rogue])
+
+        self.assertEqual(rogue.max_resources["satchel"], 5)
+        self.assertEqual(rogue.resources["satchel"], 5)
+        self.assertIn("Quick Mix", options)
+        self.assertIn("Redcap Tonic", options)
+        self.assertIn("Smoke Jar", options)
+        self.assertIn("Bitter Acid", options)
+        self.assertIn("Field Stitch", options)
+
+    def test_quick_mix_redcap_tonic_spends_satchel_heals_and_grants_temp_hp(self) -> None:
+        game, rogue = build_game_with_player(
+            "Rogue",
+            {"STR": 10, "DEX": 16, "CON": 13, "INT": 12, "WIS": 10, "CHA": 12},
+        )
+        ally = build_character(
+            name="Mara",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 12, "CON": 13, "INT": 8, "WIS": 10, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        rogue.features.extend(["alchemist_quick_mix", "redcap_tonic"])
+        game._in_combat = True
+        game.prepare_class_resources_for_combat(rogue)
+        ally.current_hp = ally.max_hp - 8
+        game.roll_with_display_bonus = lambda expression, *args, **kwargs: RollOutcome(expression, 5, [5], 0)  # type: ignore[method-assign]
+
+        self.assertTrue(game.use_quick_mix(rogue))
+        self.assertTrue(game.use_redcap_tonic(rogue, ally))
+
+        self.assertEqual(rogue.resources["satchel"], rogue.max_resources["satchel"] - 1)
+        self.assertEqual(ally.current_hp, ally.max_hp - 2)
+        self.assertEqual(ally.temp_hp, rogue.proficiency_bonus + rogue.ability_mod("INT"))
+        self.assertFalse(game.has_status(rogue, "quick_mix"))
+
+    def test_smoke_jar_spends_satchel_and_creates_cover_lane(self) -> None:
+        game, rogue = build_game_with_player(
+            "Rogue",
+            {"STR": 10, "DEX": 16, "CON": 13, "INT": 12, "WIS": 10, "CHA": 12},
+        )
+        ally = build_character(
+            name="Mara",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 12, "CON": 13, "INT": 8, "WIS": 10, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        rogue.features.append("smoke_jar")
+        game._in_combat = True
+        game.prepare_class_resources_for_combat(rogue)
+        rogue.resources["edge"] = 0
+
+        self.assertTrue(game.use_smoke_jar(rogue, ally, [rogue, ally]))
+
+        self.assertEqual(rogue.resources["satchel"], rogue.max_resources["satchel"] - 1)
+        self.assertTrue(game.has_status(rogue, "smoke_jar"))
+        self.assertTrue(game.has_status(ally, "smoke_jar"))
+        self.assertTrue(game.has_status(ally, "invisible"))
+        self.assertEqual(game.target_accuracy_modifier(ally), -1)
+        self.assertEqual(rogue.resources["edge"], 1)
+
+    def test_bitter_acid_applies_acid_and_armor_break_on_failed_save(self) -> None:
+        game, rogue = build_game_with_player(
+            "Rogue",
+            {"STR": 10, "DEX": 16, "CON": 13, "INT": 12, "WIS": 10, "CHA": 12},
+        )
+        target = create_enemy("animated_armor")
+        rogue.features.extend(["alchemist_quick_mix", "bitter_acid"])
+        game._in_combat = True
+        game.prepare_class_resources_for_combat(rogue)
+        game.saving_throw = lambda *args, **kwargs: False  # type: ignore[method-assign]
+        game.roll_with_display_bonus = lambda expression, *args, **kwargs: RollOutcome(expression, 4, [4], 0)  # type: ignore[method-assign]
+
+        self.assertTrue(game.use_quick_mix(rogue, "acid_cut"))
+        self.assertTrue(game.use_bitter_acid(rogue, target))
+
+        self.assertEqual(rogue.resources["satchel"], rogue.max_resources["satchel"] - 1)
+        self.assertTrue(game.has_status(target, "acid"))
+        self.assertTrue(game.has_status(target, "armor_broken"))
+        self.assertTrue(game.has_status(target, "reeling"))
+        self.assertGreaterEqual(game.total_armor_break_percent(target), 20)
+
+    def test_field_stitch_clears_bleeding_and_stabilizes_downed_ally(self) -> None:
+        game, rogue = build_game_with_player(
+            "Rogue",
+            {"STR": 10, "DEX": 16, "CON": 13, "INT": 12, "WIS": 10, "CHA": 12},
+        )
+        ally = build_character(
+            name="Mara",
+            race="Human",
+            class_name="Fighter",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 12, "CON": 13, "INT": 8, "WIS": 10, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        rogue.features.append("field_stitch")
+        game._in_combat = True
+        game.prepare_class_resources_for_combat(rogue)
+        ally.current_hp = 0
+        ally.death_failures = 2
+        game.apply_status(ally, "bleeding", 2, source="test setup")
+
+        self.assertTrue(game.use_field_stitch(rogue, ally))
+
+        self.assertEqual(rogue.resources["satchel"], rogue.max_resources["satchel"] - 1)
+        self.assertEqual(ally.current_hp, 1)
+        self.assertEqual(ally.death_failures, 0)
+        self.assertFalse(game.has_status(ally, "bleeding"))
 
     def test_on_hit_hook_grants_edge_against_exposed_target(self) -> None:
         game, rogue = build_game_with_player(
@@ -625,6 +1833,8 @@ class CombatResolverTests(unittest.TestCase):
         options = game.get_player_combat_options(warrior, encounter, heroes=[warrior])
         self.assertIn("Take Guard Stance", options)
         self.assertIn("Shove", options)
+        self.assertIn("Pin", options)
+        self.assertIn("Warrior Rally", options)
         self.assertIn("Weapon Read", options)
 
     def test_warrior_guard_stance_uses_buffed_defense_avoidance_and_stability(self) -> None:
@@ -677,6 +1887,499 @@ class CombatResolverTests(unittest.TestCase):
         self.assertTrue(game.has_status(enemy, "prone"))
         self.assertTrue(game.has_status(enemy, "reeling"))
         self.assertEqual(warrior.resources["grit"], 2)
+
+    def test_warrior_rally_spends_grit_to_clear_reeling_or_guard_an_ally(self) -> None:
+        game, warrior = build_game_with_player(
+            "Warrior",
+            {"STR": 15, "DEX": 12, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+        )
+        _, ally = build_game_with_player(
+            "Rogue",
+            {"STR": 10, "DEX": 16, "CON": 13, "INT": 12, "WIS": 10, "CHA": 12},
+        )
+        game._in_combat = True
+        game.prepare_class_resources_for_combat(warrior)
+
+        game.apply_status(ally, "reeling", 1, source="test setup")
+        self.assertTrue(game.use_warrior_rally(warrior, ally))
+
+        self.assertFalse(game.has_status(ally, "reeling"))
+        self.assertEqual(warrior.resources["grit"], 0)
+
+        game.grant_warrior_grit(warrior, source="test refill")
+        self.assertTrue(game.use_warrior_rally(warrior, ally))
+
+        self.assertTrue(game.has_status(ally, "guarded"))
+        self.assertEqual(warrior.resources["grit"], 0)
+
+    def test_warrior_pin_damages_reels_and_fixates_on_strong_hit(self) -> None:
+        game, warrior = build_game_with_player(
+            "Warrior",
+            {"STR": 15, "DEX": 12, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+        )
+        enemy = create_enemy("bandit")
+        game._in_combat = True
+        game.roll_check_d20 = lambda *args, **kwargs: D20Outcome(kept=20, rolls=[20], rerolls=[], advantage_state=0)  # type: ignore[method-assign]
+        game.roll_with_display_bonus = lambda expression, *args, **kwargs: RollOutcome(expression, 4, [4], 0)  # type: ignore[method-assign]
+
+        self.assertTrue(game.use_warrior_pin(warrior, enemy, [warrior], [enemy], set()))
+
+        self.assertTrue(game.has_status(enemy, "reeling"))
+        self.assertTrue(game.target_is_fixated_by(warrior, enemy))
+        self.assertGreater(game.last_damage_resolution().hp_damage, 0)
+
+    def test_juggernaut_momentum_builds_from_defense_and_glances(self) -> None:
+        game, warrior = build_game_with_player(
+            "Warrior",
+            {"STR": 15, "DEX": 12, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+        )
+        warrior.features.append("juggernaut_momentum")
+        game._in_combat = True
+        game.prepare_class_resources_for_combat(warrior)
+
+        game.apply_damage(warrior, 10, damage_type="slashing", apply_defense=True)
+
+        self.assertEqual(game.last_damage_resolution().defense_percent, 40)
+        self.assertEqual(warrior.resources["momentum"], 1)
+        self.assertEqual(warrior.resources["grit"], 2)
+
+        game.apply_damage(warrior, 1, damage_type="slashing", apply_defense=True)
+
+        self.assertTrue(game.last_damage_was_glance())
+        self.assertEqual(warrior.resources["momentum"], 2)
+        self.assertEqual(warrior.resources["grit"], 3)
+
+    def test_iron_draw_fixates_enemy_and_penalizes_other_targets(self) -> None:
+        game, warrior = build_game_with_player(
+            "Warrior",
+            {"STR": 15, "DEX": 12, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+        )
+        _, rogue = build_game_with_player(
+            "Rogue",
+            {"STR": 10, "DEX": 16, "CON": 13, "INT": 12, "WIS": 10, "CHA": 12},
+        )
+        enemy = create_enemy("bandit")
+
+        game.set_combat_stance(warrior, "guard", announce=False)
+        game.use_iron_draw(warrior, enemy)
+
+        self.assertTrue(game.target_is_fixated_by(warrior, enemy))
+        self.assertEqual(enemy.conditions["fixated"], 2)
+        self.assertIs(game.fixated_priority_target(enemy, [rogue, warrior]), warrior)
+        self.assertEqual(game.attack_focus_modifier(enemy, rogue), -1)
+        self.assertEqual(game.attack_focus_modifier(enemy, warrior), 0)
+
+    def test_shoulder_in_spends_grit_and_spikes_guard_defense(self) -> None:
+        game, warrior = build_game_with_player(
+            "Warrior",
+            {"STR": 15, "DEX": 12, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+        )
+        warrior.features.extend(["juggernaut_momentum", "shoulder_in"])
+        game._in_combat = True
+        game.prepare_class_resources_for_combat(warrior)
+
+        self.assertTrue(game.use_shoulder_in(warrior))
+
+        self.assertEqual(game.current_combat_stance_key(warrior), "guard")
+        self.assertTrue(game.has_status(warrior, "shoulder_in"))
+        self.assertEqual(game.effective_defense_percent(warrior, damage_type="slashing"), 65)
+        self.assertEqual(warrior.resources["grit"], 0)
+
+        game.grant_warrior_grit(warrior, source="test refill")
+        self.assertTrue(game.use_shoulder_in(warrior))
+
+        self.assertEqual(warrior.resources["momentum"], 1)
+
+    def test_weapon_master_training_adds_combo_and_combat_options(self) -> None:
+        game, warrior = build_game_with_player(
+            "Warrior",
+            {"STR": 15, "DEX": 12, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+        )
+        warrior.features.extend([
+            "weapon_master_combo",
+            "style_wheel",
+            "measure_twice",
+            "clean_line",
+            "dent_the_shell",
+            "hook_the_guard",
+        ])
+        enemy = create_enemy("bandit")
+        encounter = Encounter("Sparring", "A quick pressure test.", [enemy])
+        game._in_combat = True
+
+        game.prepare_class_resources_for_combat(warrior)
+        options = game.get_player_combat_options(warrior, encounter, heroes=[warrior])
+
+        self.assertEqual(warrior.max_resources["combo"], 5)
+        self.assertEqual(warrior.resources["combo"], 0)
+        self.assertIn("Clean Line", options)
+        self.assertIn("Dent The Shell", options)
+        self.assertIn("Hook The Guard", options)
+        self.assertIn("Measure Twice", options)
+        self.assertIn("Style Wheel", options)
+
+    def test_measure_twice_reads_weakness_and_grants_combo(self) -> None:
+        game, warrior = build_game_with_player(
+            "Warrior",
+            {"STR": 15, "DEX": 12, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+        )
+        warrior.features.extend(["weapon_master_combo", "measure_twice"])
+        enemy = create_enemy("animated_armor")
+        game._in_combat = True
+        game.prepare_class_resources_for_combat(warrior)
+
+        self.assertTrue(game.use_measure_twice(warrior, enemy))
+
+        self.assertEqual(warrior.resources["combo"], 1)
+        self.assertEqual(enemy.bond_flags["weapon_master_measured_by_id"], id(warrior))
+
+    def test_style_wheel_free_swap_then_costs_combo(self) -> None:
+        game, warrior = build_game_with_player(
+            "Warrior",
+            {"STR": 15, "DEX": 12, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+        )
+        warrior.features.extend(["weapon_master_combo", "style_wheel"])
+        game._in_combat = True
+        game._active_round_number = 1
+        game.prepare_class_resources_for_combat(warrior)
+        warrior.resources["combo"] = 1
+
+        self.assertEqual(game.weapon_master_style_key(warrior), "cleave")
+        self.assertEqual(game.use_weapon_master_style(warrior, "pierce"), "free")
+        self.assertEqual(warrior.resources["combo"], 1)
+        self.assertEqual(game.weapon_master_style_key(warrior), "pierce")
+
+        self.assertEqual(game.use_weapon_master_style(warrior, "crush"), "combo")
+
+        self.assertEqual(warrior.resources["combo"], 0)
+        self.assertEqual(game.weapon_master_style_key(warrior), "crush")
+
+    def test_dent_the_shell_breaks_armor_for_current_and_followup_hits(self) -> None:
+        game, warrior = build_game_with_player(
+            "Warrior",
+            {"STR": 15, "DEX": 12, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+        )
+        warrior.features.extend(["weapon_master_combo", "style_wheel", "dent_the_shell"])
+        enemy = create_enemy("animated_armor")
+        game._in_combat = True
+        game.prepare_class_resources_for_combat(warrior)
+        game.roll_check_d20 = lambda *args, **kwargs: D20Outcome(kept=20, rolls=[20], rerolls=[], advantage_state=0)  # type: ignore[method-assign]
+        game.roll_with_display_bonus = lambda expression, *args, **kwargs: RollOutcome(expression, 8, [8], 0)  # type: ignore[method-assign]
+
+        self.assertTrue(game.use_dent_the_shell(warrior, enemy, [warrior], [enemy], set()))
+
+        result = game.last_damage_resolution()
+        self.assertEqual(result.armor_break_percent, 10)
+        self.assertEqual(result.defense_percent, 25)
+        self.assertTrue(game.has_status(enemy, "armor_broken"))
+        self.assertGreater(warrior.resources["combo"], 0)
+
+        game.apply_damage(enemy, 10, damage_type="slashing", source_actor=warrior, apply_defense=True)
+
+        followup = game.last_damage_resolution()
+        self.assertEqual(followup.armor_break_percent, 10)
+        self.assertEqual(followup.defense_percent, 25)
+
+    def test_hook_the_guard_clears_guard_layers_and_reels_on_strong_hit(self) -> None:
+        game, warrior = build_game_with_player(
+            "Warrior",
+            {"STR": 15, "DEX": 12, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+        )
+        warrior.features.extend(["weapon_master_combo", "style_wheel", "hook_the_guard"])
+        enemy = create_enemy("bandit")
+        game._in_combat = True
+        game.prepare_class_resources_for_combat(warrior)
+        game.set_combat_stance(enemy, "guard", announce=False)
+        game.apply_status(enemy, "guarded", 1, source="test guard")
+        game.apply_status(enemy, "raised_shield", 1, source="test shield")
+        game.roll_check_d20 = lambda *args, **kwargs: D20Outcome(kept=20, rolls=[20], rerolls=[], advantage_state=0)  # type: ignore[method-assign]
+        game.roll_with_display_bonus = lambda expression, *args, **kwargs: RollOutcome(expression, 1, [1], 0)  # type: ignore[method-assign]
+
+        self.assertTrue(game.use_hook_the_guard(warrior, enemy, [warrior], [enemy], set()))
+
+        self.assertEqual(game.current_combat_stance_key(enemy), "neutral")
+        self.assertFalse(game.has_status(enemy, "guarded"))
+        self.assertFalse(game.has_status(enemy, "raised_shield"))
+        self.assertTrue(game.has_status(enemy, "reeling"))
+
+    def test_weapon_master_pierce_style_adds_accuracy_to_simulator(self) -> None:
+        game, warrior = build_game_with_player(
+            "Warrior",
+            {"STR": 15, "DEX": 12, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+        )
+        warrior.features.extend(["weapon_master_combo", "style_wheel"])
+        enemy = create_enemy("bandit")
+
+        cleave = simulate_weapon_attack(game, warrior, enemy)
+        game.set_weapon_master_style(warrior, "pierce", announce=False)
+        pierce = simulate_weapon_attack(game, warrior, enemy)
+
+        self.assertEqual(pierce.accuracy_bonus, cleave.accuracy_bonus + 1)
+
+    def test_berserker_training_adds_fury_and_combat_options(self) -> None:
+        game, warrior = build_game_with_player(
+            "Warrior",
+            {"STR": 15, "DEX": 12, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+        )
+        warrior.features.extend(["berserker_fury", "redline", "reckless_cut", "teeth_set", "drink_the_hurt"])
+        enemy = create_enemy("bandit")
+        encounter = Encounter("Sparring", "A quick pressure test.", [enemy])
+        game._in_combat = True
+        game.prepare_class_resources_for_combat(warrior)
+        warrior.resources["fury"] = 2
+
+        options = game.get_player_combat_options(warrior, encounter, heroes=[warrior])
+
+        self.assertEqual(warrior.max_resources["fury"], 6)
+        self.assertIn("Reckless Cut", options)
+        self.assertIn("Redline", options)
+        self.assertIn("Teeth Set", options)
+        self.assertIn("Drink The Hurt", options)
+
+    def test_berserker_fury_builds_from_wounds_aggressive_hits_and_kills(self) -> None:
+        game, warrior = build_game_with_player(
+            "Warrior",
+            {"STR": 15, "DEX": 12, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+        )
+        warrior.features.append("berserker_fury")
+        game._in_combat = True
+        game.prepare_class_resources_for_combat(warrior)
+
+        game.apply_damage(warrior, 10, damage_type="slashing", apply_defense=True)
+
+        self.assertEqual(warrior.resources["fury"], 1)
+
+        enemy = create_enemy("animated_armor")
+        game.set_combat_stance(warrior, "aggressive", announce=False)
+        game.roll_check_d20 = lambda *args, **kwargs: D20Outcome(kept=20, rolls=[20], rerolls=[], advantage_state=0)  # type: ignore[method-assign]
+        game.roll_with_display_bonus = lambda expression, *args, **kwargs: RollOutcome(expression, 1, [1], 0)  # type: ignore[method-assign]
+
+        game.perform_weapon_attack(warrior, enemy, [warrior], [enemy], set())
+
+        self.assertGreaterEqual(warrior.resources["fury"], 2)
+
+        enemy.current_hp = 1
+        game.perform_weapon_attack(warrior, enemy, [warrior], [enemy], set())
+
+        self.assertGreaterEqual(warrior.resources["fury"], 3)
+
+    def test_redline_spends_fury_for_burst_and_lowers_defenses(self) -> None:
+        game, warrior = build_game_with_player(
+            "Warrior",
+            {"STR": 15, "DEX": 12, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+        )
+        warrior.features.extend(["berserker_fury", "redline"])
+        game._in_combat = True
+        game.prepare_class_resources_for_combat(warrior)
+        warrior.resources["fury"] = 3
+
+        self.assertTrue(game.use_redline(warrior))
+
+        self.assertEqual(warrior.resources["fury"], 0)
+        self.assertTrue(game.has_status(warrior, "redline"))
+        self.assertEqual(game.status_accuracy_modifier(warrior), 2)
+        self.assertEqual(game.status_damage_modifier(warrior), 3)
+        self.assertEqual(game.effective_defense_percent(warrior, damage_type="slashing"), 35)
+        self.assertEqual(game.effective_avoidance(warrior), -1)
+
+    def test_reckless_cut_adds_accuracy_and_invites_counterpressure(self) -> None:
+        game, warrior = build_game_with_player(
+            "Warrior",
+            {"STR": 15, "DEX": 12, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+        )
+        warrior.features.extend(["berserker_fury", "reckless_cut"])
+        enemy = create_enemy("bandit")
+        game._in_combat = True
+        game.prepare_class_resources_for_combat(warrior)
+        game.roll_check_d20 = lambda *args, **kwargs: D20Outcome(kept=20, rolls=[20], rerolls=[], advantage_state=0)  # type: ignore[method-assign]
+        game.roll_with_display_bonus = lambda expression, *args, **kwargs: RollOutcome(expression, 4, [4], 0)  # type: ignore[method-assign]
+
+        before = simulate_weapon_attack(game, enemy, warrior, heroes=[enemy], enemies=[warrior])
+        self.assertTrue(game.use_reckless_cut(warrior, enemy, [warrior], [enemy], set()))
+        after = simulate_weapon_attack(game, enemy, warrior, heroes=[enemy], enemies=[warrior])
+
+        self.assertTrue(game.has_status(warrior, "reckless_opening"))
+        self.assertEqual(game.target_accuracy_modifier(warrior), 1)
+        self.assertEqual(after.accuracy_bonus, before.accuracy_bonus + 1)
+
+    def test_teeth_set_spends_fury_and_grants_temp_hp(self) -> None:
+        game, warrior = build_game_with_player(
+            "Warrior",
+            {"STR": 15, "DEX": 12, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+        )
+        warrior.features.extend(["berserker_fury", "teeth_set"])
+        game._in_combat = True
+        game.prepare_class_resources_for_combat(warrior)
+        warrior.resources["fury"] = 1
+
+        self.assertTrue(game.use_teeth_set(warrior))
+
+        self.assertEqual(warrior.resources["fury"], 0)
+        self.assertEqual(warrior.temp_hp, warrior.proficiency_bonus + warrior.ability_mod("CON"))
+
+    def test_drink_the_hurt_spends_fury_and_heals_after_wounding(self) -> None:
+        game, warrior = build_game_with_player(
+            "Warrior",
+            {"STR": 15, "DEX": 12, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+        )
+        warrior.features.extend(["berserker_fury", "drink_the_hurt"])
+        enemy = create_enemy("bandit")
+        game._in_combat = True
+        game.prepare_class_resources_for_combat(warrior)
+        warrior.resources["fury"] = 2
+        warrior.current_hp = 6
+        game.roll_check_d20 = lambda *args, **kwargs: D20Outcome(kept=20, rolls=[20], rerolls=[], advantage_state=0)  # type: ignore[method-assign]
+        game.roll_with_display_bonus = lambda expression, *args, **kwargs: RollOutcome(expression, 4, [4], 0)  # type: ignore[method-assign]
+
+        self.assertTrue(game.use_drink_the_hurt(warrior))
+        game.perform_weapon_attack(warrior, enemy, [warrior], [enemy], set())
+
+        self.assertEqual(warrior.resources["fury"], 0)
+        self.assertFalse(game.has_status(warrior, "drink_the_hurt"))
+        self.assertGreater(warrior.current_hp, 6)
+
+    def test_bloodreaver_training_adds_blood_debt_and_combat_options(self) -> None:
+        game, warrior = build_game_with_player(
+            "Warrior",
+            {"STR": 15, "DEX": 12, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+        )
+        warrior.features.extend(["bloodreaver_blood_debt", "red_mark", "blood_price", "war_salve_strike", "open_the_ledger"])
+        enemy = create_enemy("bandit")
+        encounter = Encounter("Sparring", "A quick pressure test.", [enemy])
+        game._in_combat = True
+        game.prepare_class_resources_for_combat(warrior)
+        warrior.resources["blood_debt"] = 1
+
+        options = game.get_player_combat_options(warrior, encounter, heroes=[warrior])
+
+        self.assertEqual(warrior.max_resources["blood_debt"], 5)
+        self.assertIn("Red Mark", options)
+        self.assertIn("Blood Price", options)
+        self.assertIn("War-Salve Strike", options)
+        self.assertIn("Open The Ledger", options)
+
+    def test_red_mark_heals_first_wound_each_round_and_grants_blood_debt(self) -> None:
+        game, warrior = build_game_with_player(
+            "Warrior",
+            {"STR": 15, "DEX": 12, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+        )
+        _, rogue = build_game_with_player(
+            "Rogue",
+            {"STR": 10, "DEX": 16, "CON": 13, "INT": 12, "WIS": 10, "CHA": 12},
+        )
+        warrior.features.extend(["bloodreaver_blood_debt", "red_mark"])
+        enemy = create_enemy("bandit")
+        game._in_combat = True
+        game._active_round_number = 1
+        game._active_combat_heroes = [warrior, rogue]
+        game.prepare_class_resources_for_combat(warrior)
+        rogue.current_hp = 5
+
+        self.assertTrue(game.use_red_mark(warrior, enemy))
+        game.apply_damage(enemy, 6, damage_type="slashing", source_actor=rogue, apply_defense=True)
+
+        self.assertEqual(rogue.current_hp, 8)
+        self.assertEqual(warrior.resources["blood_debt"], 1)
+
+        game.apply_damage(enemy, 6, damage_type="slashing", source_actor=rogue, apply_defense=True)
+
+        self.assertEqual(rogue.current_hp, 8)
+        self.assertEqual(warrior.resources["blood_debt"], 1)
+
+        game._active_round_number = 2
+        game.apply_damage(enemy, 6, damage_type="slashing", source_actor=rogue, apply_defense=True)
+
+        self.assertEqual(rogue.current_hp, 10)
+        self.assertEqual(warrior.resources["blood_debt"], 2)
+
+    def test_blood_debt_builds_from_own_wounds_ally_wounds_and_marked_wounds(self) -> None:
+        game, warrior = build_game_with_player(
+            "Warrior",
+            {"STR": 15, "DEX": 12, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+        )
+        _, ally = build_game_with_player(
+            "Rogue",
+            {"STR": 10, "DEX": 16, "CON": 13, "INT": 12, "WIS": 10, "CHA": 12},
+        )
+        warrior.features.extend(["bloodreaver_blood_debt", "red_mark"])
+        enemy = create_enemy("bandit")
+        game._in_combat = True
+        game._active_combat_heroes = [warrior, ally]
+        game.prepare_class_resources_for_combat(warrior)
+
+        game.apply_damage(warrior, 10, damage_type="slashing", apply_defense=True)
+        self.assertEqual(warrior.resources["blood_debt"], 1)
+
+        game.apply_damage(ally, 5, damage_type="slashing", apply_defense=True)
+        self.assertEqual(warrior.resources["blood_debt"], 2)
+
+        game.use_red_mark(warrior, enemy)
+        game.apply_damage(enemy, 6, damage_type="slashing", source_actor=warrior, apply_defense=True)
+
+        self.assertGreaterEqual(warrior.resources["blood_debt"], 3)
+
+    def test_blood_price_spends_debt_heals_ally_and_reels_bloodreaver(self) -> None:
+        game, warrior = build_game_with_player(
+            "Warrior",
+            {"STR": 15, "DEX": 12, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+        )
+        _, ally = build_game_with_player(
+            "Rogue",
+            {"STR": 10, "DEX": 16, "CON": 13, "INT": 12, "WIS": 10, "CHA": 12},
+        )
+        warrior.features.extend(["bloodreaver_blood_debt", "blood_price"])
+        game._in_combat = True
+        game.prepare_class_resources_for_combat(warrior)
+        warrior.resources["blood_debt"] = 1
+        ally.current_hp = 4
+        game.roll_with_display_bonus = lambda expression, *args, **kwargs: RollOutcome(expression, 4, [4], 0)  # type: ignore[method-assign]
+
+        self.assertTrue(game.use_blood_price(warrior, ally))
+
+        self.assertEqual(warrior.resources["blood_debt"], 0)
+        self.assertEqual(ally.current_hp, 10)
+        self.assertTrue(game.has_status(warrior, "reeling"))
+
+    def test_war_salve_strike_heals_lowest_ally_on_wound(self) -> None:
+        game, warrior = build_game_with_player(
+            "Warrior",
+            {"STR": 15, "DEX": 12, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+        )
+        _, ally = build_game_with_player(
+            "Rogue",
+            {"STR": 10, "DEX": 16, "CON": 13, "INT": 12, "WIS": 10, "CHA": 12},
+        )
+        warrior.features.extend(["bloodreaver_blood_debt", "war_salve_strike"])
+        enemy = create_enemy("bandit")
+        game._in_combat = True
+        game.prepare_class_resources_for_combat(warrior)
+        ally.current_hp = 4
+        game.roll_check_d20 = lambda *args, **kwargs: D20Outcome(kept=20, rolls=[20], rerolls=[], advantage_state=0)  # type: ignore[method-assign]
+        game.roll_with_display_bonus = lambda expression, *args, **kwargs: RollOutcome(expression, 4, [4], 0)  # type: ignore[method-assign]
+
+        self.assertTrue(game.use_war_salve_strike(warrior, enemy, [warrior, ally], [enemy], set()))
+
+        self.assertEqual(ally.current_hp, 5)
+        self.assertGreater(game.last_damage_resolution().hp_damage, 0)
+
+    def test_open_the_ledger_costs_grit_and_applies_bleeding_to_red_mark(self) -> None:
+        game, warrior = build_game_with_player(
+            "Warrior",
+            {"STR": 15, "DEX": 12, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+        )
+        warrior.features.extend(["bloodreaver_blood_debt", "red_mark", "open_the_ledger"])
+        enemy = create_enemy("bandit")
+        game._in_combat = True
+        game.prepare_class_resources_for_combat(warrior)
+        game.use_red_mark(warrior, enemy)
+        game.roll_check_d20 = lambda *args, **kwargs: D20Outcome(kept=9, rolls=[9], rerolls=[], advantage_state=0)  # type: ignore[method-assign]
+        game.roll_with_display_bonus = lambda expression, *args, **kwargs: RollOutcome(expression, 4, [4], 0)  # type: ignore[method-assign]
+
+        self.assertTrue(game.use_open_the_ledger(warrior, enemy, [warrior], [enemy], set()))
+
+        self.assertEqual(warrior.resources["grit"], 0)
+        self.assertTrue(game.has_status(enemy, "bleeding"))
+        self.assertGreaterEqual(warrior.resources["blood_debt"], 1)
 
     def test_weapon_read_reports_defense_avoidance_and_stability(self) -> None:
         log: list[str] = []

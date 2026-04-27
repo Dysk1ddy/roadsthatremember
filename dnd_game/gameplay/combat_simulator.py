@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass
 from itertools import product
+from math import inf
 import re
 
 
@@ -87,6 +88,57 @@ class WeaponAttackSimulation:
         )
 
 
+@dataclass(frozen=True, slots=True)
+class OffensiveActionSimulation:
+    actor_name: str
+    target_name: str
+    action_name: str
+    expected_hp_damage: float
+    hit_chance: float | None = None
+    miss_chance: float | None = None
+    save_success_chance: float | None = None
+    wound_chance: float = 0.0
+    defense_percent: int = 0
+    armor_break_percent: int = 0
+
+
+@dataclass(frozen=True, slots=True)
+class EncounterPassSimulation:
+    name: str
+    party_actions: tuple[OffensiveActionSimulation, ...]
+    enemy_actions: tuple[OffensiveActionSimulation, ...]
+    party_names: tuple[str, ...]
+    enemy_names: tuple[str, ...]
+    party_hp: int
+    enemy_hp: int
+    max_enemy_defense_percent: int
+    max_enemy_avoidance: int
+
+    @property
+    def party_expected_damage_per_round(self) -> float:
+        return sum(action.expected_hp_damage for action in self.party_actions)
+
+    @property
+    def enemy_expected_damage_per_round(self) -> float:
+        return sum(action.expected_hp_damage for action in self.enemy_actions)
+
+    @property
+    def rounds_to_clear(self) -> float:
+        if self.party_expected_damage_per_round <= 0:
+            return inf
+        return self.enemy_hp / self.party_expected_damage_per_round
+
+    @property
+    def rounds_to_party_defeat(self) -> float:
+        if self.enemy_expected_damage_per_round <= 0:
+            return inf
+        return self.party_hp / self.enemy_expected_damage_per_round
+
+    @property
+    def survival_margin_rounds(self) -> float:
+        return self.rounds_to_party_defeat - self.rounds_to_clear
+
+
 def d20_kept_distribution(*, advantage_state: int = 0, lucky: bool = False) -> dict[int, float]:
     roll_count = 2 if advantage_state else 1
     totals: dict[int, float] = defaultdict(float)
@@ -169,6 +221,27 @@ def dice_total_distribution(expression: str, *, critical: bool = False) -> dict[
     return {total + modifier: ways / total_ways for total, ways in totals.items()}
 
 
+def add_damage_bonus(distribution: dict[int, float], bonus: int) -> dict[int, float]:
+    if bonus == 0:
+        return dict(distribution)
+    return {total + bonus: chance for total, chance in distribution.items()}
+
+
+def half_damage_distribution(distribution: dict[int, float]) -> dict[int, float]:
+    totals: dict[int, float] = defaultdict(float)
+    for total, chance in distribution.items():
+        totals[max(1, total // 2)] += chance
+    return dict(totals)
+
+
+def combine_damage_distributions(first: dict[int, float], second: dict[int, float]) -> dict[int, float]:
+    totals: dict[int, float] = defaultdict(float)
+    for left_total, left_chance in first.items():
+        for right_total, right_chance in second.items():
+            totals[left_total + right_total] += left_chance * right_chance
+    return dict(totals)
+
+
 def _resisted_damage(game, target, damage: int, damage_type: str) -> int:
     resisted = False
     if game.has_status(target, "petrified"):
@@ -220,6 +293,7 @@ def simulate_weapon_damage(
     damage_type: str = "",
     armor_break_percent: int = 0,
     armor_break: int = 0,
+    extra_damage: str | None = None,
 ) -> DamageSimulation:
     total_armor_break = game.total_armor_break_percent(
         target,
@@ -233,13 +307,17 @@ def simulate_weapon_damage(
         armor_break_percent=total_armor_break,
     )
     damage_bonus = attacker.damage_bonus() + game.status_damage_modifier(attacker)
-    normal_distribution = {
-        total + damage_bonus: chance for total, chance in dice_total_distribution(attacker.weapon.damage).items()
-    }
-    critical_distribution = {
-        total + damage_bonus: chance
-        for total, chance in dice_total_distribution(attacker.weapon.damage, critical=True).items()
-    }
+    normal_distribution = add_damage_bonus(dice_total_distribution(attacker.weapon.damage), damage_bonus)
+    critical_distribution = add_damage_bonus(dice_total_distribution(attacker.weapon.damage, critical=True), damage_bonus)
+    if extra_damage:
+        normal_distribution = combine_damage_distributions(
+            normal_distribution,
+            dice_total_distribution(extra_damage),
+        )
+        critical_distribution = combine_damage_distributions(
+            critical_distribution,
+            dice_total_distribution(extra_damage, critical=True),
+        )
     normal_expected, normal_glance, normal_wound = simulate_damage_after_defense(
         game,
         target,
@@ -278,9 +356,11 @@ def simulate_weapon_attack(
     damage_type: str | None = None,
     armor_break_percent: int = 0,
     armor_break: int = 0,
+    attacker_allies: list | None = None,
 ) -> WeaponAttackSimulation:
     heroes = heroes if heroes is not None else [attacker]
     enemies = enemies if enemies is not None else []
+    attacker_allies = attacker_allies if attacker_allies is not None else heroes
     dodging = dodging if dodging is not None else frozenset()
     if advantage_state is None:
         advantage_state = game.attack_advantage_state(
@@ -291,11 +371,15 @@ def simulate_weapon_attack(
             dodging,
             ranged=attacker.weapon.ranged,
         )
-    target_number = game.effective_attack_target_number(target)
+        target_number = game.effective_attack_target_number(target)
     accuracy_bonus = (
         attacker.attack_bonus()
-        + game.ally_pressure_bonus(attacker, heroes, ranged=attacker.weapon.ranged)
+        + game.ally_pressure_bonus(attacker, attacker_allies, ranged=attacker.weapon.ranged)
         + game.status_accuracy_modifier(attacker)
+        + game.attack_focus_modifier(attacker, target)
+        + game.weapon_master_style_accuracy_modifier(attacker, target)
+        + game.assassin_accuracy_modifier(attacker, target, attacker_allies)
+        + game.target_accuracy_modifier(target)
     )
     critical_threshold = game.critical_threshold(attacker) if hasattr(game, "critical_threshold") else 20
     attack_roll = simulate_attack_roll(
@@ -310,6 +394,9 @@ def simulate_weapon_attack(
     resolved_damage_type = damage_type
     if resolved_damage_type is None:
         resolved_damage_type = weapon_item.damage_type if weapon_item is not None else ""
+    extra_damage = None
+    if getattr(attacker, "class_name", "") == "Rogue" and advantage_state >= 0 and game.can_sneak_attack(attacker, attacker_allies, target):
+        extra_damage = game.rogue_sneak_attack_dice(attacker)
     damage = simulate_weapon_damage(
         game,
         attacker,
@@ -317,5 +404,237 @@ def simulate_weapon_attack(
         damage_type=resolved_damage_type or "",
         armor_break_percent=armor_break_percent,
         armor_break=armor_break,
+        extra_damage=extra_damage,
     )
     return WeaponAttackSimulation(attack_roll=attack_roll, damage=damage)
+
+
+def weapon_action_simulation(
+    game,
+    attacker,
+    target,
+    *,
+    heroes: list,
+    enemies: list,
+    attacker_allies: list,
+    armor_break_percent: int = 0,
+) -> OffensiveActionSimulation:
+    result = simulate_weapon_attack(
+        game,
+        attacker,
+        target,
+        heroes=heroes,
+        enemies=enemies,
+        attacker_allies=attacker_allies,
+        armor_break_percent=armor_break_percent,
+    )
+    return OffensiveActionSimulation(
+        actor_name=attacker.name,
+        target_name=target.name,
+        action_name=f"Weapon: {attacker.weapon.name}",
+        expected_hp_damage=result.expected_hp_damage,
+        hit_chance=result.hit_chance,
+        miss_chance=result.miss_chance,
+        wound_chance=result.wound_chance,
+        defense_percent=result.damage.defense_percent,
+        armor_break_percent=result.damage.armor_break_percent,
+    )
+
+
+def save_success_chance(game, target, ability: str, dc: int) -> float:
+    if game.auto_fail_save(target, ability):
+        return 0.0
+    advantage = 0
+    if ability == "DEX" and game.actor_is_dodging(target):
+        advantage += 1
+    if game.has_status(target, "restrained") and ability == "DEX":
+        advantage -= 1
+    if max(0, int(getattr(target, "conditions", {}).get("exhaustion", 0))) >= 3:
+        advantage -= 1
+    advantage_state = 1 if advantage > 0 else -1 if advantage < 0 else 0
+    total_modifier = (
+        target.save_bonus(ability)
+        + game.status_value(target, "save_bonus")
+        - game.status_value(target, "save_penalty")
+    )
+    chance = 0.0
+    for kept, roll_chance in d20_kept_distribution(advantage_state=advantage_state, lucky="lucky" in getattr(target, "features", [])).items():
+        if kept + total_modifier >= dc:
+            chance += roll_chance
+    return chance
+
+
+def save_damage_action_simulation(
+    game,
+    caster,
+    target,
+    *,
+    action_name: str,
+    damage_expression: str,
+    save_ability: str,
+    damage_type: str,
+    dc: int,
+    damage_bonus: int = 0,
+) -> OffensiveActionSimulation:
+    success_chance = save_success_chance(game, target, save_ability, dc)
+    full_distribution = add_damage_bonus(dice_total_distribution(damage_expression), damage_bonus)
+    half_distribution = half_damage_distribution(full_distribution)
+    full_expected, _, full_wound = simulate_damage_after_defense(
+        game,
+        target,
+        full_distribution,
+        damage_type=damage_type,
+        defense_percent=0,
+    )
+    half_expected, _, half_wound = simulate_damage_after_defense(
+        game,
+        target,
+        half_distribution,
+        damage_type=damage_type,
+        defense_percent=0,
+    )
+    expected_hp_damage = ((1 - success_chance) * full_expected) + (success_chance * half_expected)
+    wound_chance = ((1 - success_chance) * full_wound) + (success_chance * half_wound)
+    return OffensiveActionSimulation(
+        actor_name=caster.name,
+        target_name=target.name,
+        action_name=action_name,
+        expected_hp_damage=expected_hp_damage,
+        save_success_chance=success_chance,
+        wound_chance=wound_chance,
+        defense_percent=0,
+        armor_break_percent=0,
+    )
+
+
+def mage_offensive_action_candidates(game, actor, target) -> list[OffensiveActionSimulation]:
+    if not hasattr(game, "mage_channel_dc"):
+        return []
+    features = set(getattr(actor, "features", []))
+    dc = game.mage_channel_dc(actor)
+    spell_damage_bonus = game.spell_damage_bonus(actor) if hasattr(game, "spell_damage_bonus") else 0
+    specs: list[tuple[str, str, str, str]] = []
+    if "minor_channel" in features:
+        specs.append(("Minor Channel", "1d6", "DEX", "force"))
+    if "arc_pulse" in features:
+        specs.append(("Arc Pulse", "1d8", "DEX", "force"))
+    if "ember_lance" in features:
+        specs.append(("Ember Lance", "1d8", "DEX", "fire"))
+    if "frost_shard" in features:
+        specs.append(("Frost Shard", "1d8", "DEX", "cold"))
+    if "volt_grasp" in features:
+        specs.append(("Volt Grasp", "1d8", "CON", "lightning"))
+    if "blue_glass_palm" in features:
+        specs.append(("Blue Glass Palm", "1d6", "STR", "force"))
+    return [
+        save_damage_action_simulation(
+            game,
+            actor,
+            target,
+            action_name=name,
+            damage_expression=damage,
+            save_ability=save_ability,
+            damage_type=damage_type,
+            dc=dc,
+            damage_bonus=spell_damage_bonus,
+        )
+        for name, damage, save_ability, damage_type in specs
+    ]
+
+
+def best_offensive_action(
+    game,
+    attacker,
+    targets: list,
+    *,
+    heroes: list,
+    enemies: list,
+    attacker_allies: list,
+    armor_break_percent: int = 0,
+) -> OffensiveActionSimulation | None:
+    candidates: list[OffensiveActionSimulation] = []
+    for target in targets:
+        if not target.is_conscious():
+            continue
+        candidates.append(
+            weapon_action_simulation(
+                game,
+                attacker,
+                target,
+                heroes=heroes,
+                enemies=enemies,
+                attacker_allies=attacker_allies,
+                armor_break_percent=armor_break_percent,
+            )
+        )
+        if getattr(attacker, "class_name", "") == "Mage":
+            candidates.extend(mage_offensive_action_candidates(game, attacker, target))
+    if not candidates:
+        return None
+    return max(
+        candidates,
+        key=lambda action: (
+            action.expected_hp_damage,
+            action.wound_chance,
+            action.hit_chance if action.hit_chance is not None else 1 - (action.save_success_chance or 0.0),
+        ),
+    )
+
+
+def simulate_encounter_pass(
+    game,
+    name: str,
+    party: list,
+    enemies: list,
+    *,
+    party_armor_break_percent: int = 0,
+) -> EncounterPassSimulation:
+    living_party = [actor for actor in party if actor.is_conscious()]
+    living_enemies = [actor for actor in enemies if actor.is_conscious()]
+    party_actions = tuple(
+        action
+        for action in (
+            best_offensive_action(
+                game,
+                actor,
+                living_enemies,
+                heroes=living_party,
+                enemies=living_enemies,
+                attacker_allies=living_party,
+                armor_break_percent=party_armor_break_percent,
+            )
+            for actor in living_party
+        )
+        if action is not None
+    )
+    enemy_actions = tuple(
+        action
+        for action in (
+            best_offensive_action(
+                game,
+                enemy,
+                living_party,
+                heroes=living_party,
+                enemies=living_enemies,
+                attacker_allies=living_enemies,
+            )
+            for enemy in living_enemies
+        )
+        if action is not None
+    )
+    enemy_defenses = [
+        game.effective_defense_percent(enemy, damage_type="slashing")
+        for enemy in living_enemies
+    ]
+    enemy_avoidance = [game.effective_avoidance(enemy) for enemy in living_enemies]
+    return EncounterPassSimulation(
+        name=name,
+        party_actions=party_actions,
+        enemy_actions=enemy_actions,
+        party_names=tuple(actor.name for actor in living_party),
+        enemy_names=tuple(enemy.name for enemy in living_enemies),
+        party_hp=sum(max(0, actor.current_hp) for actor in living_party),
+        enemy_hp=sum(max(0, actor.current_hp) for actor in living_enemies),
+        max_enemy_defense_percent=max(enemy_defenses, default=0),
+        max_enemy_avoidance=max(enemy_avoidance, default=0),
+    )

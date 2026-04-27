@@ -5,7 +5,7 @@ from math import ceil
 MAGIC_POINT_RESOURCE = "mp"
 SPELL_SLOT_RESTORE_MP = 4
 
-FULL_CASTER_CLASSES = {"Bard", "Cleric", "Druid", "Sorcerer", "Wizard"}
+FULL_CASTER_CLASSES = {"Bard", "Cleric", "Druid", "Mage", "Sorcerer", "Wizard"}
 HALF_CASTER_CLASSES = {"Paladin", "Ranger"}
 PACT_CASTER_CLASSES = {"Warlock"}
 
@@ -24,6 +24,22 @@ SPELL_MP_COSTS: dict[str, int] = {
     "cure_wounds": 3,
     "healing_word": 3,
     "magic_missile": 5,
+    "minor_channel": 1,
+    "arc_pulse": 1,
+    "marked_angle": 1,
+    "ember_lance": 1,
+    "frost_shard": 1,
+    "volt_grasp": 1,
+    "burning_line": 4,
+    "lockfrost": 4,
+    "field_mend": 3,
+    "pulse_restore": 4,
+    "triage_line": 3,
+    "clean_breath": 2,
+    "anchor_shell": 3,
+    "ward_shell": 2,
+    "blue_glass_palm": 1,
+    "lockstep_field": 3,
     "divine_smite": 4,
 }
 

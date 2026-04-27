@@ -2,7 +2,7 @@ from __future__ import annotations
 
 SPELL_SLOT_LEVELS = (1, 2, 3, 4)
 
-FULL_CASTER_CLASSES = {"Bard", "Cleric", "Druid", "Sorcerer", "Wizard"}
+FULL_CASTER_CLASSES = {"Bard", "Cleric", "Druid", "Mage", "Sorcerer", "Wizard"}
 HALF_CASTER_CLASSES = {"Paladin", "Ranger"}
 WARLOCK_CLASSES = {"Warlock"}
 

@@ -10,7 +10,7 @@ from ..ui.colors import rich_style_name, strip_ansi
 from ..ui.rich_render import Group, Live, Panel, Table, Text, box
 from .encounter import Encounter
 from .magic_points import has_magic_points, magic_point_cost
-from .combat_resolution import STANCE_ORDER
+from .combat_resolution import ELEMENTALIST_ELEMENT_LABELS, ELEMENTALIST_ELEMENT_ORDER, STANCE_ORDER, WEAPON_MASTER_STYLE_ORDER
 
 
 HEALING_POTION_NAME = get_item("potion_healing").name
@@ -921,6 +921,7 @@ class CombatFlowMixin:
                     success = self.skill_check(actor, "Stealth", 12, context="to vanish back into the melee's blind spots")
                     if success:
                         self.apply_status(actor, "invisible", 2, source="Veil Step")
+                        self.grant_rogue_edge(actor, source="a clean Hide")
                         self.say(f"{self.style_name(actor)} slips back out of the enemy's direct line.")
                     else:
                         self.say(f"{self.style_name(actor)} cannot quite disappear into the chaos.")
@@ -960,12 +961,416 @@ class CombatFlowMixin:
                 self.use_warrior_shove(actor, target)
                 turn_state.actions_remaining -= 1
                 continue
+            if action == "Pin":
+                target = self.choose_target(conscious_enemies, prompt="Choose a target to pin.", allow_back=True)
+                if target is None:
+                    continue
+                self.use_warrior_pin(actor, target, heroes, enemies, dodging)
+                turn_state.actions_remaining -= 1
+                continue
+            if action == "Clean Line":
+                target = self.choose_target(conscious_enemies, prompt="Choose a target for Clean Line.", allow_back=True)
+                if target is None:
+                    continue
+                self.use_clean_line(actor, target, heroes, enemies, dodging)
+                turn_state.actions_remaining -= 1
+                continue
+            if action == "Dent The Shell":
+                target = self.choose_target(conscious_enemies, prompt="Choose a target to Dent The Shell.", allow_back=True)
+                if target is None:
+                    continue
+                self.use_dent_the_shell(actor, target, heroes, enemies, dodging)
+                turn_state.actions_remaining -= 1
+                continue
+            if action == "Hook The Guard":
+                target = self.choose_target(conscious_enemies, prompt="Choose a target to Hook The Guard.", allow_back=True)
+                if target is None:
+                    continue
+                self.use_hook_the_guard(actor, target, heroes, enemies, dodging)
+                turn_state.actions_remaining -= 1
+                continue
+            if action == "Reckless Cut":
+                target = self.choose_target(conscious_enemies, prompt="Choose a target for Reckless Cut.", allow_back=True)
+                if target is None:
+                    continue
+                self.use_reckless_cut(actor, target, heroes, enemies, dodging)
+                turn_state.actions_remaining -= 1
+                continue
+            if action == "War-Salve Strike":
+                target = self.choose_target(conscious_enemies, prompt="Choose a target for War-Salve Strike.", allow_back=True)
+                if target is None:
+                    continue
+                self.use_war_salve_strike(actor, target, heroes, enemies, dodging)
+                turn_state.actions_remaining -= 1
+                continue
+            if action == "Open The Ledger":
+                target = self.choose_target(conscious_enemies, prompt="Choose a Red Mark target for Open The Ledger.", allow_back=True)
+                if target is None:
+                    continue
+                if self.use_open_the_ledger(actor, target, heroes, enemies, dodging):
+                    turn_state.actions_remaining -= 1
+                continue
+            if action == "Dirty Trick":
+                target = self.choose_target(conscious_enemies, prompt="Choose a target for Dirty Trick.", allow_back=True)
+                if target is None:
+                    continue
+                trick_choice = self.choose(
+                    "Choose a Dirty Trick.",
+                    [
+                        self.action_option("Distract and expose the target."),
+                        self.action_option("Throw dust or flash powder into their eyes."),
+                        self.action_option("Trip or tangle their footing."),
+                        self.action_option("Cut a strap or expose an armor seam."),
+                        "Back",
+                    ],
+                    allow_meta=False,
+                    show_hud=False,
+                )
+                if trick_choice == 5:
+                    continue
+                trick_kind = ("distract", "blind", "trip", "seam")[trick_choice - 1]
+                if self.use_dirty_trick(actor, target, trick_kind):
+                    turn_state.actions_remaining -= 1
+                continue
+            if action == "Smoke Pin":
+                target = self.choose_target(conscious_enemies, prompt="Choose a target for Smoke Pin.", allow_back=True)
+                if target is None:
+                    continue
+                if self.use_smoke_pin(actor, target):
+                    turn_state.actions_remaining -= 1
+                continue
+            if action == "Quiet Knife":
+                target = self.choose_target(conscious_enemies, prompt="Choose a target for Quiet Knife.", allow_back=True)
+                if target is None:
+                    continue
+                if self.use_quiet_knife(actor, target, heroes, enemies, dodging):
+                    turn_state.actions_remaining -= 1
+                continue
+            if action == "Between Plates":
+                target = self.choose_target(conscious_enemies, prompt="Choose a Death Mark target for Between Plates.", allow_back=True)
+                if target is None:
+                    continue
+                if self.use_between_plates(actor, target, heroes, enemies, dodging):
+                    turn_state.actions_remaining -= 1
+                continue
+            if action == "Sudden End":
+                target = self.choose_target(conscious_enemies, prompt="Choose a Death Mark target for Sudden End.", allow_back=True)
+                if target is None:
+                    continue
+                if self.use_sudden_end(actor, target, heroes, enemies, dodging):
+                    turn_state.actions_remaining -= 1
+                continue
+            if action == "Green Needle":
+                target = self.choose_target(conscious_enemies, prompt="Choose a target for Green Needle.", allow_back=True)
+                if target is None:
+                    continue
+                if self.use_green_needle(actor, target, heroes, enemies, dodging):
+                    turn_state.actions_remaining -= 1
+                continue
+            if action == "Bitter Cloud":
+                target = self.choose_target(conscious_enemies, prompt="Choose a target for Bitter Cloud.", allow_back=True)
+                if target is None:
+                    continue
+                if self.use_bitter_cloud(actor, target):
+                    turn_state.actions_remaining -= 1
+                continue
+            if action == "Rot Thread":
+                target = self.choose_target(conscious_enemies, prompt="Choose a poisoned target for Rot Thread.", allow_back=True)
+                if target is None:
+                    continue
+                if self.use_rot_thread(actor, target):
+                    turn_state.actions_remaining -= 1
+                continue
+            if action == "Bloom In The Blood":
+                target = self.choose_target(conscious_enemies, prompt="Choose a poisoned target for Bloom In The Blood.", allow_back=True)
+                if target is None:
+                    continue
+                if self.use_bloom_in_the_blood(actor, target):
+                    turn_state.actions_remaining -= 1
+                continue
+            if action == "Minor Channel":
+                target = self.choose_target(conscious_enemies, prompt="Choose a target for Minor Channel.", allow_back=True)
+                if target is None:
+                    continue
+                if self.use_minor_channel(actor, target):
+                    turn_state.actions_remaining -= 1
+                continue
+            if action == "Arc Pulse":
+                target = self.choose_target(conscious_enemies, prompt="Choose a target for Arc Pulse.", allow_back=True)
+                if target is None:
+                    continue
+                if self.use_arc_pulse(actor, target):
+                    turn_state.actions_remaining -= 1
+                continue
+            if action == "Detonate Pattern":
+                target = self.choose_target(conscious_enemies, prompt="Choose a charged target for Detonate Pattern.", allow_back=True)
+                if target is None:
+                    continue
+                if self.use_detonate_pattern(actor, target):
+                    turn_state.actions_remaining -= 1
+                continue
+            if action == "Ember Lance":
+                target = self.choose_target(conscious_enemies, prompt="Choose a target for Ember Lance.", allow_back=True)
+                if target is None:
+                    continue
+                if self.use_ember_lance(actor, target):
+                    turn_state.actions_remaining -= 1
+                continue
+            if action == "Frost Shard":
+                target = self.choose_target(conscious_enemies, prompt="Choose a target for Frost Shard.", allow_back=True)
+                if target is None:
+                    continue
+                if self.use_frost_shard(actor, target):
+                    turn_state.actions_remaining -= 1
+                continue
+            if action == "Volt Grasp":
+                target = self.choose_target(conscious_enemies, prompt="Choose a target for Volt Grasp.", allow_back=True)
+                if target is None:
+                    continue
+                if self.use_volt_grasp(actor, target):
+                    turn_state.actions_remaining -= 1
+                continue
+            if action == "Burning Line":
+                if self.use_burning_line(actor, conscious_enemies):
+                    turn_state.actions_remaining -= 1
+                continue
+            if action == "Lockfrost":
+                if self.use_lockfrost(actor, conscious_enemies):
+                    turn_state.actions_remaining -= 1
+                continue
+            if action == "Blue Glass Palm":
+                target = self.choose_target(conscious_enemies, prompt="Choose a target for Blue Glass Palm.", allow_back=True)
+                if target is None:
+                    continue
+                if self.use_blue_glass_palm(actor, target):
+                    turn_state.actions_remaining -= 1
+                continue
+            if action == "Lockstep Field":
+                if self.use_lockstep_field(actor, heroes):
+                    turn_state.actions_remaining -= 1
+                continue
+            if action == "Field Mend":
+                target = self.choose_ally(heroes, prompt="Choose an ally for Field Mend.", allow_back=True)
+                if target is None:
+                    continue
+                if self.use_field_mend(actor, target):
+                    turn_state.actions_remaining -= 1
+                continue
+            if action == "Triage Line":
+                if self.use_triage_line(actor, heroes):
+                    turn_state.actions_remaining -= 1
+                continue
+            if action == "Clean Breath":
+                target = self.choose_ally(heroes, prompt="Choose an ally for Clean Breath.", allow_back=True)
+                if target is None:
+                    continue
+                if self.use_clean_breath(actor, target):
+                    turn_state.actions_remaining -= 1
+                continue
+            if action == "Redcap Tonic":
+                target = self.choose_ally(heroes, prompt="Choose an ally for Redcap Tonic.", allow_back=True)
+                if target is None:
+                    continue
+                if self.use_redcap_tonic(actor, target):
+                    turn_state.actions_remaining -= 1
+                continue
+            if action == "Smoke Jar":
+                target = self.choose_ally(heroes, prompt="Choose an ally to anchor Smoke Jar cover.", allow_back=True)
+                if target is None:
+                    continue
+                if self.use_smoke_jar(actor, target, heroes):
+                    turn_state.actions_remaining -= 1
+                continue
+            if action == "Bitter Acid":
+                target = self.choose_target(conscious_enemies, prompt="Choose a target for Bitter Acid.", allow_back=True)
+                if target is None:
+                    continue
+                if self.use_bitter_acid(actor, target):
+                    turn_state.actions_remaining -= 1
+                continue
+            if action == "Field Stitch":
+                target = self.choose_ally(heroes, prompt="Choose an ally for Field Stitch.", allow_back=True)
+                if target is None:
+                    continue
+                if self.use_field_stitch(actor, target):
+                    turn_state.actions_remaining -= 1
+                continue
             if action == "Weapon Read":
                 target = self.choose_target(conscious_enemies, prompt="Choose a target to read.", allow_back=True)
                 if target is None:
                     continue
                 self.use_weapon_read(actor, target)
                 turn_state.bonus_action_available = False
+                continue
+            if action == "Measure Twice":
+                target = self.choose_target(conscious_enemies, prompt="Choose a target to Measure Twice.", allow_back=True)
+                if target is None:
+                    continue
+                if self.use_measure_twice(actor, target):
+                    turn_state.bonus_action_available = False
+                continue
+            if action == "Style Wheel":
+                style_result = self.choose_weapon_master_style(actor)
+                if style_result == "combo":
+                    turn_state.bonus_action_available = False
+                continue
+            if action == "Redline":
+                if self.use_redline(actor):
+                    turn_state.bonus_action_available = False
+                continue
+            if action == "Teeth Set":
+                if self.use_teeth_set(actor):
+                    turn_state.bonus_action_available = False
+                continue
+            if action == "Drink The Hurt":
+                if self.use_drink_the_hurt(actor):
+                    turn_state.bonus_action_available = False
+                continue
+            if action == "Red Mark":
+                target = self.choose_target(conscious_enemies, prompt="Choose a target for Red Mark.", allow_back=True)
+                if target is None:
+                    continue
+                if self.use_red_mark(actor, target):
+                    turn_state.bonus_action_available = False
+                continue
+            if action == "Blood Price":
+                target = self.choose_ally(heroes, prompt="Choose an ally for Blood Price.", allow_back=True)
+                if target is None:
+                    continue
+                if self.use_blood_price(actor, target):
+                    turn_state.bonus_action_available = False
+                continue
+            if action == "Tool Read":
+                target = self.choose_target(conscious_enemies, prompt="Choose a target for Tool Read.", allow_back=True)
+                if target is None:
+                    continue
+                if self.use_tool_read(actor, target):
+                    turn_state.bonus_action_available = False
+                continue
+            if action == "Feint":
+                target = self.choose_target(conscious_enemies, prompt="Choose a target to Feint.", allow_back=True)
+                if target is None:
+                    continue
+                if self.use_rogue_feint(actor, target):
+                    turn_state.bonus_action_available = False
+                continue
+            if action == "Skirmish":
+                if self.use_rogue_skirmish(actor):
+                    turn_state.free_flee = True
+                    turn_state.bonus_action_available = False
+                continue
+            if action == "False Target":
+                target = self.choose_ally(heroes, prompt="Choose an ally for False Target.", allow_back=True)
+                if target is None:
+                    continue
+                if self.use_false_target(actor, target):
+                    turn_state.bonus_action_available = False
+                continue
+            if action == "Cover The Healer":
+                target = self.choose_ally(heroes, prompt="Choose an ally to cover.", allow_back=True)
+                if target is None:
+                    continue
+                if self.use_cover_the_healer(actor, target):
+                    turn_state.bonus_action_available = False
+                continue
+            if action == "Death Mark":
+                target = self.choose_target(conscious_enemies, prompt="Choose a target for Death Mark.", allow_back=True)
+                if target is None:
+                    continue
+                if self.use_death_mark(actor, target):
+                    turn_state.bonus_action_available = False
+                continue
+            if action == "Black Drop":
+                if self.use_black_drop(actor):
+                    turn_state.bonus_action_available = False
+                continue
+            if action == "Pattern Read":
+                target = self.choose_target(conscious_enemies, prompt="Choose a target for Pattern Read.", allow_back=True)
+                if target is None:
+                    continue
+                if self.use_pattern_read(actor, target):
+                    turn_state.bonus_action_available = False
+                continue
+            if action == "Marked Angle":
+                target = self.choose_target(conscious_enemies, prompt="Choose a Pattern Read target for Marked Angle.", allow_back=True)
+                if target is None:
+                    continue
+                if self.use_marked_angle(actor, target):
+                    turn_state.bonus_action_available = False
+                continue
+            if action == "Change Weather":
+                weather_options = [ELEMENTALIST_ELEMENT_LABELS[element] for element in ELEMENTALIST_ELEMENT_ORDER] + ["Back"]
+                weather_choice = self.choose(
+                    "Choose an element to hold.",
+                    weather_options,
+                    allow_meta=False,
+                    show_hud=False,
+                )
+                if weather_choice == len(weather_options):
+                    continue
+                if self.use_change_weather_hand(actor, ELEMENTALIST_ELEMENT_ORDER[weather_choice - 1]):
+                    turn_state.bonus_action_available = False
+                continue
+            if action == "Ground":
+                if self.use_ground(actor):
+                    turn_state.bonus_action_available = False
+                continue
+            if action == "Anchor Shell":
+                target = self.choose_ally(heroes, prompt="Choose an ally for Anchor Shell.", allow_back=True)
+                if target is None:
+                    continue
+                if self.use_anchor_shell(actor, target):
+                    turn_state.bonus_action_available = False
+                continue
+            if action == "Pulse Restore":
+                target = self.choose_ally(heroes, prompt="Choose an ally for Pulse Restore.", allow_back=True)
+                if target is None:
+                    continue
+                if self.use_pulse_restore(actor, target):
+                    turn_state.bonus_action_available = False
+                continue
+            if action == "Overflow Shell":
+                target = self.choose_ally(heroes, prompt="Choose an ally for Overflow Shell.", allow_back=True)
+                if target is None:
+                    continue
+                if self.use_overflow_shell(actor, target):
+                    turn_state.bonus_action_available = False
+                continue
+            if action == "Quick Mix":
+                mix_choice = self.choose(
+                    "Choose a Quick Mix rider.",
+                    [
+                        self.action_option("Numbing paste for temporary hit points."),
+                        self.action_option("Clinging smoke for longer cover."),
+                        self.action_option("Acid-cut solvent for sharper armor work."),
+                        "Back",
+                    ],
+                    allow_meta=False,
+                    show_hud=False,
+                )
+                if mix_choice == 4:
+                    continue
+                rider = ("numbed", "smoke", "acid_cut")[mix_choice - 1]
+                if self.use_quick_mix(actor, rider):
+                    turn_state.bonus_action_available = False
+                continue
+            if action == "Warrior Rally":
+                target = self.choose_ally(heroes, prompt="Choose an ally to Rally.", allow_back=True)
+                if target is None:
+                    continue
+                if self.use_warrior_rally(actor, target):
+                    turn_state.bonus_action_available = False
+                continue
+            if action == "Iron Draw":
+                target = self.choose_target(conscious_enemies, prompt="Choose a target to Fixate.", allow_back=True)
+                if target is None:
+                    continue
+                self.use_iron_draw(actor, target)
+                turn_state.bonus_action_available = False
+                continue
+            if action == "Shoulder In":
+                if self.use_shoulder_in(actor):
+                    turn_state.bonus_action_available = False
                 continue
             if action == "Use Bardic Inspiration":
                 target = self.choose_ally(heroes, prompt="Choose an ally for a Rally Note.", allow_back=True)
@@ -1167,6 +1572,18 @@ class CombatFlowMixin:
             return False
         return self.set_combat_stance(actor, STANCE_ORDER[choice - 1])
 
+    def choose_weapon_master_style(self, actor: Character) -> str | None:
+        options = [self.weapon_master_style_option(style_key, actor) for style_key in WEAPON_MASTER_STYLE_ORDER] + ["Back"]
+        choice = self.choose(
+            "Choose a weapon style.",
+            options,
+            allow_meta=False,
+            show_hud=False,
+        )
+        if choice == len(options):
+            return None
+        return self.use_weapon_master_style(actor, WEAPON_MASTER_STYLE_ORDER[choice - 1])
+
     def combat_option_group(self, option: str) -> str:
         action = self.combat_action_key(option)
         if action == "End Turn":
@@ -1187,6 +1604,28 @@ class CombatFlowMixin:
             "Use Second Wind",
             "Use Bardic Inspiration",
             "Weapon Read",
+            "Measure Twice",
+            "Style Wheel",
+            "Redline",
+            "Teeth Set",
+            "Drink The Hurt",
+            "Red Mark",
+            "Blood Price",
+            "Tool Read",
+            "Feint",
+            "Skirmish",
+            "False Target",
+            "Cover The Healer",
+            "Death Mark",
+            "Black Drop",
+            "Pattern Read",
+            "Marked Angle",
+            "Change Weather",
+            "Ground",
+            "Anchor Shell",
+            "Pulse Restore",
+            "Overflow Shell",
+            "Quick Mix",
             "Raise Shield",
             "Change Stance",
             "Cast Healing Word",
@@ -1538,7 +1977,8 @@ class CombatFlowMixin:
         if not conscious_heroes:
             return
         conscious_allies = [enemy for enemy in enemies if enemy.is_conscious() and enemy is not actor]
-        marked_target = self.marked_priority_target(conscious_heroes)
+        fixated_target = self.fixated_priority_target(actor, conscious_heroes)
+        marked_target = fixated_target or self.marked_priority_target(conscious_heroes)
         if not self.can_make_hostile_action(actor):
             self.say(f"{self.style_name(actor)} falters and cannot press a hostile attack while Charmed.")
             return
@@ -2296,6 +2736,73 @@ class CombatFlowMixin:
                 options.append("Take Guard Stance")
             if "warrior_shove" in actor.features:
                 options.append("Shove")
+            if "warrior_pin" in actor.features:
+                options.append("Pin")
+            if "clean_line" in actor.features:
+                options.append("Clean Line")
+            if "dent_the_shell" in actor.features:
+                options.append("Dent The Shell")
+            if "hook_the_guard" in actor.features:
+                options.append("Hook The Guard")
+            if "reckless_cut" in actor.features:
+                options.append("Reckless Cut")
+            if "war_salve_strike" in actor.features:
+                options.append("War-Salve Strike")
+            if "open_the_ledger" in actor.features and actor.resources.get("grit", 0) > 0:
+                options.append("Open The Ledger")
+            if "dirty_trick" in actor.features:
+                options.append("Dirty Trick")
+            if "smoke_pin" in actor.features and actor.resources.get("shadow", 0) > 0:
+                options.append("Smoke Pin")
+            if "quiet_knife" in actor.features:
+                options.append("Quiet Knife")
+            if "between_plates" in actor.features and actor.resources.get("edge", 0) >= 2:
+                options.append("Between Plates")
+            if "sudden_end" in actor.features and actor.resources.get("edge", 0) >= 3:
+                options.append("Sudden End")
+            if "green_needle" in actor.features:
+                options.append("Green Needle")
+            if "bitter_cloud" in actor.features and actor.resources.get("toxin", 0) > 0:
+                options.append("Bitter Cloud")
+            if "rot_thread" in actor.features and actor.resources.get("toxin", 0) > 0:
+                options.append("Rot Thread")
+            if "bloom_in_the_blood" in actor.features and actor.resources.get("toxin", 0) >= 2:
+                options.append("Bloom In The Blood")
+            if "minor_channel" in actor.features and has_magic_points(actor, magic_point_cost("minor_channel")):
+                options.append("Minor Channel (1 MP)")
+            if "arc_pulse" in actor.features and has_magic_points(actor, magic_point_cost("arc_pulse")):
+                options.append("Arc Pulse (1 MP)")
+            if "detonate_pattern" in actor.features and actor.resources.get("arc", 0) >= 2:
+                options.append("Detonate Pattern (2 Arc)")
+            if "ember_lance" in actor.features and has_magic_points(actor, magic_point_cost("ember_lance")):
+                options.append("Ember Lance (1 MP)")
+            if "frost_shard" in actor.features and has_magic_points(actor, magic_point_cost("frost_shard")):
+                options.append("Frost Shard (1 MP)")
+            if "volt_grasp" in actor.features and has_magic_points(actor, magic_point_cost("volt_grasp")):
+                options.append("Volt Grasp (1 MP)")
+            if "burning_line" in actor.features and has_magic_points(actor, magic_point_cost("burning_line")):
+                options.append("Burning Line (4 MP)")
+            if "lockfrost" in actor.features and has_magic_points(actor, magic_point_cost("lockfrost")):
+                options.append("Lockfrost (4 MP)")
+            if "blue_glass_palm" in actor.features and has_magic_points(actor, magic_point_cost("blue_glass_palm")):
+                options.append("Blue Glass Palm (1 MP)")
+            if "lockstep_field" in actor.features and has_magic_points(actor, magic_point_cost("lockstep_field")):
+                options.append("Lockstep Field (3 MP)")
+            if "field_mend" in actor.features and has_magic_points(actor, magic_point_cost("field_mend")):
+                options.append("Field Mend (3 MP)")
+            if "triage_line" in actor.features and has_magic_points(actor, magic_point_cost("triage_line")):
+                options.append("Triage Line (3 MP)")
+            if "clean_breath" in actor.features and has_magic_points(actor, magic_point_cost("clean_breath")):
+                options.append("Clean Breath (2 MP)")
+            if actor.resources.get("satchel", 0) > 0:
+                if "redcap_tonic" in actor.features:
+                    options.append("Redcap Tonic")
+                if "smoke_jar" in actor.features:
+                    options.append("Smoke Jar")
+                if "bitter_acid" in actor.features:
+                    options.append("Bitter Acid")
+                if "field_stitch" in actor.features:
+                    options.append("Field Stitch")
             if actor.class_name == "Cleric":
                 if actor.resources.get("channel_divinity", 0) > 0:
                     options.append("Invoke Lantern Surge")
@@ -2351,8 +2858,58 @@ class CombatFlowMixin:
                 options.append("Use Rally Note")
             if actor.class_name == "Fighter" and actor.resources.get("second_wind", 0) > 0:
                 options.append("Use Second Breath")
+            if "warrior_rally" in actor.features and actor.resources.get("grit", 0) > 0:
+                options.append("Warrior Rally")
+            if "iron_draw" in actor.features:
+                options.append("Iron Draw")
+            if "shoulder_in" in actor.features and actor.resources.get("grit", 0) > 0:
+                options.append("Shoulder In")
             if "weapon_read" in actor.features:
                 options.append("Weapon Read")
+            if "measure_twice" in actor.features:
+                options.append("Measure Twice")
+            if "style_wheel" in actor.features:
+                options.append("Style Wheel")
+            if "redline" in actor.features and not self.has_status(actor, "redline"):
+                options.append("Redline")
+            if "teeth_set" in actor.features and actor.resources.get("fury", 0) > 0:
+                options.append("Teeth Set")
+            if "drink_the_hurt" in actor.features and actor.resources.get("fury", 0) >= 2 and not self.has_status(actor, "drink_the_hurt"):
+                options.append("Drink The Hurt")
+            if "red_mark" in actor.features:
+                options.append("Red Mark")
+            if "blood_price" in actor.features and actor.resources.get("blood_debt", 0) > 0:
+                options.append("Blood Price")
+            if "tool_read" in actor.features:
+                options.append("Tool Read")
+            if "rogue_feint" in actor.features:
+                options.append("Feint")
+            if "rogue_skirmish" in actor.features and actor.resources.get("edge", 0) > 0:
+                options.append("Skirmish")
+            if "false_target" in actor.features and actor.resources.get("edge", 0) > 0:
+                options.append("False Target")
+            if "cover_the_healer" in actor.features and actor.resources.get("shadow", 0) >= 2:
+                options.append("Cover The Healer")
+            if "death_mark" in actor.features:
+                options.append("Death Mark")
+            if "black_drop" in actor.features and actor.resources.get("toxin", 0) > 0 and not self.has_status(actor, "black_drop"):
+                options.append("Black Drop")
+            if "pattern_read" in actor.features:
+                options.append("Pattern Read")
+            if "marked_angle" in actor.features and has_magic_points(actor, magic_point_cost("marked_angle")):
+                options.append("Marked Angle (1 MP)")
+            if "change_weather_hand" in actor.features:
+                options.append("Change Weather")
+            if "ground" in actor.features and not self.has_status(actor, "grounded_channel"):
+                options.append("Ground")
+            if "anchor_shell" in actor.features and has_magic_points(actor, magic_point_cost("anchor_shell")):
+                options.append("Anchor Shell (3 MP)")
+            if "pulse_restore" in actor.features and has_magic_points(actor, magic_point_cost("pulse_restore")):
+                options.append("Pulse Restore (4 MP)")
+            if "overflow_shell" in actor.features and actor.resources.get("flow", 0) > 0:
+                options.append("Overflow Shell (1 Flow)")
+            if "alchemist_quick_mix" in actor.features and not self.has_status(actor, "quick_mix"):
+                options.append("Quick Mix")
             if actor.class_name in {"Bard", "Cleric", "Druid"} and self.can_afford_spell(actor, "healing_word") and not turn_state.non_cantrip_action_spell_cast:
                 options.append(self.combat_spell_option("Cast Healing Word", "healing_word", note="Bonus Action"))
             if self.can_raise_shield(actor):

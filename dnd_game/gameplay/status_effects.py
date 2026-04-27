@@ -33,6 +33,12 @@ STATUS_DEFINITIONS: dict[str, dict[str, object]] = {
         "ongoing_damage": "1d6",
         "damage_type": "fire",
     },
+    "burning_line": {
+        "name": "Burning Line",
+        "combat_only": True,
+        "ongoing_damage": "1d4",
+        "damage_type": "fire",
+    },
     "acid": {
         "name": "Acid-Burned",
         "combat_only": True,
@@ -45,6 +51,23 @@ STATUS_DEFINITIONS: dict[str, dict[str, object]] = {
         "name": "Reeling",
         "combat_only": True,
         "attack_penalty": 2,
+    },
+    "slowed": {
+        "name": "Slowed",
+        "combat_only": True,
+        "avoidance_penalty": 1,
+        "stability_penalty": 1,
+    },
+    "lockfrost_field": {
+        "name": "Lockfrost",
+        "combat_only": True,
+        "avoidance_penalty": 1,
+        "stability_penalty": 2,
+    },
+    "triage_line": {
+        "name": "Triage Line",
+        "combat_only": True,
+        "save_bonus": 1,
     },
     "prone": {
         "name": "Prone",
@@ -137,10 +160,116 @@ STATUS_DEFINITIONS: dict[str, dict[str, object]] = {
         "name": "Raised Shield",
         "combat_only": True,
     },
+    "shoulder_in": {
+        "name": "Shoulder In",
+        "combat_only": True,
+        "defense_bonus_percent": 5,
+    },
+    "fixated": {
+        "name": "Fixated",
+        "combat_only": True,
+    },
+    "measured_line": {
+        "name": "Measured Line",
+        "combat_only": True,
+        "avoidance_penalty": 1,
+    },
+    "unbalanced": {
+        "name": "Unbalanced",
+        "combat_only": True,
+        "stability_penalty": 2,
+    },
+    "redline": {
+        "name": "Redline",
+        "combat_only": True,
+        "attack_bonus": 2,
+        "defense_bonus_percent": -5,
+        "avoidance_penalty": 1,
+    },
+    "reckless_opening": {
+        "name": "Reckless Opening",
+        "combat_only": True,
+        "incoming_attack_bonus": 1,
+    },
+    "drink_the_hurt": {
+        "name": "Drink The Hurt",
+        "combat_only": True,
+    },
     "attack_pressure": {
         "name": "Attack Pressure",
         "combat_only": True,
         "attack_bonus": 1,
+    },
+    "tool_read": {
+        "name": "Tool Read",
+        "combat_only": True,
+        "incoming_attack_bonus": 1,
+    },
+    "pattern_read": {
+        "name": "Pattern Read",
+        "combat_only": True,
+        "incoming_attack_bonus": 1,
+    },
+    "grounded_channel": {
+        "name": "Grounded",
+        "combat_only": True,
+        "avoidance_penalty": 1,
+        "save_bonus": 1,
+        "stability_bonus": 1,
+    },
+    "anchor_shell": {
+        "name": "Anchor Shell",
+        "combat_only": True,
+    },
+    "pattern_charge": {
+        "name": "Pattern Charge",
+        "combat_only": True,
+    },
+    "lockstep_field": {
+        "name": "Lockstep Field",
+        "combat_only": True,
+        "stability_bonus": 1,
+    },
+    "exposed": {
+        "name": "Exposed",
+        "combat_only": True,
+        "incoming_attack_bonus": 1,
+    },
+    "slip_away": {
+        "name": "Slip Away",
+        "combat_only": True,
+        "avoidance_bonus": 2,
+    },
+    "false_target": {
+        "name": "False Target",
+        "combat_only": True,
+        "avoidance_bonus": 1,
+        "incoming_attack_penalty": 2,
+    },
+    "shadow_lane": {
+        "name": "Shadow Lane",
+        "combat_only": True,
+        "avoidance_bonus": 1,
+    },
+    "quick_mix": {
+        "name": "Quick Mix",
+        "combat_only": True,
+    },
+    "smoke_jar": {
+        "name": "Smoke Jar",
+        "combat_only": True,
+        "avoidance_bonus": 1,
+        "incoming_attack_penalty": 1,
+        "flee_bonus": 1,
+    },
+    "black_drop": {
+        "name": "Black Drop",
+        "combat_only": True,
+    },
+    "rot_thread": {
+        "name": "Rot Thread",
+        "combat_only": True,
+        "armor_break_percent": 10,
     },
     "marked": {"name": "Marked", "combat_only": True},
     "bleeding": {
@@ -317,6 +446,9 @@ class StatusEffectMixin:
         return "disabled"
 
     def tick_conditions(self, actor) -> None:
+        poison_tick = getattr(self, "tick_rogue_poison_stacks", None)
+        if callable(poison_tick):
+            poison_tick(actor)
         ongoing = [(name, self.status_definition(name)) for name, value in actor.conditions.items() if value != 0]
         for name, definition in ongoing:
             damage_roll = definition.get("ongoing_damage")
