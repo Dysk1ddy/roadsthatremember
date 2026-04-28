@@ -1,0 +1,11 @@
+{
+  "sound_effects_enabled": false,
+  "music_enabled": true,
+  "dice_animations_enabled": true,
+  "dice_animation_mode": "full",
+  "typed_dialogue_enabled": true,
+  "pacing_pauses_enabled": true,
+  "staggered_reveals_enabled": true,
+  "animations_and_delays_enabled": true,
+  "kivy_dark_mode_enabled": true
+}

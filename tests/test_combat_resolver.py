@@ -2121,7 +2121,7 @@ class CombatResolverTests(unittest.TestCase):
         self.assertTrue(game.target_is_fixated_by(warrior, enemy))
         self.assertEqual(enemy.conditions["fixated"], 2)
         self.assertIs(game.fixated_priority_target(enemy, [rogue, warrior]), warrior)
-        self.assertEqual(game.attack_focus_modifier(enemy, rogue), -1)
+        self.assertEqual(game.attack_focus_modifier(enemy, rogue), -2)
         self.assertEqual(game.attack_focus_modifier(enemy, warrior), 0)
 
     def test_shoulder_in_spends_grit_and_spikes_guard_defense(self) -> None:

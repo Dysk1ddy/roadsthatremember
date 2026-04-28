@@ -1,0 +1,226 @@
+from __future__ import annotations
+
+import re
+
+from .colors import ANSI_RE
+
+
+ANSI_COLOR_HEX = {
+    "36": "44d7e8",
+    "91": "f87171",
+    "92": "7ee787",
+    "93": "facc15",
+    "94": "60a5fa",
+    "95": "d8b4fe",
+    "96": "67e8f9",
+    "97": "fff7ed",
+}
+
+
+TAG_NAME_RE = re.compile(r"^/?([a-zA-Z]+)")
+DIALOGUE_PREFIX_RE = re.compile(r'^[^:\n]{1,42}:\s+"')
+RESOURCE_BAR_RE = re.compile(
+    r"\b(?P<label>[A-Za-z][A-Za-z0-9 /'_-]{0,32})\s+\[[^\]\n]*\]\s*"
+    r"(?P<current>\d+)\s*/\s*(?P<maximum>\d+)"
+)
+KIVY_VISIBLE_ENTITIES = {
+    "&amp;": "&",
+    "&bl;": "[",
+    "&br;": "]",
+}
+COMBAT_SYMBOL_TRANSLATION = str.maketrans(
+    {
+        0x2588: "#",
+        0x2593: "#",
+        0x2592: "#",
+        0x2591: "-",
+        0x2665: "",
+        0x2764: "",
+        0x1F6E1: "",
+        0x2620: "",
+        0xFE0F: "",
+    }
+)
+
+
+def escape_kivy_markup(text: object) -> str:
+    return (
+        str(text)
+        .replace("&", "&amp;")
+        .replace("[", "&bl;")
+        .replace("]", "&br;")
+    )
+
+
+def ansi_to_kivy_markup(text: object) -> str:
+    rendered = str(text)
+    output: list[str] = []
+    active_color = False
+    position = 0
+
+    for match in ANSI_RE.finditer(rendered):
+        output.append(escape_kivy_markup(rendered[position : match.start()]))
+        codes = [code for code in match.group()[2:-1].split(";") if code]
+        if not codes:
+            codes = ["0"]
+        for code in codes:
+            if code == "0":
+                if active_color:
+                    output.append("[/color]")
+                    active_color = False
+                continue
+            color = ANSI_COLOR_HEX.get(code)
+            if color is not None:
+                if active_color:
+                    output.append("[/color]")
+                output.append(f"[color=#{color}]")
+                active_color = True
+        position = match.end()
+
+    output.append(escape_kivy_markup(rendered[position:]))
+    if active_color:
+        output.append("[/color]")
+    return "".join(output)
+
+
+def plain_combat_status_text(text: object) -> str:
+    rendered = str(text)
+
+    def replace_resource_bar(match: re.Match[str]) -> str:
+        label = " ".join(match.group("label").split())
+        return f"{label} {match.group('current')}/{match.group('maximum')}"
+
+    rendered = RESOURCE_BAR_RE.sub(replace_resource_bar, rendered)
+    return rendered.translate(COMBAT_SYMBOL_TRANSLATION)
+
+
+def format_kivy_log_entry(text: object) -> tuple[str, bool]:
+    raw = plain_combat_status_text(text)
+    plain = ANSI_RE.sub("", raw).strip()
+    if not plain:
+        return ("", False)
+
+    banner_match = re.fullmatch(r"=+\s*(.*?)\s*=+", plain)
+    if banner_match is not None:
+        title = escape_kivy_markup(banner_match.group(1).strip())
+        return (
+            "\n"
+            f"[size=22sp][b][color=#facc15]{title}[/color][/b][/size]\n"
+            "[color=#8a6b39]--------------------------------[/color]",
+            False,
+        )
+
+    if plain.startswith("Commands:"):
+        return (f"[size=12sp][color=#8f7d62]{ansi_to_kivy_markup(raw)}[/color][/size]", False)
+
+    if plain.startswith("*"):
+        body = escape_kivy_markup(plain[1:].strip())
+        return (f"[color=#d9a441]*[/color] [i]{body}[/i]", False)
+
+    if re.match(r"^[^:\n]{1,42}:\s+\".*\"$", plain):
+        return (f"[i]{ansi_to_kivy_markup(raw)}[/i]", True)
+
+    if re.match(r"^\s*\d+\.\s+", plain):
+        return (f"[color=#d9a441]{ansi_to_kivy_markup(raw)}[/color]", False)
+
+    if ":" in plain and len(plain) < 96:
+        label, rest = raw.split(":", 1)
+        return (
+            f"[b][color=#facc15]{ansi_to_kivy_markup(label)}:[/color][/b]{ansi_to_kivy_markup(rest)}",
+            False,
+        )
+
+    return (ansi_to_kivy_markup(raw), False)
+
+
+def _tag_name(tag: str) -> str | None:
+    match = TAG_NAME_RE.match(tag.strip())
+    if match is None:
+        return None
+    return match.group(1).lower()
+
+
+def visible_markup_length(markup: str) -> int:
+    visible = 0
+    position = 0
+    while position < len(markup):
+        if markup[position] == "[":
+            end = markup.find("]", position)
+            if end != -1:
+                position = end + 1
+                continue
+        if markup[position] == "&":
+            end = markup.find(";", position)
+            if end != -1:
+                visible += 1
+                position = end + 1
+                continue
+        visible += 1
+        position += 1
+    return visible
+
+
+def visible_markup_text(markup: str) -> str:
+    output: list[str] = []
+    position = 0
+    while position < len(markup):
+        if markup[position] == "[":
+            end = markup.find("]", position)
+            if end != -1:
+                position = end + 1
+                continue
+        if markup[position] == "&":
+            end = markup.find(";", position)
+            if end != -1:
+                entity = markup[position : end + 1]
+                output.append(KIVY_VISIBLE_ENTITIES.get(entity, "?"))
+                position = end + 1
+                continue
+        output.append(markup[position])
+        position += 1
+    return "".join(output)
+
+
+def dialogue_typing_start_index(markup: str) -> int:
+    match = DIALOGUE_PREFIX_RE.match(visible_markup_text(markup))
+    return 0 if match is None else match.end()
+
+
+def reveal_kivy_markup(markup: str, visible_characters: int) -> str:
+    remaining = max(0, int(visible_characters))
+    output: list[str] = []
+    open_tags: list[str] = []
+    position = 0
+
+    while position < len(markup) and remaining > 0:
+        character = markup[position]
+        if character == "[":
+            end = markup.find("]", position)
+            if end != -1:
+                tag = markup[position + 1 : end]
+                output.append(markup[position : end + 1])
+                tag_name = _tag_name(tag)
+                if tag_name is not None:
+                    if tag.strip().startswith("/"):
+                        for index in range(len(open_tags) - 1, -1, -1):
+                            if open_tags[index] == tag_name:
+                                del open_tags[index]
+                                break
+                    else:
+                        open_tags.append(tag_name)
+                position = end + 1
+                continue
+        if character == "&":
+            end = markup.find(";", position)
+            if end != -1:
+                output.append(markup[position : end + 1])
+                remaining -= 1
+                position = end + 1
+                continue
+        output.append(character)
+        remaining -= 1
+        position += 1
+
+    for tag_name in reversed(open_tags):
+        output.append(f"[/{tag_name}]")
+    return "".join(output)

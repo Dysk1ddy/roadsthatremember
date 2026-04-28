@@ -97,6 +97,14 @@ from dnd_game.items import ITEMS, format_inventory_line
 from dnd_game.models import GameState
 from dnd_game.gameplay.status_effects import STATUS_DEFINITIONS
 from dnd_game.ui.colors import colorize, strip_ansi
+from dnd_game.ui.kivy_markup import (
+    ansi_to_kivy_markup,
+    dialogue_typing_start_index,
+    format_kivy_log_entry,
+    plain_combat_status_text,
+    reveal_kivy_markup,
+    visible_markup_text,
+)
 from dnd_game.ui.rich_render import RICH_AVAILABLE, render_rich_lines
 
 
@@ -293,6 +301,65 @@ class CoreTests(unittest.TestCase):
             self.assertEqual(run_game_from_args(args), 2)
 
         self.assertIn("py -3.13 main.py --gui", stderr.getvalue())
+
+    def test_kivy_markup_preserves_colors_and_escapes_choice_tags(self) -> None:
+        rendered = ansi_to_kivy_markup("\x1b[93m[ATHLETICS]\x1b[0m *Hold the line.")
+
+        self.assertIn("[color=#facc15]", rendered)
+        self.assertIn("&bl;ATHLETICS&br;", rendered)
+        self.assertIn("[/color]", rendered)
+
+    def test_kivy_log_entry_formats_banners_and_reveals_without_broken_tags(self) -> None:
+        banner, animated = format_kivy_log_entry("=== Aethrune ===")
+        partial = reveal_kivy_markup("[color=#facc15]Road[/color]", 2)
+
+        self.assertFalse(animated)
+        self.assertIn("[size=22sp]", banner)
+        self.assertEqual(partial, "[color=#facc15]Ro[/color]")
+
+    def test_kivy_typewriter_marks_only_dialogue_for_animation(self) -> None:
+        narration, narration_animated = format_kivy_log_entry("The road bends through wet ash.")
+        action, action_animated = format_kivy_log_entry("*Hold the line.")
+        dialogue, dialogue_animated = format_kivy_log_entry('Mira Thann: "Hold the line."')
+
+        self.assertFalse(narration_animated)
+        self.assertFalse(action_animated)
+        self.assertTrue(dialogue_animated)
+        self.assertIn("[i]", dialogue)
+
+    def test_kivy_dialogue_typewriter_starts_after_speaker_name(self) -> None:
+        dialogue, animated = format_kivy_log_entry('Elira Dawnmantle: "Wash your hands first."')
+
+        self.assertTrue(animated)
+        self.assertEqual(dialogue_typing_start_index(dialogue), len('Elira Dawnmantle: "'))
+        self.assertEqual(
+            visible_markup_text(reveal_kivy_markup(dialogue, dialogue_typing_start_index(dialogue))),
+            'Elira Dawnmantle: "',
+        )
+
+    def test_kivy_visible_markup_text_strips_tags_and_decodes_escaped_brackets(self) -> None:
+        rendered = visible_markup_text("[i][color=#facc15]&bl;Road&br; opens.[/color][/i]")
+
+        self.assertEqual(rendered, "[Road] opens.")
+
+    def test_kivy_combat_status_text_uses_plain_resource_labels(self) -> None:
+        block = chr(0x2588)
+        rendered = plain_combat_status_text(
+            f"Ashen Brand Runner: HP [\x1b[92m{block * 3}\x1b[0m     ] 3/11, "
+            f"Defense 10%, Avoidance +0 | MP [{block * 2}  ] 2/4"
+        )
+
+        self.assertEqual(
+            rendered,
+            "Ashen Brand Runner: HP 3/11, Defense 10%, Avoidance +0 | MP 2/4",
+        )
+        markup, _animated = format_kivy_log_entry(
+            f"Ashen Brand Runner: HP [{block * 3}     ] 3/11, Defense 10%, Avoidance +0"
+        )
+
+        visible = visible_markup_text(markup)
+        self.assertIn("HP 3/11", visible)
+        self.assertNotIn(block, visible)
 
     def test_piped_stdio_disables_interactive_terminal_surfaces(self) -> None:
         fake_stdin = SimpleNamespace(isatty=lambda: False)
@@ -648,6 +715,36 @@ class CoreTests(unittest.TestCase):
 
         self.assertTrue(game._music_supported)
         self.assertTrue(game._music_assets_ready)
+        self.assertTrue(game.music_enabled)
+        self.assertEqual(messages, ["Music enabled."])
+        self.assertTrue(any(command.startswith('open "') and "Main menu" in command for command in commands))
+        self.assertIn("play dnd_game_music repeat", commands)
+
+    def test_music_settings_enable_for_audio_capable_custom_output(self) -> None:
+        class GuiLikeGame(TextDnDGame):
+            def music_output_allows_playback(self) -> bool:
+                return True
+
+        commands: list[str] = []
+        fake_winmm = SimpleNamespace(
+            mciSendStringW=lambda command, buffer, buffer_size, callback: commands.append(command) or 0,
+        )
+        with (
+            patch.object(audio_backend, "pygame", None),
+            patch.object(audio_backend, "_WINMM", fake_winmm),
+            patch.object(audio_backend, "_MCI_MUSIC_OPEN", False),
+        ):
+            game = GuiLikeGame(
+                input_fn=lambda _: "1",
+                output_fn=lambda _: None,
+                rng=random.Random(900315),
+                play_music=False,
+            )
+            messages: list[str] = []
+            game.say = messages.append
+            game.persist_settings = lambda: None
+            game.set_music_enabled(True)
+
         self.assertTrue(game.music_enabled)
         self.assertEqual(messages, ["Music enabled."])
         self.assertTrue(any(command.startswith('open "') and "Main menu" in command for command in commands))
@@ -1916,7 +2013,7 @@ class CoreTests(unittest.TestCase):
             game.collect_loot([create_enemy("bandit")], source="Roadside Ambush")
         self.assertEqual(pauses, ["pause", "pause"])
 
-    def test_encounter_scaling_adds_minimum_enemies_for_three_member_party(self) -> None:
+    def test_encounter_scaling_adds_minimum_enemies_for_three_member_party_at_level_three(self) -> None:
         player = build_character(
             name="Velkor",
             race="Human",
@@ -1945,6 +2042,85 @@ class CoreTests(unittest.TestCase):
         self.assertGreater(encounter.enemies[0].xp_value, 50)
         self.assertTrue(any("Added by party-size encounter scaling." in note for enemy in encounter.enemies[1:] for note in enemy.notes))
         self.assertTrue(all(enemy.level >= 2 for enemy in encounter.enemies))
+
+    def test_standard_encounter_scaling_does_not_add_minimum_enemies_before_level_three(self) -> None:
+        player = build_character(
+            name="Velkor",
+            race="Human",
+            class_name="Warrior",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        companions = [create_kaelis_starling(), create_elira_dawnmantle()]
+        for member in [player, *companions]:
+            member.level = 2
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(90097))
+        game.state = GameState(player=player, companions=companions, current_scene="road_ambush")
+        encounter = Encounter(
+            title="Early Scaling Probe",
+            description="Early fights should keep their listed enemy count on Standard.",
+            enemies=[create_enemy("goblin_skirmisher")],
+            allow_post_combat_random_encounter=False,
+        )
+
+        game.prepare_encounter_for_party(encounter)
+
+        self.assertEqual(len(encounter.enemies), 1)
+        self.assertEqual(encounter.enemies[0].level, 2)
+
+    def test_difficulty_mode_controls_party_size_scaling_level(self) -> None:
+        player = build_character(
+            name="Velkor",
+            race="Human",
+            class_name="Warrior",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        companions = [create_kaelis_starling(), create_elira_dawnmantle()]
+        for member in [player, *companions]:
+            member.level = 2
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(90098))
+        game.state = GameState(player=player, companions=companions, current_scene="road_ambush")
+        game.persist_settings = lambda: None
+        game.set_difficulty_mode("tactician")
+        encounter = Encounter(
+            title="Tactician Scaling Probe",
+            description="Tactician keeps the old support-scaling pressure.",
+            enemies=[create_enemy("goblin_skirmisher")],
+            allow_post_combat_random_encounter=False,
+        )
+
+        game.prepare_encounter_for_party(encounter)
+
+        self.assertEqual(len(encounter.enemies), 3)
+
+    def test_encounter_can_opt_out_of_party_size_support_scaling(self) -> None:
+        player = build_character(
+            name="Velkor",
+            race="Human",
+            class_name="Warrior",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        companions = [create_kaelis_starling(), create_elira_dawnmantle()]
+        for member in [player, *companions]:
+            member.level = 3
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(90099))
+        game.state = GameState(player=player, companions=companions, current_scene="road_ambush")
+        encounter = Encounter(
+            title="Scripted Scaling Probe",
+            description="A scripted fight can keep its listed support count.",
+            enemies=[create_enemy("goblin_skirmisher")],
+            allow_post_combat_random_encounter=False,
+            allow_party_size_scaling=False,
+        )
+
+        game.prepare_encounter_for_party(encounter)
+
+        self.assertEqual(len(encounter.enemies), 1)
 
     def test_encounter_scaling_raises_two_enemies_when_four_or_more_are_present(self) -> None:
         player = build_character(
@@ -12175,7 +12351,8 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(stock["bread_round"], 2)
 
     def test_early_item_prices_are_more_affordable(self) -> None:
-        self.assertEqual(ITEMS["potion_healing"].value, 15)
+        self.assertEqual(ITEMS["potion_healing"].value, 10)
+        self.assertEqual(ITEMS["potion_healing"].heal_bonus, 4)
         self.assertLess(ITEMS["longbow_common"].value, 50)
         self.assertLess(ITEMS["chain_shirt_uncommon"].value, 100)
 
@@ -14688,7 +14865,7 @@ class CoreTests(unittest.TestCase):
         self.assertIn("Identify: Potion of Healing", rendered)
         self.assertIn(f"ID: {item_id}", rendered)
         self.assertIn("Legacy ID: potion_healing", rendered)
-        self.assertIn("Rules: restores 2d4+2", rendered)
+        self.assertIn("Rules: restores 2d4+4", rendered)
 
     def test_choose_hides_compact_hud_for_active_game_prompts_by_default(self) -> None:
         player = build_character(
@@ -15343,7 +15520,7 @@ class CoreTests(unittest.TestCase):
             class_skill_choices=["Athletics", "Survival"],
         )
         log: list[str] = []
-        answers = iter(["settings", "7", "1"])
+        answers = iter(["settings", "8", "1"])
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=log.append, rng=random.Random(401))
         game.state = GameState(player=player, current_scene="iron_hollow_hub")
         choice = game.choose("Choose one.", ["First", "Second"])
@@ -15352,12 +15529,13 @@ class CoreTests(unittest.TestCase):
         self.assertIn("Settings", rendered)
         self.assertIn("Toggle sound effects", rendered)
         self.assertIn("Dice animation style", rendered)
+        self.assertIn("Difficulty", rendered)
         self.assertIn("Toggle typed dialogue and narration", rendered)
         self.assertIn("Toggle pacing pauses", rendered)
         self.assertIn("Toggle staggered option reveals", rendered)
 
     def test_settings_menu_can_disable_presentation_toggles(self) -> None:
-        answers = iter(["3", "1", "4", "5", "6", "7"])
+        answers = iter(["3", "1", "5", "6", "7", "8"])
         game = TextDnDGame(
             input_fn=lambda _: next(answers),
             output_fn=print,
@@ -15410,6 +15588,7 @@ class CoreTests(unittest.TestCase):
                 "music_enabled": True,
                 "dice_animations_enabled": False,
                 "dice_animation_mode": "off",
+                "difficulty_mode": "standard",
                 "typed_dialogue_enabled": False,
                 "pacing_pauses_enabled": False,
                 "staggered_reveals_enabled": False,
@@ -15431,6 +15610,7 @@ class CoreTests(unittest.TestCase):
         self.assertTrue(second_game.current_settings_payload()["music_enabled"])
         self.assertFalse(second_game.current_settings_payload()["dice_animations_enabled"])
         self.assertEqual(second_game.current_settings_payload()["dice_animation_mode"], "off")
+        self.assertEqual(second_game.current_settings_payload()["difficulty_mode"], "standard")
         self.assertFalse(second_game.current_settings_payload()["typed_dialogue_enabled"])
         self.assertFalse(second_game.current_settings_payload()["pacing_pauses_enabled"])
         self.assertFalse(second_game.current_settings_payload()["staggered_reveals_enabled"])
@@ -15456,6 +15636,7 @@ class CoreTests(unittest.TestCase):
         self.assertTrue(game.current_settings_payload()["music_enabled"])
         self.assertTrue(game.current_settings_payload()["dice_animations_enabled"])
         self.assertEqual(game.current_settings_payload()["dice_animation_mode"], "full")
+        self.assertEqual(game.current_settings_payload()["difficulty_mode"], "standard")
         self.assertTrue(game.current_settings_payload()["typed_dialogue_enabled"])
         self.assertTrue(game.current_settings_payload()["pacing_pauses_enabled"])
         self.assertTrue(game.current_settings_payload()["staggered_reveals_enabled"])
@@ -15517,7 +15698,7 @@ class CoreTests(unittest.TestCase):
 
     def test_main_menu_includes_settings_option(self) -> None:
         log: list[str] = []
-        answers = iter(["4", "7", "5"])
+        answers = iter(["4", "8", "5"])
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=log.append, rng=random.Random(403))
         game.run()
         rendered = self.plain_output(log)
@@ -15776,6 +15957,35 @@ class CoreTests(unittest.TestCase):
             self.assertIn("invisible", hero.conditions)
             self.assertIn("guarded", hero.conditions)
 
+    def test_warrior_companion_uses_guard_stance_without_also_attacking(self) -> None:
+        player = build_character(
+            name="Velkor",
+            race="Human",
+            class_name="Warrior",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        tolan = create_tolan_ironshield()
+        enemy = create_enemy("bandit")
+        attacks: list[str] = []
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(4304))
+        game.state = GameState(player=player, companions=[tolan], current_scene="road_ambush")
+        game.perform_weapon_attack = (
+            lambda actor, target, heroes, enemies, dodging: attacks.append(target.name) or False
+        )
+
+        game.companion_turn(
+            tolan,
+            [player, tolan],
+            [enemy],
+            Encounter(title="Guard Probe", description="", enemies=[enemy], allow_flee=False),
+            set(),
+        )
+
+        self.assertEqual(game.current_combat_stance_key(tolan), "guard")
+        self.assertEqual(attacks, [])
+
     def test_ash_brand_enforcer_prioritizes_buffed_hero_when_no_mark_exists(self) -> None:
         player = build_character(
             name="Velkor",
@@ -15799,6 +16009,36 @@ class CoreTests(unittest.TestCase):
         )
         game.enemy_turn(enemy, [player, companion], [enemy], SimpleNamespace(), set())
         self.assertEqual(targeted, [player.name])
+
+    def test_default_enemy_targeting_uses_random_living_hero_instead_of_lowest_hp(self) -> None:
+        player = build_character(
+            name="Velkor",
+            race="Human",
+            class_name="Warrior",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        player.current_hp = 1
+        companion = create_tolan_ironshield()
+        companion.current_hp = companion.max_hp
+        enemy = create_enemy("bandit")
+        targeted: list[str] = []
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(4303))
+        game.state = GameState(player=player, companions=[companion], current_scene="road_ambush")
+
+        class SecondChoiceRng:
+            def choice(self, values):
+                return values[1]
+
+        game.rng = SecondChoiceRng()  # type: ignore[assignment]
+        game.perform_enemy_attack = (
+            lambda attacker, target, heroes, enemies, dodging: targeted.append(target.name) or False
+        )
+
+        game.enemy_turn(enemy, [player, companion], [enemy], SimpleNamespace(), set())
+
+        self.assertEqual(targeted, [companion.name])
 
     def test_official_conditions_are_all_defined(self) -> None:
         official_conditions = {
