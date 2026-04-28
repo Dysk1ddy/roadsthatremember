@@ -69,7 +69,7 @@ class StoryTownServicesMixin:
             else:
                 self.say(
                     "A modest shrine stands open to the road, all wind bells, votive flame, and hurried footsteps. "
-                    "Sister Elira Lanternward is kneeling beside a miner whose wound has darkened with ash-stained poison, "
+                    "Sister Elira Dawnmantle is kneeling beside a miner whose wound has darkened with ash-stained poison, "
                     "working with the calm intensity of someone refusing to let panic set the pace.",
                     typed=True,
                 )
@@ -105,25 +105,25 @@ class StoryTownServicesMixin:
                 success = self.skill_check(self.state.player, "Medicine", 8, context="to stabilize the miner")
                 if success:
                     self.state.flags["elira_helped"] = True
-                    self.speaker("Elira Lanternward", "Good hands. You just bought this miner another sunrise.")
+                    self.speaker("Elira Dawnmantle", "Good hands. You just bought this miner another sunrise.")
                     self.reward_party(xp=10, reason="helping Elira treat the poisoned miner")
                 else:
-                    self.speaker("Elira Lanternward", "You did what you could. Let me carry the rest from here.")
+                    self.speaker("Elira Dawnmantle", "You did what you could. Let me carry the rest from here.")
             elif selection_key == "prayer":
                 self.state.flags["shrine_prayer_attempted"] = True
                 self.player_speaker("I'll offer a prayer with you.")
                 success = self.skill_check(self.state.player, "Religion", 8, context="to guide a steady prayer")
                 if success:
                     self.state.flags["elira_helped"] = True
-                    self.speaker("Elira Lanternward", "Luck still walks beside you. I can feel it.")
+                    self.speaker("Elira Dawnmantle", "Luck still walks beside you. I can feel it.")
                     self.reward_party(xp=10, reason="praying with Elira")
                 else:
-                    self.speaker("Elira Lanternward", "Your heart is in the right place. The Lantern honors that too.")
+                    self.speaker("Elira Dawnmantle", "Your heart is in the right place. The Lantern honors that too.")
             elif selection_key == "raiders":
                 self.state.flags["shrine_raiders_asked"] = True
                 self.player_speaker("What have you learned about the raiders?")
                 self.speaker(
-                    "Elira Lanternward",
+                    "Elira Dawnmantle",
                     "Their blades carry an ash-bitter toxin, and they move through ruined stonework like trained soldiers, not frightened thieves. "
                     "Whoever shaped them taught discipline first and cruelty second, which is usually the more dangerous order.",
                 )
@@ -135,14 +135,14 @@ class StoryTownServicesMixin:
                     self.recruit_companion(create_elira_dawnmantle())
                     self.state.flags["elira_iron_hollow_recruited"] = True
                     self.state.flags.pop("elira_iron_hollow_fallback_pending", None)
-                    self.speaker("Elira Lanternward", "Then I will walk with you. The road needs more than prayers.")
+                    self.speaker("Elira Dawnmantle", "Then I will walk with you. The road needs more than prayers.")
                 else:
                     success = self.skill_check(self.state.player, "Persuasion", 8, context="to ask Elira into danger")
                     if success:
                         self.recruit_companion(create_elira_dawnmantle())
-                        self.speaker("Elira Lanternward", "Very well. Faith that never leaves the shrine is only half alive.")
+                        self.speaker("Elira Dawnmantle", "Very well. Faith that never leaves the shrine is only half alive.")
                     else:
-                        self.speaker("Elira Lanternward", "I want to help, but I won't abandon this place lightly without trust.")
+                        self.speaker("Elira Dawnmantle", "I want to help, but I won't abandon this place lightly without trust.")
             else:
                 if self.has_companion("Elira Dawnmantle"):
                     self.player_action("You give Elira a moment to tend the shrine before moving on.")

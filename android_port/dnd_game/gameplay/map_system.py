@@ -284,7 +284,7 @@ class MapSystemMixin:
         if elira is None:
             return
         self.say("In the wrecked barracks you find one gutter zealot alive under a collapsed bunk, too wounded to keep lying convincingly and too proud to beg well.")
-        self.speaker("Elira Lanternward", "This is the moment that matters more than speeches ever do.")
+        self.speaker("Elira Dawnmantle", "This is the moment that matters more than speeches ever do.")
         choice = self.scenario_choice(
             "What do you do with the captive cultist?",
             [
@@ -307,7 +307,7 @@ class MapSystemMixin:
         self.reward_party(xp=20, reason="deciding Elira's question under fire")
         self.state.flags["elira_faith_under_ash_resolved"] = True
         self.refresh_quest_statuses(announce=False)
-        self.turn_in_quest("elira_faith_under_ash", giver="Elira Lanternward")
+        self.turn_in_quest("elira_faith_under_ash", giver="Elira Dawnmantle")
 
     def act1_victory_tier(self) -> str:
         assert self.state is not None
@@ -3283,7 +3283,7 @@ class MapSystemMixin:
         self.say("The cistern should be a quiet basin where silt drops out before clean flow continues. Instead the surface looks filmed over with thinking darkness.")
         if self._glasswater_active_companion("Elira Dawnmantle") is not None and not delayed:
             self.speaker(
-                "Elira Lanternward",
+                "Elira Dawnmantle",
                 "If someone is still breathing in this room, that is the first clean task we have had since entering it.",
             )
         choice = self.scenario_choice(
@@ -3324,7 +3324,7 @@ class MapSystemMixin:
         self.say("The chapel is hardly larger than a pantry: six lamp niches, a worn basin, and a hammered plaque reminding crews that steady hands keep whole towns alive.")
         if self._glasswater_active_companion("Elira Dawnmantle") is not None:
             self.speaker(
-                "Elira Lanternward",
+                "Elira Dawnmantle",
                 "This is a shrine for people who kept strangers alive without ever meeting them. I would rather not fail them in their own room.",
             )
         choice = self.scenario_choice(
@@ -3744,7 +3744,7 @@ class MapSystemMixin:
                 self.apply_status(merik, "reeling", 1, source="the tuning line breaks under your first push")
 
         if self._glasswater_active_companion("Elira Dawnmantle") is not None:
-            self.speaker("Elira Lanternward", "You do not get to call sickness discipline because you wrote it down neatly.")
+            self.speaker("Elira Dawnmantle", "You do not get to call sickness discipline because you wrote it down neatly.")
         if self._glasswater_active_companion("Bryn Underbough") is not None:
             self.speaker("Bryn Underbough", "He talks like a clerk who found religion at the bottom of a lockbox.")
         if self._glasswater_active_companion("Tolan Ironshield") is not None:
@@ -4752,7 +4752,7 @@ class MapSystemMixin:
         )
         if elira_active:
             self.speaker(
-                "Elira Lanternward",
+                "Elira Dawnmantle",
                 "Break the line if you have to. Just do not make the prisoners pay the price twice.",
             )
         choice = self.scenario_choice(
@@ -4771,7 +4771,7 @@ class MapSystemMixin:
             )
             if elira_active:
                 self.speaker(
-                    "Elira Lanternward",
+                    "Elira Dawnmantle",
                     "Then keep the break on the wardens, not the people behind them.",
                 )
         else:
@@ -4782,7 +4782,7 @@ class MapSystemMixin:
             )
             if elira_active:
                 self.speaker(
-                    "Elira Lanternward",
+                    "Elira Dawnmantle",
                     "Good. A clean escape is still a kind of justice down here.",
                 )
 

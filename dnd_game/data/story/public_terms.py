@@ -46,6 +46,7 @@ SKILL_PUBLIC_LABELS: dict[str, str] = {}
 
 
 SPELL_PUBLIC_LABELS = {
+    "arcane_bolt": "Arcane Bolt",
     "minor_channel": "Minor Channel",
     "arc_pulse": "Arc Pulse",
     "marked_angle": "Marked Angle",
@@ -66,6 +67,7 @@ SPELL_PUBLIC_LABELS = {
 
 
 SPELL_NAME_TO_ID = {
+    "Arcane Bolt": "arcane_bolt",
     "Arc Pulse": "arc_pulse",
     "Marked Angle": "marked_angle",
     "Ember Lance": "ember_lance",
@@ -89,6 +91,7 @@ FEATURE_PUBLIC_LABELS = {
     "expertise": "Deep Practice",
     "mage_charge": "Charge",
     "mage_focus": "Focus",
+    "arcane_bolt": "Arcane Bolt",
     "minor_channel": "Minor Channel",
     "pattern_read": "Pattern Read",
     "ground": "Ground",
@@ -330,11 +333,11 @@ def marks_label(value: int) -> str:
 
 
 def guard_label(value: int) -> str:
-    return f"Defense {value}"
+    return f"Guard {value}"
 
 
 def target_guard_label(value: int) -> str:
-    return f"Defense {value}"
+    return f"Guard {value}"
 
 
 def d20_edge_label(advantage_state: int) -> str:

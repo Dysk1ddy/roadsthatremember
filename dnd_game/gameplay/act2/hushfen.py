@@ -36,7 +36,7 @@ class StoryAct2HushfenMixin:
         bryn = self._hushfen_active_companion("Bryn Underbough")
         if elira is not None:
             self.speaker(
-                "Elira Lanternward",
+                "Elira Dawnmantle",
                 "Panic spreads faster when someone respectable pretends it is caution. Start with the frightened. The rest will follow what the room becomes.",
             )
         if bryn is not None:
@@ -72,7 +72,7 @@ class StoryAct2HushfenMixin:
             self.player_action("Pull one witness aside and extract the cleanest version before fear edits it again.")
             if elira is not None:
                 self.speaker(
-                    "Elira Lanternward",
+                    "Elira Dawnmantle",
                     "Take the clearest witness if you must. Just do not teach the others that only precise fear is worth answering.",
                 )
             if bryn is not None:
@@ -90,7 +90,7 @@ class StoryAct2HushfenMixin:
             self.player_action("Follow the one story that changed in the telling and track the wrongness first.")
             if elira is not None:
                 self.speaker(
-                    "Elira Lanternward",
+                    "Elira Dawnmantle",
                     "Then do it quickly. I will not have the road think we stepped around the living to get to the mystery.",
                 )
             if self.skill_check(self.state.player, "Survival", 13, context="to track the wrongness moving through Hushfen's road"):
@@ -159,7 +159,7 @@ class StoryAct2HushfenMixin:
         elira = self._hushfen_active_companion("Elira Dawnmantle")
         if elira is not None:
             self.speaker(
-                "Elira Lanternward",
+                "Elira Dawnmantle",
                 "This is not ornamental faith. This is maintenance made holy because strangers depended on it.",
             )
         choice = self.scenario_choice(
@@ -192,7 +192,7 @@ class StoryAct2HushfenMixin:
                 if elira is not None:
                     self.state.flags["elira_field_lantern"] = True
                     self.speaker(
-                        "Elira Lanternward",
+                        "Elira Dawnmantle",
                         "If we carry it, we carry it as responsibility, not salvage.",
                     )
                 self.say("The basin lantern comes free with less protest than you feared, as if the chapel would rather be carried carefully than admired badly.")
@@ -219,7 +219,7 @@ class StoryAct2HushfenMixin:
         bryn = self._hushfen_active_companion("Bryn Underbough")
         if elira is not None:
             self.speaker(
-                "Elira Lanternward",
+                "Elira Dawnmantle",
                 "Say the names if you can. The dead should not have to compete with our urgency to stay real.",
             )
         choice = self.scenario_choice(
@@ -261,7 +261,7 @@ class StoryAct2HushfenMixin:
                     )
                 if elira is not None:
                     self.speaker(
-                        "Elira Lanternward",
+                        "Elira Dawnmantle",
                         "Then the living have already tried to use grief as cover. That is a smaller sin than murder and closer to the same shape than people admit.",
                     )
             else:
@@ -282,7 +282,7 @@ class StoryAct2HushfenMixin:
         bryn = self._hushfen_active_companion("Bryn Underbough")
         if elira is not None:
             self.speaker(
-                "Elira Lanternward",
+                "Elira Dawnmantle",
                 "Look at the neatness of it. Somebody wanted the ward to keep the posture of service while answering the wrong will.",
             )
         if bryn is not None:
@@ -306,7 +306,7 @@ class StoryAct2HushfenMixin:
                 self._hushfen_shift_circuit_strain(-1)
                 if elira is not None:
                     self.speaker(
-                        "Elira Lanternward",
+                        "Elira Dawnmantle",
                         "Better broken than obedient to the wrong voice.",
                     )
                 self.say("The sigil fails with a sound closer to a breath leaving than a curse breaking.")
@@ -320,7 +320,7 @@ class StoryAct2HushfenMixin:
                 self._hushfen_shift_circuit_strain(1)
                 if elira is not None:
                     self.speaker(
-                        "Elira Lanternward",
+                        "Elira Dawnmantle",
                         "Be careful. There is a kind of understanding that always pretends it can stay clean.",
                     )
                 self.add_clue("The Quiet Choir has been teaching older roadside wards to keep the posture of service while answering the wrong will.")
@@ -414,7 +414,7 @@ class StoryAct2HushfenMixin:
             self.speaker("Pale Witness", "Then let it travel honestly, even if honesty makes cowards of half the room for a while.")
             elira = self._hushfen_active_companion("Elira Dawnmantle")
             if elira is not None:
-                self.speaker("Elira Lanternward", "Good. Fear travels easily enough. Truth should not arrive gagged.")
+                self.speaker("Elira Dawnmantle", "Good. Fear travels easily enough. Truth should not arrive gagged.")
         elif choice == 2:
             self.player_speaker("Restrict it to trusted hands until the town can act instead of merely panic.")
             self.state.flags["hushfen_warning_exit_choice"] = "trusted"

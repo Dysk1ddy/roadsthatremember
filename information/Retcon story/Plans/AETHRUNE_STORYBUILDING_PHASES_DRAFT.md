@@ -134,7 +134,7 @@ Outputs:
 - revised major-NPC briefs tied to one clear worldview each
 
 Suggested early pairings to test:
-- Elira Lanternward -> Lantern Faith
+- Elira Dawnmantle -> Lantern Faith
 - Bryn Underbough -> Free Path
 - Nim Ardentglass -> Meridian Doctrine leaning
 - Caldra Voss -> Quiet Choir

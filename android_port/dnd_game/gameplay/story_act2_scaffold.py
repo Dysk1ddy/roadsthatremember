@@ -38,7 +38,7 @@ class StoryAct2ScaffoldMixin:
     ACT2_SPONSOR_LABELS = {
         "exchange": "Halia Vey's Exchange bloc",
         "lionshield": "Linene Ironward's disciplined supply line",
-        "wardens": "Elira Lanternward and Daran Orchard's cautious wardens",
+        "wardens": "Elira Dawnmantle and Daran Orchard's cautious wardens",
         "council": "a divided but cooperative council",
     }
     ACT2_FORGE_SUBROUTES = (
@@ -303,7 +303,7 @@ class StoryAct2ScaffoldMixin:
             return f"{line} It is stability under quarantine, not a clean victory."
         if sponsor == "wardens":
             if claims_state == "secured":
-                line = "Elira Lanternward and Daran Orchard come out with the strongest moral authority over the deepest routework, even if profit has to wait behind burial, warding, and witness."
+                line = "Elira Dawnmantle and Daran Orchard come out with the strongest moral authority over the deepest routework, even if profit has to wait behind burial, warding, and witness."
             elif claims_state == "contested":
                 line = "The wardens are trusted by the people who saw the worst of the cave, but not obeyed by everyone still counting ore and salvage."
             else:

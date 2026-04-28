@@ -328,7 +328,7 @@ ACT_1_QUESTS: dict[str, QuestDefinition] = {
     "elira_faith_under_ash": QuestDefinition(
         quest_id="elira_faith_under_ash",
         title="Faith Under Ash",
-        giver="Elira Lanternward",
+        giver="Elira Dawnmantle",
         location="Wherever mercy has to stand under pressure",
         summary=(
             "Elira wants to see what kind of justice survives once the Ashen Brand is beaten badly enough to beg. She is asking about you as much as about them."

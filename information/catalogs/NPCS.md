@@ -33,7 +33,7 @@ This file documents the non-player cast currently surfaced by the game, includin
 | Rhogar Valeguard | `rhogar_valeguard` | Forged Warrior / Bloodreaver | Optional Greywake contract companion before the Emberway | Level 1, 11 HP, AC 18, Longsword `1d8`, attack +5 | Oathsworn caravan guardian. Great: `+1 damage`; Exceptional: `+1 AC`. Supports `ashfall_watch` and `blackwake_crossing`. |
 | Tolan Ironshield | `tolan_ironshield` | Dwarf Warrior / Juggernaut | Joins after the Emberway ambush, or later from Ashlamp Inn if not recruited immediately | Level 1, 13 HP, AC 18, Longsword `1d8`, attack +4 | Shield-wall caravan veteran. Great: `+1 AC`; Exceptional: `+1 CON save`. Supports `ashfall_watch` and `blackwake_crossing`. |
 | Bryn Underbough | `bryn_underbough` | Halfling Rogue / Shadowguard | Recruited at Ashlamp Inn through Persuasion or Insight | Level 1, 9 HP, AC 14, Shortsword `1d6`, attack +5 | Trail scout, rumor-reader, and old smuggling contact. Great: `+1 Stealth`, `+1 initiative`; Exceptional: `+1 Perception`. Supports `blackglass_well`, `emberhall_cellars`, and `blackwake_crossing`; unlocks `Loose Ends`. |
-| Elira Lanternward | `elira_dawnmantle` | Human Mage / Aethermancer | Met at Wayside or Iron Hollow's shrine; easier to recruit after helping her | Level 1, 10 HP, AC 17, Mace `1d6`, attack +2 | Lantern priestess and field healer. Great: `+1 healing`; Exceptional: `+1 WIS save`. Supports `camp_rest` and `blackwake_crossing`; unlocks `Faith Under Ash`. |
+| Elira Dawnmantle | `elira_dawnmantle` | Human Mage / Aethermancer | Met at Wayside or Iron Hollow's shrine; easier to recruit after helping her | Level 1, 10 HP, AC 17, Mace `1d6`, attack +2 | Lantern priestess and field healer. Great: `+1 healing`; Exceptional: `+1 WIS save`. Supports `camp_rest` and `blackwake_crossing`; unlocks `Faith Under Ash`. |
 | Nim Ardentglass | `nim_ardentglass` | Unrecorded Mage / Arcanist | Act 2 recruit around Stonehollow Dig or early-route convergence | Level 1, 7 HP, AC 11, Quarterstaff `1d6`, attack +1 | Meridian Compact cartographer and ruin scholar. Great: `+1 Arcana`, `+1 Investigation`; Exceptional: `+1 spell attack`. Supports `stonehollow_dig` and `resonant_vault_outer_galleries`. |
 | Irielle Ashwake | `irielle_ashwake` | Fire-Blooded Mage / Elementalist | Freed and recruited during South Adit | Level 1, 9 HP, AC 12, Quarterstaff `1d6`, attack +1 | Escaped Quiet Choir augur and witness against the cult. Great: `+1 spell damage`, `+1 Insight`; Exceptional: `+1 WIS save`. Supports `south_adit` and `meridian_forge`. |
 
@@ -175,7 +175,7 @@ These entries are unique names or aliases used in scenes, intros, or reference m
 | --- | --- |
 | Greywake / civic authority | Mira Thann, Tessa Harrow |
 | Iron Hollow commerce and claims | Hadrik, Halia Vey, Linene Ironward, Town Council |
-| Wardens and local defenders | Daran Orchard, Elira Lanternward, Rhogar Valeguard, Tolan Ironshield |
+| Wardens and local defenders | Daran Orchard, Elira Dawnmantle, Rhogar Valeguard, Tolan Ironshield |
 | Scouts and route readers | Kaelis Starling, Bryn Underbough, Nim Ardentglass |
 | Quiet Choir witnesses or defectors | Irielle Ashwake, South Adit captives |
 | Ashen Brand named leadership | Sereth Vane, Rukhar Cinderfang, Varyn Sable |

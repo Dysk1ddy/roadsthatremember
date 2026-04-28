@@ -437,7 +437,7 @@ class CharacterCreationMixin:
                 return
         self.say(
             f"{character.name}, {character.public_identity} ({character.background})\n"
-            f"HP {character.current_hp}/{character.max_hp}, Defense {character.armor_class}, weapon: {character.weapon.name}"
+            f"HP {character.current_hp}/{character.max_hp}, {self.combat_defense_summary(character)}, weapon: {character.weapon.name}"
         )
         abilities = ", ".join(f"{ability_label(ability, include_code=True)} {character.ability_scores[ability]}" for ability in ABILITY_ORDER)
         self.say(f"Abilities: {abilities}")
@@ -460,7 +460,7 @@ class CharacterCreationMixin:
         header.add_row("People / Role", f"Level {character.level} {character.public_identity}")
         header.add_row("Background", character.background)
         header.add_row("Health", f"{character.current_hp}/{character.max_hp}")
-        header.add_row("Defense", str(character.armor_class))
+        header.add_row("Combat", self.combat_defense_summary(character))
         header.add_row("Weapon", character.weapon.name)
 
         abilities = Table(box=box.SIMPLE_HEAVY, expand=True, pad_edge=False)

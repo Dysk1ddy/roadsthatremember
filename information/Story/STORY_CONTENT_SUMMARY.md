@@ -48,7 +48,7 @@ These ids are the current save-facing route names. Legacy ids are handled by com
 - Oren Vale, Sabra Kestrel, Vessa Marr, and Garren Flint: contract-house witnesses and city-side logistics pressure.
 - Tessa Harrow: Iron Hollow steward.
 - Halia Vey, Linene Ironward, Daran Orchard, Hadrik, and Mara Ashlamp: hub civic and trade pressure.
-- Elira Lanternward: Lantern priestess and field healer.
+- Elira Dawnmantle: Lantern priestess and field healer.
 - Kaelis Starling: Astral Elf scout.
 - Rhogar Valeguard: Forged oathsworn.
 - Tolan Ironshield: shield-wall veteran.

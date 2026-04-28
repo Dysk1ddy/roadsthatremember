@@ -125,7 +125,7 @@ Resolution for implementation:
 
 | Current public role/name | Aethrune direction |
 | --- | --- |
-| Elira Dawnmantle | Elira Lanternward in public text; keep companion id initially |
+| Elira Dawnmantle | Elira Dawnmantle in public text; keep companion id initially |
 | Barthen | Hadrik |
 | Halia Thornton | convert to Delvers' Exchange / Reclaimer-aligned claims figure; final public name still needs one pass |
 | Linene Graywind | convert to Ironbound supply/trade figure; final public name still needs one pass |
@@ -329,7 +329,7 @@ Goal:
 
 Implemented first Act 1 surface slice:
 
-- rewritten opening/background prologue copy to Greywake, the Emberway, Iron Hollow, Lantern Hall, and Elira Lanternward public presentation
+- rewritten opening/background prologue copy to Greywake, the Emberway, Iron Hollow, Lantern Hall, and Elira Dawnmantle public presentation
 - rewritten Greywake briefing, departure fork, Emberway ambush, side-branch return copy, early encounter titles, and route prompts in `story_intro.py`
 - rewritten Act 1 hybrid route-map public node labels and travel-edge labels in `act1_hybrid_map.py`
 - added public character-name display aliases so legacy internal companion/NPC names can remain stable while dialogue and HUD output show Aethrune-facing names
@@ -353,7 +353,7 @@ Implemented Iron Hollow town/service slice:
 
 - rewritten town arrival, Blackwake arrival callbacks, steward options, hub menu labels, inn/service options, and town reward reasons in `story_town_hub.py`
 - rewritten shrine, provisioner, and trading-post service copy in `story_town_services.py`
-- rewritten Act 1 quest public definitions for Greywake, Iron Hollow, Hadrik's Provisions, Ironbound Trading Post, Ashlamp Inn, Delvers' Exchange, Blackglass Well, Orchard Wall, Red Mesa Hold, and Elira Lanternward while preserving quest ids
+- rewritten Act 1 quest public definitions for Greywake, Iron Hollow, Hadrik's Provisions, Ironbound Trading Post, Ashlamp Inn, Delvers' Exchange, Blackglass Well, Orchard Wall, Red Mesa Hold, and Elira Dawnmantle while preserving quest ids
 - updated public-facing town arrival identity interactions and companion interjections in `interaction_actions.py` and `dialogue_inputs.py`
 - added a public intro for Mara Ashlamp and kept old internal companion/NPC keys where save compatibility still depends on them
 - updated turn-in giver checks touched by renamed quest definitions so gameplay remains consistent while scene ids and quest ids remain stable
@@ -413,7 +413,7 @@ Implemented the Phase 4 Act 2 surface rewrite and the linked runtime cleanup it 
 
 - rewritten public-facing Act 2 council, Hushfen/Pale Circuit, Greywake Survey Camp, scaffold summary, quest, and route-map text in `council.py`, `conyberry.py`, `wood_survey.py`, `story_act2_scaffold.py`, `act2.py`, `act2_enemy_map.py`, and `ACT2_ENEMY_DRIVEN_MAP_SYSTEM.md`
 - extended the pass into `dnd_game/gameplay/map_system.py` where the playable late-route/runtime scenes still surfaced Black Lake, Conyberry, Pact, and related old public Act 2 language
-- normalized public Elira references in the touched Act 2 runtime surfaces to `Elira Lanternward` while preserving internal companion ids/lookups as `Elira Dawnmantle`
+- normalized public Elira references in the touched Act 2 runtime surfaces to `Elira Dawnmantle` while preserving internal companion ids/lookups as `Elira Dawnmantle`
 - updated `tests/test_core.py` for the new public canon and repaired the accidental mojibake block/box-drawing assertions introduced during earlier bulk rewrites
 
 Validation:

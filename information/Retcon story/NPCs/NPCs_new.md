@@ -49,7 +49,7 @@ Each NPC should clearly align with:
 
 ---
 
-## 2. ELIRA DAWNMANTLE → ELIRA LANTERNWARD (Shrine Keeper)
+## 2. ELIRA DAWNMANTLE 
 
 ### Role
 - Spiritual / morale anchor

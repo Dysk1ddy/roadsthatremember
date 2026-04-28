@@ -142,7 +142,7 @@ class GameBase:
     SCENE_OBJECTIVES = {
         "opening_tutorial": "Take the optional frontier primer or skip straight into your origin.",
         "background_prologue": "Finish your origin story and answer the road's first test.",
-        "wayside_luck_shrine": "Meet Elira Lanternward and steady the first wounded travelers.",
+        "wayside_luck_shrine": "Meet Elira Dawnmantle and steady the first wounded travelers.",
         "greywake_triage_yard": "Stabilize Greywake Yard before the road pressure breaks open.",
         "greywake_road_breakout": "Protect the wounded or the proof when the Ashen Brand attacks.",
         "greywake_briefing": "Hear Mira Thann out and take the road south.",
@@ -194,7 +194,6 @@ class GameBase:
     STORY_CHECK_OPTION_FLAG_PREFIX = "story_check_option_attempt::"
     STORY_CHECK_OPTION_TAGS = frozenset(skill.upper() for skill in SKILL_TO_ABILITY)
     PUBLIC_CHARACTER_NAMES = {
-        "Elira Dawnmantle": "Elira Lanternward",
         "Barthen": "Hadrik",
         "Halia Thornton": "Halia Vey",
         "Daran Edermath": "Daran Orchard",
@@ -205,8 +204,7 @@ class GameBase:
         "Mira Thann": "Mira Thann is a sharp-eyed Greywake officer who wears quiet authority like armor and studies every answer for weakness or leverage.",
         "Tessa Harrow": "Tessa Harrow is Iron Hollow's exhausted steward, all ink-stained hands, sleepless focus, and frontier resolve held together by sheer will.",
         "Bryn Underbough": "Bryn Underbough is a halfling trail scout with quick eyes, a quicker tongue, and the watchful stillness of someone who trusts exits before promises.",
-        "Elira Dawnmantle": "Elira Lanternward is a priestess of the Lantern whose steady hands and road-worn faith make the shrine feel more like a field hospital than a sanctuary.",
-        "Elira Lanternward": "Elira Lanternward is a priestess of the Lantern whose steady hands and road-worn faith make the shrine feel more like a field hospital than a sanctuary.",
+        "Elira Dawnmantle": "Elira Dawnmantle is a priestess of the Lantern whose steady hands and road-worn faith make the shrine feel more like a field hospital than a sanctuary.",
         "Hadrik": "Hadrik is a broad-shouldered provisioner with a merchant's apron, a teamster's worry, and the tired patience of a man rationing hope as carefully as flour.",
         "Halia Vey": "Halia Vey is a polished guild agent with perfectly measured calm, sharp ledgers, and the kind of smile that always seems to know one more thing than it says.",
         "Daran Orchard": "Daran Orchard is a retired half-elf adventurer tending his orchard like a quiet fortification, all old reflexes, weathered patience, and the easy economy of someone who has survived uglier frontiers.",
@@ -2879,6 +2877,7 @@ class GameBase:
                     ("map / maps / map menu", "Open the map menu, including Travel Ledger, overworld, and current-site views when available."),
                     ("journal", "Open the journal and clues log."),
                     ("party", "Review quick party combat stats, statuses, and roster state."),
+                    ("level", "Choose pending class skill training after the party levels up."),
                 ],
             ),
             (

@@ -32,7 +32,7 @@ Focus: Survival, profit, autonomy
 ## IRON HOLLOW CORE
 
 - Tessa Harrow → Iron Hollow Council (Leader)
-- Elira Lanternward → Iron Hollow Council (Faith/Stability)
+- Elira Dawnmantle → Iron Hollow Council (Faith/Stability)
 - Garen Flint → Iron Hollow Council (Defense)
 - Nera Doss → Iron Hollow Council (Labor)
 - Old Tam Veller → Neutral / Knowledge Keeper
@@ -85,7 +85,7 @@ Focus: Survival, profit, autonomy
 - Council fears loss of control
 - Choir views Council as ignorant
 
-Elira Lanternward vs Caldra Voss:
+Elira Dawnmantle vs Caldra Voss:
 - Emotion vs “truth”
 
 ---
@@ -159,7 +159,7 @@ Use for dialogue/branching:
 |------|------|-------------|
 | Tessa Harrow | Varyn Sable | Hostile |
 | Tessa Harrow | Caldra Voss | Tense |
-| Elira Lanternward | Caldra Voss | Ideological Conflict |
+| Elira Dawnmantle | Caldra Voss | Ideological Conflict |
 | Nim | Caldra | Tense |
 | Irielle | Caldra | Hostile |
 | Nera Doss | Excavation Foreman | Tense |

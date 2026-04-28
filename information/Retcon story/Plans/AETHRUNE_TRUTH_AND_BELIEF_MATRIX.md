@@ -114,11 +114,11 @@ Narrative read:
 
 Use public-facing names in story docs. Runtime ids can remain save-safe until a
  later implementation pass. For example, Elira may still be stored internally as
- `Elira Dawnmantle`, but storybuilding should treat her as `Elira Lanternward`.
+ `Elira Dawnmantle`, but storybuilding should treat her as `Elira Dawnmantle`.
 
 | Character | Primary lane | Secondary pull | Approves of | Rejects | Break line |
 | --- | --- | --- | --- | --- | --- |
-| Elira Lanternward | Lantern Faith | Remembered | rescue, naming the dead, mercy under pressure, choosing people before proof | contempt, dehumanized control, sacrifice justified as efficiency | repeated choices that preserve order while abandoning witnesses or survivors |
+| Elira Dawnmantle | Lantern Faith | Remembered | rescue, naming the dead, mercy under pressure, choosing people before proof | contempt, dehumanized control, sacrifice justified as efficiency | repeated choices that preserve order while abandoning witnesses or survivors |
 | Bryn Underbough | Free Path | practical survivor ethics | breaking fake authority, flexible solutions, anti-monopoly choices, keeping exits open | rigid authority, trust-me-because-I-say-so institutions, public crackdowns | a player who keeps trading freedom for structure |
 | Tolan Ironshield | civic duty grounded in survival | Council pragmatism | holding the line, protecting civilians, honest follow-through, earned steadiness | vanity, reckless theorizing, promises without action | repeated choices that privilege abstraction over the living people in front of him |
 | Kaelis Starling | truth through pattern-reading | cautious civic responsibility | careful observation, honest route-reading, disciplined anti-Brand action, subtlety over noise | sloppy certainty, false maps, repeating mistakes because authority said so | a player who ignores evidence and treats maps as more real than judgment |

@@ -5,7 +5,6 @@ from ..data.story.public_terms import (
     marks_label,
     resource_label,
     skill_option_label,
-    target_guard_label,
 )
 from ..models import ABILITY_ORDER, SKILL_TO_ABILITY
 from ..items import get_item
@@ -54,7 +53,7 @@ class JournalMixin:
         details = [
             self.rich_from_ansi(f"Level {member.level} {member.public_identity}"),
             self.rich_from_ansi(
-                f"{self.character_health_summary(member)} | {target_guard_label(member.armor_class)} | Temp HP {member.temp_hp}"
+                f"{self.character_health_summary(member)} | {self.combat_defense_summary(member)} | Temp HP {member.temp_hp}"
             ),
         ]
         magic_bar = self.format_member_magic_bar(member)
@@ -109,7 +108,7 @@ class JournalMixin:
         header.add_row("People / Role", f"Level {member.level} {member.public_identity}")
         header.add_row("Background", member.background)
         header.add_row("Status", strip_ansi(self.character_health_summary(member)))
-        header.add_row("Defense", str(member.armor_class))
+        header.add_row("Combat", self.combat_defense_summary(member))
         header.add_row("Training", f"+{member.proficiency_bonus}")
         if getattr(member, "companion_id", ""):
             header.add_row("Relationship", f"{self.relationship_label_for(member)} ({member.disposition})")
@@ -656,7 +655,7 @@ class JournalMixin:
             temp_hp = f", temp {member.temp_hp}" if member.temp_hp else ""
             self.output_fn(
                 f"- {member.name}: Level {member.level} {member.public_identity}, "
-                f"{self.character_health_summary(member)}, {target_guard_label(member.armor_class)}{temp_hp}, "
+                f"{self.character_health_summary(member)}, {self.combat_defense_summary(member)}{temp_hp}, "
                 f"conditions [{conditions}]"
             )
             story_modifiers = self.story_skill_modifier_summary(member)
@@ -725,7 +724,7 @@ class JournalMixin:
                 return
         self.say(
             f"Level {member.level} {member.public_identity} | Background: {member.background} | "
-            f"Status: {self.character_health_summary(member)} | {target_guard_label(member.armor_class)} | "
+            f"Status: {self.character_health_summary(member)} | {self.combat_defense_summary(member)} | "
             f"Training bonus +{member.proficiency_bonus}"
         )
         self.output_fn("")

@@ -59,10 +59,17 @@ class GameIOMixin:
         has_state = self.state is not None
         in_combat = bool(getattr(self, "_in_combat", False))
         commands: list[str] = []
+        has_level_training = bool(
+            has_state
+            and callable(getattr(self, "has_pending_player_level_up_choices", None))
+            and self.has_pending_player_level_up_choices()
+        )
         if has_state and not in_combat:
             commands.append("map")
         if has_state:
             commands.extend(["journal", "party", "inventory"])
+        if has_level_training:
+            commands.append("level")
         if has_state and not in_combat:
             commands.append("camp")
         if has_state:
@@ -75,6 +82,21 @@ class GameIOMixin:
 
     def render_command_shelf(self, *, allow_meta: bool = True) -> None:
         self.output_fn(self.style_text(self.command_shelf_text(), "light_aqua"))
+        reminder = self.interaction_level_up_reminder_text()
+        if reminder:
+            self.output_fn(self.style_text(reminder, "light_yellow"))
+
+    def interaction_level_up_reminder_text(self) -> str:
+        reminder_getter = getattr(self, "level_up_reminder_text", None)
+        if not callable(reminder_getter):
+            return ""
+        return str(reminder_getter() or "")
+
+    def rich_interaction_level_up_reminder(self):
+        reminder = self.interaction_level_up_reminder_text()
+        if not reminder:
+            return None
+        return self.rich_text(reminder, "light_yellow", dim=True)
 
     def style_text(self, text: object, color: str) -> str:
         return colorize(text, color)
@@ -684,6 +706,9 @@ class GameIOMixin:
         group_items.extend([option_table, self.rich_text("", dim=True)])
         if show_command_shelf:
             group_items.append(self.rich_text(self.command_shelf_text(), "light_aqua", dim=True))
+        level_reminder = self.rich_interaction_level_up_reminder()
+        if level_reminder is not None:
+            group_items.append(level_reminder)
         group_items.extend(footer_items)
 
         return Panel(

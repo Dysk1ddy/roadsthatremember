@@ -195,7 +195,7 @@ Act 2 should deepen the whole party through optional side tracks that pull perso
 | Rhogar Valeguard | `oath_beneath_stone` | sealed miners' chapel | oath, mercy, and whether duty means guarding relics or people first | anchor his oath in the town or the threshold | stronger civic stability vs lower whisper seepage |
 | Tolan Ironshield | `last_wagon_standing` | Broken Prospect road | caravan memory, survivor anger, and whether pragmatism is moral enough | salvage tainted structure or destroy profitable wrongness | better route control vs cleaner spiritual state |
 | Bryn Underbough | `false_ledgers` | Delvers' Exchange / sponsor stores | smuggling instincts, bad old contacts, and choosing who gets trusted with the truth | quietly falsify bad ledgers or expose the scheme in public | better covert route leverage vs stronger civic trust |
-| Elira Lanternward | `lantern_under_ash` | dead-testimony chapel ruins | faith under pressure, grief, and whether hope is luck or discipline | carry the warding lantern into the field or leave it in town | lower whisper pressure vs higher town stability |
+| Elira Dawnmantle | `lantern_under_ash` | dead-testimony chapel ruins | faith under pressure, grief, and whether hope is luck or discipline | carry the warding lantern into the field or leave it in town | lower whisper pressure vs higher town stability |
 | Nim Ardentglass | `missing_theorem` | South Adit archive room | mentor legacy, academic pride, and whether knowledge is worth carrying out intact | preserve the dangerous theorem or burn its corrupted pages | stronger forge options vs safer Act 3 contamination profile |
 | Irielle Ashwake | `starved_signal` | Blackglass shrine | resisting the cult's hold and deciding whether dangerous knowledge should be destroyed or studied | teach the counter-cadence or bury it | stronger forge opening vs cleaner containment into Act 3 |
 
@@ -292,11 +292,11 @@ These enemies should carry the act's thematic load: cave pressure, expedition ri
 | Quest id | Title | Giver | Location | Trigger | Reward |
 | --- | --- | --- | --- | --- | --- |
 | `recover_pact_waymap` | Recover the Compact Waymap | Halia Vey | Delvers' Exchange | offered during the first claims council if the player presses the mine-history angle | `140 XP`, `75 gp`, `pact_waymap_case x1`, `resonance_tonic x2` |
-| `seek_pale_witness_truth` | Ask the Pale Witness What Was Buried | Elira Lanternward | Hushfen Road | offered after the player follows chapel or spiritual clues | `130 XP`, `40 gp`, `pale_witness_lantern x1`, `scroll_quell_the_deep x1` |
+| `seek_pale_witness_truth` | Ask the Pale Witness What Was Buried | Elira Dawnmantle | Hushfen Road | offered after the player follows chapel or spiritual clues | `130 XP`, `40 gp`, `pale_witness_lantern x1`, `scroll_quell_the_deep x1` |
 | `rescue_stonehollow_scholars` | Bring Back the Survey Team | Linene Ironward | Stonehollow Dig | offered if the player asks about missing hired specialists | `140 XP`, `70 gp`, `stonehollow_survey_lantern x1`, `miners_ration_tin x4` |
 | `cut_woodland_saboteurs` | Break the Woodland Saboteurs | Daran Orchard | Greywake Survey Line | offered if the player pushes the road-and-scout angle | `140 XP`, `65 gp`, `woodland_wayfinder_boots x1`, `delvers_amber x2` |
 | `hold_the_claims_meet` | Hold the Claims Meeting Together | Linene Ironward | Iron Hollow | triggers automatically once any two early leads are cleared | `120 XP`, `75 gp`, `claims_accord_brooch x1` |
-| `free_resonant_vault_captives` | Free the South Adit Prisoners | Elira Lanternward | South Adit | offered when the resonance cells are discovered | `160 XP`, `80 gp`, `freed_captive_prayer_beads x1`, `scroll_echo_step x1`, `scroll_lesser_restoration x1` |
+| `free_resonant_vault_captives` | Free the South Adit Prisoners | Elira Dawnmantle | South Adit | offered when the resonance cells are discovered | `160 XP`, `80 gp`, `freed_captive_prayer_beads x1`, `scroll_echo_step x1`, `scroll_lesser_restoration x1` |
 | `sever_quiet_choir` | Sever the Quiet Choir | Iron Hollow Council | Resonant Vaults | becomes active once Caldra and the cult cell are positively identified | `250 XP`, `150 gp`, `forgeheart_cinder x1`, `forge_blessing_elixir x2`, `scroll_forge_shelter x1` |
 
 ### Quest state logic

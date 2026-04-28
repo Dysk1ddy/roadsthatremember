@@ -214,6 +214,10 @@ STATUS_DEFINITIONS: dict[str, dict[str, object]] = {
         "save_bonus": 1,
         "stability_bonus": 1,
     },
+    "arcane_bolt_cooldown": {
+        "name": "Arcane Bolt Cooldown",
+        "combat_only": True,
+    },
     "anchor_shell": {
         "name": "Anchor Shell",
         "combat_only": True,

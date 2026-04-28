@@ -225,7 +225,7 @@ Use these as late-game hard lines.
 
 | Companion | Most likely break trigger |
 | --- | --- |
-| Elira Lanternward | preserving system order by knowingly discarding witnesses, captives, or the dead |
+| Elira Dawnmantle | preserving system order by knowingly discarding witnesses, captives, or the dead |
 | Bryn Underbough | handing permanent truth or route monopoly to one authority without meaningful limit |
 | Tolan Ironshield | treating ordinary people as acceptable collateral for elegant systemic solutions |
 | Kaelis Starling | accepting false certainty when evidence proves the route or map is lying |

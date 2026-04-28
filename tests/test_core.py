@@ -2127,11 +2127,11 @@ class CoreTests(unittest.TestCase):
         log: list[str] = []
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=log.append, rng=random.Random(900831))
         game.state = GameState(player=player, current_scene="wayside_luck_shrine")
-        game.speaker("Elira Lanternward", "Wash your hands first.")
+        game.speaker("Elira Dawnmantle", "Wash your hands first.")
         game.speaker("Elira Dawnmantle", "Then keep pressure on the wound.")
         rendered = self.plain_output(log)
-        self.assertEqual(rendered.count("Elira Lanternward is a priestess of the Lantern"), 1)
-        self.assertIn('Elira Lanternward: "Then keep pressure on the wound."', rendered)
+        self.assertEqual(rendered.count("Elira Dawnmantle is a priestess of the Lantern"), 1)
+        self.assertIn('Elira Dawnmantle: "Then keep pressure on the wound."', rendered)
 
     def test_all_scripted_speakers_have_intro_text(self) -> None:
         gameplay_root = Path(gameplay_base.__file__).resolve().parent
@@ -3210,7 +3210,7 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(boss_encounter.enemies[0].name, "Vaelith Marr")
         self.assertEqual(boss_encounter.enemies[0].archetype, "vaelith_marr")
         self.assertEqual(boss_encounter.enemies[0].level, 4)
-        self.assertEqual(boss_encounter.enemies[0].max_hp, 50)
+        self.assertEqual(boss_encounter.enemies[0].max_hp, 53)
         self.assertEqual(boss_encounter.enemies[0].current_hp, boss_encounter.enemies[0].max_hp - 4)
         self.assertIn("reeling", boss_encounter.enemies[0].conditions)
         self.assertTrue(any(enemy.name == "Carrion Lash Crawler" for enemy in boss_encounter.enemies[1:]))
@@ -7945,10 +7945,10 @@ class CoreTests(unittest.TestCase):
         game.on_encounter_round_start(encounter, [player], encounter.enemies, [player, rukhar, support], 1)
 
         self.assertEqual(rukhar.level, 3)
-        self.assertEqual(rukhar.max_hp, 45)
+        self.assertEqual(rukhar.max_hp, 48)
         self.assertIn("emboldened", support.conditions)
 
-        game.apply_damage(rukhar, 23)
+        game.apply_damage(rukhar, 24)
 
         self.assertTrue(rukhar.bond_flags["break_their_line_triggered"])
         self.assertEqual(rukhar.bond_flags["marked_target"], player.name)
@@ -8255,10 +8255,10 @@ class CoreTests(unittest.TestCase):
         enemy = create_enemy("rukhar")
         self.assertEqual(enemy.name, "Rukhar Cinderfang")
         self.assertEqual(enemy.level, 3)
-        self.assertEqual(enemy.max_hp, 45)
+        self.assertEqual(enemy.max_hp, 48)
         vaelith = create_enemy("vaelith_marr")
         self.assertEqual(vaelith.level, 4)
-        self.assertEqual(vaelith.max_hp, 50)
+        self.assertEqual(vaelith.max_hp, 53)
         saboteur = create_enemy("brand_saboteur")
         self.assertEqual(saboteur.name, "Ashen Brand Saboteur")
         self.assertEqual(saboteur.resources["flash_ash"], 1)
@@ -9661,6 +9661,28 @@ class CoreTests(unittest.TestCase):
                 self.assertEqual(game.state.flags["background_prologue_completed"], background)
                 self.assertTrue(game.state.flags["system_profile_seeded"])
 
+    def test_soldier_prologue_runner_uses_level_one_enemy_hp_bonus(self) -> None:
+        player = build_character(
+            name="Mara Gatehand",
+            race="Human",
+            class_name="Warrior",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        encounters: list[Encounter] = []
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(4451))
+        game.state = GameState(player=player, current_scene="background_prologue")
+        game.skill_check = lambda actor, skill, dc, context: True
+        game.run_encounter = lambda encounter: encounters.append(encounter) or "victory"
+
+        game.prologue_soldier()
+
+        runner = encounters[0].enemies[0]
+        self.assertEqual(runner.name, "Ashen Brand Runner")
+        self.assertEqual(runner.max_hp, 11)
+        self.assertEqual(runner.current_hp, 11)
+
     def test_background_prologue_shows_starting_rundown(self) -> None:
         player = build_character(
             name="Ash",
@@ -10674,6 +10696,64 @@ class CoreTests(unittest.TestCase):
         self.assertIn("hard_lesson", game.state.player.features)
         self.assertIn("grit", game.state.player.max_resources)
 
+    def test_reward_party_defers_player_skill_choice_until_level_command(self) -> None:
+        answers = iter(["level", "1", "1"])
+        log: list[str] = []
+        player = build_character(
+            name="Velkor",
+            race="Human",
+            class_name="Warrior",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=log.append, rng=random.Random(1400))
+        game.state = GameState(player=player, current_scene="iron_hollow_hub", xp=290)
+
+        game.reward_party(xp=20, reason="testing delayed level training")
+
+        self.assertEqual(player.level, 2)
+        self.assertNotIn("Acrobatics", player.skill_proficiencies)
+        self.assertEqual(game.pending_player_level_up_skill_levels(), [2])
+
+        selected = game.choose("Choose one.", ["First"], allow_meta=False)
+
+        self.assertEqual(selected, 1)
+        self.assertIn("Acrobatics", player.skill_proficiencies)
+        self.assertEqual(game.pending_player_level_up_skill_levels(), [])
+        rendered = self.plain_output(log)
+        self.assertIn("The party leveled up to level 2. Type `level`", rendered)
+        self.assertIn("Level Up", rendered)
+        self.assertIn("Class Progression", rendered)
+        self.assertIn("Available Skills", rendered)
+
+    def test_level_command_uses_rich_level_up_ui_when_available(self) -> None:
+        if not RICH_AVAILABLE:
+            self.skipTest("rich is not installed")
+        log: list[str] = []
+        player = build_character(
+            name="Velkor",
+            race="Human",
+            class_name="Mage",
+            background="Sage",
+            base_ability_scores={"STR": 8, "DEX": 14, "CON": 12, "INT": 15, "WIS": 13, "CHA": 10},
+            class_skill_choices=["Arcana", "Investigation"],
+        )
+        answers = iter(["1"])
+        game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=log.append, rng=random.Random(14001))
+        game._interactive_output = True
+        game.state = GameState(player=player, current_scene="iron_hollow_hub")
+        player.level = 2
+        game.add_pending_player_level_up_skill_pick(2)
+
+        self.assertTrue(game.open_level_up_menu())
+
+        rendered = self.plain_output(log)
+        self.assertIn("Level Up", rendered)
+        self.assertIn("Class Progression", rendered)
+        self.assertIn("Subclass Path", rendered)
+        self.assertIn("Available Skill", rendered)
+
     def test_scaled_check_reward_xp_uses_party_level_floor(self) -> None:
         player = build_character(
             name="Velkor",
@@ -10912,7 +10992,7 @@ class CoreTests(unittest.TestCase):
         ally = create_tolan_ironshield()
         ally.current_hp = max(1, ally.current_hp - 5)
         enemy = create_enemy("bandit")
-        answers = iter(["6", "2", "2", "1"])
+        answers = iter(["8", "2", "2", "1"])
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=lambda _: None, rng=random.Random(8155))
         game.state = GameState(player=player, companions=[ally], current_scene="road_ambush")
         game.saving_throw = lambda actor, ability, dc, context, against_poison=False: False
@@ -11314,7 +11394,7 @@ class CoreTests(unittest.TestCase):
 
     def test_describe_living_combatants_aligns_mp_bars_for_spellcasters(self) -> None:
         elira = build_character(
-            name="Elira Lanternward",
+            name="Elira Dawnmantle",
             race="Human",
             class_name="Mage",
             background="Acolyte",
@@ -12119,7 +12199,7 @@ class CoreTests(unittest.TestCase):
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
         )
-        answers = iter(["1", "3", "10", "3"])
+        answers = iter(["level", "1", "3", "10", "3"])
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=lambda _: None, rng=random.Random(52))
         game.state = GameState(
             player=player,
@@ -12130,6 +12210,7 @@ class CoreTests(unittest.TestCase):
         )
         game.scene_iron_hollow_hub()
         self.assertEqual(game.state.player.level, 2)
+        self.assertEqual(game.pending_player_level_up_skill_levels(), [])
         self.assertEqual(game.state.current_scene, "emberhall_cellars")
 
     def test_greywake_prep_skill_check_has_situation_specific_failure_text(self) -> None:
@@ -13082,7 +13163,7 @@ class CoreTests(unittest.TestCase):
         game._ashfall_rukhar_command(dungeon, room)
 
         self.assertEqual(len(captured), 1)
-        self.assertEqual(captured[0].enemies[0].current_hp, 41)
+        self.assertEqual(captured[0].enemies[0].current_hp, 44)
 
     def test_emberhall_quiet_room_intel_option_reads_ledgers_without_check(self) -> None:
         player = build_character(
@@ -13863,8 +13944,8 @@ class CoreTests(unittest.TestCase):
         game.handle_greywake_departure_fork = lambda: setattr(game.state, "current_scene", "road_ambush")
 
         def choose_mira_option(prompt: str, options: list[str], **kwargs) -> int:
-            if any("You know Elira Lanternward" in option for option in options):
-                return self.option_index_containing(options, "You know Elira Lanternward")
+            if any("You know Elira Dawnmantle" in option for option in options):
+                return self.option_index_containing(options, "You know Elira Dawnmantle")
             return self.option_index_containing(options, "Take the writ")
 
         game.scenario_choice = choose_mira_option  # type: ignore[method-assign]
@@ -13902,8 +13983,8 @@ class CoreTests(unittest.TestCase):
         game.handle_greywake_departure_fork = lambda: setattr(game.state, "current_scene", "road_ambush")
 
         def choose_mira_option(prompt: str, options: list[str], **kwargs) -> int:
-            if any("You know Elira Lanternward" in option for option in options):
-                return self.option_index_containing(options, "You know Elira Lanternward")
+            if any("You know Elira Dawnmantle" in option for option in options):
+                return self.option_index_containing(options, "You know Elira Dawnmantle")
             return self.option_index_containing(options, "Take the writ")
 
         game.scenario_choice = choose_mira_option  # type: ignore[method-assign]

@@ -36,13 +36,13 @@ ACT_2_QUESTS: dict[str, QuestDefinition] = {
     "seek_pale_witness_truth": QuestDefinition(
         quest_id="seek_pale_witness_truth",
         title="Ask the Pale Witness What Was Buried",
-        giver="Elira Lanternward",
+        giver="Elira Dawnmantle",
         location="Hushfen Road",
         summary=(
             "Elira believes the dead around Hushfen still remember what greed and fear tried to hide from the living."
         ),
         objective="Reach the Pale Circuit, learn what was buried, and return with a cleaner truth.",
-        turn_in="Return to Elira Lanternward once the Hushfen lead is settled.",
+        turn_in="Return to Elira Dawnmantle once the Hushfen lead is settled.",
         completion_flags=("hushfen_truth_secured",),
         reward=QuestReward(
             xp=130,
@@ -54,7 +54,7 @@ ACT_2_QUESTS: dict[str, QuestDefinition] = {
         accepted_text=(
             "Elira does not call it safe. She only says that grief often keeps straighter records than the living do."
         ),
-        ready_text="Hushfen's dead have given up what they know. Elira Lanternward should hear it clearly.",
+        ready_text="Hushfen's dead have given up what they know. Elira Dawnmantle should hear it clearly.",
         turn_in_text=(
             "Elira listens without interrupting, then bows her head once as if accepting testimony from both the living "
             "and the lost."
@@ -146,13 +146,13 @@ ACT_2_QUESTS: dict[str, QuestDefinition] = {
     "free_resonant_vault_captives": QuestDefinition(
         quest_id="free_resonant_vault_captives",
         title="Free the South Adit Prisoners",
-        giver="Elira Lanternward",
+        giver="Elira Dawnmantle",
         location="South Adit",
         summary=(
             "The deeper cells are being used for prisoners, labor, and whatever the Quiet Choir cannot yet do to people in public."
         ),
         objective="Open the South Adit cells, free the prisoners, and get the survivors back aboveground.",
-        turn_in="Return to Elira Lanternward after the captives are clear of the adit.",
+        turn_in="Return to Elira Dawnmantle after the captives are clear of the adit.",
         completion_flags=("south_adit_cleared",),
         reward=QuestReward(
             xp=160,
@@ -164,7 +164,7 @@ ACT_2_QUESTS: dict[str, QuestDefinition] = {
         accepted_text=(
             "Elira's voice goes colder than usual when she realizes the mine has turned into a prison."
         ),
-        ready_text="The South Adit captives are free. Elira Lanternward should know who made it out.",
+        ready_text="The South Adit captives are free. Elira Dawnmantle should know who made it out.",
         turn_in_text=(
             "Elira receives the names of the living with more visible relief than any coin reward could equal."
         ),

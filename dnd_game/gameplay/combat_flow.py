@@ -1004,6 +1004,17 @@ class CombatFlowMixin:
                 if self.use_minor_channel(actor, target):
                     turn_state.actions_remaining -= 1
                 continue
+            if action == "Arcane Bolt":
+                target = self.choose_target(conscious_enemies, prompt="Choose a target for Arcane Bolt.", allow_back=True)
+                if target is None:
+                    continue
+                action_cast = self.combat_option_group(selected_option) == "Action"
+                if self.use_arcane_bolt(actor, target, heroes, enemies, dodging, action_cast=action_cast):
+                    if action_cast:
+                        turn_state.actions_remaining -= 1
+                    else:
+                        turn_state.bonus_action_available = False
+                continue
             if action == "Arc Pulse":
                 target = self.choose_target(conscious_enemies, prompt="Choose a target for Arc Pulse.", allow_back=True)
                 if target is None:
@@ -1382,7 +1393,7 @@ class CombatFlowMixin:
         return action
 
     def can_afford_spell(self, actor: Character, spell_id: str) -> bool:
-        return has_magic_points(actor, magic_point_cost(spell_id))
+        return has_magic_points(actor, magic_point_cost(spell_id, actor))
 
     def choose_combat_stance(self, actor: Character) -> bool:
         options = [self.combat_stance_option(stance_key, actor) for stance_key in STANCE_ORDER] + ["Back"]
@@ -1412,6 +1423,8 @@ class CombatFlowMixin:
         action = self.combat_action_key(option)
         if action == "End Turn":
             return "End Turn"
+        if action == "Arcane Bolt" and "Action" in self.choice_text(option):
+            return "Action"
         if action == "Use an Item":
             return "Item"
         if action == "Attempt Parley":
@@ -1436,6 +1449,7 @@ class CombatFlowMixin:
             "Cover The Healer",
             "Death Mark",
             "Black Drop",
+            "Arcane Bolt",
             "Pattern Read",
             "Marked Angle",
             "Change Weather",
@@ -1519,6 +1533,9 @@ class CombatFlowMixin:
             if section_index < len(sections) - 1:
                 action_items.append(self.rich_text("", dim=True))
         action_items.extend([self.rich_text("", dim=True), self.rich_text(self.command_shelf_text(), "light_aqua", dim=True)])
+        level_reminder = self.rich_interaction_level_up_reminder()
+        if level_reminder is not None:
+            action_items.append(level_reminder)
         action_panel = self.build_combat_action_panel(action_items, actor=actor)
         return self.emit_rich(
             self.build_combat_dashboard_renderable(
@@ -1568,6 +1585,9 @@ class CombatFlowMixin:
                 )
             )
         action_items.append(self.rich_text(self.command_shelf_text(), "light_aqua", dim=True))
+        level_reminder = self.rich_interaction_level_up_reminder()
+        if level_reminder is not None:
+            action_items.append(level_reminder)
         action_items.append(self.rich_text("", dim=True))
         for section_index, (section, grouped_options) in enumerate(sections):
             action_items.append(self.rich_text(f"{section}:", "light_yellow", bold=True))
@@ -2537,6 +2557,12 @@ class CombatFlowMixin:
                 options.append("Bloom In The Blood")
             if "minor_channel" in actor.features and has_magic_points(actor, magic_point_cost("minor_channel")):
                 options.append("Minor Channel (1 MP)")
+            if (
+                "arcane_bolt" in actor.features
+                and not self.arcane_bolt_on_cooldown(actor)
+                and has_magic_points(actor, self.arcane_bolt_mp_cost(actor, action_cast=True))
+            ):
+                options.append(f"Arcane Bolt (Action, {self.arcane_bolt_mp_cost(actor, action_cast=True)} MP)")
             if "arc_pulse" in actor.features and has_magic_points(actor, magic_point_cost("arc_pulse")):
                 options.append("Arc Pulse (1 MP)")
             if "detonate_pattern" in actor.features and actor.resources.get("arc", 0) >= 2:
@@ -2620,6 +2646,12 @@ class CombatFlowMixin:
                 options.append("Death Mark")
             if "black_drop" in actor.features and actor.resources.get("toxin", 0) > 0 and not self.has_status(actor, "black_drop"):
                 options.append("Black Drop")
+            if (
+                "arcane_bolt" in actor.features
+                and not self.arcane_bolt_on_cooldown(actor)
+                and has_magic_points(actor, self.arcane_bolt_mp_cost(actor))
+            ):
+                options.append(f"Arcane Bolt (Bonus, {self.arcane_bolt_mp_cost(actor)} MP)")
             if "pattern_read" in actor.features:
                 options.append("Pattern Read")
             if "marked_angle" in actor.features and has_magic_points(actor, magic_point_cost("marked_angle")):

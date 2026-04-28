@@ -122,7 +122,7 @@ Draft a fresh camp banter packet:
 ```powershell
 python tools/story_writer.py `
   --mode banter `
-  --speaker "Elira Lanternward" `
+  --speaker "Elira Dawnmantle" `
   --speaker "Bryn Underbough" `
   --brief "Write 6 short campfire lines after a costly Emberway fight. Keep Bryn defensive and Elira steady without making either sentimental." `
   --context "information/Retcon story/NPCs/NPC_relationship_map.md" `

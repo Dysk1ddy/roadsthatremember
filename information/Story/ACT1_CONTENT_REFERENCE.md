@@ -60,7 +60,7 @@ The summary sections at the top reflect the expanded Act 1 route and should be t
 | Rhogar Valeguard | Forged Warrior / Bloodreaver | oathsworn caravan guardian | optional contract companion in Greywake before the road | Great: `+1 damage`; Exceptional: `+1 AC` |
 | Tolan Ironshield | Dwarf Warrior / Juggernaut | shield-wall caravan veteran | joins after Roadside Ambush or later from the inn | Great: `+1 AC`; Exceptional: `+1 CON saves` |
 | Bryn Underbough | Halfling Rogue | trail scout and rumor-reader | recruited at Ashlamp Inn on Persuasion success | Great: `+1 Stealth`, `+1 initiative`; Exceptional: `+1 Perception` |
-| Elira Lanternward | Human Mage / Aethermancer | shrine healer and faith anchor | first met at Wayside Lantern Shrine, recruitable there or at Greywake before the second shared combat; if missed, recruited at Iron Hollow's shrine | Great: `+1 healing`; Exceptional: `+1 WIS saves` |
+| Elira Dawnmantle | Human Mage / Aethermancer | shrine healer and faith anchor | first met at Wayside Lantern Shrine, recruitable there or at Greywake before the second shared combat; if missed, recruited at Iron Hollow's shrine | Great: `+1 healing`; Exceptional: `+1 WIS saves` |
 
 ### Scene support hooks
 
@@ -198,7 +198,7 @@ The summary sections at the top reflect the expanded Act 1 route and should be t
 | `silence_blackglass_well` | Silence Blackglass Well | Halia Vey | Delvers' Exchange | `blackglass_well_cleared` | `100 XP`, `45 gp`, `gravequiet_amulet x1`, `scroll_clarity x1`, `blessed_salve x1` |
 | `break_red_mesa_raiders` | Break the Red Mesa Raiders | Daran Orchard | Orchard Wall | `red_mesa_hold_cleared` | `100 XP`, `40 gp`, `edermath_scout_buckle x1`, `greater_healing_draught x1` |
 | `bryn_loose_ends` | Loose Ends | Bryn Underbough | personal / road chain | `bryn_loose_ends_resolved` | `80 XP`, `25 gp`, `bryns_cache_keyring x1`, `dust_of_disappearance x1` |
-| `elira_faith_under_ash` | Faith Under Ash | Elira Lanternward | personal / Ashfall field scene | `elira_faith_under_ash_resolved` | `80 XP`, `20 gp`, `dawnmantle_mercy_charm x1`, `blessed_salve x1` |
+| `elira_faith_under_ash` | Faith Under Ash | Elira Dawnmantle | personal / Ashfall field scene | `elira_faith_under_ash_resolved` | `80 XP`, `20 gp`, `dawnmantle_mercy_charm x1`, `blessed_salve x1` |
 
 ### Quest state logic
 
@@ -248,7 +248,7 @@ The summary sections at the top reflect the expanded Act 1 route and should be t
 ### Pre-Greywake Elira and Greywake sequence
 
 - Background prologues now converge at `Wayside Luck Shrine` before Mira Thann's briefing.
-- Elira Lanternward is introduced as the first companion candidate.
+- Elira Dawnmantle is introduced as the first companion candidate.
 - First Elira recruitment chance:
   - Wayside Luck Shrine after helping with poison, prayer, road marks, or triage flow.
   - Helping Elira makes recruitment automatic or much easier.

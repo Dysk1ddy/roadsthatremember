@@ -17,6 +17,7 @@ from .status_effects import STANCE_STATUS_BY_KEY, STANCE_STATUS_NAMES
 
 
 PHYSICAL_DEFENSE_DAMAGE_TYPES = {"", "slashing", "piercing", "bludgeoning"}
+BASE_ATTACK_TARGET_NUMBER = 8
 STANCE_LABELS = {
     "neutral": "Neutral",
     "guard": "Guard",
@@ -97,7 +98,7 @@ class CombatResolutionMixin:
         )
 
     def spend_mp_for_spell(self, caster, spell_id: str, spell_name: str) -> bool:
-        cost = magic_point_cost(spell_id)
+        cost = magic_point_cost(spell_id, caster)
         if spend_magic_points(caster, cost):
             return True
         channel_name = spell_label(spell_id, spell_name)
@@ -349,11 +350,13 @@ class CombatResolutionMixin:
         if armor_cap <= 0:
             if armor is None or (armor_type in {"clothing", "light"} and not getattr(armor, "heavy", False)):
                 armor_cap = 45
+            elif getattr(armor, "heavy", False) or armor_type == "heavy":
+                armor_cap = 80
             else:
                 armor_cap = 75
         if "heavy_armor_specialist" in getattr(actor, "features", []):
             armor_cap = max(armor_cap, 80)
-        return bonus_cap or armor_cap
+        return max(bonus_cap, armor_cap)
 
     def shield_defense_percent(self, actor) -> int:
         if not getattr(actor, "shield", False):
@@ -418,10 +421,10 @@ class CombatResolutionMixin:
         return total
 
     def effective_attack_target_number(self, actor) -> int:
-        return max(1, 10 + self.effective_avoidance(actor))
+        return max(1, BASE_ATTACK_TARGET_NUMBER + self.effective_avoidance(actor))
 
     def attack_target_label(self, target_number: int) -> str:
-        return f"Avoidance {target_number}"
+        return f"Contact {target_number}"
 
     def last_damage_resolution(self) -> DamageResolution:
         return getattr(self, "_last_damage_resolution", DamageResolution())
@@ -649,6 +652,7 @@ class CombatResolutionMixin:
             & {
                 "mage_charge",
                 "mage_focus",
+                "arcane_bolt",
                 "minor_channel",
                 "pattern_read",
                 "ground",
@@ -848,6 +852,95 @@ class CombatResolutionMixin:
         self.say(f"{self.style_name(actor)} grounds the channel and steadies the next pattern.")
         self.record_opening_tutorial_combat_event("combat_ground", actor=actor)
         return True
+
+    def arcane_bolt_mp_cost(self, actor, *, action_cast: bool = False) -> int:
+        base_cost = magic_point_cost("arcane_bolt", actor)
+        return base_cost * 2 if action_cast else base_cost
+
+    def arcane_bolt_damage_expression(self, actor) -> str:
+        level = max(1, int(getattr(actor, "level", 1)))
+        dice = min(5, 1 + (level - 1) // 2)
+        return f"{dice}d4"
+
+    def arcane_bolt_cooldown_duration(self) -> int:
+        # Conditions tick at end of the current turn, so 3 blocks the next two turns.
+        return 3
+
+    def arcane_bolt_on_cooldown(self, actor) -> bool:
+        return self.has_status(actor, "arcane_bolt_cooldown")
+
+    def use_arcane_bolt(self, actor, target, heroes=None, enemies=None, dodging=None, *, action_cast: bool = False) -> bool:
+        if "arcane_bolt" not in getattr(actor, "features", []):
+            self.say(f"{self.style_name(actor)} has no Arcane Bolt training.")
+            return False
+        if self.arcane_bolt_on_cooldown(actor):
+            self.say(f"{self.style_name(actor)} needs another breath before Arcane Bolt will answer.")
+            return False
+        if not self.can_make_hostile_action(actor):
+            self.say(f"{self.style_name(actor)} cannot shape Arcane Bolt toward harm while Charmed.")
+            return False
+        channel = spell_label("arcane_bolt")
+        cost = self.arcane_bolt_mp_cost(actor, action_cast=action_cast)
+        if not spend_magic_points(actor, cost):
+            self.say(
+                f"{self.style_name(actor)} needs {cost} MP to use {channel}, "
+                f"but has {current_magic_points(actor)}."
+            )
+            return False
+        self.apply_status(actor, "arcane_bolt_cooldown", self.arcane_bolt_cooldown_duration(), source=channel)
+        self.record_opening_tutorial_combat_event("combat_arcane_bolt", actor=actor, target=target)
+        play_attack_sound_for = getattr(self, "play_attack_sound_for", None)
+        if callable(play_attack_sound_for):
+            play_attack_sound_for(actor)
+        try:
+            active_heroes = heroes if heroes is not None else self.active_allies_for_actor(actor)
+            active_enemies = enemies if enemies is not None else list(getattr(self, "_active_combat_enemies", []) or [])
+            active_dodging = dodging if dodging is not None else getattr(self, "_active_dodging_names", frozenset())
+            target_number = self.effective_attack_target_number(target)
+            advantage = self.attack_advantage_state(actor, target, active_heroes, active_enemies, active_dodging, ranged=True)
+            total_modifier = (
+                self.spell_attack_bonus(actor, "INT")
+                + self.ally_pressure_bonus(actor, active_heroes, ranged=True)
+                + self.status_accuracy_modifier(actor)
+                + self.attack_focus_modifier(actor, target)
+                + self.target_accuracy_modifier(target)
+            )
+            d20 = self.roll_check_d20(
+                actor,
+                advantage,
+                target_number=target_number,
+                target_label=self.attack_target_label(target_number),
+                modifier=total_modifier,
+                style="attack",
+                outcome_kind="attack",
+                context_label=f"{actor.name} casts {channel} at {target.name}",
+            )
+            total = d20.kept + total_modifier
+            critical_hit = d20.kept >= self.critical_threshold(actor)
+            if d20.kept == 1 or (not critical_hit and total < target_number):
+                self.say(f"{channel} snaps past {self.style_name(target)} without finding a mark.")
+                return True
+            damage_bonus = max(0, actor.ability_mod("INT")) + self.spell_damage_bonus(actor)
+            damage_roll = self.roll_with_display_bonus(
+                self.arcane_bolt_damage_expression(actor),
+                bonus=damage_bonus,
+                critical=critical_hit,
+                style="damage",
+                context_label=channel,
+                outcome_kind="damage",
+            )
+            damage_multiplier = 2 if action_cast else 1
+            damage = max(1, (damage_roll.total + damage_bonus) * damage_multiplier)
+            actual = self.apply_damage(target, damage, damage_type="force", source_actor=actor)
+            self.say(f"{channel} strikes {self.style_name(target)} for {self.style_damage(actual)} force damage.")
+            self.announce_downed_target(target)
+            self.trigger_blacklake_adjudicator_reflection(actor, target, source=channel)
+            if actual > 0 and target.is_conscious():
+                self.add_arcanist_pattern_charge(actor, target, source=channel)
+            self.maybe_gain_mage_focus_from_channel(actor, target, source=channel)
+            return True
+        finally:
+            self.break_invisibility_from_hostile_action(actor)
 
     def mage_minor_channel_save_ability(self, actor, target) -> str:
         if self.target_is_pattern_read_by(actor, target):

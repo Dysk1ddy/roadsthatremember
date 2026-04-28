@@ -11,15 +11,15 @@ from .companions import apply_companion_profile
 from .options import BACKGROUNDS, CLASSES, RACES
 
 
-BASELINE_HIT_CHANCE_TARGET = (0.75, 0.85)
+BASELINE_HIT_CHANCE_TARGET = (0.75, 0.90)
+LEVEL_ONE_HERO_HP_BONUS = 6
+LEVEL_ONE_ENEMY_HP_BONUS = 3
 AVOIDANCE_BANDS: dict[str, tuple[int, int]] = {
     "exposed": (-2, -1),
     "trained": (0, 0),
     "agile": (1, 1),
     "skirmisher": (2, 2),
-    "dedicated": (3, 3),
-    "high": (4, 4),
-    "exceptional": (5, 5),
+    "high": (3, 3),
 }
 HIGH_AVOIDANCE_ENEMY_TEMPLATES = frozenset(
     {
@@ -32,57 +32,57 @@ HIGH_AVOIDANCE_ENEMY_TEMPLATES = frozenset(
     }
 )
 LOW_LEVEL_ENEMY_COMBAT_PROFILES: dict[str, dict[str, int]] = {
-    "goblin_skirmisher": {"avoidance": 2, "defense_percent": 5},
+    "goblin_skirmisher": {"avoidance": 1, "defense_percent": 10},
     "wolf": {"avoidance": 1, "defense_percent": 10},
     "bandit": {"avoidance": 0, "defense_percent": 10},
-    "bandit_archer": {"avoidance": 1, "defense_percent": 10},
-    "brand_saboteur": {"avoidance": 1, "defense_percent": 10},
-    "skeletal_sentry": {"avoidance": 0, "defense_percent": 15},
+    "bandit_archer": {"avoidance": 1, "defense_percent": 15},
+    "brand_saboteur": {"avoidance": 1, "defense_percent": 15},
+    "skeletal_sentry": {"avoidance": 0, "defense_percent": 20},
     "worg": {"avoidance": 1, "defense_percent": 15},
-    "orc_raider": {"avoidance": 0, "defense_percent": 20},
-    "cinder_kobold": {"avoidance": 2, "defense_percent": 10},
+    "orc_raider": {"avoidance": 0, "defense_percent": 25},
+    "cinder_kobold": {"avoidance": 1, "defense_percent": 15},
     "briar_twig": {"avoidance": 0, "defense_percent": 15},
-    "mireweb_spider": {"avoidance": 2, "defense_percent": 20},
+    "mireweb_spider": {"avoidance": 1, "defense_percent": 25},
     "gutter_zealot": {"avoidance": 0, "defense_percent": 5},
-    "rust_shell_scuttler": {"avoidance": 0, "defense_percent": 20},
-    "sereth_vane": {"avoidance": 3, "defense_percent": 15},
-    "ash_brand_enforcer": {"avoidance": 0, "defense_percent": 25},
+    "rust_shell_scuttler": {"avoidance": 0, "defense_percent": 25},
+    "sereth_vane": {"avoidance": 2, "defense_percent": 25},
+    "ash_brand_enforcer": {"avoidance": 0, "defense_percent": 30},
     "ember_channeler": {"avoidance": 0, "defense_percent": 5},
-    "carrion_stalker": {"avoidance": 3, "defense_percent": 15},
-    "orc_bloodchief": {"avoidance": 0, "defense_percent": 25},
-    "ogre_brute": {"avoidance": -1, "defense_percent": 15},
-    "gravecaller": {"avoidance": 0, "defense_percent": 10},
-    "expedition_reaver": {"avoidance": 1, "defense_percent": 15},
-    "cult_lookout": {"avoidance": 2, "defense_percent": 15},
-    "grimlock_tunneler": {"avoidance": 0, "defense_percent": 20},
-    "stirge_swarm": {"avoidance": 4, "defense_percent": 5},
+    "carrion_stalker": {"avoidance": 2, "defense_percent": 25},
+    "orc_bloodchief": {"avoidance": 0, "defense_percent": 30},
+    "ogre_brute": {"avoidance": -1, "defense_percent": 20},
+    "gravecaller": {"avoidance": 0, "defense_percent": 15},
+    "expedition_reaver": {"avoidance": 1, "defense_percent": 20},
+    "cult_lookout": {"avoidance": 1, "defense_percent": 20},
+    "grimlock_tunneler": {"avoidance": 0, "defense_percent": 25},
+    "stirge_swarm": {"avoidance": 3, "defense_percent": 5},
     "ochre_slime": {"avoidance": -2, "defense_percent": 5},
-    "animated_armor": {"avoidance": -1, "defense_percent": 35},
-    "lantern_fen_wisp": {"avoidance": 4, "defense_percent": 0},
-    "ashstone_percher": {"avoidance": 1, "defense_percent": 25},
-    "acidmaw_burrower": {"avoidance": 0, "defense_percent": 25},
-    "bugbear_reaver": {"avoidance": 0, "defense_percent": 20},
+    "animated_armor": {"avoidance": -1, "defense_percent": 45, "defense_cap_percent": 80},
+    "lantern_fen_wisp": {"avoidance": 3, "defense_percent": 0},
+    "ashstone_percher": {"avoidance": 1, "defense_percent": 30},
+    "acidmaw_burrower": {"avoidance": 0, "defense_percent": 30},
+    "bugbear_reaver": {"avoidance": 0, "defense_percent": 25},
     "nothic": {"avoidance": 0, "defense_percent": 20},
     "rukhar": {"avoidance": 0, "defense_percent": 30},
     "choir_adept": {"avoidance": 0, "defense_percent": 10},
-    "spectral_foreman": {"avoidance": 1, "defense_percent": 20},
-    "starblighted_miner": {"avoidance": 0, "defense_percent": 10},
-    "ettervine_webherd": {"avoidance": 1, "defense_percent": 20},
-    "carrion_lash_crawler": {"avoidance": 1, "defense_percent": 20},
-    "cache_mimic": {"avoidance": 0, "defense_percent": 25},
-    "stonegaze_skulker": {"avoidance": 0, "defense_percent": 30},
-    "cliff_harpy": {"avoidance": 2, "defense_percent": 10},
+    "spectral_foreman": {"avoidance": 1, "defense_percent": 25},
+    "starblighted_miner": {"avoidance": 0, "defense_percent": 15},
+    "ettervine_webherd": {"avoidance": 1, "defense_percent": 25},
+    "carrion_lash_crawler": {"avoidance": 1, "defense_percent": 25},
+    "cache_mimic": {"avoidance": 0, "defense_percent": 30},
+    "stonegaze_skulker": {"avoidance": 0, "defense_percent": 40},
+    "cliff_harpy": {"avoidance": 2, "defense_percent": 15},
     "whispermaw_blob": {"avoidance": -2, "defense_percent": 5},
-    "vaelith_marr": {"avoidance": 3, "defense_percent": 15},
-    "false_map_skirmisher": {"avoidance": 4, "defense_percent": 10},
-    "claimbinder_notary": {"avoidance": 0, "defense_percent": 20},
-    "echo_sapper": {"avoidance": 0, "defense_percent": 30},
-    "pact_archive_warden": {"avoidance": 0, "defense_percent": 45},
-    "blackglass_listener": {"avoidance": 4, "defense_percent": 10},
-    "blacklake_pincerling": {"avoidance": 0, "defense_percent": 40},
-    "graveblade_wight": {"avoidance": 0, "defense_percent": 40},
-    "cinderflame_skull": {"avoidance": 4, "defense_percent": 10},
-    "obelisk_eye": {"avoidance": 4, "defense_percent": 15},
+    "vaelith_marr": {"avoidance": 2, "defense_percent": 25},
+    "false_map_skirmisher": {"avoidance": 3, "defense_percent": 15},
+    "claimbinder_notary": {"avoidance": 0, "defense_percent": 25},
+    "echo_sapper": {"avoidance": 0, "defense_percent": 40},
+    "pact_archive_warden": {"avoidance": 0, "defense_percent": 55, "defense_cap_percent": 80},
+    "blackglass_listener": {"avoidance": 3, "defense_percent": 15},
+    "blacklake_pincerling": {"avoidance": 0, "defense_percent": 50, "defense_cap_percent": 80},
+    "graveblade_wight": {"avoidance": 0, "defense_percent": 50, "defense_cap_percent": 80},
+    "cinderflame_skull": {"avoidance": 3, "defense_percent": 15},
+    "obelisk_eye": {"avoidance": 3, "defense_percent": 20},
 }
 
 
@@ -112,7 +112,9 @@ def build_character(
     skills = sorted(set(background_data["skills"] + race_data["skills"] + class_skill_choices))
     expertise = sorted(set(expertise_choices or []))
     features = sorted(set(class_data["features"] + race_data["features"]))
-    hp = max(1, class_data["hit_die"] + ability_modifier(final_scores["CON"]))
+    character_tags = list(tags or ["hero"])
+    hp_bonus = LEVEL_ONE_HERO_HP_BONUS if "hero" in character_tags else 0
+    hp = max(1, class_data["hit_die"] + ability_modifier(final_scores["CON"]) + hp_bonus)
     merged_notes = [*background_data["notes"], *(notes or [])]
     character = Character(
         name=name,
@@ -138,7 +140,7 @@ def build_character(
         inventory={"Healing Potion": 1, **(inventory or {})},
         equipment_bonuses=dict(background_data["equipment_bonuses"]),
         notes=merged_notes,
-        tags=list(tags or ["hero"]),
+        tags=character_tags,
         archetype=class_name.lower(),
     )
     synchronize_spell_slots(character, refill=True)
@@ -290,6 +292,13 @@ def apply_enemy_combat_profile(enemy: Character, template: str) -> None:
         "avoidance": target_avoidance,
         "defense_percent": target_defense,
     }
+
+
+def apply_enemy_level_one_hp_bonus(enemy: Character) -> None:
+    if enemy.level < 1:
+        return
+    enemy.current_hp += LEVEL_ONE_ENEMY_HP_BONUS
+    enemy.max_hp += LEVEL_ONE_ENEMY_HP_BONUS
 
 
 def create_enemy(template: str, *, name: str | None = None) -> Character:
@@ -1922,6 +1931,7 @@ def create_enemy(template: str, *, name: str | None = None) -> Character:
     template_character = templates[template]
     enemy = Character.from_dict(template_character.to_dict())
     apply_enemy_combat_profile(enemy, template)
+    apply_enemy_level_one_hp_bonus(enemy)
     if name is not None:
         enemy.name = name
     return enemy

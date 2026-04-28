@@ -59,7 +59,7 @@ class StoryAct2CouncilMixin:
             "Routes decide whether people come home at all. Start there."
         )
         self.speaker(
-            "Elira Lanternward",
+            "Elira Dawnmantle",
             "If the dead are already trying to warn us, greed is not the only thing bidding on this cave."
         )
         if self.act2_company_has("Bryn Underbough"):
@@ -386,7 +386,7 @@ class StoryAct2CouncilMixin:
             )
         elif quest_id == "seek_pale_witness_truth":
             self.speaker(
-                "Elira Lanternward",
+                "Elira Dawnmantle",
                 "Then Hushfen's dead were not left speaking into the dark. Tell me the warning cleanly, and I will make sure it is carried gently.",
             )
             if self.state is not None and self.state.flags.get("hushfen_claim_cover_suspected"):
@@ -442,7 +442,7 @@ class StoryAct2CouncilMixin:
             )
         elif quest_id == "free_resonant_vault_captives":
             self.speaker(
-                "Elira Lanternward",
+                "Elira Dawnmantle",
                 "Give me every name you can remember. The rescued deserve more than being counted as proof that we did the correct thing.",
             )
         elif quest_id == "sever_quiet_choir":

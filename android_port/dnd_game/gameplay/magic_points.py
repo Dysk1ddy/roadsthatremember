@@ -10,6 +10,7 @@ FULL_CASTER_CLASSES = {"Mage"}
 FEATURE_CASTER_IDS = {"magic_initiate", "racial_magic"}
 
 SPELL_MP_COSTS: dict[str, int] = {
+    "arcane_bolt": 1,
     "minor_channel": 1,
     "arc_pulse": 1,
     "marked_angle": 1,
@@ -29,7 +30,14 @@ SPELL_MP_COSTS: dict[str, int] = {
 }
 
 
-def magic_point_cost(spell_id: str) -> int:
+def arcane_bolt_mp_cost(actor=None) -> int:
+    level = max(1, int(getattr(actor, "level", 1) if actor is not None else 1))
+    return min(4, 1 + (level - 1) // 3)
+
+
+def magic_point_cost(spell_id: str, actor=None) -> int:
+    if spell_id == "arcane_bolt":
+        return arcane_bolt_mp_cost(actor)
     return SPELL_MP_COSTS[spell_id]
 
 

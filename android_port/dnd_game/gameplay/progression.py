@@ -17,6 +17,7 @@ COMPANION_SUBCLASS_ELIGIBLE_KEY = "companion_subclass_player_choice_eligible"
 COMPANION_SUBCLASS_RECRUITED_LEVEL_KEY = "companion_recruited_level"
 COMPANION_SUBCLASS_PREPICKED_KEY = "companion_subclass_prepicked"
 COMPANION_SUBCLASS_PLAYER_CHOSEN_KEY = "companion_subclass_player_chosen"
+PLAYER_LEVEL_UP_SKILL_PICKS_KEY = "player_level_up_skill_picks_pending"
 
 CLASS_SUBCLASS_OPTIONS: dict[str, tuple[dict[str, str], ...]] = {
     "Warrior": (
@@ -159,6 +160,234 @@ CLASS_SUBCLASS_FEATURE_ID_SETS: dict[str, set[str]] = {
 
 
 class ProgressionMixin:
+    def level_up_skill_choices_for(self, actor: Character) -> list[str]:
+        return [skill for skill in CLASSES[actor.class_name]["skill_choices"] if skill not in actor.skill_proficiencies]
+
+    def pending_player_level_up_skill_levels(self) -> list[int]:
+        if self.state is None:
+            return []
+        raw_levels = self.state.flags.get(PLAYER_LEVEL_UP_SKILL_PICKS_KEY, [])
+        if isinstance(raw_levels, int):
+            raw_items = [raw_levels]
+        elif isinstance(raw_levels, (list, tuple)):
+            raw_items = list(raw_levels)
+        else:
+            raw_items = []
+        levels: list[int] = []
+        for raw_level in raw_items:
+            try:
+                level = int(raw_level)
+            except (TypeError, ValueError):
+                continue
+            if level >= 2:
+                levels.append(level)
+        if raw_levels != levels:
+            if levels:
+                self.state.flags[PLAYER_LEVEL_UP_SKILL_PICKS_KEY] = levels
+            else:
+                self.state.flags.pop(PLAYER_LEVEL_UP_SKILL_PICKS_KEY, None)
+        return levels
+
+    def set_pending_player_level_up_skill_levels(self, levels: list[int]) -> None:
+        if self.state is None:
+            return
+        clean_levels: list[int] = []
+        for raw_level in levels:
+            try:
+                level = int(raw_level)
+            except (TypeError, ValueError):
+                continue
+            if level >= 2:
+                clean_levels.append(level)
+        clean_levels.sort()
+        if clean_levels:
+            self.state.flags[PLAYER_LEVEL_UP_SKILL_PICKS_KEY] = clean_levels
+        else:
+            self.state.flags.pop(PLAYER_LEVEL_UP_SKILL_PICKS_KEY, None)
+
+    def add_pending_player_level_up_skill_pick(self, level: int) -> None:
+        if self.state is None:
+            return
+        pending_levels = self.pending_player_level_up_skill_levels()
+        pending_levels.append(int(level))
+        self.set_pending_player_level_up_skill_levels(pending_levels)
+
+    def has_pending_player_level_up_choices(self) -> bool:
+        if self.state is None:
+            return False
+        pending_levels = self.pending_player_level_up_skill_levels()
+        if not pending_levels:
+            return False
+        if not self.level_up_skill_choices_for(self.state.player):
+            self.set_pending_player_level_up_skill_levels([])
+            return False
+        return True
+
+    def level_up_reminder_text(self) -> str:
+        if not self.has_pending_player_level_up_choices():
+            return ""
+        pending_levels = self.pending_player_level_up_skill_levels()
+        level_text = ", ".join(f"level {level}" for level in pending_levels)
+        if len(pending_levels) == 1:
+            return f"The party leveled up to {level_text}. Type `level` to choose a new class skill."
+        return f"The party leveled up through {level_text}. Type `level` to choose new class skills."
+
+    def complete_one_pending_player_level_up_skill_pick(self) -> None:
+        pending_levels = self.pending_player_level_up_skill_levels()
+        if pending_levels:
+            pending_levels.pop(0)
+        self.set_pending_player_level_up_skill_levels(pending_levels)
+
+    def class_progression_summary_lines(self, actor: Character) -> list[tuple[int, str, str]]:
+        progression_by_level = CLASS_LEVEL_PROGRESSION.get(actor.class_name, {})
+        lines: list[tuple[int, str, str]] = []
+        for level in sorted(progression_by_level):
+            progression = progression_by_level[level]
+            feature_ids = list(progression.get("feature_ids", []))
+            labels = [feature_label(feature_id) for feature_id in feature_ids]
+            state = "unlocked" if level <= actor.level else "later"
+            lines.append((level, state, ", ".join(labels) if labels else "No listed feature"))
+        return lines
+
+    def subclass_progression_summary_lines(self, actor: Character) -> list[tuple[str, str]]:
+        options = CLASS_SUBCLASS_OPTIONS.get(actor.class_name, ())
+        return [(str(option["label"]), str(option["description"])) for option in options]
+
+    def build_level_up_renderable(self, actor: Character, available: list[str], pending_levels: list[int]):
+        from ..ui.rich_render import Group, Panel, Table, Text, box
+        from ..ui.colors import rich_style_name
+
+        if Group is None or Panel is None or Table is None or Text is None or box is None:
+            return None
+
+        pending_text = ", ".join(f"level {level}" for level in pending_levels)
+        header = Text()
+        header.append(f"{actor.name} reached {pending_text}.\n", style=f"bold {rich_style_name('light_yellow')}")
+        header.append("Choose one new class skill for each waiting level.", style="dim")
+
+        progression_table = Table(box=box.SIMPLE_HEAVY, expand=True, pad_edge=False)
+        progression_table.add_column("Level", style=f"bold {rich_style_name('light_yellow')}", width=8)
+        progression_table.add_column("State", width=10)
+        progression_table.add_column("Class Progression", ratio=1)
+        for level, state, features in self.class_progression_summary_lines(actor):
+            state_style = rich_style_name("light_green") if state == "unlocked" else "dim"
+            progression_table.add_row(f"{level}", Text(state.title(), style=state_style), features)
+
+        subclass_table = Table(box=box.SIMPLE_HEAVY, expand=True, pad_edge=False)
+        subclass_table.add_column("Subclass Path", style=f"bold {rich_style_name('light_aqua')}", width=18)
+        subclass_table.add_column("Focus", ratio=1)
+        for label, description in self.subclass_progression_summary_lines(actor):
+            subclass_table.add_row(label, description)
+
+        skill_table = Table(box=box.SIMPLE_HEAVY, expand=True, pad_edge=False)
+        skill_table.add_column("#", style=f"bold {rich_style_name('light_yellow')}", width=4)
+        skill_table.add_column("Available Skill", ratio=1)
+        for index, skill in enumerate(available, start=1):
+            skill_table.add_row(f"{index}.", skill_option_label(skill))
+
+        footer = Text()
+        footer.append("Type a number to learn that skill. Type ", style="dim")
+        footer.append("back", style=f"bold {rich_style_name('light_yellow')} dim")
+        footer.append(" to return.", style="dim")
+
+        return Panel(
+            Group(
+                header,
+                self.rich_text("", dim=True),
+                progression_table,
+                self.rich_text("", dim=True),
+                subclass_table,
+                self.rich_text("", dim=True),
+                skill_table,
+                self.rich_text("", dim=True),
+                footer,
+            ),
+            title=self.rich_text("Level Up", "light_yellow", bold=True),
+            border_style=rich_style_name("light_yellow"),
+            box=box.ROUNDED,
+            padding=(0, 1),
+        )
+
+    def render_level_up_ui(self, actor: Character, available: list[str], pending_levels: list[int]) -> None:
+        renderable = self.build_level_up_renderable(actor, available, pending_levels)
+        if renderable is not None and self.should_use_rich_ui() and self.emit_rich(renderable, width=self.safe_rich_render_width()):
+            return
+        self.banner("Level Up")
+        self.say(self.level_up_reminder_text() or f"{actor.name} has level-up training waiting.")
+        self.output_fn("Class Progression:")
+        for level, state, features in self.class_progression_summary_lines(actor):
+            self.output_fn(f"  Level {level} [{state}]: {features}")
+        subclass_lines = self.subclass_progression_summary_lines(actor)
+        if subclass_lines:
+            self.output_fn("")
+            self.output_fn("Subclass Paths:")
+            for label, description in subclass_lines:
+                self.output_fn(f"  {label}: {description}")
+        self.output_fn("")
+        self.output_fn("Available Skills:")
+        for index, skill in enumerate(available, start=1):
+            self.output_fn(f"  {index}. {skill_option_label(skill)}")
+        self.output_fn("Type a number to learn that skill, or back.")
+
+    def choose_pending_level_up_skill(self, actor: Character) -> bool:
+        pending_levels = self.pending_player_level_up_skill_levels()
+        available = self.level_up_skill_choices_for(actor)
+        if not pending_levels:
+            self.say("No level-up training is waiting.")
+            return False
+        if not available:
+            self.say(f"{actor.name} has no new {class_label(actor.class_name)} skills available to learn.")
+            self.set_pending_player_level_up_skill_levels([])
+            return False
+
+        while True:
+            raw = self.read_resize_aware_input(
+                lambda: self.render_level_up_ui(actor, available, pending_levels),
+                prompt="level> ",
+            ).strip()
+            lowered = raw.lower()
+            if lowered in {"", "back", "exit", "quit"}:
+                self.say("Level-up training remains available. Type `level` when you are ready.")
+                return False
+            if lowered == "level":
+                self.say("You are already choosing level-up training.")
+                continue
+            if raw.isdigit():
+                choice = int(raw)
+                if 1 <= choice <= len(available):
+                    picked = available[choice - 1]
+                    actor.skill_proficiencies.append(picked)
+                    actor.skill_proficiencies.sort()
+                    self.complete_one_pending_player_level_up_skill_pick()
+                    self.say(f"{actor.name} learns {skill_option_label(picked)}.")
+                    return True
+            self.say("Please enter a listed number, or type back.")
+
+    def open_level_up_menu(self) -> bool:
+        if self.state is None:
+            self.say("There is no active party to train yet.")
+            return False
+        completed = False
+        while self.pending_player_level_up_skill_levels():
+            if not self.level_up_skill_choices_for(self.state.player):
+                self.say(f"{self.state.player.name} has no new {class_label(self.state.player.class_name)} skills available to learn.")
+                self.set_pending_player_level_up_skill_levels([])
+                break
+            if not self.choose_pending_level_up_skill(self.state.player):
+                break
+            completed = True
+        if completed and not self.pending_player_level_up_skill_levels():
+            self.say("Level-up training is complete.")
+        elif not completed and not self.has_pending_player_level_up_choices():
+            self.say("No level-up training is waiting.")
+        return completed
+
+    def handle_meta_command(self, raw: str) -> bool:
+        if raw.strip().lower() == "level":
+            self.open_level_up_menu()
+            return True
+        return super().handle_meta_command(raw)
+
     def companion_subclass_options(self, actor: Character) -> tuple[dict[str, str], ...]:
         if not getattr(actor, "companion_id", ""):
             return ()
@@ -411,7 +640,9 @@ class ProgressionMixin:
             self.say(f"{actor.name} gains {hp_gain} max HP.")
             for line in feature_lines:
                 self.say(line)
-            self.choose_level_up_skill(actor)
+            if self.level_up_skill_choices_for(actor):
+                self.add_pending_player_level_up_skill_pick(new_level)
+                self.say("New class skill training is waiting. Type `level` at any prompt to choose it.")
         else:
             picked = self.auto_choose_level_up_skill(actor)
             summary_parts = [f"{actor.name} gains {hp_gain} max HP"]
@@ -429,7 +660,7 @@ class ProgressionMixin:
             synchronize_class_resources(actor, refill=refill)
 
     def choose_level_up_skill(self, actor: Character) -> None:
-        available = [skill for skill in CLASSES[actor.class_name]["skill_choices"] if skill not in actor.skill_proficiencies]
+        available = self.level_up_skill_choices_for(actor)
         if not available:
             self.say(f"{actor.name} has no new {class_label(actor.class_name)} skills available to learn.")
             return
@@ -444,7 +675,7 @@ class ProgressionMixin:
         self.say(f"{actor.name} learns {skill_option_label(picked)}.")
 
     def auto_choose_level_up_skill(self, actor: Character) -> str | None:
-        available = [skill for skill in CLASSES[actor.class_name]["skill_choices"] if skill not in actor.skill_proficiencies]
+        available = self.level_up_skill_choices_for(actor)
         if not available:
             return None
         picked = available[0]
@@ -453,7 +684,7 @@ class ProgressionMixin:
         return picked
 
     def random_choose_level_up_skill(self, actor: Character) -> str | None:
-        available = [skill for skill in CLASSES[actor.class_name]["skill_choices"] if skill not in actor.skill_proficiencies]
+        available = self.level_up_skill_choices_for(actor)
         if not available:
             return None
         picked = self.rng.choice(available)

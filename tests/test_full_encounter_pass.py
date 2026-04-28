@@ -72,15 +72,16 @@ class FullEncounterPassTests(unittest.TestCase):
 
         for name, result in results.items():
             with self.subTest(name=name):
-                self.assertEqual(len(result.party_actions), 3)
+                self.assertGreaterEqual(len(result.party_actions), 3)
+                self.assertTrue(any(action.action_name.endswith("Arcane Bolt") for action in result.party_actions))
                 self.assertGreater(result.party_expected_damage_per_round, 8.0)
                 self.assertGreater(result.enemy_expected_damage_per_round, 1.0)
                 self.assertLess(result.rounds_to_clear, result.rounds_to_party_defeat)
                 self.assertGreater(result.survival_margin_rounds, 1.0)
 
-        self.assertLessEqual(results["basic raiders"].max_enemy_defense_percent, 10)
+        self.assertLessEqual(results["basic raiders"].max_enemy_defense_percent, 15)
         self.assertGreaterEqual(results["shieldhands"].max_enemy_defense_percent, 40)
-        self.assertGreaterEqual(results["high-Avoidance scouts"].max_enemy_avoidance, 4)
+        self.assertGreaterEqual(results["high-Avoidance scouts"].max_enemy_avoidance, 3)
         self.assertGreaterEqual(results["high-Defense brutes"].max_enemy_defense_percent, 40)
         self.assertIn("Sereth Vane", results["Sereth-style named enemy"].enemy_names)
 
@@ -97,12 +98,12 @@ class FullEncounterPassTests(unittest.TestCase):
             party_armor_break_percent=20,
         )
 
-        self.assertEqual(base.max_enemy_defense_percent, 45)
+        self.assertEqual(base.max_enemy_defense_percent, 55)
         self.assertGreater(broken.party_expected_damage_per_round, base.party_expected_damage_per_round)
         self.assertLess(broken.rounds_to_clear, base.rounds_to_clear * 0.9)
         self.assertTrue(
             any(
-                action.armor_break_percent >= 20 and action.defense_percent <= 25
+                action.armor_break_percent >= 20 and action.defense_percent <= 35
                 for action in broken.party_actions
                 if action.action_name.startswith("Weapon:")
             )

@@ -8,6 +8,7 @@ from ..content import (
     create_rhogar_valeguard,
     create_tolan_ironshield,
 )
+from ..data.story.factories import LEVEL_ONE_ENEMY_HP_BONUS
 from ..data.story.public_terms import marks_label
 from ..items import resolve_item_id
 from ..models import GameState
@@ -36,6 +37,19 @@ class StoryIntroMixin:
 
     def intro_pick_enemy(self, templates, *, name: str | None = None):
         return create_enemy(self.rng.choice(tuple(templates)), name=name)
+
+    def intro_enemy_hp_value(self, enemy, hp: int) -> int:
+        if enemy.level >= 1 and "enemy" in enemy.tags:
+            return hp + LEVEL_ONE_ENEMY_HP_BONUS
+        return hp
+
+    def set_intro_enemy_hp(self, enemy, hp: int) -> None:
+        adjusted_hp = self.intro_enemy_hp_value(enemy, hp)
+        enemy.current_hp = adjusted_hp
+        enemy.max_hp = adjusted_hp
+
+    def set_intro_enemy_current_hp(self, enemy, hp: int) -> None:
+        enemy.current_hp = min(enemy.max_hp, self.intro_enemy_hp_value(enemy, hp))
 
     def opening_tutorial_lesson_flag(self, lesson_key: str) -> str:
         return f"opening_tutorial_lesson_{lesson_key}_complete"
@@ -841,30 +855,30 @@ class StoryIntroMixin:
         if background == "Acolyte":
             self.state.flags["elira_first_read"] = "faith_action"
             self.speaker(
-                "Elira Lanternward",
+                "Elira Dawnmantle",
                 "If your faith can move your hands, I need both. If it only names the pain, pray after.",
             )
         elif background == "Soldier" or class_name == "Warrior":
             self.state.flags["elira_first_read"] = "triage_competence"
             self.speaker(
-                "Elira Lanternward",
+                "Elira Dawnmantle",
                 "You have seen triage before. Good. Then you know the first rule: choose fast and keep breathing.",
             )
         elif background in {"Criminal", "Charlatan"} or class_name == "Rogue":
             self.state.flags["elira_first_read"] = "unwatched_mercy"
             self.speaker(
-                "Elira Lanternward",
+                "Elira Dawnmantle",
                 "No one important is watching this shrine. That makes what you do next more honest, not less.",
             )
         elif background == "Sage" or class_name == "Mage":
             self.state.flags["elira_first_read"] = "knowledge_vs_saving"
             self.speaker(
-                "Elira Lanternward",
+                "Elira Dawnmantle",
                 "Name the poison if you can, but do not mistake knowing it for saving him.",
             )
         else:
             self.state.flags["elira_first_read"] = "steady_hands"
-            self.speaker("Elira Lanternward", "If you can keep your hands steady, I can use them.")
+            self.speaker("Elira Dawnmantle", "If you can keep your hands steady, I can use them.")
 
     def wayside_set_elira_trust(self, route: str, trust: str) -> None:
         assert self.state is not None
@@ -879,16 +893,16 @@ class StoryIntroMixin:
         trust = self.state.flags.get("elira_initial_trust_reason")
         if trust == "warm_trust":
             self.adjust_companion_disposition(elira, 1, "you helped the wounded before asking anything of her")
-            self.speaker("Elira Lanternward", "You helped before I had to ask twice. I remember that.")
+            self.speaker("Elira Dawnmantle", "You helped before I had to ask twice. I remember that.")
         elif trust == "spiritual_kinship":
             self.adjust_companion_disposition(elira, 1, "your prayer made room for action")
-            self.speaker("Elira Lanternward", "You know prayer has to leave the mouth eventually. Good.")
+            self.speaker("Elira Dawnmantle", "You know prayer has to leave the mouth eventually. Good.")
         elif trust == "wary_respect":
             self.adjust_companion_disposition(elira, 1, "you read danger in the road before it announced itself")
-            self.speaker("Elira Lanternward", "You read the road sharply. Keep that edge pointed at the people hurting it.")
+            self.speaker("Elira Dawnmantle", "You read the road sharply. Keep that edge pointed at the people hurting it.")
         elif trust == "reserved_kindness":
             self.speaker(
-                "Elira Lanternward",
+                "Elira Dawnmantle",
                 "You kept moving when the shrine needed hands. I can still walk beside you, but trust will need work.",
             )
 
@@ -908,7 +922,7 @@ class StoryIntroMixin:
             typed=True,
         )
         self.wayside_elira_first_read()
-        self.speaker("Elira Lanternward", "If you are here to pray, kneel. If you are here to help, wash your hands first.")
+        self.speaker("Elira Dawnmantle", "If you are here to pray, kneel. If you are here to help, wash your hands first.")
         choice = self.scenario_choice(
             "How do you help at the roadside shrine?",
             [
@@ -980,7 +994,7 @@ class StoryIntroMixin:
                     self.state.flags["elira_greywake_recruited"] = True
                     self.state.flags["elira_first_companion"] = True
                     self.wayside_apply_elira_trust()
-                    self.speaker("Elira Lanternward", "Then I walk now. The Lantern can keep a shrine; people need hands.")
+                    self.speaker("Elira Dawnmantle", "Then I walk now. The Lantern can keep a shrine; people need hands.")
                     self.state.flags["wayside_luck_bell_promised"] = True
                     self.say(
                         "Elira ties the cracked luck bell once with a green road-ribbon, not as a prayer, "
@@ -989,10 +1003,10 @@ class StoryIntroMixin:
                 else:
                     self.state.flags["elira_wayside_recruit_failed"] = True
                     self.state.flags["elira_iron_hollow_fallback_pending"] = True
-                    self.speaker("Elira Lanternward", "Not yet. I will not leave people bleeding because the road might need me more loudly.")
+                    self.speaker("Elira Dawnmantle", "Not yet. I will not leave people bleeding because the road might need me more loudly.")
             else:
                 self.state.flags["elira_iron_hollow_fallback_pending"] = True
-                self.speaker("Elira Lanternward", "Then I will move the wounded toward the city and trust you to keep the road alive.")
+                self.speaker("Elira Dawnmantle", "Then I will move the wounded toward the city and trust you to keep the road alive.")
         self.state.current_scene = "greywake_triage_yard"
 
     def scene_greywake_triage_yard(self) -> None:
@@ -1012,14 +1026,14 @@ class StoryIntroMixin:
         self.add_clue("Greywake's intake board sorted travelers into outcomes before their wagons reached the yard.")
         if self.has_companion("Elira Dawnmantle"):
             self.speaker(
-                "Elira Lanternward",
+                "Elira Dawnmantle",
                 "Three names. Not cargo, not totals. People with breath still in them, if the Lantern gives us a minute. "
                 "Treat, hold, lost is what you write after hands and eyes have done the work. This ledger has them buried before the wagons arrive. "
                 "Someone is not reporting wounds; they are deciding who gets mercy and who gets erased.",
             )
         elif self.state.flags.get("elira_first_contact"):
             self.speaker(
-                "Elira Lanternward",
+                "Elira Dawnmantle",
                 "I kept the shrine breathing. Now someone has taught the road to decide who survives before it sees them.",
             )
         choice = self.scenario_choice(
@@ -1085,7 +1099,7 @@ class StoryIntroMixin:
 
         if not self.has_companion("Elira Dawnmantle"):
             self.speaker(
-                "Elira Lanternward",
+                "Elira Dawnmantle",
                 "This is not a ledger mistake. If I stay, I treat what someone already decided. If I walk with you, maybe we reach the hand moving the marks.",
             )
             options = [
@@ -1105,14 +1119,14 @@ class StoryIntroMixin:
                     self.recruit_companion(create_elira_dawnmantle())
                     self.state.flags["elira_greywake_recruited"] = True
                     self.state.flags["elira_first_companion"] = True
-                    self.speaker("Elira Lanternward", "Then I stop waiting for the next wound to be carried to me.")
+                    self.speaker("Elira Dawnmantle", "Then I stop waiting for the next wound to be carried to me.")
                 else:
                     self.state.flags["elira_greywake_recruit_failed"] = True
                     self.state.flags["elira_iron_hollow_fallback_pending"] = True
-                    self.speaker("Elira Lanternward", "Not yet. If the Lantern is kind, you will find me in Iron Hollow before the next prayer turns into triage.")
+                    self.speaker("Elira Dawnmantle", "Not yet. If the Lantern is kind, you will find me in Iron Hollow before the next prayer turns into triage.")
             else:
                 self.state.flags["elira_iron_hollow_fallback_pending"] = True
-                self.speaker("Elira Lanternward", "Then I will keep this line breathing and follow the wounded south.")
+                self.speaker("Elira Dawnmantle", "Then I will keep this line breathing and follow the wounded south.")
         self.state.flags["greywake_attack_imminent"] = True
         self.say(
             "The east-rope clerk tries to fold the marked manifest under his coat. A roadwarden badge flashes too cleanly at the gate, "
@@ -1133,8 +1147,7 @@ class StoryIntroMixin:
         if self.act1_party_size() >= 3:
             enemies.append(self.intro_pick_enemy(("goblin_skirmisher", "brand_saboteur")))
         else:
-            enemies[0].current_hp = min(enemies[0].current_hp, 8)
-            enemies[0].max_hp = enemies[0].current_hp
+            self.set_intro_enemy_hp(enemies[0], 8)
         hero_bonus = 0
         if self.state.flags.get("greywake_yard_steadied"):
             hero_bonus += 1
@@ -1268,7 +1281,7 @@ class StoryIntroMixin:
             allow_meta=False,
         )
         enemies = [create_enemy("bandit", name="Ashen Brand Runner")]
-        enemies[0].current_hp = enemies[0].max_hp = 8
+        self.set_intro_enemy_hp(enemies[0], 8)
         hero_bonus = 0
         if choice == 1:
             self.player_action("Hit the gate hard before the runner clears the yard.")
@@ -1282,7 +1295,7 @@ class StoryIntroMixin:
         elif choice == 2:
             self.player_action("Read the panic and pick the only escape lane still open.")
             if self.skill_check(self.state.player, "Insight", 11, context="to identify the true breakout line"):
-                enemies[0].current_hp = 5
+                self.set_intro_enemy_current_hp(enemies[0], 5)
                 hero_bonus = 1
                 self.say("You ignore the decoy panic and ruin the runner's best chance to disappear.")
             else:
@@ -1326,7 +1339,7 @@ class StoryIntroMixin:
             allow_meta=False,
         )
         enemies = [create_enemy("wolf")]
-        enemies[0].current_hp = enemies[0].max_hp = 8
+        self.set_intro_enemy_hp(enemies[0], 8)
         if choice == 1:
             self.player_action("Stabilize the poisoned teamster before the details vanish with them.")
             if self.skill_check(self.state.player, "Medicine", 11, context="to keep the poison from closing the throat"):
@@ -1412,7 +1425,7 @@ class StoryIntroMixin:
                 return
             self.say("Your fingers are quick, but not quick enough to keep the room from erupting.")
         enemies = [create_enemy("bandit", name="Ashen Brand Collector")]
-        enemies[0].current_hp = enemies[0].max_hp = 9
+        self.set_intro_enemy_hp(enemies[0], 9)
         if not self.resolve_background_encounter(
             title="Low Docks Warehouse",
             description="An Ashen Brand collector finally decides the room would be safer if you stopped breathing.",
@@ -1464,7 +1477,7 @@ class StoryIntroMixin:
             return
         self.say("You solve enough of the pattern to know the theft matters, but not fast enough to stop the getaway cleanly.")
         enemies = [create_enemy("bandit_archer", name="Archive Cutout")]
-        enemies[0].current_hp = enemies[0].max_hp = 7
+        self.set_intro_enemy_hp(enemies[0], 7)
         if not self.resolve_background_encounter(
             title="Archive Stair",
             description="A hired cutout bolts for the service stair with copied ruin plans under one arm.",
@@ -1498,8 +1511,8 @@ class StoryIntroMixin:
             self.intro_pick_enemy(("goblin_skirmisher", "cinder_kobold")),
             self.intro_pick_enemy(("wolf", "mireweb_spider")),
         ]
-        enemies[0].current_hp = enemies[0].max_hp = 5
-        enemies[1].current_hp = enemies[1].max_hp = 7
+        self.set_intro_enemy_hp(enemies[0], 5)
+        self.set_intro_enemy_hp(enemies[1], 7)
         hero_bonus = 0
         if choice == 1:
             self.player_action("Set your ground where the tracks say they will come through.")
@@ -1518,7 +1531,7 @@ class StoryIntroMixin:
         else:
             self.player_action("Ghost into the brush and strike from the line they think is empty.")
             if self.skill_check(self.state.player, "Stealth", 11, context="to disappear from the camp's expected defense line"):
-                enemies[0].current_hp = 3
+                self.set_intro_enemy_current_hp(enemies[0], 3)
                 hero_bonus = 1
                 self.say("Your first strike lands before the goblin can decide whether this camp is prey or trap.")
             else:
@@ -1573,7 +1586,7 @@ class StoryIntroMixin:
             return
         self.say("The read is close, but not close enough, and the fixer reaches for steel rather than pride.")
         enemies = [create_enemy("bandit", name="Ashen Brand Fixer")]
-        enemies[0].current_hp = enemies[0].max_hp = 8
+        self.set_intro_enemy_hp(enemies[0], 8)
         if not self.resolve_background_encounter(
             title="Market Corner",
             description="The fixer decides a crowded market is still quiet enough for one quick killing blow.",
@@ -1605,7 +1618,7 @@ class StoryIntroMixin:
             allow_meta=False,
         )
         enemies = [create_enemy("bandit_archer", name="Ashen Brand Teamster")]
-        enemies[0].current_hp = enemies[0].max_hp = 8
+        self.set_intro_enemy_hp(enemies[0], 8)
         if choice == 1:
             self.player_action("Audit the manifests until the missing route shows its shape.")
             if self.skill_check(self.state.player, "Investigation", 11, context="to catch where the numbers stop being honest"):
@@ -1665,7 +1678,7 @@ class StoryIntroMixin:
             allow_meta=False,
         )
         enemies = [self.intro_pick_enemy(("goblin_skirmisher", "cinder_kobold"))]
-        enemies[0].current_hp = enemies[0].max_hp = 5
+        self.set_intro_enemy_hp(enemies[0], 5)
         if choice == 1:
             self.player_action("Stabilize the courier before whatever hunted them closes the distance.")
             if self.skill_check(self.state.player, "Medicine", 11, context="to keep the courier conscious long enough to speak clearly"):
@@ -1807,7 +1820,7 @@ class StoryIntroMixin:
             (self.state.flags.get("elira_first_contact") or self.has_companion("Elira Dawnmantle"))
             and not self.state.flags.get("mira_q_elira_initial")
         ):
-            options.append(("elira", "\"You know Elira Lanternward?\""))
+            options.append(("elira", "\"You know Elira Dawnmantle?\""))
         if self.mira_city_beneficiary_question_available() and not self.state.flags.get("mira_q_city_initial"):
             options.append(("city", "\"Who inside the city benefits from this?\""))
         if self.mira_need_question_available() and not self.state.flags.get("mira_q_need_initial"):
@@ -1999,7 +2012,7 @@ class StoryIntroMixin:
                 "I know of her. the Lantern's clergy tend to look harmless right up until they become the only reason a road still has witnesses.",
             )
             self.speaker(
-                "Elira Lanternward",
+                "Elira Dawnmantle",
                 "Harmless is what people call you when they have never watched you choose who gets the last clean bandage. I prefer useful.",
             )
             self.speaker(
@@ -2007,7 +2020,7 @@ class StoryIntroMixin:
                 "If Dawnmantle chose to walk with you, she saw the same thing I see: the wounded are not aftermath anymore. They are evidence someone keeps trying to erase.",
             )
             self.speaker(
-                "Elira Lanternward",
+                "Elira Dawnmantle",
                 "The wounded are people first. If their pain becomes proof, it is because someone tried to bury them with it.",
             )
         elif self.state.flags.get("elira_iron_hollow_fallback_pending"):
@@ -2030,7 +2043,7 @@ class StoryIntroMixin:
             self.speaker("Mira Thann", "So she waited until the town itself became the patient. That sounds like Dawnmantle. Do not waste what it cost her to leave.")
         if self.has_companion("Elira Dawnmantle"):
             self.speaker(
-                "Elira Lanternward",
+                "Elira Dawnmantle",
                 "Trust me with breath, blood, and bad odds. Do not trust me to bless a lie because it would make the room easier to stand in.",
             )
         self.speaker("Mira Thann", "With a life, yes. With an easy lie, no. That is usually the better arrangement.")
@@ -2861,7 +2874,7 @@ class StoryIntroMixin:
             typed=True,
         )
         self.speaker(
-            "Elira Lanternward",
+            "Elira Dawnmantle",
             "If the road is teaching its wounds this close to the city, then Iron Hollow will be seeing worse by nightfall.",
         )
         choice = self.scenario_choice(
@@ -2933,13 +2946,13 @@ class StoryIntroMixin:
                 self.recruit_companion(create_elira_dawnmantle())
                 self.state.flags["elira_greywake_recruited"] = True
                 self.state.flags["shrine_recruit_attempted"] = True
-                self.speaker("Elira Lanternward", "Then I walk now. The Lantern can keep a shrine; people need hands.")
+                self.speaker("Elira Dawnmantle", "Then I walk now. The Lantern can keep a shrine; people need hands.")
             else:
                 self.state.flags["greywake_elira_recruit_failed"] = True
-                self.speaker("Elira Lanternward", "Not yet. Earn the road's trust, and ask me again in Iron Hollow.")
+                self.speaker("Elira Dawnmantle", "Not yet. Earn the road's trust, and ask me again in Iron Hollow.")
         else:
             self.state.flags["elira_greywake_available_in_iron_hollow"] = True
-            self.speaker("Elira Lanternward", "Then I will finish here and follow the wounded south. We may meet again before the day is done.")
+            self.speaker("Elira Dawnmantle", "Then I will finish here and follow the wounded south. We may meet again before the day is done.")
 
     def handle_greywake_emberway_milehouse(self) -> None:
         assert self.state is not None
@@ -2957,7 +2970,7 @@ class StoryIntroMixin:
         if self.act1_party_size() >= 3:
             enemies.append(create_enemy("bandit"))
         else:
-            enemies[0].current_hp = enemies[0].max_hp = 7
+            self.set_intro_enemy_hp(enemies[0], 7)
         hero_bonus = 0
         choice = self.scenario_choice(
             "Which path do you secure from the milehouse?",
@@ -3035,7 +3048,7 @@ class StoryIntroMixin:
         if self.act1_party_size() >= 3:
             enemies.append(create_enemy("bandit_archer"))
         else:
-            enemies[0].current_hp = enemies[0].max_hp = 6
+            self.set_intro_enemy_hp(enemies[0], 6)
         hero_bonus = 0
         choice = self.scenario_choice(
             "How do you handle the signal cairn?",
@@ -3690,8 +3703,8 @@ class StoryIntroMixin:
                     self.intro_pick_enemy(("goblin_skirmisher", "cinder_kobold")),
                     self.intro_pick_enemy(("wolf", "mireweb_spider")),
                 ]
-                enemies[0].current_hp = enemies[0].max_hp = 5
-                enemies[1].current_hp = enemies[1].max_hp = 5
+                self.set_intro_enemy_hp(enemies[0], 5)
+                self.set_intro_enemy_hp(enemies[1], 5)
                 hero_bonus = 2
                 self.state.player.temp_hp = max(self.state.player.temp_hp, 6)
                 self.apply_status(self.state.player, "blessed", 1, source="the guard's desperate cover")
@@ -3704,7 +3717,7 @@ class StoryIntroMixin:
                     self.intro_pick_enemy(("goblin_skirmisher", "cinder_kobold")),
                     self.intro_pick_enemy(("wolf", "mireweb_spider")),
                 ]
-                enemies[1].current_hp = enemies[1].max_hp = 7
+                self.set_intro_enemy_hp(enemies[1], 7)
                 hero_bonus = 1
                 self.say("The wounded guard buys your smaller company a narrow opening before the ambush can fully close.")
             else:
@@ -3847,8 +3860,7 @@ class StoryIntroMixin:
             party_size = len(self.state.party_members())
             if party_size <= 2:
                 enemies = [create_enemy("bandit"), self.intro_pick_enemy(("goblin_skirmisher", "cinder_kobold"))]
-                enemies[0].current_hp = min(enemies[0].current_hp, 9)
-                enemies[0].max_hp = min(enemies[0].max_hp, 9)
+                self.set_intro_enemy_hp(enemies[0], 9)
                 hero_bonus = 1
             elif party_size == 3:
                 enemies = [create_enemy("ash_brand_enforcer"), self.intro_pick_enemy(("goblin_skirmisher", "cinder_kobold"))]

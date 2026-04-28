@@ -14,7 +14,7 @@ Runtime subclass focus now prunes companion feature grants. Player-built version
 | --- | --- | --- | --- | --- | --- | --- |
 | Tolan Ironshield | `tolan_ironshield` | Fighter | Warrior | Juggernaut | Weapon Master | shield wall, Guard tank, Fixated control |
 | Bryn Underbough | `bryn_underbough` | Rogue | Rogue | Shadowguard | Assassin | avoidance tank, decoys, exposed targets |
-| Elira Lanternward | `elira_dawnmantle` | Cleric | Mage | Aethermancer | Spellguard | healer, Ward overflow, condition repair |
+| Elira Dawnmantle | `elira_dawnmantle` | Cleric | Mage | Aethermancer | Spellguard | healer, Ward overflow, condition repair |
 | Kaelis Starling | `kaelis_starling` | Ranger | Rogue | Assassin | Shadowguard | ranged opener, Death Mark, scout pressure |
 | Rhogar Valeguard | `rhogar_valeguard` | Paladin | Warrior | Bloodreaver | Juggernaut | oath mark, ally sustain, armored pressure |
 | Nim Ardentglass | `nim_ardentglass` | Wizard | Mage | Arcanist | Spellguard | Pattern Read, Arc setup, force damage |
@@ -63,13 +63,13 @@ Implementation test:
 - verify False Target and Smoke Pin interact with Edge and Shadow
 - verify her opener still grants a stealth or ambush advantage without breaking Rogue resource setup
 
-### Elira Lanternward
+### Elira Dawnmantle
 
 Elira should move from Cleric to Mage with an Aethermancer focus. Her Lantern work becomes field medicine, breath control, triage marks, and Ward overflow. She keeps the language of mercy because her mechanics now make mercy practical under pressure.
 
 Mechanical target:
 - runtime id remains `elira_dawnmantle`
-- public text should use Elira Lanternward where the retcon pass touches prose
+- public text should use Elira Dawnmantle where the retcon pass touches prose
 - `class_name`: `Mage`
 - `spellcasting_ability`: `WIS`
 - preferred resources: MP, Flow, Ward
@@ -192,7 +192,7 @@ Bryn already uses Rogue. Start here to prove companion leveling still exposes th
 
 Convert Fighter to Warrior and test Guard, shield Defense, Grit, Momentum, and companion opener support.
 
-3. Elira Lanternward
+3. Elira Dawnmantle
 
 Convert Cleric to Mage/Aethermancer because she carries the party's healer expectation. Verify Wisdom-based healing before touching the other Mage companions.
 

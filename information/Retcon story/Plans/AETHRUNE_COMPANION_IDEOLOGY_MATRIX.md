@@ -33,7 +33,7 @@ Runtime ids can remain save-safe for now:
 
 | Public name | Current runtime id / internal name |
 | --- | --- |
-| Elira Lanternward | `elira_dawnmantle` / `Elira Dawnmantle` |
+| Elira Dawnmantle | `elira_dawnmantle` / `Elira Dawnmantle` |
 | Tolan Ironshield | `tolan_ironshield` |
 | Bryn Underbough | `bryn_underbough` |
 | Kaelis Starling | `kaelis_starling` |
@@ -45,7 +45,7 @@ Runtime ids can remain save-safe for now:
 
 | Companion | Primary lane | Secondary pull | Core wound | What they want from Aethrune | What they fear most |
 | --- | --- | --- | --- | --- | --- |
-| Elira Lanternward | Lantern Faith | Remembered | the road teaches people to treat losses as acceptable paperwork | a world where witness, mercy, and the dead still count | a restored order that functions by making sacrifice feel normal |
+| Elira Dawnmantle | Lantern Faith | Remembered | the road teaches people to treat losses as acceptable paperwork | a world where witness, mercy, and the dead still count | a restored order that functions by making sacrifice feel normal |
 | Bryn Underbough | Free Path | practical survivor ethics | authority usually protects itself first | routes no one faction can own completely | becoming trapped under a structure that calls obedience safety |
 | Tolan Ironshield | civic duty under strain | Council pragmatism | too many promises failed after people trusted the line would hold | dependable protection that ordinary people can build life around | abstraction outranking the living people immediately at risk |
 | Kaelis Starling | pattern-reading truth | cautious civic trust | he once trusted the wrong map and paid for it in lives | honest routes, honest signals, and leaders who listen to evidence | institutions forcing false certainty onto unstable ground |
@@ -57,7 +57,7 @@ Runtime ids can remain save-safe for now:
 
 Use these as the default approval logic for scene writing.
 
-### Elira Lanternward
+### Elira Dawnmantle
 
 Wins trust when the player:
 - rescues witnesses, captives, or civilians
@@ -161,7 +161,7 @@ These are the preferred personal-quest outcome lanes.
 
 | Companion | State A | State B | State C |
 | --- | --- | --- | --- |
-| Elira Lanternward | hopeful witness | burdened healer | hardened mercy |
+| Elira Dawnmantle | hopeful witness | burdened healer | hardened mercy |
 | Bryn Underbough | loyal freehand | opportunist survivor | escaped self |
 | Tolan Ironshield | mentor | hardened wall | fatalist veteran |
 | Kaelis Starling | balanced scout | decisive hunter | paranoid cartographer |

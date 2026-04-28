@@ -227,6 +227,13 @@ def add_damage_bonus(distribution: dict[int, float], bonus: int) -> dict[int, fl
     return {total + bonus: chance for total, chance in distribution.items()}
 
 
+def multiply_damage_distribution(distribution: dict[int, float], multiplier: int) -> dict[int, float]:
+    multiplier = max(1, int(multiplier))
+    if multiplier == 1:
+        return dict(distribution)
+    return {total * multiplier: chance for total, chance in distribution.items()}
+
+
 def half_damage_distribution(distribution: dict[int, float]) -> dict[int, float]:
     totals: dict[int, float] = defaultdict(float)
     for total, chance in distribution.items():
@@ -507,7 +514,74 @@ def save_damage_action_simulation(
     )
 
 
-def mage_offensive_action_candidates(game, actor, target) -> list[OffensiveActionSimulation]:
+def attack_damage_action_simulation(
+    game,
+    caster,
+    target,
+    *,
+    action_name: str,
+    damage_expression: str,
+    damage_type: str,
+    accuracy_bonus: int,
+    damage_bonus: int = 0,
+    damage_multiplier: int = 1,
+    advantage_state: int = 0,
+    cooldown_cycle_turns: int = 1,
+) -> OffensiveActionSimulation:
+    target_number = game.effective_attack_target_number(target)
+    critical_threshold = game.critical_threshold(caster) if hasattr(game, "critical_threshold") else 20
+    attack_roll = simulate_attack_roll(
+        target_number=target_number,
+        accuracy_bonus=accuracy_bonus,
+        advantage_state=advantage_state,
+        critical_threshold=critical_threshold,
+        lucky="lucky" in getattr(caster, "features", []),
+        critical_immunity=bool(getattr(target, "gear_bonuses", {}).get("crit_immunity", 0)),
+    )
+    normal_distribution = multiply_damage_distribution(
+        add_damage_bonus(dice_total_distribution(damage_expression), damage_bonus),
+        damage_multiplier,
+    )
+    critical_distribution = multiply_damage_distribution(
+        add_damage_bonus(dice_total_distribution(damage_expression, critical=True), damage_bonus),
+        damage_multiplier,
+    )
+    normal_expected, _, normal_wound = simulate_damage_after_defense(
+        game,
+        target,
+        normal_distribution,
+        damage_type=damage_type,
+        defense_percent=0,
+    )
+    critical_expected, _, critical_wound = simulate_damage_after_defense(
+        game,
+        target,
+        critical_distribution,
+        damage_type=damage_type,
+        defense_percent=0,
+    )
+    expected_hp_damage = (
+        attack_roll.normal_hit_chance * normal_expected
+        + attack_roll.critical_chance * critical_expected
+    ) / max(1, cooldown_cycle_turns)
+    wound_chance = (
+        attack_roll.normal_hit_chance * normal_wound
+        + attack_roll.critical_chance * critical_wound
+    ) / max(1, cooldown_cycle_turns)
+    return OffensiveActionSimulation(
+        actor_name=caster.name,
+        target_name=target.name,
+        action_name=action_name,
+        expected_hp_damage=expected_hp_damage,
+        hit_chance=attack_roll.hit_chance,
+        miss_chance=attack_roll.miss_chance,
+        wound_chance=wound_chance,
+        defense_percent=0,
+        armor_break_percent=0,
+    )
+
+
+def mage_offensive_action_candidates(game, actor, target, *, heroes: list | None = None, enemies: list | None = None) -> list[OffensiveActionSimulation]:
     if not hasattr(game, "mage_channel_dc"):
         return []
     features = set(getattr(actor, "features", []))
@@ -526,7 +600,7 @@ def mage_offensive_action_candidates(game, actor, target) -> list[OffensiveActio
         specs.append(("Volt Grasp", "1d8", "CON", "lightning"))
     if "blue_glass_palm" in features:
         specs.append(("Blue Glass Palm", "1d6", "STR", "force"))
-    return [
+    candidates = [
         save_damage_action_simulation(
             game,
             actor,
@@ -539,6 +613,66 @@ def mage_offensive_action_candidates(game, actor, target) -> list[OffensiveActio
             damage_bonus=spell_damage_bonus,
         )
         for name, damage, save_ability, damage_type in specs
+    ]
+    if "arcane_bolt" in features and hasattr(game, "arcane_bolt_damage_expression"):
+        damage_bonus = max(0, actor.ability_mod("INT"))
+        if hasattr(game, "spell_damage_bonus"):
+            damage_bonus += game.spell_damage_bonus(actor)
+        accuracy_bonus = (
+            game.spell_attack_bonus(actor, "INT")
+            + game.ally_pressure_bonus(actor, heroes or [actor], ranged=True)
+            + game.status_accuracy_modifier(actor)
+            + game.attack_focus_modifier(actor, target)
+            + game.target_accuracy_modifier(target)
+        )
+        advantage = game.attack_advantage_state(actor, target, heroes or [actor], enemies or [], frozenset(), ranged=True)
+        candidates.append(
+            attack_damage_action_simulation(
+                game,
+                actor,
+                target,
+                action_name="Action: Arcane Bolt",
+                damage_expression=game.arcane_bolt_damage_expression(actor),
+                damage_type="force",
+                accuracy_bonus=accuracy_bonus,
+                damage_bonus=damage_bonus,
+                damage_multiplier=2,
+                advantage_state=advantage,
+                cooldown_cycle_turns=3,
+            )
+        )
+    return candidates
+
+
+def mage_bonus_offensive_action_candidates(game, actor, target, *, heroes: list, enemies: list) -> list[OffensiveActionSimulation]:
+    features = set(getattr(actor, "features", []))
+    if "arcane_bolt" not in features or not hasattr(game, "arcane_bolt_damage_expression"):
+        return []
+    damage_bonus = max(0, actor.ability_mod("INT"))
+    if hasattr(game, "spell_damage_bonus"):
+        damage_bonus += game.spell_damage_bonus(actor)
+    accuracy_bonus = (
+        game.spell_attack_bonus(actor, "INT")
+        + game.ally_pressure_bonus(actor, heroes, ranged=True)
+        + game.status_accuracy_modifier(actor)
+        + game.attack_focus_modifier(actor, target)
+        + game.target_accuracy_modifier(target)
+    )
+    advantage = game.attack_advantage_state(actor, target, heroes, enemies, frozenset(), ranged=True)
+    return [
+        attack_damage_action_simulation(
+            game,
+            actor,
+            target,
+            action_name="Bonus: Arcane Bolt",
+            damage_expression=game.arcane_bolt_damage_expression(actor),
+            damage_type="force",
+            accuracy_bonus=accuracy_bonus,
+            damage_bonus=damage_bonus,
+            damage_multiplier=1,
+            advantage_state=advantage,
+            cooldown_cycle_turns=3,
+        )
     ]
 
 
@@ -568,7 +702,7 @@ def best_offensive_action(
             )
         )
         if getattr(attacker, "class_name", "") == "Mage":
-            candidates.extend(mage_offensive_action_candidates(game, attacker, target))
+            candidates.extend(mage_offensive_action_candidates(game, attacker, target, heroes=heroes, enemies=enemies))
     if not candidates:
         return None
     return max(
@@ -577,6 +711,32 @@ def best_offensive_action(
             action.expected_hp_damage,
             action.wound_chance,
             action.hit_chance if action.hit_chance is not None else 1 - (action.save_success_chance or 0.0),
+        ),
+    )
+
+
+def best_bonus_offensive_action(
+    game,
+    attacker,
+    targets: list,
+    *,
+    heroes: list,
+    enemies: list,
+) -> OffensiveActionSimulation | None:
+    candidates: list[OffensiveActionSimulation] = []
+    for target in targets:
+        if not target.is_conscious():
+            continue
+        if getattr(attacker, "class_name", "") == "Mage":
+            candidates.extend(mage_bonus_offensive_action_candidates(game, attacker, target, heroes=heroes, enemies=enemies))
+    if not candidates:
+        return None
+    return max(
+        candidates,
+        key=lambda action: (
+            action.expected_hp_damage,
+            action.wound_chance,
+            action.hit_chance if action.hit_chance is not None else 0.0,
         ),
     )
 
@@ -591,22 +751,30 @@ def simulate_encounter_pass(
 ) -> EncounterPassSimulation:
     living_party = [actor for actor in party if actor.is_conscious()]
     living_enemies = [actor for actor in enemies if actor.is_conscious()]
-    party_actions = tuple(
-        action
-        for action in (
-            best_offensive_action(
+    party_action_list: list[OffensiveActionSimulation] = []
+    for actor in living_party:
+        main_action = best_offensive_action(
+            game,
+            actor,
+            living_enemies,
+            heroes=living_party,
+            enemies=living_enemies,
+            attacker_allies=living_party,
+            armor_break_percent=party_armor_break_percent,
+        )
+        if main_action is not None:
+            party_action_list.append(main_action)
+        if main_action is None or main_action.action_name != "Action: Arcane Bolt":
+            bonus_action = best_bonus_offensive_action(
                 game,
                 actor,
                 living_enemies,
                 heroes=living_party,
                 enemies=living_enemies,
-                attacker_allies=living_party,
-                armor_break_percent=party_armor_break_percent,
             )
-            for actor in living_party
-        )
-        if action is not None
-    )
+            if bonus_action is not None:
+                party_action_list.append(bonus_action)
+    party_actions = tuple(party_action_list)
     enemy_actions = tuple(
         action
         for action in (

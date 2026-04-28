@@ -44,7 +44,7 @@ Deities may be:
 - Community gatherings at Lantern Posts
 
 ## Followers
-- Elira Lanternward
+- Elira Dawnmantle
 - civilians of Iron Hollow
 
 ## Themes
