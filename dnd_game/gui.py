@@ -35,7 +35,7 @@ from kivy.uix.textinput import TextInput
 from kivy.uix.widget import Widget
 
 from .game import TextDnDGame
-from .gameplay.base import QuitProgram
+from .gameplay.base import QuitProgram, ReturnToTitleMenu
 from .gameplay.constants import MENU_PAGE_SIZE
 from .data.story.companions import COMPANION_PROFILES
 from .drafts.map_system import ACT1_HYBRID_MAP, ACT2_ENEMY_DRIVEN_MAP
@@ -954,7 +954,7 @@ class NativeCommandWorkspace(BoxLayout):
         width = self.width
         if width <= dp(80):
             width = getattr(self.screen, "width", width)
-        return width < dp(620)
+        return width < dp(240)
 
     def _split_body(
         self,
@@ -1187,6 +1187,18 @@ class NativeCommandWorkspace(BoxLayout):
     def _stat_line(self, label: str, value: str) -> str:
         return f"[b][color=#d6c59a]{escape_kivy_markup(label)}[/color][/b] {escape_kivy_markup(value)}"
 
+    def _member_health_text(self, member) -> str:
+        current_hp = max(0, int(getattr(member, "current_hp", 0)))
+        max_hp = max(0, int(getattr(member, "max_hp", 0)))
+        temp_hp = max(0, int(getattr(member, "temp_hp", 0)))
+        suffix = ""
+        if getattr(member, "dead", False):
+            suffix = " (dead)"
+        elif current_hp == 0:
+            suffix = " (down)"
+        temp = f", temp {temp_hp}" if temp_hp else ""
+        return f"HP {current_hp}/{max_hp}{temp}{suffix}"
+
     def render_journal(self, *, section_index: int | None = None) -> None:
         self._activate_mode("journal")
         if section_index is not None:
@@ -1290,6 +1302,14 @@ class NativeCommandWorkspace(BoxLayout):
         output.extend(f"{index}. {escape_kivy_markup(line)}" for index, line in enumerate(lines, start=1))
         return "\n".join(output)
 
+    def _inventory_filter_button_text(self, filter_snapshot) -> str:
+        count = max(0, int(getattr(filter_snapshot, "count", 0)))
+        noun = "item" if count == 1 else "items"
+        return (
+            f"[b]{escape_kivy_markup(filter_snapshot.label)}[/b]\n"
+            f"[size=10sp]{count} {noun}[/size]"
+        )
+
     def _journal_updates_markup(self, snapshot) -> str:
         lines = ["[size=17sp][b][color=#facc15]Recent Updates[/color][/b][/size]", ""]
         if not snapshot.recent_updates:
@@ -1326,14 +1346,13 @@ class NativeCommandWorkspace(BoxLayout):
         if feedback is not None:
             self.add_widget(feedback)
 
-        filter_grid = GridLayout(cols=4, rows=2, spacing=dp(5), size_hint_y=None, height=dp(76))
+        filter_grid = GridLayout(cols=2, rows=4, spacing=dp(5), size_hint_y=None, height=dp(172))
         for filter_snapshot in snapshot.filters:
-            text = f"{escape_kivy_markup(filter_snapshot.label)}\n[size=11sp]{filter_snapshot.count}[/size]"
             filter_grid.add_widget(
                 self._button(
-                    text,
+                    self._inventory_filter_button_text(filter_snapshot),
                     lambda key=filter_snapshot.key: self.render_inventory(filter_key=key),
-                    height=34,
+                    height=38,
                     font_size="11sp",
                     selected=filter_snapshot.key == snapshot.filter_key,
                 )
@@ -1437,7 +1456,7 @@ class NativeCommandWorkspace(BoxLayout):
             if not targets:
                 grid.add_widget(self._label("[color=#8f7d62]No valid target right now.[/color]", font_size="12sp"))
             for target_index, target in targets:
-                label = f"{escape_kivy_markup(target.name)}\n[size=11sp]{escape_kivy_markup(game.character_health_summary(target))}[/size]"
+                label = f"{escape_kivy_markup(target.name)}\n[size=11sp]{escape_kivy_markup(self._member_health_text(target))}[/size]"
                 grid.add_widget(
                     self._button(
                         label,
@@ -3492,9 +3511,64 @@ class ClickableTextDnDGame(TextDnDGame):
             "gear",
         }
 
+    def open_kivy_quit_menu(self) -> bool:
+        active_adventure = bool(
+            getattr(self, "state", None) is not None
+            and not getattr(self, "_at_title_screen", False)
+        )
+        options = ["Quit to Main Menu", "Quit to Desktop", "Back"] if active_adventure else ["Quit to Desktop", "Back"]
+        display_options = [self.format_option_text(option) for option in options]
+        while True:
+            raw = self.bridge.request_choice("Quit menu.", display_options).strip()
+            if raw == KIVY_SIDE_COMMAND_CLOSE_TOKEN:
+                self.handle_kivy_close_token()
+                continue
+            normalized = " ".join(raw.strip().lower().split())
+            selected = ""
+            if raw.isdigit():
+                value = int(raw)
+                if 1 <= value <= len(options):
+                    selected = options[value - 1]
+            else:
+                aliases = {
+                    "quit to main menu": "Quit to Main Menu",
+                    "main menu": "Quit to Main Menu",
+                    "menu": "Quit to Main Menu",
+                    "quit to title": "Quit to Main Menu",
+                    "title": "Quit to Main Menu",
+                    "title screen": "Quit to Main Menu",
+                    "quit to desktop": "Quit to Desktop",
+                    "desktop": "Quit to Desktop",
+                    "exit": "Quit to Desktop",
+                    "close": "Quit to Desktop",
+                    "back": "Back",
+                    "cancel": "Back",
+                    "stay": "Back",
+                }
+                selected = aliases.get(normalized, "")
+                if selected not in options:
+                    selected = ""
+
+            if selected == "Quit to Main Menu":
+                self.state = None
+                self._compact_hud_last_scene_key = None
+                raise ReturnToTitleMenu()
+            if selected == "Quit to Desktop":
+                self.bridge.close_app_on_finish()
+                raise QuitProgram()
+            if selected == "Back":
+                if active_adventure:
+                    self.say("You stay with the current adventure.")
+                else:
+                    self.say("You remain at the main menu.")
+                return True
+            self.say("Please choose one of the listed quit options.")
+
     def handle_meta_command(self, raw: str) -> bool:
+        normalized = " ".join(str(raw).strip().lower().split())
+        if normalized == "quit":
+            return self.open_kivy_quit_menu()
         if self.kivy_should_show_native_command(raw):
-            normalized = " ".join(str(raw).strip().lower().split())
             self.bridge.show_native_command(normalized)
             return True
         if not self.kivy_should_route_command_to_side(raw):
@@ -3965,6 +4039,8 @@ class GameScreen(BoxLayout):
     COMMAND_BUTTON_FONT_SIZE = "12sp"
     COMMAND_BAR_HEIGHT = 34
     COMMAND_BAR_ANIMATION_SECONDS = 0.18
+    RIGHT_PANEL_WIDTH_FRACTION = 0.40
+    NATIVE_COMMAND_PANEL_WIDTH_FRACTION = 0.40
     TITLE_MENU_TRANSITION_SECONDS = 0.38
     COMMANDS = [
         "load",
@@ -3998,6 +4074,7 @@ class GameScreen(BoxLayout):
         "panel": (0.08, 0.07, 0.055, 1),
         "options": (0.11, 0.13, 0.10, 1),
         "combat": (0.075, 0.075, 0.085, 1),
+        "examine": (0.035, 0.105, 0.100, 1),
         "title_panel": (0.035, 0.070, 0.073, 1),
         "title_info_panel": (0.025, 0.052, 0.055, 0.96),
         "title_info_header": (0.44, 0.84, 0.81, 1),
@@ -4044,6 +4121,7 @@ class GameScreen(BoxLayout):
         "panel": (0.97, 0.93, 0.82, 1),
         "options": (0.89, 0.82, 0.66, 1),
         "combat": (0.91, 0.86, 0.75, 1),
+        "examine": (0.78, 0.89, 0.84, 1),
         "title_panel": (0.84, 0.91, 0.88, 1),
         "title_info_panel": (0.78, 0.87, 0.84, 1),
         "title_info_header": (0.05, 0.36, 0.36, 1),
@@ -4158,6 +4236,9 @@ class GameScreen(BoxLayout):
         self._title_menu_transition_active = False
         self._main_title_menu_active = False
         self._command_bar_visible = False
+        self._input_row_visible = False
+        self._console_drawer_visible = False
+        self._active_text_prompt_is_console = False
         self.kivy_dark_mode_enabled = self.load_kivy_dark_mode_setting()
         self.kivy_fullscreen_enabled = self.load_kivy_fullscreen_setting()
         self.command_buttons: list[Button] = []
@@ -4424,10 +4505,11 @@ class GameScreen(BoxLayout):
 
         self.examine_shell = PanelBox(
             orientation="vertical",
-            size_hint=(0.4, 1),
+            size_hint=(1, None),
+            height=0,
             padding=[dp(8), dp(6), dp(8), dp(8)],
             spacing=dp(5),
-            background_color=(0.075, 0.075, 0.085, 1),
+            background_color=self.theme["examine"],
             radius=6,
             opacity=0,
             disabled=True,
@@ -4539,8 +4621,6 @@ class GameScreen(BoxLayout):
         self.combat_panel.add_widget(self.command_workspace)
         self.combat_panel.add_widget(self.combat_stats_scroll)
         self.add_widget(self.main_body)
-        self.add_widget(self.prompt_label)
-        self.add_widget(self.options_area)
 
         self.input_row = BoxLayout(size_hint_y=None, height=dp(42), spacing=dp(6))
         self.text_input = TextInput(
@@ -4569,7 +4649,6 @@ class GameScreen(BoxLayout):
         self._bind_fixed_button_alignment(self.send_button)
         self.send_button.bind(on_release=lambda *_args: self.submit_text())
         self.input_row.add_widget(self.send_button)
-        self.add_widget(self.input_row)
 
         self.commands = GridLayout(
             rows=1,
@@ -4592,16 +4671,17 @@ class GameScreen(BoxLayout):
             self._apply_font(button, "ui")
             self._bind_fixed_button_alignment(button)
             button.bind(on_release=lambda _btn, value=command: self.submit_command(value))
+            button._kivy_command_name = command
             self.command_buttons.append(button)
             self.command_buttons_by_command[command] = button
             self.commands.add_widget(button)
+        self.add_widget(self.prompt_label)
+        self.add_widget(self.options_area)
         self.add_widget(self.commands)
         self._standard_widgets = [
-            self.header,
             self.main_body,
             self.prompt_label,
             self.options_area,
-            self.input_row,
             self.commands,
         ]
         self._apply_text_window_mode(side_visible=False)
@@ -4774,14 +4854,108 @@ class GameScreen(BoxLayout):
         self.side_command_header.opacity = 1 if visible else 0
         self.side_command_header.disabled = not visible
 
+    def _set_prompt_controls_docked_to_left(self, docked: bool) -> None:
+        controls = (self.prompt_label, self.options_area, self.commands)
+        if docked:
+            for widget in controls:
+                if widget.parent is self:
+                    self.remove_widget(widget)
+                elif widget.parent is not None and widget.parent is not self.left_column:
+                    widget.parent.remove_widget(widget)
+            for widget in controls:
+                if widget.parent is not self.left_column:
+                    self.left_column.add_widget(widget)
+            return
+
+        for widget in controls:
+            if widget.parent is self.left_column:
+                self.left_column.remove_widget(widget)
+            elif widget.parent is not None and widget.parent is not self:
+                widget.parent.remove_widget(widget)
+        for widget in controls:
+            if widget.parent is not self:
+                self.add_widget(widget)
+
     def _set_app_header_visible(self, visible: bool) -> None:
         self.header.height = dp(44) if visible else 0
         self.header.opacity = 1 if visible else 0
         self.header.disabled = not visible
 
+    def _set_input_row_visible(self, visible: bool, *, animate: bool = False) -> None:
+        self._input_row_visible = bool(visible)
+        Animation.cancel_all(self.input_row, "height", "opacity")
+        if visible:
+            if self.input_row.parent is None and self.commands.parent is self:
+                self.remove_widget(self.commands)
+                if self.input_row.height <= 0:
+                    self.input_row.height = 0
+                    self.input_row.opacity = 0
+                self.add_widget(self.input_row)
+                self.add_widget(self.commands)
+            elif self.input_row.parent is None:
+                if self.input_row.height <= 0:
+                    self.input_row.height = 0
+                    self.input_row.opacity = 0
+                self.add_widget(self.input_row)
+            self.input_row.disabled = False
+            self.text_input.disabled = False
+            self.send_button.disabled = False
+            target_height = dp(42)
+            if not animate:
+                self.input_row.height = target_height
+                self.input_row.opacity = 1
+                return
+            Animation(
+                height=target_height,
+                opacity=1,
+                duration=self.COMMAND_BAR_ANIMATION_SECONDS,
+                t="out_quad",
+            ).start(self.input_row)
+            return
+
+        if self.input_row.parent is self:
+            if animate:
+                self.input_row.disabled = True
+                animation = Animation(
+                    height=0,
+                    opacity=0,
+                    duration=self.COMMAND_BAR_ANIMATION_SECONDS,
+                    t="in_quad",
+                )
+                animation.bind(on_complete=lambda *_args: self._finish_input_row_hide())
+                animation.start(self.input_row)
+                return
+            self.remove_widget(self.input_row)
+        self.input_row.height = 0
+        self.input_row.opacity = 0
+        self.input_row.disabled = True
+
+    def _finish_input_row_hide(self) -> None:
+        if self._input_row_visible:
+            return
+        if self.input_row.parent is self:
+            self.remove_widget(self.input_row)
+        self.input_row.height = 0
+        self.input_row.opacity = 0
+        self.input_row.disabled = True
+
+    def _prompt_is_console_drawer(self, prompt: str) -> bool:
+        return plain_combat_status_text(visible_markup_text(str(prompt))).strip().lower().startswith("console>")
+
+    def toggle_console_drawer(self) -> None:
+        self._set_command_bar_visible(False, animate=True)
+        if self._console_drawer_visible:
+            self._console_drawer_visible = False
+            self._active_text_prompt_is_console = False
+            self._set_input_row_visible(False, animate=True)
+            self.submit_direct("back")
+            return
+        self.submit_direct("~")
+
     def _enter_save_browser(self, root: PanelBox) -> None:
         self._save_browser_active = True
         self._save_browser_root = root
+        self._set_input_row_visible(False)
         self.clear_widgets()
         self.add_widget(root)
 
@@ -4797,6 +4971,10 @@ class GameScreen(BoxLayout):
         for widget in self._standard_widgets:
             if widget.parent is not self:
                 self.add_widget(widget)
+        self._set_input_row_visible(
+            self.bridge.waiting_for_input and self._active_text_prompt_is_console,
+            animate=False,
+        )
         self.apply_theme()
 
     def _sync_save_browser_button_text_size(self, button: Button, *_args) -> None:
@@ -5114,8 +5292,16 @@ class GameScreen(BoxLayout):
     def _apply_command_button_theme(self, button: Button) -> None:
         theme = self.theme
         unavailable = bool(getattr(button, "_kivy_command_unavailable_reason", ""))
-        button.background_color = theme["command_disabled_bg" if unavailable else "command_bg"]
-        button.color = theme["command_disabled_text" if unavailable else "command_text"]
+        command_name = str(getattr(button, "_kivy_command_name", "")).lower()
+        if unavailable:
+            button.background_color = theme["command_disabled_bg"]
+            button.color = theme["command_disabled_text"]
+        elif command_name == "quit":
+            button.background_color = theme["choice_end_turn_bg"]
+            button.color = theme["choice_end_turn_text"]
+        else:
+            button.background_color = theme["command_bg"]
+            button.color = theme["command_text"]
         button.opacity = 0.72 if unavailable else 1.0
         button.disabled = False
 
@@ -5260,6 +5446,10 @@ class GameScreen(BoxLayout):
         normalized = str(codepoint).strip().lower()
         return normalized in {"\x1b", "esc", "escape"}
 
+    def is_console_menu_key(self, key, scancode, codepoint) -> bool:
+        del key, scancode
+        return str(codepoint).strip() in {"`", "~"}
+
     def apply_kivy_fullscreen(self) -> None:
         try:
             Window.fullscreen = "auto" if self.kivy_fullscreen_enabled else False
@@ -5278,7 +5468,7 @@ class GameScreen(BoxLayout):
             (self.dice_animation_tray, "dice_tray"),
             (self.options_shell, "title_options" if self._title_menu_active else "options"),
             (self.combat_panel, "combat"),
-            (self.examine_shell, "combat"),
+            (self.examine_shell, "examine"),
         ):
             panel.set_background_color(theme[key])
         self.title_label.color = theme["title"]
@@ -5354,6 +5544,7 @@ class GameScreen(BoxLayout):
         if not self.side_panel_allowed() or self.combat_active():
             self._complete_log_append(done_event)
             return
+        self._set_prompt_controls_docked_to_left(False)
         self.update_combat_layout()
         self._side_panel_mode = "command"
         self._side_command_title = title
@@ -5367,6 +5558,7 @@ class GameScreen(BoxLayout):
         if not self.side_panel_allowed() or self.combat_active():
             self._complete_log_append(done_event)
             return
+        self._set_prompt_controls_docked_to_left(False)
         self.update_combat_layout()
         self._side_panel_mode = "command"
         self._side_command_title = title
@@ -5399,7 +5591,6 @@ class GameScreen(BoxLayout):
         if not self.side_panel_allowed() or self.combat_active():
             self._complete_log_append(done_event)
             return
-        self.update_combat_layout()
         normalized = " ".join(str(command).strip().lower().split())
         title = {
             "journal": "Journal",
@@ -5412,6 +5603,8 @@ class GameScreen(BoxLayout):
         }.get(normalized, normalized.title() or "Command")
         self._side_panel_mode = "native_command"
         self._side_command_title = title
+        self._set_prompt_controls_docked_to_left(True)
+        self.update_combat_layout()
         self.native_map_view.hide_map()
         self._set_side_command_header_visible(True)
         self.side_command_title_label.text = escape_kivy_markup(title)
@@ -5441,12 +5634,27 @@ class GameScreen(BoxLayout):
             and not getattr(game, "_at_title_screen", False)
         )
 
+    def _right_panel_width_fraction(self) -> float:
+        if self._side_panel_mode == "native_command":
+            return self.NATIVE_COMMAND_PANEL_WIDTH_FRACTION
+        return self.RIGHT_PANEL_WIDTH_FRACTION
+
+    def _apply_right_panel_width(self, fraction: float | None = None) -> None:
+        fraction = self._right_panel_width_fraction() if fraction is None else fraction
+        fraction = max(0.1, min(0.9, float(fraction)))
+        self.left_column.size_hint_x = 1.0 - fraction
+        self.combat_panel.size_hint_x = fraction
+
     def update_combat_layout(self) -> None:
         side_visible = self.side_panel_allowed()
         combat_active = self.combat_active()
         was_combat_active = self._combat_mode_enabled
+        if self._side_panel_mode != "native_command":
+            self._set_prompt_controls_docked_to_left(False)
         if side_visible == self._side_panel_visible and combat_active == self._combat_mode_enabled:
             self._apply_text_window_mode(side_visible=side_visible)
+            if side_visible:
+                self._apply_right_panel_width()
             if side_visible:
                 self.refresh_combat_panel()
             return
@@ -5457,8 +5665,7 @@ class GameScreen(BoxLayout):
             self._clear_dice_tray()
         self._apply_text_window_mode(side_visible=side_visible)
         if side_visible:
-            self.left_column.size_hint_x = 0.6
-            self.combat_panel.size_hint_x = 0.4
+            self._apply_right_panel_width()
             if self.combat_panel.parent is None:
                 self.main_body.add_widget(self.combat_panel)
             self.status_label.text = (
@@ -5471,6 +5678,7 @@ class GameScreen(BoxLayout):
 
         if self.combat_panel.parent is self.main_body:
             self.main_body.remove_widget(self.combat_panel)
+        self._set_prompt_controls_docked_to_left(False)
         self.left_column.size_hint_x = 1
         self._active_combat_actor_name = ""
         self._stop_initiative_turn_arrow_animation()
@@ -5509,6 +5717,7 @@ class GameScreen(BoxLayout):
             if self._side_panel_mode == "command":
                 self._render_side_command()
             elif self._side_panel_mode == "native_command":
+                self._apply_right_panel_width()
                 self._show_command_workspace()
                 self.command_workspace.refresh_active()
             else:
@@ -5524,6 +5733,7 @@ class GameScreen(BoxLayout):
             self._side_panel_mode = "default"
             self._side_command_title = ""
             self._side_command_lines = []
+        self._set_prompt_controls_docked_to_left(False)
         self.native_map_view.hide_map()
         self._hide_command_workspace()
         self._set_side_command_header_visible(False)
@@ -5535,6 +5745,7 @@ class GameScreen(BoxLayout):
         self._side_panel_mode = "default"
         self._side_command_title = ""
         self._side_command_lines = []
+        self._set_prompt_controls_docked_to_left(False)
         self.native_map_view.hide_map()
         self._hide_command_workspace()
         self._set_side_command_header_visible(False)
@@ -5608,6 +5819,7 @@ class GameScreen(BoxLayout):
         if not self.side_panel_allowed():
             self._complete_log_append(done_event)
             return
+        self._set_prompt_controls_docked_to_left(False)
         self.update_combat_layout()
         self._side_panel_mode = "command"
         self._side_command_title = title
@@ -5624,6 +5836,7 @@ class GameScreen(BoxLayout):
         if not self.side_panel_allowed():
             self._complete_log_append(done_event)
             return
+        self._set_prompt_controls_docked_to_left(False)
         self.update_combat_layout()
         if self._side_panel_mode != "command":
             self._side_panel_mode = "command"
@@ -6660,6 +6873,9 @@ class GameScreen(BoxLayout):
         if self.is_fullscreen_shortcut(key, scancode, codepoint):
             self.toggle_kivy_fullscreen_from_shortcut()
             return True
+        if self.is_console_menu_key(key, scancode, codepoint):
+            self.toggle_console_drawer()
+            return True
         if self._save_browser_active:
             normalized = str(codepoint).strip().lower()
             if self.is_escape_key(key, scancode, codepoint):
@@ -6670,6 +6886,11 @@ class GameScreen(BoxLayout):
                 return True
             if normalized in {"b", "back"}:
                 self.submit_direct("back")
+                return True
+        if self.bridge.waiting_for_input and not self._input_row_visible:
+            normalized = str(codepoint).strip().lower()
+            if normalized.isdigit():
+                self.submit_direct(normalized)
                 return True
         if self._side_panel_mode == "native_command":
             if self.is_escape_key(key, scancode, codepoint):
@@ -6705,7 +6926,7 @@ class GameScreen(BoxLayout):
         button = getattr(self, "side_command_close_button", None)
         if (
             button is None
-            or self._side_panel_mode != "command"
+            or self._side_panel_mode not in {"command", "native_command"}
             or self.side_command_header.disabled
             or self.side_command_header.opacity <= 0
         ):
@@ -6767,6 +6988,9 @@ class GameScreen(BoxLayout):
         self.title_label.text = title
         self.status_label.text = "Route desk open. Pick a tag, browse saves, or tune the table."
         self.prompt_label.text = ""
+        self._active_text_prompt_is_console = False
+        self._console_drawer_visible = False
+        self._set_input_row_visible(False, animate=False)
         self.text_input.disabled = False
         self.text_input.text = ""
         self.text_input.hint_text = "Type a number, load, settings, or quit"
@@ -6880,6 +7104,9 @@ class GameScreen(BoxLayout):
             self._set_title_card_markup("")
         self._set_app_header_visible(not self._main_title_menu_active)
         self.prompt_label.text = format_kivy_prompt_markup(prompt)
+        self._active_text_prompt_is_console = False
+        self._console_drawer_visible = False
+        self._set_input_row_visible(False, animate=True)
         if self._title_menu_active:
             self.status_label.text = "Route desk open. Pick a tag, browse saves, or tune the table."
         elif self.combat_active():
@@ -6895,7 +7122,6 @@ class GameScreen(BoxLayout):
             else "Type a number or a command like help"
         )
         self._sync_command_bar_visibility()
-        Clock.schedule_once(lambda _dt: self._focus_text_input(), 0)
 
     def show_text_prompt(self, prompt: str) -> None:
         self.update_combat_layout()
@@ -6907,6 +7133,10 @@ class GameScreen(BoxLayout):
         self._set_app_header_visible(True)
         self.apply_theme()
         self.prompt_label.text = format_kivy_prompt_markup(prompt)
+        console_prompt = self._prompt_is_console_drawer(prompt)
+        self._active_text_prompt_is_console = console_prompt
+        self._console_drawer_visible = console_prompt
+        self._set_input_row_visible(console_prompt, animate=True)
         if self._title_menu_active:
             self.status_label.text = "Route desk open. Type a response or command."
         elif self.side_panel_allowed():
@@ -6914,9 +7144,10 @@ class GameScreen(BoxLayout):
         else:
             self.status_label.text = "Type a response below. Commands like save and journal still work."
         self._rebuild_options([])
-        self.text_input.hint_text = "Type your answer here"
+        self.text_input.hint_text = "Type a console command, or back"
         self._sync_command_bar_visibility()
-        Clock.schedule_once(lambda _dt: self._focus_text_input(), 0)
+        if console_prompt:
+            Clock.schedule_once(lambda _dt: self._focus_text_input(), 0)
 
     def clear_prompt(self) -> None:
         self.hide_save_browser()
@@ -6941,6 +7172,9 @@ class GameScreen(BoxLayout):
         self.text_input.hint_text = "Waiting for the story..."
         self.text_input.disabled = False
         self.send_button.disabled = False
+        self._active_text_prompt_is_console = False
+        self._console_drawer_visible = False
+        self._set_input_row_visible(False, animate=True)
         self._sync_command_bar_visibility()
         self.refresh_combat_panel()
 
@@ -6954,6 +7188,9 @@ class GameScreen(BoxLayout):
         self.status_label.text = "Session finished. Close the window or restart the game to play again."
         self.prompt_label.text = ""
         self._rebuild_options([])
+        self._active_text_prompt_is_console = False
+        self._console_drawer_visible = False
+        self._set_input_row_visible(False, animate=True)
         self.text_input.disabled = True
         self._sync_command_bar_visibility()
         if close_app:
@@ -7009,28 +7246,32 @@ class GameScreen(BoxLayout):
         if rows is None:
             rows = self._current_option_rows
         option_height = self._option_shell_height(rows, detailed=self._current_options_detailed)
-        examine_floor = dp(170) if self._examine_panel_visible else dp(44)
-        self.options_area.height = max(option_height, examine_floor)
-        self.options_shell.size_hint_x = 0.6 if self._examine_panel_visible else 1
+        self.options_area.height = max(option_height, dp(44))
+        self.options_shell.size_hint_x = 1
         self._sync_examine_panel_layout()
 
     def _sync_examine_panel_layout(self) -> None:
         if self._examine_panel_visible:
-            if self.examine_shell.parent is self.left_column:
-                self.left_column.remove_widget(self.examine_shell)
-            if self.examine_shell.parent is None:
-                self.options_area.add_widget(self.examine_shell)
+            for parent in (self.left_column, self.options_area):
+                if self.examine_shell.parent is parent:
+                    parent.remove_widget(self.examine_shell)
+            if self.examine_shell.parent is not self.combat_panel:
+                if self.examine_shell.parent is not None:
+                    self.examine_shell.parent.remove_widget(self.examine_shell)
+                self.combat_panel.add_widget(self.examine_shell)
+            self.examine_shell.size_hint_y = None
+            self.examine_shell.height = dp(190)
             self.examine_shell.opacity = 1
             self.examine_shell.disabled = False
             self.examine_label._sync_text_size()
             self.examine_label._sync_height()
         else:
-            if self.examine_shell.parent is self.options_area:
-                self.options_area.remove_widget(self.examine_shell)
-            if self.examine_shell.parent is self.left_column:
-                self.left_column.remove_widget(self.examine_shell)
+            for parent in (self.options_area, self.left_column, self.combat_panel):
+                if self.examine_shell.parent is parent:
+                    parent.remove_widget(self.examine_shell)
             self.examine_shell.opacity = 0
             self.examine_shell.disabled = True
+            self.examine_shell.height = 0
 
     def _compact_option_markup(self, index: int, option: str, columns: int) -> str:
         plain = plain_combat_status_text(" ".join(strip_ansi(option).split()))

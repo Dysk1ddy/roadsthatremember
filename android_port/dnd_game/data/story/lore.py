@@ -46,6 +46,14 @@ LOCATION_LORE: dict[str, LoreEntry] = {
             "to wake it."
         ),
     },
+    "Frontier Primer": {
+        "menu": "A practice-table introduction to checks, choices, and road consequences.",
+        "text": "The primer starts with chalk marks, scuffed boots, and a patient voice teaching the table how Aethrune spends risk.",
+    },
+    "Prologue": {
+        "menu": "The character's first pressure point before the road opens.",
+        "text": "The prologue keeps close to one origin: a door, a debt, a warning, or a habit the road will test before Greywake ever sees it.",
+    },
     "Shatterbelt Frontier": {
         "menu": "The Act I borderland where trade, fear, and old roadwork collide.",
         "text": (
@@ -66,6 +74,10 @@ LOCATION_LORE: dict[str, LoreEntry] = {
             "It is a pressured city. Wounded teamsters come in ahead of their wagons, missing freight turns into ledger "
             "fights, and every faction in town wants to decide whether the Emberway gets saved or written off."
         ),
+    },
+    "Wayside Luck Shrine": {
+        "menu": "A road shrine where Elira spends lamp oil, bandages, and witness names on field care.",
+        "text": "The shrine smells of wet wool and lamp smoke. Cots crowd the wall, and every name Elira writes down becomes one more person the road failed to erase.",
     },
     "Emberway": {
         "menu": "The old road artery whose milestones, shrines, and tollmarks still shape Act I.",

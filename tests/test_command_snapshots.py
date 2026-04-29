@@ -98,6 +98,9 @@ class CommandSnapshotTests(unittest.TestCase):
         self.assertTrue(any(candidate.name == iron_cap_name for candidate in head_slot.candidates))
         candidate = next(candidate for candidate in head_slot.candidates if candidate.name == iron_cap_name)
         self.assertIn("Defense", candidate.comparison)
+        self.assertIn("HP ", snapshot.members[0].health)
+        self.assertNotIn("[", snapshot.members[0].health)
+        self.assertNotIn("█", snapshot.members[0].health)
         self.assertEqual(dict(game.state.player.equipment_slots), before_slots)
 
     def test_journal_snapshot_collects_quest_clue_and_recent_update_sections(self) -> None:
@@ -121,6 +124,8 @@ class CommandSnapshotTests(unittest.TestCase):
         self.assertEqual(snapshot.active_party_count, 2)
         self.assertEqual(snapshot.camp_roster_count, 1)
         self.assertTrue(any("Vale" in line for line in snapshot.active_party))
+        self.assertTrue(any("HP " in line for line in snapshot.active_party))
+        self.assertFalse(any("█" in line or "[" in line for line in snapshot.active_party))
         self.assertTrue(any("Elira" in line for line in snapshot.camp_roster))
         action_labels = [action.label for action in snapshot.actions]
         self.assertIn("Supplies and equipment", action_labels)

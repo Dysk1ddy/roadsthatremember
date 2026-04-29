@@ -17,6 +17,19 @@ def _plain(value: object) -> str:
     return strip_ansi(str(value or "")).strip()
 
 
+def _plain_health_summary(member) -> str:
+    current_hp = max(0, int(getattr(member, "current_hp", 0)))
+    max_hp = max(0, int(getattr(member, "max_hp", 0)))
+    temp_hp = max(0, int(getattr(member, "temp_hp", 0)))
+    suffix = ""
+    if getattr(member, "dead", False):
+        suffix = " (dead)"
+    elif current_hp == 0:
+        suffix = " (down)"
+    temp = f", temp {temp_hp}" if temp_hp else ""
+    return f"HP {current_hp}/{max_hp}{temp}{suffix}"
+
+
 @dataclass(frozen=True)
 class InventoryFilterSnapshot:
     key: str
@@ -307,7 +320,7 @@ def build_gear_snapshot(
                 index=member_index,
                 name=_plain(member.name),
                 public_identity=_plain(member.public_identity),
-                health=_plain(game.character_health_summary(member)),
+                health=_plain_health_summary(member),
                 combat=_plain(game.combat_defense_summary(member)),
                 conditions=_plain(game.character_condition_summary(member)),
                 resources=_plain(game.member_resource_summary(member)),
@@ -394,7 +407,7 @@ def build_camp_snapshot(game) -> CampSnapshot:
     digest_lines = tuple(str(line) for line in game.camp_digest_lines())
     active_party = tuple(
         _plain(
-            f"{member.name}: {game.character_health_summary(member)} | "
+            f"{member.name}: {_plain_health_summary(member)} | "
             f"{game.combat_defense_summary(member)} | {game.character_condition_summary(member)}"
         )
         for member in game.state.party_members()
