@@ -74,6 +74,7 @@ class CombatFlowMixin:
                     self.apply_status(enemy, "invisible", 1, source=f"{enemy.name}'s stalking entry")
             dodging: set[str] = set()
             self._active_dodging_names = dodging
+            self._active_round_number = 1
             initiative = self.roll_initiative(
                 heroes,
                 enemies,
@@ -90,7 +91,6 @@ class CombatFlowMixin:
                     encounter_outcome = "defeat"
                     return encounter_outcome
 
-                self.say(f"Round {round_number}")
                 round_start_hook = getattr(self, "on_encounter_round_start", None)
                 if callable(round_start_hook):
                     round_start_hook(encounter, heroes, enemies, initiative, round_number)

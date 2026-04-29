@@ -74,6 +74,7 @@ class CombatFlowMixin:
                     self.apply_status(enemy, "invisible", 1, source=f"{enemy.name}'s stalking entry")
             dodging: set[str] = set()
             self._active_dodging_names = dodging
+            self._active_round_number = 1
             initiative = self.roll_initiative(
                 heroes,
                 enemies,
@@ -90,7 +91,6 @@ class CombatFlowMixin:
                     encounter_outcome = "defeat"
                     return encounter_outcome
 
-                self.say(f"Round {round_number}")
                 round_start_hook = getattr(self, "on_encounter_round_start", None)
                 if callable(round_start_hook):
                     round_start_hook(encounter, heroes, enemies, initiative, round_number)
@@ -100,11 +100,14 @@ class CombatFlowMixin:
                     if not any(hero.is_conscious() for hero in heroes):
                         encounter_outcome = "defeat"
                         return encounter_outcome
+                show_combat_actor = getattr(self, "show_combat_actor", None)
                 for actor in initiative:
                     if actor.name in dodging:
                         dodging.discard(actor.name)
                     if actor.dead:
                         continue
+                    if callable(show_combat_actor):
+                        show_combat_actor(actor)
                     if actor in heroes and actor.is_dying():
                         self.resolve_death_save(actor)
                         if actor.dead:
@@ -140,6 +143,9 @@ class CombatFlowMixin:
             self._active_dodging_names = previous_active_dodging
             self._active_round_number = previous_active_round
             self._in_combat = False
+            show_combat_actor = getattr(self, "show_combat_actor", None)
+            if callable(show_combat_actor):
+                show_combat_actor(None)
             deferred_refresh_outcomes = getattr(self, "_defer_scene_music_refresh_on_outcomes", frozenset())
             if encounter_outcome not in deferred_refresh_outcomes and callable(refresh_scene_music):
                 refresh_scene_music()

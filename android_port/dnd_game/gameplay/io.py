@@ -337,10 +337,10 @@ class GameIOMixin:
             else ("On" if getattr(self, "_dice_animations_preference", False) else "Off")
         )
         typed = "On" if getattr(self, "_typed_dialogue_preference", getattr(self, "type_dialogue", False)) else "Off"
-        return f"Animations {presentation} | Dice {dice_mode_label} | Typed text {typed}"
+        return f"Animations {presentation} | Dice {dice_mode_label} | Typed Text {typed}"
 
     def title_screen_campaign_summary(self) -> str:
-        return "Acts I and II are playable now, with later acts scaffolded for expansion."
+        return "Acts I and II playable; later acts scaffolded"
 
     def build_title_screen_header_panel(self, title: str, subtitle: str, intro_text: str):
         header = Text(justify="center")

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
 import unittest
 
-from dnd_game.ui.examine import examine_entry_for_text, status_examine_entry
+from dnd_game.ui.examine import current_location_examine_entry, examine_entry_for_text, status_examine_entry
 
 
 class ExamineEntryTests(unittest.TestCase):
@@ -43,6 +44,27 @@ class ExamineEntryTests(unittest.TestCase):
         assert entry is not None
         self.assertEqual(entry.title, "Burning")
         self.assertIn("ongoing", " ".join(entry.details).lower())
+
+    def test_location_entry_uses_location_lore(self) -> None:
+        entry = examine_entry_for_text("Glasswater Intake")
+
+        self.assertEqual(entry.title, "Glasswater Intake")
+        self.assertEqual(entry.category, "Location")
+        self.assertIn("waterworks", entry.description)
+
+    def test_current_location_entry_includes_scene_objective(self) -> None:
+        game = SimpleNamespace(
+            state=SimpleNamespace(current_scene="glasswater_intake"),
+            SCENE_LABELS={"glasswater_intake": "Glasswater Intake"},
+            SCENE_OBJECTIVES={"glasswater_intake": "Stabilize the headgate."},
+        )
+
+        entry = current_location_examine_entry(game)
+
+        self.assertIsNotNone(entry)
+        assert entry is not None
+        self.assertEqual(entry.title, "Glasswater Intake")
+        self.assertIn("Stabilize the headgate.", " ".join(entry.details))
 
 
 if __name__ == "__main__":

@@ -119,12 +119,15 @@ class GameBase:
         "greywake_triage_yard": "Greywake Yard",
         "greywake_road_breakout": "Greywake Breakout",
         "greywake_briefing": "Greywake",
+        "blackwake_crossing": "Blackwake Crossing",
+        "road_decision_post_blackwake": "Blackwake Crossing",
         "road_ambush": "Emberway",
         "emberway_liars_circle": "Liar's Circle",
         "emberway_false_checkpoint": "False Checkpoint",
         "emberway_false_tollstones": "False Tollstones",
         "iron_hollow_hub": "Iron Hollow",
         "blackglass_well": "Blackglass Well",
+        "cinderfall_ruins": "Cinderfall Ruins",
         "red_mesa_hold": "Red Mesa Hold",
         "ashfall_watch": "Ashfall Watch",
         "duskmere_manor": "Duskmere Manor",
@@ -135,6 +138,7 @@ class GameBase:
         "hushfen_pale_circuit": "Hushfen and the Pale Circuit",
         "greywake_survey_camp": "Greywake Wood",
         "stonehollow_dig": "Stonehollow Dig",
+        "glasswater_intake": "Glasswater Intake",
         "siltlock_counting_house": "Siltlock Counting House",
         "act2_midpoint_convergence": "Sabotage Night",
         "broken_prospect": "Broken Prospect",
@@ -586,26 +590,35 @@ class GameBase:
 
     def run(self) -> None:
         try:
-            title_options = [
-                "Start a new game",
-                "Save Files",
-                "Read the lore notes",
-                "Settings",
-                "Quit",
-            ]
-            title_option_details = {
-                "Start a new game": "Build a new character and ride the Emberway toward Iron Hollow.",
-                "Save Files": "Browse save files, load a run, or delete old journals.",
-                "Read the lore notes": "Browse Aethrune context, mechanics guidance, and item basics.",
-                "Settings": "Adjust audio, animations, typed narration, and presentation pacing.",
-                "Quit": "Leave the frontier for now.",
-            }
             while True:
                 try:
                     self._at_title_screen = True
                     refresh_scene_music = getattr(self, "refresh_scene_music", None)
                     if callable(refresh_scene_music):
                         refresh_scene_music(default_to_menu=True)
+                    saves = self.loadable_save_paths()
+                    latest_save = saves[0] if saves else None
+                    continue_detail = (
+                        f"Load latest save: {self.save_basic_menu_label(latest_save)}"
+                        if latest_save is not None
+                        else "No save files yet."
+                    )
+                    title_options = [
+                        "Continue",
+                        "Start a new game",
+                        "Save Files",
+                        "Read the lore notes",
+                        "Settings",
+                        "Quit",
+                    ]
+                    title_option_details = {
+                        "Continue": continue_detail,
+                        "Start a new game": "Build a new character and ride the Emberway toward Iron Hollow.",
+                        "Save Files": "Browse save files, load a run, or delete old journals.",
+                        "Read the lore notes": "Browse Aethrune context, mechanics guidance, and item basics.",
+                        "Settings": "Adjust audio, animations, typed narration, and presentation pacing.",
+                        "Quit": "Leave the frontier for now.",
+                    }
                     choice = self.choose_title_menu(
                         "Aethrune",
                         "Acts I-II: Frontier Roads and Echoing Depths",
@@ -617,17 +630,24 @@ class GameBase:
                         option_details=title_option_details,
                     )
                     if choice == 1:
+                        if latest_save is None:
+                            self.say("No save files were found yet.")
+                            continue
+                        self._at_title_screen = False
+                        self.load_save_path(latest_save)
+                        self.play_current_state()
+                    elif choice == 2:
                         self._at_title_screen = False
                         self.start_new_game()
                         self.play_current_state()
-                    elif choice == 2:
+                    elif choice == 3:
                         self._at_title_screen = False
                         loaded = self.open_save_files_menu()
                         if loaded:
                             self.play_current_state()
-                    elif choice == 3:
-                        self.show_lore_notes()
                     elif choice == 4:
+                        self.show_lore_notes()
+                    elif choice == 5:
                         self.open_settings_menu()
                     else:
                         self.say("Safe travels, adventurer.")
@@ -678,6 +698,8 @@ class GameBase:
 
     def skill_tag(self, tag: str, text: str) -> str:
         normalized_tag = tag.strip().upper()
+        if normalized_tag == "SAFE":
+            return text
         if normalized_tag.startswith("BACKTRACK"):
             return f"[{tag}] {text}"
         normalized_text = strip_ansi(text).lower()
@@ -2508,10 +2530,7 @@ class GameBase:
 
     def open_console_commands_menu(self) -> bool:
         while True:
-            raw = self.read_resize_aware_input(
-                self.show_console_command_reference,
-                prompt="console> ",
-            ).strip()
+            raw = self.read_input("console> ").strip()
             if raw.lower() in {"", "back", "exit", "quit"}:
                 return False
             if self.execute_console_command(raw):

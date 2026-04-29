@@ -8,7 +8,15 @@ from ..data.items.catalog import ITEMS, item_category_label, item_rules_text, it
 from ..data.story.character_options.backgrounds import BACKGROUNDS
 from ..data.story.character_options.classes import CLASSES, CLASS_LEVEL_PROGRESSION
 from ..data.story.character_options.races import RACES
-from ..data.story.lore import ABILITY_LORE, BACKGROUND_LORE, CLASS_LORE, FEATURE_LORE, RACE_LORE, SKILL_LORE
+from ..data.story.lore import (
+    ABILITY_LORE,
+    BACKGROUND_LORE,
+    CLASS_LORE,
+    FEATURE_LORE,
+    LOCATION_LORE,
+    RACE_LORE,
+    SKILL_LORE,
+)
 from ..data.story.public_terms import (
     ability_label,
     class_label,
@@ -179,6 +187,23 @@ RESOURCE_DESCRIPTIONS = {
     "satchel": "Satchel measures field tools available to Rogue and Alchemist techniques.",
     "toxin": "Toxin measures prepared poison pressure.",
     "focus": "Focus represents a Mage keeping a clean pattern under stress.",
+}
+
+
+LOCATION_LORE_ALIASES = {
+    "frontier primer": "Aethrune",
+    "prologue": "Aethrune",
+    "greywake briefing": "Greywake",
+    "emberway ambush": "Emberway",
+    "road decision after blackwake": "Blackwake Crossing",
+    "act ii hub": "Act II Expedition Hub",
+    "claims council": "Ashlamp Claims Council",
+    "iron hollow claims council": "Ashlamp Claims Council",
+    "greywake survey camp": "Greywake Wood",
+    "wayside lantern shrine": "Wayside Luck Shrine",
+    "resonant vault outer galleries": "Resonant Vaults",
+    "resonant vaults outer galleries": "Resonant Vaults",
+    "act ii complete": "Resonant Vaults",
 }
 
 
@@ -445,6 +470,122 @@ def item_examine_entry(text: str) -> ExamineEntry | None:
     return None
 
 
+def _location_lore_key_for_label(label: object) -> str | None:
+    normalized = _normalize_lookup_key(label)
+    for key in LOCATION_LORE:
+        if normalized == _normalize_lookup_key(key):
+            return key
+    for alias, lore_key in LOCATION_LORE_ALIASES.items():
+        if normalized == _normalize_lookup_key(alias) and lore_key in LOCATION_LORE:
+            return lore_key
+    return None
+
+
+def _location_description(lore: dict[str, object]) -> str:
+    menu = str(lore.get("menu", "")).strip()
+    if menu:
+        return menu
+    text = str(lore.get("text", "")).strip()
+    if not text:
+        return "No location note recorded yet."
+    return text.split("\n\n", 1)[0].strip()
+
+
+def _location_entry_from_lore(title: str, lore: dict[str, object], *, details: Iterable[str] = ()) -> ExamineEntry:
+    return ExamineEntry(
+        title=title,
+        category="Location",
+        description=_location_description(lore),
+        details=tuple(detail for detail in details if detail),
+    )
+
+
+def _current_room_location_entry(game, title: str) -> ExamineEntry | None:
+    for dungeon_getter_name, room_getter_name in (
+        ("current_act1_dungeon", "current_act1_room"),
+        ("current_act2_dungeon", "current_act2_room"),
+    ):
+        dungeon_getter = getattr(game, dungeon_getter_name, None)
+        room_getter = getattr(game, room_getter_name, None)
+        if not callable(dungeon_getter) or not callable(room_getter):
+            continue
+        try:
+            dungeon = dungeon_getter()
+            if dungeon is None:
+                continue
+            room = room_getter(dungeon)
+        except Exception:
+            continue
+        room_title = str(getattr(room, "title", "")).strip()
+        display_title = title
+        if room_title and _normalize_lookup_key(room_title) not in _normalize_lookup_key(title):
+            display_title = f"{title} / {room_title}"
+        description = str(getattr(room, "summary", "")).strip() or "A mapped room in the current site."
+        details = []
+        dungeon_title = str(getattr(dungeon, "title", "")).strip()
+        if dungeon_title:
+            details.append(f"Site: {dungeon_title}")
+        role = str(getattr(room, "role", "")).strip()
+        if role:
+            details.append(f"Map role: {role.title()}")
+        return ExamineEntry(display_title, "Location", description, tuple(details))
+    return None
+
+
+def current_location_examine_entry(game) -> ExamineEntry | None:
+    state = getattr(game, "state", None)
+    if state is None:
+        return None
+    hud_location = getattr(game, "hud_location_label", None)
+    if callable(hud_location):
+        title = str(hud_location()).strip()
+    else:
+        scene_labels = getattr(game, "SCENE_LABELS", {})
+        scene_key = str(getattr(state, "current_scene", ""))
+        title = str(scene_labels.get(scene_key, scene_key.replace("_", " ").title() or "Adventure"))
+
+    room_entry = _current_room_location_entry(game, title)
+    if room_entry is not None:
+        return room_entry
+
+    scene_key = str(getattr(state, "current_scene", ""))
+    scene_labels = getattr(game, "SCENE_LABELS", {})
+    label = scene_labels.get(scene_key, title)
+    lore_key = (
+        _location_lore_key_for_label(label)
+        or _location_lore_key_for_label(title)
+        or _location_lore_key_for_label(scene_key.replace("_", " "))
+    )
+    if lore_key is None:
+        return None
+    objective = str(getattr(game, "SCENE_OBJECTIVES", {}).get(scene_key, "")).strip()
+    return _location_entry_from_lore(title or lore_key, LOCATION_LORE[lore_key], details=(f"Objective: {objective}",))
+
+
+def location_examine_entry(text: str, *, game=None) -> ExamineEntry | None:
+    if game is not None:
+        current_entry = current_location_examine_entry(game)
+        if current_entry is not None and _normalize_lookup_key(text) == _normalize_lookup_key(current_entry.title):
+            return current_entry
+        scene_labels = getattr(game, "SCENE_LABELS", {})
+        for scene_key, label in scene_labels.items():
+            if _normalize_lookup_key(text) in {
+                _normalize_lookup_key(scene_key),
+                _normalize_lookup_key(label),
+            }:
+                lore_key = (
+                    _location_lore_key_for_label(label)
+                    or _location_lore_key_for_label(scene_key.replace("_", " "))
+                )
+                if lore_key is not None:
+                    return _location_entry_from_lore(str(label), LOCATION_LORE[lore_key])
+
+    lore_key = _location_lore_key_for_label(text)
+    if lore_key is None:
+        return None
+    return _location_entry_from_lore(lore_key, LOCATION_LORE[lore_key])
+
+
 def named_character_examine_entry(text: str, game=None) -> ExamineEntry | None:
     name = _plain_text(text)
     intros = getattr(game, "NAMED_CHARACTER_INTROS", None)
@@ -578,6 +719,10 @@ def examine_entry_for_text(text: str, *, game=None) -> ExamineEntry:
             entry = builder(candidate)
             if entry is not None:
                 return entry
+
+        location_entry = location_examine_entry(candidate, game=game)
+        if location_entry is not None:
+            return location_entry
 
         character_entry = named_character_examine_entry(candidate, game=game)
         if character_entry is not None:

@@ -337,10 +337,10 @@ class GameIOMixin:
             else ("On" if getattr(self, "_dice_animations_preference", False) else "Off")
         )
         typed = "On" if getattr(self, "_typed_dialogue_preference", getattr(self, "type_dialogue", False)) else "Off"
-        return f"Animations {presentation} | Dice {dice_mode_label} | Typed text {typed}"
+        return f"Animations {presentation} | Dice {dice_mode_label} | Typed Text {typed}"
 
     def title_screen_campaign_summary(self) -> str:
-        return "Acts I and II are playable now, with later acts scaffolded for expansion."
+        return "Acts I and II playable; later acts scaffolded"
 
     def build_title_screen_header_panel(self, title: str, subtitle: str, intro_text: str):
         header = Text(justify="center")
@@ -1192,6 +1192,25 @@ class GameIOMixin:
             return f"{minutes}m {seconds:02d}s"
         return f"{seconds}s"
 
+    def format_save_timestamp(self, saved_at: object, *, fallback_path: Path | None = None) -> str:
+        timestamp: datetime | None = None
+        raw_saved_at = str(saved_at or "").strip()
+        if raw_saved_at:
+            for candidate in (raw_saved_at, raw_saved_at.replace("Z", "+00:00")):
+                try:
+                    timestamp = datetime.fromisoformat(candidate)
+                    break
+                except ValueError:
+                    continue
+        if timestamp is None and fallback_path is not None:
+            try:
+                timestamp = datetime.fromtimestamp(fallback_path.stat().st_mtime)
+            except OSError:
+                timestamp = None
+        if timestamp is None:
+            return "Unknown time"
+        return timestamp.strftime("%Y-%m-%d %H:%M")
+
     def party_level_from_save_data(self, data: dict[str, object]) -> int:
         companions = data.get("companions", [])
         members = [data.get("player"), *(companions if isinstance(companions, list) else [])]
@@ -1335,15 +1354,38 @@ class GameIOMixin:
             party_level = int(metadata.get("party_level") or self.party_level_from_save_data(data))
         except (TypeError, ValueError):
             party_level = self.party_level_from_save_data(data)
+        saved_at = metadata.get("saved_at", "")
         return {
             "label": self.save_display_label(path),
             "kind": str(metadata.get("kind") or ("autosave" if self.is_autosave_path(path) else "manual")).title(),
+            "saved_at": str(saved_at or ""),
+            "saved_at_label": self.format_save_timestamp(saved_at, fallback_path=path),
             "act_label": str(metadata.get("act_label") or self.act_label_from_number(act)),
             "scene_label": str(metadata.get("scene_label") or self.scene_label_from_key(scene_key)),
             "party_level": party_level,
             "playtime": self.format_playtime(playtime_seconds),
             "objective": str(objective),
         }
+
+    def save_preview_short_label(self, path: Path) -> str:
+        preview = self.save_preview_payload(path)
+        kind = str(preview["kind"])
+        kind_tag = "[Auto]" if kind.lower() == "autosave" else f"[{kind}]"
+        label = str(preview["label"])
+        for prefix in (kind_tag, "[Autosave]", "[Manual]"):
+            if label.startswith(prefix):
+                label = label[len(prefix):].strip()
+                break
+        if kind.lower() == "autosave" and " | " in label:
+            label = label.split(" | ", 1)[0].strip()
+        return f"{kind_tag} {label}"
+
+    def save_basic_menu_label(self, path: Path) -> str:
+        preview = self.save_preview_payload(path)
+        return (
+            f"{self.save_preview_short_label(path)} | "
+            f"Saved {preview['saved_at_label']} | Lv {preview['party_level']}"
+        )
 
     def save_preview_menu_label(self, path: Path) -> str:
         preview = self.save_preview_payload(path)
@@ -1366,6 +1408,7 @@ class GameIOMixin:
         preview = self.save_preview_payload(path)
         return (
             f"Type: {preview['kind']}\n"
+            f"Saved: {preview['saved_at_label']}\n"
             f"Act: {preview['act_label']}\n"
             f"Scene: {preview['scene_label']}\n"
             f"Party level: {preview['party_level']}\n"

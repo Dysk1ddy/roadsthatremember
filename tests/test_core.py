@@ -1552,6 +1552,7 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(90073601))
 
         self.assertEqual(game.quoted_option("KING", "The King tells the truth."), '"The King tells the truth."')
+        self.assertEqual(game.quoted_option("SAFE", "Stay with the caravan."), '"Stay with the caravan."')
         self.assertEqual(game.skill_tag("BACKTRACK", game.action_option("Backtrack to Emberway")), "[BACKTRACK] *Backtrack to Emberway")
         self.assertEqual(
             game.skill_tag("BACKTRACK WEST", game.action_option("Backtrack to Charred Tollhouse")),
@@ -2105,6 +2106,31 @@ class CoreTests(unittest.TestCase):
         self.assertIn("Choose a difficulty for this new game.", rendered)
         self.assertIn("Difficulty set to Tactician.", rendered)
         self.assertIn("Choose how you want to start.", rendered)
+        settings_path.unlink(missing_ok=True)
+
+    def test_start_new_game_difficulty_back_returns_to_title_flow(self) -> None:
+        save_dir = Path.cwd() / "tests_output" / "new_game_difficulty_back"
+        save_dir.mkdir(parents=True, exist_ok=True)
+        settings_path = save_dir / "settings.json"
+        settings_path.unlink(missing_ok=True)
+
+        answers = iter(["4"])
+        log: list[str] = []
+        game = TextDnDGame(
+            input_fn=lambda _: next(answers),
+            output_fn=log.append,
+            save_dir=save_dir,
+            rng=random.Random(900822),
+        )
+
+        game.start_new_game()
+
+        self.assertIsNone(game.state)
+        self.assertEqual(game.current_difficulty_mode(), "standard")
+        rendered = self.plain_output(log)
+        self.assertIn("Choose a difficulty for this new game.", rendered)
+        self.assertIn("Back", rendered)
+        self.assertNotIn("Choose how you want to start.", rendered)
         settings_path.unlink(missing_ok=True)
 
     def test_apply_damage_triggers_health_bar_animation_on_hp_loss(self) -> None:
@@ -7457,11 +7483,17 @@ class CoreTests(unittest.TestCase):
             self.assertEqual(metadata["playtime_seconds"], 125)
             self.assertEqual(metadata["last_objective"], "Choose which pressure in Iron Hollow to answer next.")
 
+            saved_stamp = metadata["saved_at"][:16].replace("T", " ")
+            basic_label = game.save_basic_menu_label(Path(path))
+            self.assertIn(f"Saved {saved_stamp}", basic_label)
+            self.assertIn("Lv 3", basic_label)
+
             menu_label = game.save_preview_menu_label(Path(path))
             self.assertEqual(menu_label, "[Manual] campaign_preview | Act I | Iron Hollow | Lv 3 | 2m 05s")
             self.assertNotIn("Choose which pressure in Iron Hollow to answer next.", menu_label)
             detail = game.save_preview_detail(Path(path))
             self.assertIn("Type: Manual", detail)
+            self.assertIn(f"Saved: {saved_stamp}", detail)
             self.assertIn("Last objective: Choose which pressure in Iron Hollow to answer next.", detail)
 
             with patch("dnd_game.gameplay.io.time.monotonic", return_value=100.0):
@@ -10062,7 +10094,7 @@ class CoreTests(unittest.TestCase):
         self.assertIn("poisoned teamster", rendered)
 
     def test_lore_codex_can_browse_world_entry(self) -> None:
-        answers = iter(["1", "4", "2", "10", "1"])
+        answers = iter(["1", "6", "2", "10", "1"])
         log: list[str] = []
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=log.append, rng=random.Random(440))
         game.show_lore_notes()
@@ -10070,6 +10102,16 @@ class CoreTests(unittest.TestCase):
         self.assertIn("=== Lore Codex ===", rendered)
         self.assertIn("=== World & Locations: Greywake ===", rendered)
         self.assertIn("Greywake opens the campaign with salt on the wind", rendered)
+
+    def test_lore_codex_world_option_seven_has_clean_shrine_summary(self) -> None:
+        answers = iter(["1", "7", "2", "10", "1"])
+        log: list[str] = []
+        game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=log.append, rng=random.Random(447))
+        game.show_lore_notes()
+        rendered = self.plain_output(log)
+        self.assertIn("7. Wayside Luck Shrine: A road shrine where Elira spends lamp oil, bandages, and witness names on field care.", rendered)
+        self.assertIn("=== World & Locations: Wayside Luck Shrine ===", rendered)
+        self.assertNotIn("witness work into first aid", rendered)
 
     def test_lore_codex_skills_section_has_visible_exit(self) -> None:
         answers = iter(["6", "1", "10", "1"])
@@ -14847,9 +14889,18 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(choice, 2)
         self.assertEqual(opened, ["console"])
 
-    def test_console_commands_menu_lists_available_commands(self) -> None:
+    def test_console_commands_menu_does_not_print_reference_on_open(self) -> None:
         log: list[str] = []
         game = TextDnDGame(input_fn=lambda _: "back", output_fn=log.append, rng=random.Random(4013))
+
+        game.open_console_commands_menu()
+
+        self.assertEqual(self.plain_output(log).strip(), "")
+
+    def test_console_commands_menu_lists_available_commands_on_helpconsole(self) -> None:
+        log: list[str] = []
+        answers = iter(["helpconsole", "back"])
+        game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=log.append, rng=random.Random(401301))
 
         game.open_console_commands_menu()
 
@@ -14893,25 +14944,22 @@ class CoreTests(unittest.TestCase):
         self.assertIn("Inventory And Gold", rendered)
         self.assertIn("console> Type a command", rendered)
 
-    def test_console_commands_menu_uses_resize_aware_terminal_prompt(self) -> None:
+    def test_console_commands_menu_uses_plain_prompt_without_reference_renderer(self) -> None:
         log: list[str] = []
         prompts: list[str] = []
         game = TextDnDGame(input_fn=lambda _: "back", output_fn=log.append, rng=random.Random(401303))
 
-        def fake_read(render_screen, *, prompt: str = "> ") -> str:
+        def fake_read(prompt: str = "> ") -> str:
             prompts.append(prompt)
-            render_screen()
             return "back"
 
-        game.read_resize_aware_input = fake_read  # type: ignore[method-assign]
+        game.read_input = fake_read  # type: ignore[method-assign]
 
         should_resume = game.open_console_commands_menu()
 
         self.assertFalse(should_resume)
         self.assertEqual(prompts, ["console> "])
-        rendered = self.plain_output(log)
-        self.assertIn("Available console commands:", rendered)
-        self.assertIn("Checks And Combat:", rendered)
+        self.assertEqual(self.plain_output(log).strip(), "")
 
     def test_helpconsole_command_lists_console_reference_from_prompt(self) -> None:
         player = build_character(
@@ -16022,12 +16070,55 @@ class CoreTests(unittest.TestCase):
 
     def test_main_menu_includes_settings_option(self) -> None:
         log: list[str] = []
-        answers = iter(["4", "8", "5"])
+        answers = iter(["5", "8", "6"])
         game = TextDnDGame(input_fn=lambda _: next(answers), output_fn=log.append, rng=random.Random(403))
         game.run()
         rendered = self.plain_output(log)
-        self.assertIn("4.", rendered)
+        self.assertIn("5.", rendered)
         self.assertIn("Settings", rendered)
+
+    def test_main_menu_continue_loads_latest_save(self) -> None:
+        save_dir = Path.cwd() / "tests_output" / "title_continue"
+        save_dir.mkdir(parents=True, exist_ok=True)
+        player = build_character(
+            name="Iri",
+            race="Human",
+            class_name="Mage",
+            background="Sage",
+            base_ability_scores={"STR": 8, "DEX": 14, "CON": 12, "INT": 15, "WIS": 13, "CHA": 10},
+            class_skill_choices=["Arcana", "Investigation"],
+        )
+        writer = TextDnDGame(
+            input_fn=lambda _: "1",
+            output_fn=lambda _: None,
+            save_dir=save_dir,
+            rng=random.Random(4033),
+        )
+        writer.state = GameState(player=player, current_scene="iron_hollow_hub", gold=37)
+        save_path = writer.save_game(slot_name="continue_latest")
+
+        log: list[str] = []
+        game = TextDnDGame(
+            input_fn=lambda _: "1",
+            output_fn=log.append,
+            save_dir=save_dir,
+            rng=random.Random(4034),
+        )
+        game.play_current_state = lambda: (_ for _ in ()).throw(gameplay_base.QuitProgram())
+        try:
+            game.run()
+            self.assertIsNotNone(game.state)
+            assert game.state is not None
+            self.assertEqual(game.state.player.name, "Iri")
+            self.assertEqual(game.state.gold, 37)
+            rendered = self.plain_output(log)
+            self.assertIn("Continue", rendered)
+            self.assertIn("Loaded continue_latest.", rendered)
+        finally:
+            save_path.unlink(missing_ok=True)
+            settings_path = save_dir / "settings.json"
+            settings_path.unlink(missing_ok=True)
+            save_dir.rmdir()
 
     def test_main_menu_stacks_panels_at_narrow_terminal_width(self) -> None:
         if not RICH_AVAILABLE:
