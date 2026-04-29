@@ -37,6 +37,7 @@ from kivy.uix.widget import Widget
 from .game import TextDnDGame
 from .gameplay.base import QuitProgram
 from .gameplay.constants import MENU_PAGE_SIZE
+from .data.story.companions import COMPANION_PROFILES
 from .drafts.map_system import ACT1_HYBRID_MAP, ACT2_ENEMY_DRIVEN_MAP
 from .drafts.map_system.runtime import (
     available_travel_edges,
@@ -73,6 +74,23 @@ from .ui.examine import (
     feature_examine_entry,
     resource_examine_entry,
     status_examine_entry,
+)
+from .ui.command_snapshots import (
+    build_camp_snapshot,
+    build_gear_snapshot,
+    build_inventory_snapshot,
+    build_journal_snapshot,
+)
+from .ui.command_actions import (
+    drop_inventory_item,
+    equip_item_for_member,
+    magic_mirror_unavailable_reason,
+    revive_dead_ally,
+    take_long_rest,
+    take_short_rest,
+    unequip_member_slot,
+    usable_inventory_targets,
+    use_inventory_item_on_target,
 )
 
 
@@ -894,6 +912,1088 @@ class NativeMapView(BoxLayout):
         return f"[b]Pressure[/b]: {escape_kivy_markup(' | '.join(parts))}"
 
 
+class NativeCommandWorkspace(BoxLayout):
+    RARITY_HEX = {
+        "common": "f0e7d1",
+        "uncommon": "86efac",
+        "rare": "70a8ff",
+        "epic": "d58cff",
+        "legendary": "facc15",
+    }
+
+    def __init__(self, screen: "GameScreen", **kwargs):
+        super().__init__(
+            orientation="vertical",
+            spacing=dp(6),
+            size_hint=(1, 1),
+            opacity=0,
+            disabled=True,
+            **kwargs,
+        )
+        self.screen = screen
+        self.mode = ""
+        self.inventory_filter_key = "all"
+        self.inventory_selected_item_id: str | None = None
+        self.inventory_use_item_id: str | None = None
+        self.gear_selected_member_index = 0
+        self.gear_selected_slot: str | None = None
+        self.camp_view = "overview"
+        self.journal_section_index = 0
+        self.feedback_message = ""
+        self.confirm_action: dict[str, object] | None = None
+
+    def _theme(self) -> dict[str, tuple[float, float, float, float]]:
+        return self.screen.theme
+
+    def _activate_mode(self, mode: str) -> None:
+        if self.mode != mode:
+            self.feedback_message = ""
+        self.mode = mode
+
+    def _compact_layout(self) -> bool:
+        width = self.width
+        if width <= dp(80):
+            width = getattr(self.screen, "width", width)
+        return width < dp(620)
+
+    def _split_body(
+        self,
+        *,
+        first_weight: float = 0.5,
+        second_weight: float = 0.5,
+    ) -> tuple[BoxLayout, tuple[float, float], tuple[float, float]]:
+        if self._compact_layout():
+            return (
+                BoxLayout(orientation="vertical", spacing=dp(6)),
+                (1, first_weight),
+                (1, second_weight),
+            )
+        return (
+            BoxLayout(orientation="horizontal", spacing=dp(6)),
+            (first_weight, 1),
+            (second_weight, 1),
+        )
+
+    def _rarity_hex(self, rarity: str) -> str:
+        return self.RARITY_HEX.get(str(rarity), self.RARITY_HEX["common"])
+
+    def _sync_label(self, label: Label, *_args) -> None:
+        label.text_size = (max(1, label.width - dp(8)), None)
+        label.height = max(dp(24), label.texture_size[1] + dp(8))
+
+    def _sync_button(self, button: Button, *_args) -> None:
+        button.text_size = (
+            max(1, button.width - dp(16)),
+            max(1, button.height - dp(8)),
+        )
+
+    def _label(
+        self,
+        text: str,
+        *,
+        font_size: str = "13sp",
+        bold: bool = False,
+        color: tuple[float, float, float, float] | None = None,
+        height: float | None = None,
+    ) -> WrappedLabel:
+        label = WrappedLabel(
+            text=text,
+            markup=True,
+            color=color or self._theme()["text"],
+            font_size=font_size,
+            bold=bold,
+            halign="left",
+            valign="top",
+            size_hint_y=None,
+            height=height if height is not None else dp(28),
+        )
+        self.screen._apply_font(label, "ui")
+        label.bind(width=self._sync_label, texture_size=self._sync_label)
+        self._sync_label(label)
+        return label
+
+    def _button(
+        self,
+        text: str,
+        callback,
+        *,
+        role: str = "choice",
+        height: float = 44,
+        font_size: str = "13sp",
+        selected: bool = False,
+        disabled: bool = False,
+    ) -> Button:
+        theme = self._theme()
+        if selected:
+            background = theme["choice_group_bg"]
+            color = theme["choice_group_text"]
+        elif role == "back":
+            background = theme["choice_back_bg"]
+            color = theme["choice_back_text"]
+        elif role == "danger":
+            background = theme["choice_end_turn_bg"]
+            color = theme["choice_end_turn_text"]
+        else:
+            background = theme["choice_bg"]
+            color = theme["choice_text"]
+        button = Button(
+            text=text,
+            markup=True,
+            background_normal="",
+            background_color=background,
+            color=color,
+            font_size=font_size,
+            halign="left",
+            valign="middle",
+            size_hint_y=None,
+            height=dp(height),
+            disabled=disabled,
+            opacity=0.58 if disabled else 1,
+        )
+        self.screen._apply_font(button, "ui")
+        button.bind(size=self._sync_button)
+        self._sync_button(button)
+        if callback is not None and not disabled:
+            button.bind(on_release=lambda *_args: callback())
+        return button
+
+    def _scrolling_grid(self) -> tuple[ScrollView, GridLayout]:
+        scroll = ScrollView(do_scroll_x=False, bar_width=dp(5))
+        grid = GridLayout(cols=1, spacing=dp(5), size_hint_y=None)
+        grid.bind(minimum_height=grid.setter("height"))
+        scroll.add_widget(grid)
+        return scroll, grid
+
+    def _scroll_label(self, label: WrappedLabel) -> ScrollView:
+        scroll = ScrollView(do_scroll_x=False, bar_width=dp(5))
+        scroll.add_widget(label)
+        Clock.schedule_once(lambda _dt: setattr(scroll, "scroll_y", 1), 0)
+        return scroll
+
+    def _panel(self, *, orientation: str = "vertical", size_hint=(1, 1), padding: int = 6) -> PanelBox:
+        return PanelBox(
+            orientation=orientation,
+            size_hint=size_hint,
+            padding=[dp(padding), dp(padding), dp(padding), dp(padding)],
+            spacing=dp(5),
+            background_color=self._theme()["panel"],
+            radius=5,
+        )
+
+    def _command_nav(self, active: str) -> GridLayout:
+        nav = GridLayout(cols=4, spacing=dp(5), size_hint_y=None, height=dp(36))
+        for mode, label in (
+            ("journal", "Journal"),
+            ("inventory", "Items"),
+            ("gear", "Gear"),
+            ("camp", "Camp"),
+        ):
+            callback = {
+                "journal": self.render_journal,
+                "inventory": self.render_inventory,
+                "gear": self.render_gear,
+                "camp": self.render_camp,
+            }[mode]
+            nav.add_widget(
+                self._button(
+                    label,
+                    callback,
+                    height=32,
+                    font_size="11sp",
+                    selected=mode == active,
+                )
+            )
+        return nav
+
+    def show(self) -> None:
+        self.opacity = 1
+        self.disabled = False
+
+    def hide(self) -> None:
+        self.opacity = 0
+        self.disabled = True
+        self.clear_widgets()
+        self.mode = ""
+        self.confirm_action = None
+        self.inventory_use_item_id = None
+
+    def refresh_active(self) -> None:
+        if self.mode == "journal":
+            self.render_journal()
+        elif self.mode == "inventory":
+            self.render_inventory(
+                filter_key=self.inventory_filter_key,
+                selected_item_id=self.inventory_selected_item_id,
+            )
+        elif self.mode == "gear":
+            self.render_gear(
+                selected_member_index=self.gear_selected_member_index,
+                selected_slot=self.gear_selected_slot,
+            )
+        elif self.mode == "camp":
+            self.render_camp(view=self.camp_view)
+
+    def render_command(self, command: str) -> None:
+        normalized = " ".join(str(command).strip().lower().split())
+        self.confirm_action = None
+        self.inventory_use_item_id = None
+        if normalized == "journal":
+            self.render_journal()
+        elif normalized in {"inventory", "backpack", "bag"}:
+            self.render_inventory()
+        elif normalized in {"gear", "equipment"}:
+            self.render_gear()
+        elif normalized == "camp":
+            self.render_camp()
+
+    def go_back(self) -> None:
+        self.confirm_action = None
+        self.inventory_use_item_id = None
+        if self.mode == "camp" and self.camp_view != "overview":
+            self.render_camp(view="overview")
+            return
+        self.screen.close_side_command_panel()
+
+    def set_feedback(self, message: str) -> None:
+        self.feedback_message = str(message or "")
+
+    def _feedback_label(self) -> WrappedLabel | None:
+        if not self.feedback_message:
+            return None
+        return self._label(
+            f"[color=#d6c59a]{escape_kivy_markup(self.feedback_message)}[/color]",
+            font_size="12sp",
+        )
+
+    def _confirmation_panel(self, prompt: str, confirm_callback, cancel_callback) -> PanelBox:
+        panel = self._panel(padding=6)
+        panel.size_hint_y = None
+        panel.height = dp(108)
+        panel.add_widget(self._label(f"[b][color=#facc15]{escape_kivy_markup(prompt)}[/color][/b]", font_size="13sp"))
+        row = GridLayout(cols=2, spacing=dp(5), size_hint_y=None, height=dp(42))
+        row.add_widget(self._button("Confirm", confirm_callback, height=38, font_size="12sp", selected=True))
+        row.add_widget(self._button("Cancel", cancel_callback, role="back", height=38, font_size="12sp"))
+        panel.add_widget(row)
+        return panel
+
+    def _section_title(self, title: str, subtitle: str = "") -> WrappedLabel:
+        subtitle_markup = f"\n[size=12sp][color=#b9ad91]{escape_kivy_markup(subtitle)}[/color][/size]" if subtitle else ""
+        return self._label(
+            f"[size=17sp][b][color=#facc15]{escape_kivy_markup(title)}[/color][/b][/size]{subtitle_markup}",
+            font_size="15sp",
+            bold=True,
+        )
+
+    def _stat_line(self, label: str, value: str) -> str:
+        return f"[b][color=#d6c59a]{escape_kivy_markup(label)}[/color][/b] {escape_kivy_markup(value)}"
+
+    def render_journal(self, *, section_index: int | None = None) -> None:
+        self._activate_mode("journal")
+        if section_index is not None:
+            self.journal_section_index = int(section_index)
+        self.clear_widgets()
+        game = self.screen.active_game()
+        if game is None or getattr(game, "state", None) is None:
+            self.add_widget(self._label("[color=#8f7d62]There is no active journal yet.[/color]"))
+            return
+        snapshot = build_journal_snapshot(game)
+        self.add_widget(self._command_nav("journal"))
+        tabs = GridLayout(cols=4, rows=2, spacing=dp(5), size_hint_y=None, height=dp(76))
+        sections = (
+            ("Snapshot", self._journal_snapshot_markup(snapshot)),
+            ("Quests", self._journal_quests_markup(snapshot)),
+            ("Clues", self._numbered_markup("Unresolved Clues", snapshot.unresolved_clues, empty="No unresolved clues tracked yet.")),
+            ("Choices", self._numbered_markup("Major Choices", snapshot.major_choices, empty="No major choices logged yet.")),
+            ("Pressure", self._numbered_markup("Faction Pressure", snapshot.faction_pressure, empty="No faction pressure tracked yet.")),
+            ("Companions", self._numbered_markup("Companion Disposition", snapshot.companion_disposition, empty="No companion trust changes tracked yet.")),
+            ("Updates", self._journal_updates_markup(snapshot)),
+        )
+        self.journal_section_index = max(0, min(self.journal_section_index, len(sections) - 1))
+        content_label = self._label("", font_size="13sp")
+
+        def set_section(index: int) -> None:
+            title, markup = sections[index]
+            content_label.text = markup
+            self.screen.side_command_title_label.text = escape_kivy_markup(f"Journal - {title}")
+            self._sync_label(content_label)
+
+        for index, (label, _markup) in enumerate(sections):
+            tabs.add_widget(
+                self._button(
+                    escape_kivy_markup(label),
+                    lambda value=index: self.render_journal(section_index=value),
+                    height=34,
+                    font_size="12sp",
+                    selected=index == self.journal_section_index,
+                )
+            )
+        self.add_widget(tabs)
+        scroll = ScrollView(do_scroll_x=False, bar_width=dp(5))
+        scroll.add_widget(content_label)
+        self.add_widget(scroll)
+        if snapshot.empty_message:
+            content_label.text = f"[color=#8f7d62]{escape_kivy_markup(snapshot.empty_message)}[/color]"
+        else:
+            set_section(self.journal_section_index)
+        Clock.schedule_once(lambda _dt: setattr(scroll, "scroll_y", 1), 0)
+
+    def _journal_snapshot_markup(self, snapshot) -> str:
+        lines = [
+            "[size=17sp][b][color=#facc15]Campaign Snapshot[/color][/b][/size]",
+            "",
+            self._stat_line("Location", snapshot.location),
+            self._stat_line("Objective", snapshot.objective),
+            self._stat_line("Quest load", snapshot.quest_load),
+            self._stat_line("Leads", snapshot.lead_count),
+        ]
+        for line in snapshot.extra_snapshot_lines:
+            lines.append(self._stat_line("Act II", str(line)))
+        consequences = "\n".join(f"{index}. {escape_kivy_markup(line)}" for index, line in enumerate(snapshot.consequences, start=1))
+        if consequences:
+            lines.extend(["", "[b][color=#d6c59a]Current Consequences[/color][/b]", consequences])
+        return "\n".join(lines)
+
+    def _journal_quests_markup(self, snapshot) -> str:
+        lines = ["[size=17sp][b][color=#facc15]Quests[/color][/b][/size]"]
+        groups = (
+            ("Ready To Turn In", snapshot.ready_quests),
+            ("Active", snapshot.active_quests),
+            ("Completed", snapshot.completed_quests),
+        )
+        wrote_any = False
+        for title, quests in groups:
+            lines.extend(["", f"[b][color=#d6c59a]{escape_kivy_markup(title)}[/color][/b]"])
+            if not quests:
+                lines.append("[color=#8f7d62]Nothing logged.[/color]")
+                continue
+            wrote_any = True
+            for quest in quests:
+                lines.append(f"[b]{escape_kivy_markup(quest.title)}[/b] [color=#8f7d62]{escape_kivy_markup(quest.giver)}[/color]")
+                if quest.summary and title == "Active":
+                    lines.append(escape_kivy_markup(quest.summary))
+                lines.append(self._stat_line("Objective", quest.objective))
+                if title == "Ready To Turn In":
+                    lines.append(self._stat_line("Turn in", quest.turn_in))
+                lines.append(self._stat_line("Rewards", quest.rewards))
+                if quest.latest_note:
+                    lines.append(self._stat_line("Latest", quest.latest_note))
+                lines.append("")
+        if not wrote_any:
+            lines.append("[color=#8f7d62]No quest entries are tracked yet.[/color]")
+        return "\n".join(lines).strip()
+
+    def _numbered_markup(self, title: str, lines: tuple[str, ...], *, empty: str) -> str:
+        output = [f"[size=17sp][b][color=#facc15]{escape_kivy_markup(title)}[/color][/b][/size]", ""]
+        if not lines:
+            output.append(f"[color=#8f7d62]{escape_kivy_markup(empty)}[/color]")
+            return "\n".join(output)
+        output.extend(f"{index}. {escape_kivy_markup(line)}" for index, line in enumerate(lines, start=1))
+        return "\n".join(output)
+
+    def _journal_updates_markup(self, snapshot) -> str:
+        lines = ["[size=17sp][b][color=#facc15]Recent Updates[/color][/b][/size]", ""]
+        if not snapshot.recent_updates:
+            lines.append("[color=#8f7d62]No recent updates logged.[/color]")
+        else:
+            lines.extend(f"{index}. {escape_kivy_markup(line)}" for index, line in enumerate(snapshot.recent_updates, start=1))
+        if snapshot.older_note_count:
+            lines.extend(["", f"[color=#d6c59a]Older notes archived in this run: {snapshot.older_note_count}[/color]"])
+        return "\n".join(lines)
+
+    def render_inventory(self, *, filter_key: str = "all", selected_item_id: str | None = None) -> None:
+        self._activate_mode("inventory")
+        if selected_item_id != self.inventory_selected_item_id:
+            self.inventory_use_item_id = None
+            self.confirm_action = None
+        self.inventory_filter_key = filter_key
+        self.inventory_selected_item_id = selected_item_id
+        self.clear_widgets()
+        game = self.screen.active_game()
+        if game is None or getattr(game, "state", None) is None:
+            self.add_widget(self._label("[color=#8f7d62]There is no shared inventory yet.[/color]"))
+            return
+        snapshot = build_inventory_snapshot(game, filter_key=filter_key, selected_item_id=selected_item_id)
+        self.inventory_filter_key = snapshot.filter_key
+        self.inventory_selected_item_id = snapshot.selected_item_id
+        self.add_widget(self._command_nav("inventory"))
+        self.add_widget(
+            self._section_title(
+                "Shared Inventory",
+                f"{snapshot.gold_label} | Supplies {snapshot.supply_points} | {snapshot.total_available} free / {snapshot.total_quantity} carried",
+            )
+        )
+        feedback = self._feedback_label()
+        if feedback is not None:
+            self.add_widget(feedback)
+
+        filter_grid = GridLayout(cols=4, rows=2, spacing=dp(5), size_hint_y=None, height=dp(76))
+        for filter_snapshot in snapshot.filters:
+            text = f"{escape_kivy_markup(filter_snapshot.label)}\n[size=11sp]{filter_snapshot.count}[/size]"
+            filter_grid.add_widget(
+                self._button(
+                    text,
+                    lambda key=filter_snapshot.key: self.render_inventory(filter_key=key),
+                    height=34,
+                    font_size="11sp",
+                    selected=filter_snapshot.key == snapshot.filter_key,
+                )
+            )
+        self.add_widget(filter_grid)
+
+        body, list_hint, detail_hint = self._split_body(first_weight=0.46, second_weight=0.54)
+        list_panel = self._panel(size_hint=list_hint, padding=4)
+        detail_panel = self._panel(size_hint=detail_hint, padding=6)
+        scroll, grid = self._scrolling_grid()
+        if not snapshot.items:
+            grid.add_widget(self._label(f"[color=#8f7d62]{escape_kivy_markup(snapshot.empty_message)}[/color]"))
+        for item in snapshot.items:
+            rarity = self._rarity_hex(item.rarity)
+            free_text = f"{item.available} free" if item.equipped else f"x{item.quantity}"
+            if item.equipped:
+                free_text += f" | {item.equipped} equipped"
+            row = (
+                f"[b][color=#{rarity}]{escape_kivy_markup(item.name)}[/color][/b]\n"
+                f"[size=11sp]{escape_kivy_markup(item.kind_label)} | {escape_kivy_markup(item.rarity_title)} | {escape_kivy_markup(free_text)}[/size]"
+            )
+            grid.add_widget(
+                self._button(
+                    row,
+                    lambda value=item.item_id: self.render_inventory(filter_key=snapshot.filter_key, selected_item_id=value),
+                    height=58,
+                    font_size="12sp",
+                    selected=item.item_id == snapshot.selected_item_id,
+                )
+            )
+        list_panel.add_widget(scroll)
+        detail_panel.add_widget(self._scroll_label(self._inventory_detail_label(snapshot.selected_item)))
+        controls = self._inventory_controls(snapshot.selected_item)
+        if controls is not None:
+            detail_panel.add_widget(controls)
+        body.add_widget(list_panel)
+        body.add_widget(detail_panel)
+        self.add_widget(body)
+        Clock.schedule_once(lambda _dt: setattr(scroll, "scroll_y", 1), 0)
+
+    def _inventory_detail_label(self, item) -> WrappedLabel:
+        if item is None:
+            return self._label("[color=#8f7d62]Select an item to inspect it.[/color]")
+        rarity = self._rarity_hex(item.rarity)
+        action_bits = []
+        if item.usable:
+            action_bits.append("Usable")
+        if item.equippable:
+            action_bits.append(f"Equips: {item.slot_label or 'Gear'}")
+        action_text = " | ".join(action_bits) if action_bits else "No direct action"
+        lines = [
+            f"[size=17sp][b][color=#{rarity}]{escape_kivy_markup(item.name)}[/color][/b][/size]",
+            f"[color=#b9ad91]{escape_kivy_markup(item.rarity_title)} {escape_kivy_markup(item.kind_label)}[/color]",
+            "",
+            self._stat_line("Quantity", f"{item.quantity} carried | {item.available} free | {item.equipped} equipped"),
+            self._stat_line("Value", item.value_label),
+            self._stat_line("Supply", item.supply_label),
+            self._stat_line("Action flags", action_text),
+            "",
+            escape_kivy_markup(item.description),
+        ]
+        if item.rules:
+            lines.extend(["", "[b][color=#d6c59a]Rules[/color][/b]", escape_kivy_markup(item.rules)])
+        if item.source:
+            lines.extend(["", "[b][color=#d6c59a]Source[/color][/b]", escape_kivy_markup(item.source)])
+        return self._label("\n".join(lines), font_size="13sp")
+
+    def _inventory_controls(self, item):
+        if item is None:
+            return None
+        game = self.screen.active_game()
+        if game is None:
+            return None
+        if self.confirm_action and self.confirm_action.get("mode") == "inventory":
+            action = str(self.confirm_action.get("action", ""))
+            if action == "drop":
+                return self._confirmation_panel(
+                    f"Drop {item.name}?",
+                    lambda: self._confirm_drop_item(str(self.confirm_action.get("item_id", item.item_id))),
+                    lambda: self._cancel_inventory_action(),
+                )
+            if action == "use":
+                target_index = int(self.confirm_action.get("target_index", 0) or 0)
+                target = game.state.party_members()[target_index] if game.state is not None and 0 <= target_index < len(game.state.party_members()) else None
+                target_name = getattr(target, "name", "this ally")
+                return self._confirmation_panel(
+                    f"Use {item.name} on {target_name}?",
+                    lambda: self._confirm_use_item(str(self.confirm_action.get("item_id", item.item_id)), target_index),
+                    lambda: self._cancel_inventory_action(),
+                )
+        if self.inventory_use_item_id == item.item_id:
+            panel = self._panel(padding=6)
+            panel.size_hint_y = None
+            targets = usable_inventory_targets(game, item.item_id)
+            rows = max(1, min(4, len(targets) + 1))
+            panel.height = dp(38 + rows * 42)
+            panel.add_widget(self._label("[b][color=#facc15]Choose Target[/color][/b]", font_size="12sp"))
+            target_scroll, grid = self._scrolling_grid()
+            target_scroll.size_hint_y = None
+            target_scroll.height = dp(rows * 42)
+            if not targets:
+                grid.add_widget(self._label("[color=#8f7d62]No valid target right now.[/color]", font_size="12sp"))
+            for target_index, target in targets:
+                label = f"{escape_kivy_markup(target.name)}\n[size=11sp]{escape_kivy_markup(game.character_health_summary(target))}[/size]"
+                grid.add_widget(
+                    self._button(
+                        label,
+                        lambda idx=target_index: self._ask_use_item(item.item_id, idx),
+                        height=38,
+                        font_size="12sp",
+                    )
+                )
+            grid.add_widget(self._button("Back", self._cancel_inventory_action, role="back", height=38, font_size="12sp"))
+            panel.add_widget(target_scroll)
+            return panel
+        action_count = 1 if self._compact_layout() else 3
+        row_height = 126 if self._compact_layout() else 44
+        row = GridLayout(cols=action_count, spacing=dp(5), size_hint_y=None, height=dp(row_height))
+        use_label = "Use"
+        if not item.usable:
+            use_label = "Use\n[size=11sp]No direct use[/size]"
+        elif item.available <= 0:
+            use_label = "Use\n[size=11sp]None free[/size]"
+        drop_label = "Drop 1" if item.available > 0 else "Drop 1\n[size=11sp]None free[/size]"
+        row.add_widget(
+            self._button(
+                use_label,
+                lambda: self._start_use_item(item.item_id),
+                height=40,
+                font_size="12sp",
+                disabled=not item.usable or item.available <= 0,
+            )
+        )
+        row.add_widget(
+            self._button(
+                drop_label,
+                lambda: self._ask_drop_item(item.item_id),
+                height=40,
+                font_size="12sp",
+                disabled=item.available <= 0,
+            )
+        )
+        row.add_widget(self._button("Back", self.go_back, role="back", height=40, font_size="12sp"))
+        return row
+
+    def _cancel_inventory_action(self) -> None:
+        self.confirm_action = None
+        self.inventory_use_item_id = None
+        self.render_inventory(filter_key=self.inventory_filter_key, selected_item_id=self.inventory_selected_item_id)
+
+    def _start_use_item(self, item_id: str) -> None:
+        self.confirm_action = None
+        self.inventory_use_item_id = item_id
+        self.render_inventory(filter_key=self.inventory_filter_key, selected_item_id=item_id)
+
+    def _ask_use_item(self, item_id: str, target_index: int) -> None:
+        self.confirm_action = {"mode": "inventory", "action": "use", "item_id": item_id, "target_index": target_index}
+        self.render_inventory(filter_key=self.inventory_filter_key, selected_item_id=item_id)
+
+    def _confirm_use_item(self, item_id: str, target_index: int) -> None:
+        self.confirm_action = None
+        self.inventory_use_item_id = None
+        result = use_inventory_item_on_target(self.screen.active_game(), item_id, target_index)
+        self.set_feedback(result.message)
+        self.render_inventory(filter_key=self.inventory_filter_key, selected_item_id=item_id)
+
+    def _ask_drop_item(self, item_id: str) -> None:
+        self.confirm_action = {"mode": "inventory", "action": "drop", "item_id": item_id}
+        self.render_inventory(filter_key=self.inventory_filter_key, selected_item_id=item_id)
+
+    def _confirm_drop_item(self, item_id: str) -> None:
+        self.confirm_action = None
+        result = drop_inventory_item(self.screen.active_game(), item_id, 1)
+        self.set_feedback(result.message)
+        self.render_inventory(filter_key=self.inventory_filter_key, selected_item_id=item_id)
+
+    def render_gear(self, *, selected_member_index: int = 0, selected_slot: str | None = None) -> None:
+        self._activate_mode("gear")
+        if selected_member_index != self.gear_selected_member_index or selected_slot != self.gear_selected_slot:
+            self.confirm_action = None
+        self.gear_selected_member_index = selected_member_index
+        self.gear_selected_slot = selected_slot
+        self.clear_widgets()
+        game = self.screen.active_game()
+        if game is None or getattr(game, "state", None) is None:
+            self.add_widget(self._label("[color=#8f7d62]There is no active party gear to manage yet.[/color]"))
+            return
+        snapshot = build_gear_snapshot(
+            game,
+            selected_member_index=selected_member_index,
+            selected_slot=selected_slot,
+        )
+        self.gear_selected_member_index = snapshot.selected_member_index
+        self.gear_selected_slot = snapshot.selected_slot
+        self.add_widget(self._command_nav("gear"))
+        subtitle = "Equipment changes are locked during combat." if snapshot.combat_locked else "Active loadouts and shared inventory candidates."
+        self.add_widget(self._section_title("Gear", subtitle))
+        feedback = self._feedback_label()
+        if feedback is not None:
+            self.add_widget(feedback)
+        member_columns = max(1, min(3, len(snapshot.members) or 1))
+        member_rows = max(1, math.ceil(max(1, len(snapshot.members)) / member_columns))
+        member_grid = GridLayout(
+            cols=member_columns,
+            rows=member_rows,
+            spacing=dp(5),
+            size_hint_y=None,
+            height=dp(member_rows * 42 + max(0, member_rows - 1) * 5),
+        )
+        for member in snapshot.members:
+            member_grid.add_widget(
+                self._button(
+                    escape_kivy_markup(member.name),
+                    lambda index=member.index: self.render_gear(selected_member_index=index),
+                    height=42,
+                    font_size="12sp",
+                    selected=member.index == snapshot.selected_member_index,
+                )
+            )
+        self.add_widget(member_grid)
+        if not snapshot.members:
+            self.add_widget(self._label("[color=#8f7d62]No party members are available.[/color]"))
+            return
+        member = snapshot.members[snapshot.selected_member_index]
+        body, slot_hint, detail_hint = self._split_body(first_weight=0.42, second_weight=0.58)
+        slot_panel = self._panel(size_hint=slot_hint, padding=4)
+        detail_panel = self._panel(size_hint=detail_hint, padding=6)
+        scroll, grid = self._scrolling_grid()
+        selected_slot_snapshot = None
+        for slot in member.slots:
+            if slot.slot == snapshot.selected_slot:
+                selected_slot_snapshot = slot
+            current = slot.current_name
+            row = (
+                f"[b][color=#facc15]{escape_kivy_markup(slot.label)}[/color][/b]\n"
+                f"[size=11sp]{escape_kivy_markup(current)} | {len(slot.candidates)} candidate(s)[/size]"
+            )
+            grid.add_widget(
+                self._button(
+                    row,
+                    lambda value=slot.slot: self.render_gear(
+                        selected_member_index=snapshot.selected_member_index,
+                        selected_slot=value,
+                    ),
+                    height=55,
+                    font_size="12sp",
+                    selected=slot.slot == snapshot.selected_slot,
+                )
+            )
+        if selected_slot_snapshot is None and member.slots:
+            selected_slot_snapshot = member.slots[0]
+        slot_panel.add_widget(scroll)
+        detail_panel.add_widget(self._scroll_label(self._gear_detail_label(member, selected_slot_snapshot, snapshot.combat_locked)))
+        controls = self._gear_controls(member, selected_slot_snapshot, snapshot.combat_locked)
+        if controls is not None:
+            detail_panel.add_widget(controls)
+        body.add_widget(slot_panel)
+        body.add_widget(detail_panel)
+        self.add_widget(body)
+        Clock.schedule_once(lambda _dt: setattr(scroll, "scroll_y", 1), 0)
+
+    def _gear_detail_label(self, member, slot, combat_locked: bool) -> WrappedLabel:
+        if slot is None:
+            return self._label("[color=#8f7d62]Select a slot to inspect it.[/color]")
+        lines = [
+            f"[size=17sp][b][color=#facc15]{escape_kivy_markup(member.name)} - {escape_kivy_markup(slot.label)}[/color][/b][/size]",
+            f"[color=#b9ad91]{escape_kivy_markup(member.public_identity)}[/color]",
+            "",
+            self._stat_line("Health", member.health),
+            self._stat_line("Combat", member.combat),
+            self._stat_line("Conditions", member.conditions),
+            self._stat_line("Resources", member.resources),
+            "",
+            self._stat_line("Current", slot.current_name),
+        ]
+        if slot.current_rules:
+            lines.extend(["", "[b][color=#d6c59a]Current Rules[/color][/b]", escape_kivy_markup(slot.current_rules)])
+        if slot.unequip_comparison:
+            lines.extend(["", "[b][color=#d6c59a]Unequip Preview[/color][/b]", escape_kivy_markup(slot.unequip_comparison)])
+        lines.extend(["", "[b][color=#d6c59a]Compatible Inventory[/color][/b]"])
+        if not slot.candidates:
+            lines.append("[color=#8f7d62]No unequipped inventory item fits this slot.[/color]")
+        for candidate in slot.candidates:
+            rarity = self._rarity_hex(candidate.rarity)
+            lines.append(f"[color=#{rarity}][b]{escape_kivy_markup(candidate.name)}[/b][/color] x{candidate.available}")
+            lines.append(escape_kivy_markup(candidate.comparison))
+            if candidate.rules:
+                lines.append(f"[size=12sp][color=#b9ad91]{escape_kivy_markup(candidate.rules)}[/color][/size]")
+            lines.append("")
+        if combat_locked:
+            lines.append("[color=#f87171]Equipment changes are locked during combat.[/color]")
+        return self._label("\n".join(lines).strip(), font_size="13sp")
+
+    def _gear_controls(self, member, slot, combat_locked: bool):
+        if slot is None:
+            return None
+        if self.confirm_action and self.confirm_action.get("mode") == "gear":
+            action = str(self.confirm_action.get("action", ""))
+            if action == "unequip":
+                return self._confirmation_panel(
+                    f"Clear {slot.label} for {member.name}?",
+                    lambda: self._confirm_unequip_slot(member.index, slot.slot),
+                    lambda: self._cancel_gear_action(),
+                )
+            if action == "equip":
+                item_name = str(self.confirm_action.get("item_name", "this item"))
+                return self._confirmation_panel(
+                    f"Equip {item_name} in {slot.label}?",
+                    lambda: self._confirm_equip_item(member.index, slot.slot, str(self.confirm_action.get("item_id", ""))),
+                    lambda: self._cancel_gear_action(),
+                )
+        panel = self._panel(padding=6)
+        button_count = 1 + len(slot.candidates) + (1 if slot.current_item_id else 0)
+        rows = max(1, min(4, button_count))
+        panel.size_hint_y = None
+        panel.height = dp(42 + rows * 42)
+        panel.add_widget(self._label("[b][color=#facc15]Gear Actions[/color][/b]", font_size="12sp"))
+        scroll, grid = self._scrolling_grid()
+        scroll.size_hint_y = None
+        scroll.height = dp(rows * 42)
+        if slot.current_item_id is not None:
+            grid.add_widget(
+                self._button(
+                    f"Unequip {escape_kivy_markup(slot.current_name)}",
+                    lambda: self._ask_unequip_slot(member.index, slot.slot),
+                    height=38,
+                    font_size="12sp",
+                    disabled=combat_locked,
+                )
+            )
+        for candidate in slot.candidates:
+            label = (
+                f"Equip {escape_kivy_markup(candidate.name)}\n"
+                f"[size=11sp]{escape_kivy_markup(candidate.comparison)}[/size]"
+            )
+            grid.add_widget(
+                self._button(
+                    label,
+                    lambda item_id=candidate.item_id, item_name=candidate.name: self._ask_equip_item(
+                        member.index,
+                        slot.slot,
+                        item_id,
+                        item_name,
+                    ),
+                    height=48,
+                    font_size="11sp",
+                    disabled=combat_locked,
+                )
+            )
+        grid.add_widget(self._button("Back", self.go_back, role="back", height=38, font_size="12sp"))
+        panel.add_widget(scroll)
+        return panel
+
+    def _cancel_gear_action(self) -> None:
+        self.confirm_action = None
+        self.render_gear(selected_member_index=self.gear_selected_member_index, selected_slot=self.gear_selected_slot)
+
+    def _ask_unequip_slot(self, member_index: int, slot: str) -> None:
+        self.confirm_action = {"mode": "gear", "action": "unequip", "member_index": member_index, "slot": slot}
+        self.render_gear(selected_member_index=member_index, selected_slot=slot)
+
+    def _confirm_unequip_slot(self, member_index: int, slot: str) -> None:
+        self.confirm_action = None
+        result = unequip_member_slot(self.screen.active_game(), member_index, slot)
+        self.set_feedback(result.message)
+        self.render_gear(selected_member_index=member_index, selected_slot=slot)
+
+    def _ask_equip_item(self, member_index: int, slot: str, item_id: str, item_name: str) -> None:
+        self.confirm_action = {
+            "mode": "gear",
+            "action": "equip",
+            "member_index": member_index,
+            "slot": slot,
+            "item_id": item_id,
+            "item_name": item_name,
+        }
+        self.render_gear(selected_member_index=member_index, selected_slot=slot)
+
+    def _confirm_equip_item(self, member_index: int, slot: str, item_id: str) -> None:
+        self.confirm_action = None
+        result = equip_item_for_member(self.screen.active_game(), member_index, slot, item_id)
+        self.set_feedback(result.message)
+        self.render_gear(selected_member_index=member_index, selected_slot=slot)
+
+    def render_camp(self, *, view: str = "overview") -> None:
+        self._activate_mode("camp")
+        self.camp_view = view
+        self.inventory_use_item_id = None
+        self.clear_widgets()
+        game = self.screen.active_game()
+        if game is None or getattr(game, "state", None) is None:
+            self.add_widget(self._label("[color=#8f7d62]There is no active adventure yet, so camp is not available.[/color]"))
+            return
+        snapshot = build_camp_snapshot(game)
+        self.add_widget(self._command_nav("camp"))
+        self.add_widget(self._section_title("Camp", f"{snapshot.gold_label} | Supplies {snapshot.supply_points} | Short rests {snapshot.short_rests_remaining}"))
+        feedback = self._feedback_label()
+        if feedback is not None:
+            self.add_widget(feedback)
+        if self.confirm_action and self.confirm_action.get("mode") == "camp":
+            confirmation = self._camp_confirmation()
+            if confirmation is not None:
+                self.add_widget(confirmation)
+        if view == "party":
+            self._render_camp_party(snapshot)
+        elif view == "supplies":
+            self._render_camp_supplies(snapshot)
+        elif view == "recovery":
+            self._render_camp_recovery(snapshot)
+        elif view == "talk":
+            self._render_camp_talk(snapshot)
+        elif view == "banter":
+            self._render_camp_banter(snapshot)
+        else:
+            self._render_camp_overview(snapshot)
+
+    def _camp_confirmation(self):
+        action = str(self.confirm_action.get("action", ""))
+        if action == "short_rest":
+            return self._confirmation_panel("Take a short rest?", self._confirm_short_rest, self._cancel_camp_action)
+        if action == "long_rest":
+            game = self.screen.active_game()
+            cost = game.long_rest_supply_cost() if game is not None else 0
+            return self._confirmation_panel(f"Take a long rest for {cost} supply points?", self._confirm_long_rest, self._cancel_camp_action)
+        if action == "revive":
+            return self._confirmation_panel(
+                f"Use Revivify on {self.confirm_action.get('target_name', 'this ally')}?",
+                lambda: self._confirm_revive(int(self.confirm_action.get("target_index", 0) or 0)),
+                self._cancel_camp_action,
+            )
+        return None
+
+    def _render_camp_overview(self, snapshot) -> None:
+        body, status_hint, action_hint = self._split_body(first_weight=0.46, second_weight=0.54)
+        status_panel = self._panel(size_hint=status_hint, padding=6)
+        lines = [
+            "[size=17sp][b][color=#facc15]Camp Ledger[/color][/b][/size]",
+            "",
+            self._stat_line("Gold", snapshot.gold_label),
+            self._stat_line("Supplies", str(snapshot.supply_points)),
+            self._stat_line("Short rests", str(snapshot.short_rests_remaining)),
+            self._stat_line("Active party", str(snapshot.active_party_count)),
+            self._stat_line("Camp roster", str(snapshot.camp_roster_count)),
+        ]
+        if snapshot.digest_lines:
+            lines.extend(["", "[b][color=#d6c59a]Act II Digest[/color][/b]"])
+            lines.extend(escape_kivy_markup(line) for line in snapshot.digest_lines)
+        status_panel.add_widget(self._scroll_label(self._label("\n".join(lines), font_size="13sp")))
+
+        action_panel = self._panel(size_hint=action_hint, padding=6)
+        scroll, grid = self._scrolling_grid()
+        action_map = {
+            "party": lambda: self.render_camp(view="party"),
+            "supplies": lambda: self.render_camp(view="supplies"),
+            "recovery": lambda: self.render_camp(view="recovery"),
+            "talk": lambda: self.render_camp(view="talk"),
+            "journal": lambda: self.render_journal(),
+            "mirror": self._show_magic_mirror_reason,
+            "break": self.screen.close_side_command_panel,
+            "banter": lambda: self.render_camp(view="banter"),
+        }
+        for action in snapshot.actions:
+            text = escape_kivy_markup(action.label)
+            if action.reason:
+                text += f"\n[size=11sp]{escape_kivy_markup(action.reason)}[/size]"
+            grid.add_widget(
+                self._button(
+                    text,
+                    action_map.get(action.key, lambda: None),
+                    height=48,
+                    font_size="12sp",
+                    disabled=not action.enabled and action.key != "mirror",
+                )
+            )
+        action_panel.add_widget(scroll)
+        body.add_widget(status_panel)
+        body.add_widget(action_panel)
+        self.add_widget(body)
+
+    def _render_camp_party(self, snapshot) -> None:
+        body, active_hint, camp_hint = self._split_body(first_weight=0.5, second_weight=0.5)
+        active_panel = self._panel(size_hint=active_hint, padding=6)
+        camp_panel = self._panel(size_hint=camp_hint, padding=6)
+        active_lines = ["[size=16sp][b][color=#facc15]Around The Fire[/color][/b][/size]", ""]
+        active_lines.extend(escape_kivy_markup(line) for line in snapshot.active_party)
+        camp_lines = ["[size=16sp][b][color=#facc15]Camp Roster[/color][/b][/size]", ""]
+        if snapshot.camp_roster:
+            camp_lines.extend(escape_kivy_markup(line) for line in snapshot.camp_roster)
+        else:
+            camp_lines.append("[color=#8f7d62]No companions are resting at camp right now.[/color]")
+        active_panel.add_widget(self._scroll_label(self._label("\n".join(active_lines), font_size="13sp")))
+        camp_panel.add_widget(self._scroll_label(self._label("\n".join(camp_lines), font_size="13sp")))
+        body.add_widget(active_panel)
+        body.add_widget(camp_panel)
+        self.add_widget(body)
+        self.add_widget(self._button("Back To Camp", lambda: self.render_camp(view="overview"), role="back", height=40, font_size="12sp"))
+
+    def _render_camp_supplies(self, snapshot) -> None:
+        del snapshot
+        panel = self._panel(padding=8)
+        panel.add_widget(self._label("[size=16sp][b][color=#facc15]Supplies And Equipment[/color][/b][/size]", font_size="14sp"))
+        grid = GridLayout(cols=1, spacing=dp(6), size_hint_y=None, height=dp(150))
+        grid.add_widget(self._button("Open Inventory", lambda: self.render_inventory(), height=44, font_size="13sp"))
+        grid.add_widget(self._button("Open Gear", lambda: self.render_gear(), height=44, font_size="13sp"))
+        grid.add_widget(self._button("Back To Camp", lambda: self.render_camp(view="overview"), role="back", height=44, font_size="13sp"))
+        panel.add_widget(grid)
+        self.add_widget(panel)
+
+    def _render_camp_recovery(self, snapshot) -> None:
+        game = self.screen.active_game()
+        panel = self._panel(padding=8)
+        lines = [
+            "[size=16sp][b][color=#facc15]Rest And Recovery[/color][/b][/size]",
+            "",
+            self._stat_line("Short rests", str(snapshot.short_rests_remaining)),
+            self._stat_line("Supplies", str(snapshot.supply_points)),
+        ]
+        if game is not None:
+            lines.append(self._stat_line("Long rest cost", str(game.long_rest_supply_cost())))
+        panel.add_widget(self._label("\n".join(lines), font_size="13sp"))
+        scroll, grid = self._scrolling_grid()
+        scroll.size_hint_y = None
+        scroll.height = dp(230)
+        grid.add_widget(
+            self._button(
+                "Take Short Rest",
+                self._ask_short_rest,
+                height=44,
+                font_size="13sp",
+                disabled=snapshot.short_rests_remaining <= 0,
+            )
+        )
+        grid.add_widget(
+            self._button(
+                "Take Long Rest",
+                self._ask_long_rest,
+                height=44,
+                font_size="13sp",
+                disabled=game is None or snapshot.supply_points < game.long_rest_supply_cost(),
+            )
+        )
+        if game is not None:
+            dead_allies = game.dead_allies_in_company()
+            if dead_allies:
+                for index, ally in enumerate(dead_allies):
+                    grid.add_widget(
+                        self._button(
+                            f"Use Revivify: {escape_kivy_markup(ally.name)}",
+                            lambda idx=index, name=ally.name: self._ask_revive(idx, name),
+                            height=44,
+                            font_size="13sp",
+                            disabled=game.inventory_dict().get("scroll_revivify", 0) <= 0,
+                        )
+                    )
+        grid.add_widget(self._button("Back To Camp", lambda: self.render_camp(view="overview"), role="back", height=44, font_size="13sp"))
+        panel.add_widget(scroll)
+        self.add_widget(panel)
+
+    def _render_camp_talk(self, snapshot) -> None:
+        del snapshot
+        game = self.screen.active_game()
+        panel = self._panel(padding=8)
+        panel.add_widget(self._label("[size=16sp][b][color=#facc15]Talk To A Companion[/color][/b][/size]", font_size="14sp"))
+        scroll, grid = self._scrolling_grid()
+        if game is None or game.state is None or not game.state.all_companions():
+            grid.add_widget(self._label("[color=#8f7d62]No companions are with your wider company yet.[/color]"))
+        elif self.confirm_action and self.confirm_action.get("mode") == "camp_talk":
+            companion_index = int(self.confirm_action.get("companion_index", 0) or 0)
+            companions = game.state.all_companions()
+            companion = companions[companion_index] if 0 <= companion_index < len(companions) else companions[0]
+            lines = [
+                f"[size=16sp][b][color=#facc15]{escape_kivy_markup(companion.name)}[/color][/b][/size]",
+                "",
+                escape_kivy_markup(game.companion_status_line(companion)),
+                self._stat_line("Relationship", f"{game.relationship_label_for(companion)} ({companion.disposition})"),
+            ]
+            profile = COMPANION_PROFILES.get(companion.companion_id, {})
+            if profile.get("summary"):
+                lines.extend(["", escape_kivy_markup(str(profile["summary"]))])
+            grid.add_widget(self._label("\n".join(lines), font_size="13sp"))
+            grid.add_widget(self._button("Back To Companions", lambda: self._clear_camp_talk_selection(), role="back", height=40, font_size="12sp"))
+        else:
+            for index, companion in enumerate(game.state.all_companions()):
+                grid.add_widget(
+                    self._button(
+                        f"{escape_kivy_markup(companion.name)}\n[size=11sp]{escape_kivy_markup(game.relationship_label_for(companion))} ({companion.disposition})[/size]",
+                        lambda idx=index: self._show_companion_talk(idx),
+                        height=48,
+                        font_size="12sp",
+                    )
+                )
+            grid.add_widget(self._button("Back To Camp", lambda: self.render_camp(view="overview"), role="back", height=40, font_size="12sp"))
+        panel.add_widget(scroll)
+        self.add_widget(panel)
+
+    def _render_camp_banter(self, snapshot) -> None:
+        del snapshot
+        game = self.screen.active_game()
+        panel = self._panel(padding=8)
+        lines = ["[size=16sp][b][color=#facc15]Campfire Conversations[/color][/b][/size]", ""]
+        if game is None:
+            lines.append("[color=#8f7d62]No campfire is available right now.[/color]")
+        else:
+            banters = game.available_camp_banters()
+            if not banters:
+                lines.append("The campfire is companionable tonight, but no new conversation rises above the crackle.")
+            else:
+                for index, banter in enumerate(banters, start=1):
+                    lines.append(f"{index}. {escape_kivy_markup(game.camp_banter_option_label(banter))}")
+        panel.add_widget(self._scroll_label(self._label("\n".join(lines), font_size="13sp")))
+        self.add_widget(panel)
+        self.add_widget(self._button("Back To Camp", lambda: self.render_camp(view="overview"), role="back", height=40, font_size="12sp"))
+
+    def _show_companion_talk(self, companion_index: int) -> None:
+        self.confirm_action = {"mode": "camp_talk", "companion_index": companion_index}
+        self.render_camp(view="talk")
+
+    def _clear_camp_talk_selection(self) -> None:
+        self.confirm_action = None
+        self.render_camp(view="talk")
+
+    def _cancel_camp_action(self) -> None:
+        self.confirm_action = None
+        self.render_camp(view=self.camp_view)
+
+    def _ask_short_rest(self) -> None:
+        self.confirm_action = {"mode": "camp", "action": "short_rest"}
+        self.render_camp(view="recovery")
+
+    def _confirm_short_rest(self) -> None:
+        self.confirm_action = None
+        result = take_short_rest(self.screen.active_game())
+        self.set_feedback(result.message)
+        self.render_camp(view="recovery")
+
+    def _ask_long_rest(self) -> None:
+        self.confirm_action = {"mode": "camp", "action": "long_rest"}
+        self.render_camp(view="recovery")
+
+    def _confirm_long_rest(self) -> None:
+        self.confirm_action = None
+        result = take_long_rest(self.screen.active_game())
+        self.set_feedback(result.message)
+        self.render_camp(view="recovery")
+
+    def _ask_revive(self, target_index: int, target_name: str) -> None:
+        self.confirm_action = {"mode": "camp", "action": "revive", "target_index": target_index, "target_name": target_name}
+        self.render_camp(view="recovery")
+
+    def _confirm_revive(self, target_index: int) -> None:
+        self.confirm_action = None
+        result = revive_dead_ally(self.screen.active_game(), target_index)
+        self.set_feedback(result.message)
+        self.render_camp(view="recovery")
+
+    def _show_magic_mirror_reason(self) -> None:
+        self.set_feedback(magic_mirror_unavailable_reason(self.screen.active_game()))
+        self.render_camp(view="overview")
+
+
 class ClickableGameBridge:
     FAST_REVEAL_COMMANDS = {
         "camp",
@@ -1209,6 +2309,11 @@ class ClickableGameBridge:
                 done_event=done,
             )
         )
+        done.wait(timeout=1.0)
+
+    def show_native_command(self, command: str) -> None:
+        done = Event()
+        Clock.schedule_once(lambda _dt: self.screen.show_native_command_pane(command, done_event=done))
         done.wait(timeout=1.0)
 
 
@@ -2373,7 +3478,25 @@ class ClickableTextDnDGame(TextDnDGame):
             "quit",
         }
 
+    def kivy_should_show_native_command(self, raw: str) -> bool:
+        if not self.kivy_side_panel_available() or getattr(self, "_in_combat", False):
+            return False
+        normalized = " ".join(str(raw).strip().lower().split())
+        return normalized in {
+            "camp",
+            "journal",
+            "inventory",
+            "backpack",
+            "bag",
+            "equipment",
+            "gear",
+        }
+
     def handle_meta_command(self, raw: str) -> bool:
+        if self.kivy_should_show_native_command(raw):
+            normalized = " ".join(str(raw).strip().lower().split())
+            self.bridge.show_native_command(normalized)
+            return True
         if not self.kivy_should_route_command_to_side(raw):
             try:
                 return super().handle_meta_command(raw)
@@ -3408,10 +4531,12 @@ class GameScreen(BoxLayout):
         self.side_command_header.add_widget(self.side_command_close_button)
         self.native_map_view = NativeMapView()
         self.native_map_view.set_dark_mode(self.kivy_dark_mode_enabled)
+        self.command_workspace = NativeCommandWorkspace(self)
         self.combat_stats_scroll = ScrollView(do_scroll_x=False, bar_width=dp(5))
         self.combat_stats_scroll.add_widget(self.combat_stats_label)
         self.combat_panel.add_widget(self.side_command_header)
         self.combat_panel.add_widget(self.native_map_view)
+        self.combat_panel.add_widget(self.command_workspace)
         self.combat_panel.add_widget(self.combat_stats_scroll)
         self.add_widget(self.main_body)
         self.add_widget(self.prompt_label)
@@ -4232,6 +5357,7 @@ class GameScreen(BoxLayout):
         self.update_combat_layout()
         self._side_panel_mode = "command"
         self._side_command_title = title
+        self._hide_command_workspace()
         self._set_side_command_header_visible(True)
         self.side_command_title_label.text = escape_kivy_markup(title)
         self.native_map_view.show_overworld(title=title, blueprint=blueprint, state=state)
@@ -4244,9 +5370,54 @@ class GameScreen(BoxLayout):
         self.update_combat_layout()
         self._side_panel_mode = "command"
         self._side_command_title = title
+        self._hide_command_workspace()
         self._set_side_command_header_visible(True)
         self.side_command_title_label.text = escape_kivy_markup(title)
         self.native_map_view.show_dungeon(title=title, dungeon=dungeon, state=state)
+        self._complete_log_append(done_event)
+
+    def _show_command_workspace(self) -> None:
+        self.combat_stats_scroll.size_hint_y = None
+        self.combat_stats_scroll.height = 0
+        self.combat_stats_scroll.opacity = 0
+        self.combat_stats_scroll.disabled = True
+        self.command_workspace.size_hint_y = 1
+        self.command_workspace.height = 0
+        self.command_workspace.show()
+
+    def _hide_command_workspace(self) -> None:
+        if not hasattr(self, "command_workspace"):
+            return
+        self.command_workspace.hide()
+        self.command_workspace.size_hint_y = None
+        self.command_workspace.height = 0
+        self.combat_stats_scroll.size_hint_y = 1
+        self.combat_stats_scroll.opacity = 1
+        self.combat_stats_scroll.disabled = False
+
+    def show_native_command_pane(self, command: str, *, done_event: Event | None = None) -> None:
+        if not self.side_panel_allowed() or self.combat_active():
+            self._complete_log_append(done_event)
+            return
+        self.update_combat_layout()
+        normalized = " ".join(str(command).strip().lower().split())
+        title = {
+            "journal": "Journal",
+            "inventory": "Inventory",
+            "backpack": "Inventory",
+            "bag": "Inventory",
+            "camp": "Camp",
+            "equipment": "Gear",
+            "gear": "Gear",
+        }.get(normalized, normalized.title() or "Command")
+        self._side_panel_mode = "native_command"
+        self._side_command_title = title
+        self.native_map_view.hide_map()
+        self._set_side_command_header_visible(True)
+        self.side_command_title_label.text = escape_kivy_markup(title)
+        self._clear_combat_resource_animation()
+        self._show_command_workspace()
+        self.command_workspace.render_command(normalized)
         self._complete_log_append(done_event)
 
     def set_active_combat_actor(self, name: str) -> None:
@@ -4306,6 +5477,7 @@ class GameScreen(BoxLayout):
         self._clear_combat_resource_animation()
         self._clear_defeated_enemy_fades()
         self.native_map_view.hide_map()
+        self._hide_command_workspace()
         self.combat_stats_label.text = ""
         self._clear_dice_tray()
         self._side_panel_mode = "default"
@@ -4336,6 +5508,9 @@ class GameScreen(BoxLayout):
             self._clear_defeated_enemy_fades()
             if self._side_panel_mode == "command":
                 self._render_side_command()
+            elif self._side_panel_mode == "native_command":
+                self._show_command_workspace()
+                self.command_workspace.refresh_active()
             else:
                 self._render_party_stats_panel()
             return
@@ -4350,6 +5525,7 @@ class GameScreen(BoxLayout):
             self._side_command_title = ""
             self._side_command_lines = []
         self.native_map_view.hide_map()
+        self._hide_command_workspace()
         self._set_side_command_header_visible(False)
         self.refresh_combat_panel()
 
@@ -4360,6 +5536,7 @@ class GameScreen(BoxLayout):
         self._side_command_title = ""
         self._side_command_lines = []
         self.native_map_view.hide_map()
+        self._hide_command_workspace()
         self._set_side_command_header_visible(False)
         if not self.side_panel_allowed():
             return
@@ -4437,6 +5614,7 @@ class GameScreen(BoxLayout):
         self._side_command_lines = []
         self._clear_combat_resource_animation()
         self.native_map_view.hide_map()
+        self._hide_command_workspace()
         self._set_side_command_header_visible(True)
         self.side_command_title_label.text = escape_kivy_markup(title)
         self._render_side_command()
@@ -4453,6 +5631,7 @@ class GameScreen(BoxLayout):
             self._side_command_lines = []
         if markup:
             self.native_map_view.hide_map()
+            self._hide_command_workspace()
             self._side_command_lines.append(markup)
             if len(self._side_command_lines) > self.MAX_LOG_ENTRIES:
                 self._side_command_lines = self._side_command_lines[-self.MAX_LOG_ENTRIES :]
@@ -4475,6 +5654,7 @@ class GameScreen(BoxLayout):
     def _render_combat_panel(self, *, scroll_to_top: bool = True) -> None:
         self._side_panel_mode = "default"
         self.native_map_view.hide_map()
+        self._hide_command_workspace()
         self._set_side_command_header_visible(False)
         self._sync_defeated_enemy_fades()
         self._reset_examine_refs()
@@ -4485,6 +5665,7 @@ class GameScreen(BoxLayout):
 
     def _render_side_command(self) -> None:
         self._reset_examine_refs()
+        self._hide_command_workspace()
         title = escape_kivy_markup(self._side_command_title or "Command")
         self._set_side_command_header_visible(True)
         self.side_command_title_label.text = title
@@ -4498,6 +5679,7 @@ class GameScreen(BoxLayout):
     def _render_party_stats_panel(self) -> None:
         self._reset_examine_refs()
         self.native_map_view.hide_map()
+        self._hide_command_workspace()
         self._set_side_command_header_visible(False)
         self.combat_stats_label.text = self.build_party_stats_markup()
         Clock.schedule_once(lambda _dt: setattr(self.combat_stats_scroll, "scroll_y", 1), 0)
@@ -5474,7 +6656,7 @@ class GameScreen(BoxLayout):
     def _escape_should_quit_title_screen(self) -> bool:
         return bool(self._main_title_menu_active and self.bridge.waiting_for_input)
 
-    def _handle_window_key_down(self, _window, key, scancode, codepoint, _modifiers) -> bool:
+    def _handle_window_key_down(self, _window, key, scancode, codepoint, modifiers) -> bool:
         if self.is_fullscreen_shortcut(key, scancode, codepoint):
             self.toggle_kivy_fullscreen_from_shortcut()
             return True
@@ -5488,6 +6670,26 @@ class GameScreen(BoxLayout):
                 return True
             if normalized in {"b", "back"}:
                 self.submit_direct("back")
+                return True
+        if self._side_panel_mode == "native_command":
+            if self.is_escape_key(key, scancode, codepoint):
+                self.close_side_command_panel()
+                return True
+            normalized = str(codepoint).strip().lower()
+            modifier_set = {str(modifier).lower() for modifier in (modifiers or [])}
+            if "ctrl" in modifier_set or "control" in modifier_set:
+                shortcut_map = {
+                    "j": "journal",
+                    "i": "inventory",
+                    "g": "gear",
+                    "c": "camp",
+                }
+                command = shortcut_map.get(normalized)
+                if command:
+                    self.show_native_command_pane(command)
+                    return True
+            if normalized in {"b"}:
+                self.command_workspace.go_back()
                 return True
         if self.is_escape_key(key, scancode, codepoint):
             if self._escape_should_quit_title_screen():

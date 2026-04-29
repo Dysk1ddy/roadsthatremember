@@ -71,6 +71,8 @@ You can also launch the clickable window directly:
 py -3.13 main.py --gui
 ```
 
+In the mouse-clickable window, `journal`, `inventory` / `backpack` / `bag`, `gear` / `equipment`, and `camp` open native right-side panes. The panes share tabs for the ledger, items, gear, and camp, and inventory, gear, and recovery actions ask for confirmation before changing the run.
+
 Terminal option:
 
 ```powershell

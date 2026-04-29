@@ -7,13 +7,24 @@ from types import SimpleNamespace
 import unittest
 import uuid
 
+from dnd_game.content import build_character, create_elira_dawnmantle, create_tolan_ironshield
+from dnd_game.game import TextDnDGame
+from dnd_game.models import GameState
+
 try:
-    from dnd_game.gui import ClickableTextDnDGame, GameScreen, KIVY_SIDE_COMMAND_CLOSE_TOKEN, KivySideCommandClosed
+    from dnd_game.gui import (
+        ClickableTextDnDGame,
+        GameScreen,
+        KIVY_SIDE_COMMAND_CLOSE_TOKEN,
+        KivySideCommandClosed,
+        NativeCommandWorkspace,
+    )
 except Exception as exc:  # pragma: no cover - depends on optional Kivy runtime
     ClickableTextDnDGame = None
     GameScreen = None
     KIVY_SIDE_COMMAND_CLOSE_TOKEN = ""
     KivySideCommandClosed = Exception
+    NativeCommandWorkspace = None
     KIVY_IMPORT_ERROR = exc
 else:
     KIVY_IMPORT_ERROR = None
@@ -26,6 +37,7 @@ class FakeKivyBridge:
         self.choice_responses: list[str] = []
         self.choice_prompts: list[tuple[str, list[str]]] = []
         self.side_command_active = False
+        self.native_commands: list[str] = []
 
     def post_output(self, text: object = "") -> None:
         self.outputs.append(str(text))
@@ -46,6 +58,9 @@ class FakeKivyBridge:
 
     def set_kivy_fullscreen(self, enabled: bool) -> None:
         self.screen.kivy_fullscreen_enabled = bool(enabled)
+
+    def show_native_command(self, command: str) -> None:
+        self.native_commands.append(command)
 
 
 @unittest.skipIf(ClickableTextDnDGame is None, f"Kivy unavailable: {KIVY_IMPORT_ERROR}")
@@ -103,6 +118,27 @@ class KivySettingsTests(unittest.TestCase):
         with self.assertRaises(KivySideCommandClosed):
             game.choose_with_display_mode("Manage inventory.", ["View inventory"], allow_meta=False)
 
+    def test_out_of_combat_journal_inventory_and_gear_use_native_command_panes(self) -> None:
+        save_dir = self.make_save_dir()
+        bridge = FakeKivyBridge()
+        game = ClickableTextDnDGame(bridge, save_dir=save_dir)
+        player = build_character(
+            name="Vale",
+            race="Human",
+            class_name="Warrior",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        game.state = GameState(player=player)
+
+        self.assertTrue(game.handle_meta_command("journal"))
+        self.assertTrue(game.handle_meta_command("inventory"))
+        self.assertTrue(game.handle_meta_command("gear"))
+        self.assertTrue(game.handle_meta_command("camp"))
+
+        self.assertEqual(bridge.native_commands, ["journal", "inventory", "gear", "camp"])
+
     def make_command_screen(self, *, state=None, in_combat: bool = False):
         screen = GameScreen.__new__(GameScreen)
         game = SimpleNamespace(state=state, _in_combat=in_combat)
@@ -142,6 +178,67 @@ class KivySettingsTests(unittest.TestCase):
         self.assertEqual(hidden, [(False, True)])
         self.assertEqual(messages, ["Maps are unavailable during combat."])
         self.assertEqual(submitted, [])
+
+    def make_native_command_game(self) -> TextDnDGame:
+        player = build_character(
+            name="Vale",
+            race="Human",
+            class_name="Warrior",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+            class_skill_choices=["Athletics", "Survival"],
+        )
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None)
+        game.state = GameState(
+            player=player,
+            companions=[create_tolan_ironshield()],
+            camp_companions=[create_elira_dawnmantle()],
+            current_scene="iron_hollow_hub",
+            gold=125,
+            inventory={
+                "potion_healing": 1,
+                "travel_biscuits": 3,
+                "longsword_common": 1,
+                "iron_cap_common": 1,
+            },
+        )
+        game.add_journal("The road ledger keeps Vale's promise in black ink.")
+        game.add_clue("A chalk mark dries on the wagon board.")
+        game.ensure_state_integrity()
+        return game
+
+    def test_native_command_workspace_renders_panes_refreshes_camp_and_goes_back(self) -> None:
+        assert NativeCommandWorkspace is not None
+        game = self.make_native_command_game()
+        closed: list[bool] = []
+        screen = SimpleNamespace(
+            theme=GameScreen.DARK_THEME,
+            width=480,
+            active_game=lambda: game,
+            close_side_command_panel=lambda: closed.append(True),
+            _apply_font=lambda _widget, _role: None,
+            side_command_title_label=SimpleNamespace(text=""),
+        )
+        workspace = NativeCommandWorkspace(screen)
+        workspace.width = 480
+
+        workspace.render_command("journal")
+        self.assertEqual(workspace.mode, "journal")
+        workspace.render_inventory(filter_key="consumables")
+        self.assertEqual(workspace.inventory_filter_key, "consumables")
+        workspace.render_gear(selected_slot="head")
+        self.assertEqual(workspace.gear_selected_slot, "head")
+        workspace.render_camp(view="recovery")
+        self.assertEqual(workspace.camp_view, "recovery")
+
+        workspace.refresh_active()
+        self.assertEqual(workspace.mode, "camp")
+        self.assertEqual(workspace.camp_view, "recovery")
+
+        workspace.go_back()
+        self.assertEqual(workspace.camp_view, "overview")
+        workspace.go_back()
+        self.assertEqual(closed, [True])
 
 
 if __name__ == "__main__":
