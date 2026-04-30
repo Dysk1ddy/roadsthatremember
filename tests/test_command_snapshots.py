@@ -128,8 +128,13 @@ class CommandSnapshotTests(unittest.TestCase):
         self.assertFalse(any("█" in line or "[" in line for line in snapshot.active_party))
         self.assertTrue(any("Elira" in line for line in snapshot.camp_roster))
         action_labels = [action.label for action in snapshot.actions]
-        self.assertIn("Supplies and equipment", action_labels)
-        self.assertIn("Break camp", action_labels)
+        self.assertIn("Rest and recovery", action_labels)
+        self.assertIn("Talk to a companion", action_labels)
+        self.assertIn("Respec", action_labels)
+        self.assertNotIn("Party and roster", action_labels)
+        self.assertNotIn("Supplies and equipment", action_labels)
+        self.assertNotIn("View journal", action_labels)
+        self.assertNotIn("Break camp", action_labels)
 
     def test_native_gear_actions_equip_and_unequip_without_prompting(self) -> None:
         game = make_snapshot_game()

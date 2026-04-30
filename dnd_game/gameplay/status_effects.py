@@ -20,6 +20,7 @@ STATUS_DEFINITIONS: dict[str, dict[str, object]] = {
     "charmed": {"name": "Charmed", "combat_only": True},
     "deafened": {"name": "Deafened", "combat_only": True},
     "exhaustion": {"name": "Exhaustion", "combat_only": True},
+    "focused": {"name": "Focused", "combat_only": True},
     "frightened": {"name": "Frightened", "combat_only": True},
     "grappled": {"name": "Grappled", "combat_only": True},
     "incapacitated": {"name": "Incapacitated", "combat_only": True},

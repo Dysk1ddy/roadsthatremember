@@ -60,6 +60,7 @@ FEATURE_DESCRIPTION_OVERRIDES = {
     "mage_focus": "Focus represents a Mage holding attention under pressure. It supports cleaner channeling and sharper reads.",
     "arcane_bolt": "Arcane Bolt is a quick channel strike that spends MP for force damage. It can be used as an action or bonus action when ready.",
     "minor_channel": "Minor Channel spends 1 MP for a small force strike shaped through a caster's pattern.",
+    "mage_ward": "Ward is stored magical shielding. Damage resolution spends Ward after armor and Defense, before temp HP or HP.",
     "pattern_read": "Pattern Read marks a target's weak angle and makes incoming attacks against them easier.",
     "ground": "Ground steadies the caster against channel strain and improves resistance for a short time.",
     "focused_eye": "Focused Eye marks a Mage's habit of reading small pressure shifts before they become danger.",
@@ -187,6 +188,128 @@ RESOURCE_DESCRIPTIONS = {
     "satchel": "Satchel measures field tools available to Rogue and Alchemist techniques.",
     "toxin": "Toxin measures prepared poison pressure.",
     "focus": "Focus represents a Mage keeping a clean pattern under stress.",
+}
+
+
+GAME_TERM_DESCRIPTIONS = {
+    "party xp": (
+        "Party XP",
+        "Progression",
+        "Party XP is shared experience for the whole crew. When it reaches the next threshold, the party levels together and new training comes online.",
+    ),
+    "loot": (
+        "Loot",
+        "Inventory",
+        "Loot comes from defeated enemies, caches, quest rewards, and scene discoveries. Collected items go into shared inventory unless the reward is gold or supplies.",
+    ),
+    "gold": (
+        "Gold",
+        "Currency",
+        "Gold is shared party money for shops, services, gear work, and camp choices that need payment.",
+    ),
+    "supplies": (
+        "Supplies",
+        "Inventory",
+        "Supplies cover food, packs, repair bits, fuel, and trade goods. Camp and inventory screens track the shared supply pool.",
+    ),
+    "short rests": (
+        "Short Rests",
+        "Rest",
+        "Short rests patch the party up between dangerous pushes. They restore some HP and class resources without the full reset of a long rest.",
+    ),
+    "hp": (
+        "HP",
+        "Combat Stat",
+        "HP is hit points. A character at 0 HP is down, and recovery actions or rest are needed to get them fighting again.",
+    ),
+    "defense": (
+        "Defense",
+        "Combat Stat",
+        "Defense covers both the contact number enemies must beat and the physical damage reduction from armor, shields, gear, and statuses.",
+    ),
+    "inventory": (
+        "Inventory",
+        "Command",
+        "Inventory shows shared items, gold, supplies, consumables, and equipment that can be used or assigned when the current scene allows it.",
+    ),
+    "journal": (
+        "Journal",
+        "Command",
+        "Journal tracks quests, clues, recent notes, major choices, and consequences carried forward by the story.",
+    ),
+    "camp": (
+        "Camp",
+        "Command",
+        "Camp manages active companions, resting, recovery, camp conversations, and party logistics between dangerous scenes.",
+    ),
+    "party": (
+        "Party",
+        "Command",
+        "Party shows the active crew, current location, objective, HP, Defense, resources, conditions, and other sheet details.",
+    ),
+    "quests": (
+        "Quests",
+        "Journal",
+        "Quests track active jobs, ready turn-ins, completed work, objectives, and rewards.",
+    ),
+    "clues": (
+        "Clues",
+        "Journal",
+        "Clues are unresolved evidence, leads, and remembered details that can open or alter later choices.",
+    ),
+}
+
+
+GAME_TERM_ALIASES = {
+    "xp": "party xp",
+    "experience": "party xp",
+    "party experience": "party xp",
+    "short rest": "short rests",
+    "rest": "short rests",
+    "ac": "defense",
+    "armor class": "defense",
+    "active party": "party",
+    "quest load": "quests",
+    "unresolved clues": "clues",
+}
+
+
+STATUS_BEHAVIOR_DESCRIPTIONS = {
+    "surprised": "Surprised costs the bearer their next turn, then clears.",
+    "blinded": "Blinded breaks sight. Attacks strain unless Blind Sense applies, and Perception, Investigation, and Survival checks strain while it lasts.",
+    "charmed": "Charmed prevents hostile actions until the effect clears.",
+    "deafened": "Deafened strains Perception checks tied to hearing, listening, sound, or noise.",
+    "exhaustion": "Exhaustion stacks. One stack strains non-attack checks, two stacks add a strike penalty, and three stacks add a resist penalty plus attack strain.",
+    "focused": "Focused records a clean route read or timing read from the scene. It is a short-lived attention state and clears with other temporary statuses.",
+    "frightened": "Frightened strains attacks and checks while it lasts.",
+    "grappled": "Grappled locks movement, blocks fleeing, strains attacks, and drags Stability down.",
+    "incapacitated": "Incapacitated prevents the bearer from acting on their turn.",
+    "invisible": "Invisible grants a cleaner attack line, can spoil enemy dodges, and breaks when the bearer makes a hostile action.",
+    "paralyzed": "Paralyzed prevents turns, blocks movement and fleeing, drops Avoidance and Stability, and auto-fails Strength or Dexterity resist checks.",
+    "petrified": "Petrified prevents turns, blocks movement and fleeing, halves incoming damage, and auto-fails Strength or Dexterity resist checks.",
+    "poisoned": "Poisoned strains attacks and checks. Poison stacks can also tick for poison damage through Rogue toxin hooks.",
+    "reeling": "Reeling knocks timing loose.",
+    "restrained": "Restrained blocks movement and fleeing, strains attacks, and drags Stability down.",
+    "prone": "Prone gives melee attackers a cleaner angle, makes ranged attacks harder, and strains the bearer's attacks.",
+    "raised_shield": "Raised Shield adds shield-based physical damage Defense while the bearer has a shield raised.",
+    "fixated": "Fixated pulls the bearer toward the named source. Attacks against anyone else take a -2 focus penalty.",
+    "drink_the_hurt": "Drink The Hurt waits for the bearer's next Wound, then heals from the hit and clears.",
+    "arcane_bolt_cooldown": "Arcane Bolt Cooldown blocks another Arcane Bolt until the timer ticks down.",
+    "anchor_shell": "Anchor Shell adds ward-backed Defense, draws enemy pressure toward the protected ally, and can leave the attacker reeling when the ward breaks.",
+    "pattern_charge": "Pattern Charge stores Arcanist setup on the target. Detonate Pattern cashes out the stored charges as damage.",
+    "exposed": "Exposed counts as an open target for Rogue and Assassin pressure.",
+    "slip_away": "Slip Away is a reaction window that can turn a near hit into a miss.",
+    "false_target": "False Target shields an ally with misdirection. If the attack misses, the Shadowguard gains Shadow and a close miss can leave the attacker reeling.",
+    "quick_mix": "Quick Mix stores the chosen satchel rider for the next alchemist mixture: numbing paste, clinging smoke, or acid-cut solvent.",
+    "black_drop": "Black Drop readies the next clean Wound to force a poison resist check and add poison stacks.",
+    "marked": "Marked names a target for focused pressure. Enemy targeting, Rogue openings, Bloodreaver healing, and Assassin techniques can all read it.",
+    "resist_fire": "Fire-Resistant halves incoming fire damage through the resistance check.",
+    "resist_cold": "Cold-Resistant halves incoming cold damage through the resistance check.",
+    "resist_lightning": "Lightning-Resistant halves incoming lightning damage through the resistance check.",
+    "resist_poison": "Poison-Resistant halves incoming poison damage through the resistance check.",
+    "armor_broken": "Armor Broken cuts physical damage Defense by 10% and counts as an opened target for Rogue and Weapon Master pressure.",
+    "stunned": "Stunned prevents turns, blocks movement and fleeing, drops Avoidance and Stability, and auto-fails Strength or Dexterity resist checks.",
+    "unconscious": "Unconscious prevents turns, blocks movement and fleeing, drops Avoidance and Stability, and auto-fails Strength or Dexterity resist checks.",
 }
 
 
@@ -403,6 +526,239 @@ def resource_examine_entry(resource_name: str) -> ExamineEntry | None:
     )
 
 
+def _game_term_key(text: str) -> str | None:
+    normalized = _normalize_lookup_key(text)
+    if not normalized:
+        return None
+    if normalized in GAME_TERM_DESCRIPTIONS:
+        return normalized
+    alias = GAME_TERM_ALIASES.get(normalized)
+    if alias is not None:
+        return alias
+    tokens = normalized.split()
+    if len(tokens) >= 2 and tokens[:2] == ["party", "xp"]:
+        return "party xp"
+    if len(tokens) >= 2 and tokens[0] == "short" and tokens[1] in {"rest", "rests"}:
+        return "short rests"
+    if tokens and tokens[0] in {"gold", "supplies", "hp", "ac"} and (len(tokens) == 1 or tokens[1].isdigit()):
+        return GAME_TERM_ALIASES.get(tokens[0], tokens[0])
+    return None
+
+
+def _game_term_details(key: str, game=None) -> tuple[str, ...]:
+    if game is None:
+        return ()
+    state = getattr(game, "state", None)
+    details: list[str] = []
+    if key == "party xp":
+        xp_summary = getattr(game, "xp_progress_summary", None)
+        if callable(xp_summary):
+            details.append(str(xp_summary()))
+        elif state is not None:
+            details.append(f"Current XP: {getattr(state, 'xp', 0)}")
+    elif key == "gold" and state is not None:
+        details.append(f"Current gold: {getattr(state, 'gold', 0)}")
+    elif key == "supplies":
+        supply_getter = getattr(game, "current_supply_points", None)
+        if callable(supply_getter):
+            details.append(f"Current supplies: {supply_getter()}")
+    elif key == "short rests" and state is not None:
+        details.append(f"Short rests remaining: {getattr(state, 'short_rests_remaining', 0)}")
+    elif key == "party" and state is not None:
+        party_members = getattr(state, "party_members", None)
+        if callable(party_members):
+            details.append(f"Active members: {len(party_members())}")
+    return tuple(details)
+
+
+def game_term_examine_entry(text: str, *, game=None) -> ExamineEntry | None:
+    key = _game_term_key(text)
+    if key is None:
+        return None
+    title, category, description = GAME_TERM_DESCRIPTIONS[key]
+    return ExamineEntry(title=title, category=category, description=description, details=_game_term_details(key, game))
+
+
+def _join_clauses(clauses: list[str]) -> str:
+    if not clauses:
+        return ""
+    if len(clauses) == 1:
+        return clauses[0]
+    if len(clauses) == 2:
+        return f"{clauses[0]} and {clauses[1]}"
+    return f"{', '.join(clauses[:-1])}, and {clauses[-1]}"
+
+
+def _status_value_clause(
+    definition: dict[str, object],
+    key: str,
+    *,
+    positive: str,
+    negative: str,
+    suffix: str = "",
+    negative_suffix: str | None = None,
+    value_style: str = "by",
+) -> str:
+    value = int(definition.get(key, 0) or 0)
+
+    def render(phrase: str, amount: int, rendered_suffix: str) -> str:
+        if value_style == "prefix":
+            return f"{phrase}{amount}{rendered_suffix}"
+        return f"{phrase} by {amount}{rendered_suffix}"
+
+    if value > 0:
+        return render(positive, value, suffix)
+    if value < 0:
+        return render(negative, abs(value), negative_suffix if negative_suffix is not None else suffix)
+    return ""
+
+
+def _status_math_clauses(definition: dict[str, object]) -> list[str]:
+    clauses: list[str] = []
+    if definition.get("ongoing_damage"):
+        damage_type = str(definition.get("damage_type", "damage")).strip() or "damage"
+        clauses.append(f"deals {definition['ongoing_damage']} {damage_type} damage when conditions tick")
+
+    clauses.extend(
+        clause
+        for clause in (
+            _status_value_clause(
+                definition,
+                "attack_bonus",
+                positive="raises strike accuracy",
+                negative="lowers strike accuracy",
+            ),
+            _status_value_clause(
+                definition,
+                "attack_penalty",
+                positive="lowers strike accuracy",
+                negative="raises strike accuracy",
+            ),
+            _status_value_clause(
+                definition,
+                "incoming_attack_bonus",
+                positive="gives attackers +",
+                negative="gives attackers -",
+                suffix=" strike accuracy",
+                value_style="prefix",
+            ),
+            _status_value_clause(
+                definition,
+                "incoming_attack_penalty",
+                positive="gives attackers -",
+                negative="gives attackers +",
+                suffix=" strike accuracy",
+                value_style="prefix",
+            ),
+            _status_value_clause(
+                definition,
+                "damage_bonus",
+                positive="adds ",
+                negative="removes ",
+                suffix=" damage to the bearer's weapon hits",
+                negative_suffix=" damage from the bearer's weapon hits",
+                value_style="prefix",
+            ),
+            _status_value_clause(
+                definition,
+                "save_bonus",
+                positive="raises resist checks",
+                negative="lowers resist checks",
+            ),
+            _status_value_clause(
+                definition,
+                "save_penalty",
+                positive="lowers resist checks",
+                negative="raises resist checks",
+            ),
+            _status_value_clause(
+                definition,
+                "ac_bonus",
+                positive="raises Defense rating",
+                negative="lowers Defense rating",
+            ),
+            _status_value_clause(
+                definition,
+                "ac_penalty",
+                positive="lowers Defense rating",
+                negative="raises Defense rating",
+            ),
+            _status_value_clause(
+                definition,
+                "defense_bonus_percent",
+                positive="raises physical damage Defense",
+                negative="lowers physical damage Defense",
+                suffix="%",
+            ),
+            _status_value_clause(
+                definition,
+                "stability_bonus",
+                positive="raises Stability",
+                negative="lowers Stability",
+            ),
+            _status_value_clause(
+                definition,
+                "stability_penalty",
+                positive="lowers Stability",
+                negative="raises Stability",
+            ),
+            _status_value_clause(
+                definition,
+                "avoidance_bonus",
+                positive="raises Avoidance",
+                negative="lowers Avoidance",
+            ),
+            _status_value_clause(
+                definition,
+                "avoidance_penalty",
+                positive="lowers Avoidance",
+                negative="raises Avoidance",
+            ),
+            _status_value_clause(
+                definition,
+                "armor_break_percent",
+                positive="cuts the bearer's armor Defense",
+                negative="restores the bearer's armor Defense",
+                suffix="%",
+            ),
+            _status_value_clause(
+                definition,
+                "outgoing_armor_break_percent",
+                positive="cuts enemy armor Defense when the bearer attacks",
+                negative="restores enemy armor Defense when the bearer attacks",
+                suffix="%",
+            ),
+            _status_value_clause(
+                definition,
+                "flee_bonus",
+                positive="lowers flee DCs",
+                negative="raises flee DCs",
+            ),
+        )
+        if clause
+    )
+    return clauses
+
+
+def _status_math_sentence(definition: dict[str, object]) -> str:
+    clauses = _status_math_clauses(definition)
+    if not clauses:
+        return ""
+    return f"It {_join_clauses(clauses)}."
+
+
+def _status_description(status_id: str, title: str, definition: dict[str, object]) -> str:
+    behavior = STATUS_BEHAVIOR_DESCRIPTIONS.get(status_id, "")
+    math = _status_math_sentence(definition)
+    if behavior and math:
+        return f"{behavior} {math}"
+    if behavior:
+        return behavior
+    if math:
+        return math
+    return f"{title} is handled by the combat hook that applied it."
+
+
 def _status_detail_lines(definition: dict[str, object]) -> tuple[str, ...]:
     details: list[str] = []
     if definition.get("ongoing_damage"):
@@ -413,6 +769,7 @@ def _status_detail_lines(definition: dict[str, object]) -> tuple[str, ...]:
         ("attack_penalty", "Strike penalty"),
         ("incoming_attack_bonus", "Incoming strike bonus"),
         ("incoming_attack_penalty", "Incoming strike penalty"),
+        ("damage_bonus", "Damage bonus"),
         ("save_bonus", "Resist bonus"),
         ("save_penalty", "Resist penalty"),
         ("ac_bonus", "Defense bonus"),
@@ -445,9 +802,7 @@ def status_examine_entry(status_id_or_label: str) -> ExamineEntry | None:
     definition = STATUS_DEFINITIONS[status_id]
     title = str(definition.get("name", status_id.replace("_", " ").title()))
     details = _status_detail_lines(definition)
-    description = "A tracked combat condition. Its modifiers apply while the condition remains on the character."
-    if details:
-        description = "This condition changes combat math while it lasts."
+    description = _status_description(status_id, title, definition)
     return ExamineEntry(title=title, category="Condition", description=description, details=details)
 
 
@@ -602,6 +957,44 @@ def named_character_examine_entry(text: str, game=None) -> ExamineEntry | None:
     return ExamineEntry(public_name, "Character", description)
 
 
+def _character_sheet_description(actor, public_name: str) -> str:
+    race_name = str(getattr(actor, "race", "")).strip()
+    class_name = str(getattr(actor, "class_name", "")).strip()
+    background_name = str(getattr(actor, "background", "")).strip()
+    level = getattr(actor, "level", "?")
+
+    race_display = race_label(race_name) if race_name else "unknown people"
+    class_display = class_label(class_name) if class_name else "adventurer"
+    background_phrase = f" with {background_name.lower()} training" if background_name else ""
+    sentences = [f"{public_name} is a level {level} {race_display} {class_display}{background_phrase}."]
+
+    class_description = str(CLASSES.get(class_name, {}).get("description", "")).strip()
+    if class_description:
+        sentences.append(class_description)
+    background_description = str(BACKGROUNDS.get(background_name, {}).get("description", "")).strip()
+    if background_description:
+        sentences.append(background_description)
+    if not class_description and not background_description:
+        race_description = str(RACES.get(race_name, {}).get("description", "")).strip()
+        if race_description:
+            sentences.append(race_description)
+
+    notes = [str(note).strip() for note in getattr(actor, "notes", []) if str(note).strip()]
+    for note in notes:
+        lowered = note.lower()
+        if "kit:" in lowered or "preset build:" in lowered:
+            continue
+        if note not in sentences:
+            sentences.append(note)
+        break
+
+    if len(sentences) == 1:
+        weapon = getattr(getattr(actor, "weapon", None), "name", "")
+        weapon_text = f" with {weapon}" if weapon else ""
+        sentences.append(f"Their sheet drives HP, Defense, skills, conditions, and combat options{weapon_text}.")
+    return " ".join(sentences)
+
+
 def character_examine_entry(actor, game=None) -> ExamineEntry:
     raw_name = str(getattr(actor, "name", "Unknown"))
     public_character_name = getattr(game, "public_character_name", None)
@@ -610,13 +1003,14 @@ def character_examine_entry(actor, game=None) -> ExamineEntry:
     description = (
         named_entry.description
         if named_entry is not None
-        else "A combatant or party member currently present in the game state."
+        else _character_sheet_description(actor, public_name)
     )
     current_hp = int(getattr(actor, "current_hp", 0) or 0)
     max_hp = int(getattr(actor, "max_hp", 0) or 0)
     features = [feature_label(feature) for feature in list(getattr(actor, "features", []))[:6]]
     details = [
         f"Level {getattr(actor, 'level', '?')} {race_label(getattr(actor, 'race', ''))} {class_label(getattr(actor, 'class_name', ''))}".strip(),
+        f"Background: {getattr(actor, 'background', 'Unknown')}",
         f"HP: {current_hp}/{max_hp} | Defense: {getattr(actor, 'armor_class', '?')}",
     ]
     if features:
@@ -704,6 +1098,10 @@ def examine_entry_for_text(text: str, *, game=None) -> ExamineEntry:
     candidates = [candidate for index, candidate in enumerate(candidates) if candidate and candidate not in candidates[:index]]
 
     for candidate in candidates:
+        game_term_entry = game_term_examine_entry(candidate, game=game)
+        if game_term_entry is not None:
+            return game_term_entry
+
         for builder in (
             ability_examine_entry,
             skill_examine_entry,

@@ -63,7 +63,7 @@ class CampMixin:
             self.rich_text("3. Rest and recovery", "light_green"),
             self.rich_text("4. Talk to a companion", "light_green"),
             self.rich_text("5. View journal", "light_green"),
-            self.rich_text("6. Speak to the magic mirror", "light_green"),
+            self.rich_text("6. Respec", "light_green"),
             self.rich_text("7. Break camp", "light_green"),
         ]
         if has_banter:
@@ -142,7 +142,7 @@ class CampMixin:
                     "Rest and recovery",
                     "Talk to a companion",
                     "View journal",
-                    "Speak to the magic mirror (100 gold)",
+                    "Respec (100 gold)",
                     "Break camp",
                 ]
                 if self.available_camp_banters():
@@ -596,13 +596,17 @@ class CampMixin:
             else:
                 self.say(f"{label} {direction} to {updated} (campfire conversation).")
 
-    def talk_to_companion(self) -> None:
+    def talk_to_companion(self, companion=None) -> None:
         assert self.state is not None
         roster = self.state.all_companions()
         if not roster:
             self.say("No companions are with your wider company yet.")
             return
-        companion = self.choose_ally(roster, prompt="Choose who you want to talk to at camp.")
+        if companion is None:
+            companion = self.choose_ally(roster, prompt="Choose who you want to talk to at camp.")
+        elif companion not in roster:
+            self.say("That companion is not available at camp right now.")
+            return
         profile = COMPANION_PROFILES[companion.companion_id]
         self.banner(companion.name)
         self.say(profile["summary"])

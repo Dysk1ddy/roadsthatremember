@@ -865,8 +865,8 @@ class CombatResolutionMixin:
         return f"{dice}d4"
 
     def arcane_bolt_cooldown_duration(self) -> int:
-        # Conditions tick at end of the current turn, so 3 blocks the next two turns.
-        return 3
+        # Conditions tick at end of the current turn, so 2 blocks the next turn.
+        return 2
 
     def arcane_bolt_on_cooldown(self, actor) -> bool:
         return self.has_status(actor, "arcane_bolt_cooldown")
@@ -4153,16 +4153,14 @@ class CombatResolutionMixin:
     def help_downed_ally(self, actor, target) -> None:
         success = self.skill_check(actor, "Medicine", 10, context=f"to haul {target.name} back into the fight")
         if success:
-            target.current_hp = 1
-            target.stable = False
-            target.death_successes = 0
-            target.death_failures = 0
+            amount = max(1, (target.max_hp + 4) // 5)
+            healed = target.heal(amount)
             play_heal_sound_for = getattr(self, "play_heal_sound_for", None)
             if callable(play_heal_sound_for):
                 play_heal_sound_for(actor)
             self.say(
                 f"{self.style_name(actor)} gets {self.style_name(target)} back to their feet at "
-                f"{self.style_healing(1)} hit point."
+                f"{self.style_healing(healed)} hit points."
             )
             return
         target.stable = True
@@ -4434,6 +4432,18 @@ class CombatResolutionMixin:
 
     def recover_after_battle(self) -> None:
         assert self.state is not None
+        if self.current_difficulty_mode() == "story":
+            healed: list[str] = []
+            for member in self.state.party_members():
+                if member.dead:
+                    continue
+                amount = max(1, (member.max_hp + 3) // 4)
+                actual = member.heal(amount)
+                if actual > 0:
+                    healed.append(f"{member.name} +{actual}")
+            if healed:
+                self.say("Story mode recovery restores " + ", ".join(healed) + " hit points after the fight.")
+            return
         recovered: list[str] = []
         for member in self.state.party_members():
             if member.dead:

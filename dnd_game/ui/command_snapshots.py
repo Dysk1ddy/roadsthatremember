@@ -415,18 +415,14 @@ def build_camp_snapshot(game) -> CampSnapshot:
     camp_roster = tuple(_plain(game.companion_status_line(companion)) for companion in game.state.camp_companions)
     has_banter = bool(game.available_camp_banters())
     actions = [
-        CampActionSnapshot("party", "Party and roster"),
-        CampActionSnapshot("supplies", "Supplies and equipment"),
         CampActionSnapshot("recovery", "Rest and recovery"),
         CampActionSnapshot("talk", "Talk to a companion"),
-        CampActionSnapshot("journal", "View journal"),
         CampActionSnapshot(
             "mirror",
-            "Speak to the magic mirror",
+            "Respec",
             enabled=game.state.gold >= 100,
             reason="" if game.state.gold >= 100 else "Need 100 gold.",
         ),
-        CampActionSnapshot("break", "Break camp"),
     ]
     if has_banter:
         actions.append(CampActionSnapshot("banter", "Listen around the campfire"))

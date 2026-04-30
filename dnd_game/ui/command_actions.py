@@ -264,4 +264,4 @@ def magic_mirror_unavailable_reason(game) -> str:
         return "There is no active adventure yet."
     if game.state.gold < 100:
         return f"Need 100 gold; the party has {marks_label(game.state.gold)}."
-    return "The magic mirror still uses the character-creation prompt flow."
+    return "Respec still uses the character-creation prompt flow."

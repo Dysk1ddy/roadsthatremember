@@ -32,6 +32,43 @@ PUBLIC_COMBAT_ACTION_KEYS = {
     DRINK_HEALING_POTION_ACTION: "Drink a Healing Potion",
 }
 
+BONUS_ACTION_COMBAT_KEYS = {
+    "Use Cunning Action",
+    "Warrior Rally",
+    "Iron Draw",
+    "Shoulder In",
+    "Weapon Read",
+    "Measure Twice",
+    "Style Wheel",
+    "Redline",
+    "Teeth Set",
+    "Drink The Hurt",
+    "Red Mark",
+    "Blood Price",
+    "Mark Target",
+    "Tool Read",
+    "Feint",
+    "Skirmish",
+    "False Target",
+    "Cover The Healer",
+    "Death Mark",
+    "Black Drop",
+    "Arcane Bolt",
+    "Pattern Read",
+    "Marked Angle",
+    "Change Weather",
+    "Ground",
+    "Anchor Shell",
+    "Pulse Restore",
+    "Overflow Shell",
+    "Quick Mix",
+    "Raise Shield",
+    "Change Stance",
+    "Cast Healing Word",
+    "Make Off-Hand Attack",
+    "Drink a Healing Potion",
+}
+
 
 class CombatFlowMixin:
     def combat_keyboard_choice_menu_supported(self) -> bool:
@@ -129,6 +166,7 @@ class CombatFlowMixin:
                     if actor in heroes:
                         result = self.hero_turn(actor, heroes, enemies, encounter, dodging)
                         if result == "fled":
+                            self.recover_after_battle()
                             encounter_outcome = "fled"
                             return encounter_outcome
                     else:
@@ -1456,39 +1494,7 @@ class CombatFlowMixin:
             return "Social"
         if action == "Try to Flee":
             return "Escape"
-        if action in {
-            "Use Cunning Action",
-            "Weapon Read",
-            "Measure Twice",
-            "Style Wheel",
-            "Redline",
-            "Teeth Set",
-            "Drink The Hurt",
-            "Red Mark",
-            "Blood Price",
-            "Mark Target",
-            "Tool Read",
-            "Feint",
-            "Skirmish",
-            "False Target",
-            "Cover The Healer",
-            "Death Mark",
-            "Black Drop",
-            "Arcane Bolt",
-            "Pattern Read",
-            "Marked Angle",
-            "Change Weather",
-            "Ground",
-            "Anchor Shell",
-            "Pulse Restore",
-            "Overflow Shell",
-            "Quick Mix",
-            "Raise Shield",
-            "Change Stance",
-            "Cast Healing Word",
-            "Make Off-Hand Attack",
-            "Drink a Healing Potion",
-        }:
+        if action in BONUS_ACTION_COMBAT_KEYS:
             return "Bonus Action"
         return "Action"
 

@@ -170,6 +170,15 @@ KIVY_DICE_COLOR_HEX = {
 }
 KIVY_SIDE_COMMAND_CLOSE_TOKEN = "__aethrune_kivy_close_side_command__"
 KIVY_EXAMINE_HOLD_SECONDS = 0.35
+KIVY_COLOR_SPAN_RE = re.compile(
+    r"\[color=#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?\](?P<body>.*?)\[/color\]",
+    re.DOTALL,
+)
+KIVY_TITLE_PHRASE_RE = re.compile(
+    r"\b(?:[A-Z][A-Za-z']+|[A-Z]{2,}|I{1,3}|IV|V)"
+    r"(?:\s+(?:and|of|the|And|Of|The|[A-Z][A-Za-z']+|[A-Z]{2,}|I{1,3}|IV|V)){0,5}\b"
+)
+KIVY_SKILL_TAG_RE = re.compile(r"\[[A-Z][A-Z /,_-]{2,}\]")
 
 
 class KivySideCommandClosed(Exception):
@@ -765,8 +774,8 @@ class NativeMapCanvas(Widget):
 
 
 class NativeMapView(BoxLayout):
-    MAP_HEIGHT_MIN = 210
-    MAP_HEIGHT_MAX = 390
+    MAP_HEIGHT_MIN = 260
+    MAP_HEIGHT_MAX = 560
 
     def __init__(self, **kwargs):
         super().__init__(
@@ -832,7 +841,7 @@ class NativeMapView(BoxLayout):
         rows = 6
         if positions:
             rows = max(y for _, y in positions.values()) - min(y for _, y in positions.values()) + 1
-        self._show(dp(78) + rows * dp(28))
+        self._show(dp(140) + rows * dp(52))
         self.header.text = f"[b]{escape_kivy_markup(title)}[/b]"
         self.info.text = self._overworld_info_markup(blueprint, state)
         self.info._sync_text_size()
@@ -841,7 +850,7 @@ class NativeMapView(BoxLayout):
 
     def show_dungeon(self, *, title: str, dungeon, state) -> None:
         rows = max(1, dungeon.height * 2 - 1)
-        self._show(dp(90) + rows * dp(34))
+        self._show(dp(125) + rows * dp(44))
         self.header.text = f"[b]{escape_kivy_markup(title)}[/b]"
         self.info.text = self._dungeon_info_markup(dungeon, state)
         self.info._sync_text_size()
@@ -939,6 +948,8 @@ class NativeCommandWorkspace(BoxLayout):
         self.gear_selected_slot: str | None = None
         self.camp_view = "overview"
         self.journal_section_index = 0
+        self.map_view_key = "route"
+        self.map_view = NativeMapView()
         self.feedback_message = ""
         self.confirm_action: dict[str, object] | None = None
 
@@ -991,7 +1002,7 @@ class NativeCommandWorkspace(BoxLayout):
         self,
         text: str,
         *,
-        font_size: str = "13sp",
+        font_size: str = "14sp",
         bold: bool = False,
         color: tuple[float, float, float, float] | None = None,
         height: float | None = None,
@@ -1011,6 +1022,14 @@ class NativeCommandWorkspace(BoxLayout):
         label.bind(width=self._sync_label, texture_size=self._sync_label)
         self._sync_label(label)
         return label
+
+    def _button_font_size(self, text: str, font_size: str) -> str:
+        if str(text).strip().upper() == "X":
+            return font_size
+        match = re.fullmatch(r"(\d+(?:\.\d+)?)sp", str(font_size).strip())
+        if match is None:
+            return font_size
+        return f"{max(14.0, float(match.group(1))):g}sp"
 
     def _button(
         self,
@@ -1042,8 +1061,8 @@ class NativeCommandWorkspace(BoxLayout):
             background_normal="",
             background_color=background,
             color=color,
-            font_size=font_size,
-            halign="left",
+            font_size=self._button_font_size(text, font_size),
+            halign="center",
             valign="middle",
             size_hint_y=None,
             height=dp(height),
@@ -1080,15 +1099,17 @@ class NativeCommandWorkspace(BoxLayout):
             radius=5,
         )
 
-    def _command_nav(self, active: str) -> GridLayout:
-        nav = GridLayout(cols=4, spacing=dp(5), size_hint_y=None, height=dp(36))
+    def _command_nav(self, active: str) -> BoxLayout:
+        nav = BoxLayout(orientation="horizontal", spacing=dp(5), size_hint_y=None, height=dp(42))
         for mode, label in (
+            ("map", "Map"),
             ("journal", "Journal"),
             ("inventory", "Items"),
             ("gear", "Gear"),
             ("camp", "Camp"),
         ):
             callback = {
+                "map": self.render_map,
                 "journal": self.render_journal,
                 "inventory": self.render_inventory,
                 "gear": self.render_gear,
@@ -1098,11 +1119,21 @@ class NativeCommandWorkspace(BoxLayout):
                 self._button(
                     label,
                     callback,
-                    height=32,
-                    font_size="11sp",
+                    height=38,
+                    font_size="13sp",
                     selected=mode == active,
                 )
             )
+        close_button = self._button(
+            "X",
+            self.screen.close_side_command_panel,
+            role="back",
+            height=30,
+            font_size="11sp",
+        )
+        close_button.size_hint_x = None
+        close_button.width = dp(30)
+        nav.add_widget(close_button)
         return nav
 
     def show(self) -> None:
@@ -1116,6 +1147,7 @@ class NativeCommandWorkspace(BoxLayout):
         self.mode = ""
         self.confirm_action = None
         self.inventory_use_item_id = None
+        self.map_view.hide_map()
 
     def refresh_active(self) -> None:
         if self.mode == "journal":
@@ -1132,12 +1164,16 @@ class NativeCommandWorkspace(BoxLayout):
             )
         elif self.mode == "camp":
             self.render_camp(view=self.camp_view)
+        elif self.mode == "map":
+            self.render_map(view=self.map_view_key)
 
     def render_command(self, command: str) -> None:
         normalized = " ".join(str(command).strip().lower().split())
         self.confirm_action = None
         self.inventory_use_item_id = None
-        if normalized == "journal":
+        if normalized in {"map", "maps", "map menu"}:
+            self.render_map()
+        elif normalized == "journal":
             self.render_journal()
         elif normalized in {"inventory", "backpack", "bag"}:
             self.render_inventory()
@@ -1199,6 +1235,155 @@ class NativeCommandWorkspace(BoxLayout):
         temp = f", temp {temp_hp}" if temp_hp else ""
         return f"HP {current_hp}/{max_hp}{temp}{suffix}"
 
+    def _active_map_context(self, game) -> dict[str, object] | None:
+        if game is None or getattr(game, "state", None) is None:
+            return None
+        if getattr(game, "act2_hybrid_map_available", lambda: False)():
+            state = game.act2_map_state()
+            return {
+                "act": "Act II",
+                "route_title": "Act II Route Map",
+                "site_empty": "There is no Act II site map to show from this location.",
+                "blueprint": ACT2_ENEMY_DRIVEN_MAP,
+                "state": state,
+                "dungeon": game.current_act2_dungeon(),
+            }
+        if getattr(game, "act1_hybrid_map_available", lambda: False)():
+            state = game.act1_map_state()
+            return {
+                "act": "Act I",
+                "route_title": "Act I Overworld",
+                "site_empty": "There is no dungeon map to show from this location.",
+                "blueprint": ACT1_HYBRID_MAP,
+                "state": state,
+                "dungeon": game.current_act1_dungeon(),
+            }
+        return None
+
+    def _map_subtitle(self, context: dict[str, object]) -> str:
+        blueprint = context["blueprint"]
+        state = context["state"]
+        current = getattr(blueprint, "nodes", {}).get(getattr(state, "current_node_id", ""))
+        if current is None:
+            return str(context["act"])
+        return f"{context['act']} | {current.title}"
+
+    def _map_ledger_markup(self, context: dict[str, object]) -> str:
+        blueprint = context["blueprint"]
+        state = context["state"]
+        current = blueprint.nodes.get(state.current_node_id)
+        known_count = sum(
+            1
+            for node in blueprint.nodes.values()
+            if node.node_id == state.current_node_id or node.node_id in state.visited_nodes
+        )
+        travel_labels: list[str] = []
+        for edge in available_travel_edges(blueprint, state):
+            target = blueprint.nodes[edge.to_node_id]
+            label = target.title if target.node_id in state.visited_nodes else edge.label
+            travel_labels.append(label)
+        travel = "\n".join(f"  - {escape_kivy_markup(label)}" for label in travel_labels[:6])
+        if not travel:
+            travel = "  - No open route from here"
+        elif len(travel_labels) > 6:
+            travel += f"\n  - +{len(travel_labels) - 6} more"
+
+        lines = [
+            "[size=16sp][b][color=#facc15]Travel Ledger[/color][/b][/size]",
+            self._stat_line("Current", current.title if current is not None else "Unknown"),
+            self._stat_line("Known", f"{known_count}/{len(blueprint.nodes)}"),
+            "[b][color=#d6c59a]Open Routes[/color][/b]",
+            travel,
+        ]
+        pressure = self.map_view._act2_pressure_markup(state)
+        if pressure:
+            lines.append(pressure)
+
+        dungeon = context["dungeon"]
+        if dungeon is not None:
+            room = dungeon.rooms[state.current_room_id or dungeon.entrance_room_id]
+            exits = current_room_exits(dungeon, state)
+            exit_text = ", ".join(exit_room.title for exit_room in exits[:4])
+            if not exit_text:
+                exit_text = "No visible exit"
+            elif len(exits) > 4:
+                exit_text += f", +{len(exits) - 4} more"
+            lines.extend(
+                [
+                    "",
+                    "[size=15sp][b][color=#facc15]Current Site[/color][/b][/size]",
+                    self._stat_line("Site", dungeon.title),
+                    self._stat_line("Room", room.title),
+                    self._stat_line("Exits", exit_text),
+                ]
+            )
+        return "\n".join(lines)
+
+    def _map_tabs(self, context: dict[str, object], active: str) -> GridLayout:
+        dungeon = context["dungeon"]
+        tabs = GridLayout(cols=3, spacing=dp(5), size_hint_y=None, height=dp(42))
+        options = (
+            ("ledger", "Ledger", True),
+            ("route", "Route", True),
+            ("site", "Site", dungeon is not None),
+        )
+        for key, label, enabled in options:
+            tabs.add_widget(
+                self._button(
+                    label,
+                    lambda view_key=key: self.render_map(view=view_key),
+                    height=38,
+                    font_size="12sp",
+                    selected=key == active,
+                    disabled=not enabled,
+                )
+            )
+        return tabs
+
+    def render_map(self, *, view: str | None = None) -> None:
+        self._activate_mode("map")
+        if view is not None:
+            self.map_view_key = str(view or "route")
+        self.clear_widgets()
+        self.map_view.hide_map()
+        if self.map_view.parent is not None:
+            self.map_view.parent.remove_widget(self.map_view)
+        game = self.screen.active_game()
+        context = self._active_map_context(game)
+        self.add_widget(self._command_nav("map"))
+        if context is None:
+            self.add_widget(self._section_title("Map", "No active route map"))
+            self.add_widget(self._label("[color=#8f7d62]There is no active hybrid map at this point in the adventure.[/color]"))
+            return
+
+        dungeon = context["dungeon"]
+        if self.map_view_key == "site" and dungeon is None:
+            self.map_view_key = "route"
+        if self.map_view_key not in {"ledger", "route", "site"}:
+            self.map_view_key = "route"
+
+        self.add_widget(self._section_title("Map", self._map_subtitle(context)))
+        self.add_widget(self._map_tabs(context, self.map_view_key))
+        if self.map_view_key == "ledger":
+            label = self._label(self._map_ledger_markup(context), font_size="13sp")
+            self.add_widget(self._scroll_label(label))
+            return
+
+        panel = self._panel(padding=4)
+        scroll = ScrollView(do_scroll_x=False, bar_width=dp(5))
+        scroll.add_widget(self.map_view)
+        panel.add_widget(scroll)
+        self.add_widget(panel)
+        self.map_view.set_dark_mode(getattr(self.screen, "kivy_dark_mode_enabled", True))
+        if self.map_view_key == "site" and dungeon is not None:
+            self.map_view.show_dungeon(title=dungeon.title, dungeon=dungeon, state=context["state"])
+        else:
+            self.map_view.show_overworld(
+                title=str(context["route_title"]),
+                blueprint=context["blueprint"],
+                state=context["state"],
+            )
+
     def render_journal(self, *, section_index: int | None = None) -> None:
         self._activate_mode("journal")
         if section_index is not None:
@@ -1226,7 +1411,8 @@ class NativeCommandWorkspace(BoxLayout):
         def set_section(index: int) -> None:
             title, markup = sections[index]
             content_label.text = markup
-            self.screen.side_command_title_label.text = escape_kivy_markup(f"Journal - {title}")
+            if getattr(self.screen, "_side_panel_mode", "") != "native_command":
+                self.screen.side_command_title_label.text = escape_kivy_markup(f"Journal - {title}")
             self._sync_label(content_label)
 
         for index, (label, _markup) in enumerate(sections):
@@ -1786,10 +1972,10 @@ class NativeCommandWorkspace(BoxLayout):
         return None
 
     def _render_camp_overview(self, snapshot) -> None:
-        body, status_hint, action_hint = self._split_body(first_weight=0.46, second_weight=0.54)
+        body, status_hint, action_hint = self._split_body(first_weight=0.66, second_weight=0.34)
         status_panel = self._panel(size_hint=status_hint, padding=6)
         lines = [
-            "[size=17sp][b][color=#facc15]Camp Ledger[/color][/b][/size]",
+            "[size=18sp][b][color=#facc15]Camp Ledger[/color][/b][/size]",
             "",
             self._stat_line("Gold", snapshot.gold_label),
             self._stat_line("Supplies", str(snapshot.supply_points)),
@@ -1800,18 +1986,22 @@ class NativeCommandWorkspace(BoxLayout):
         if snapshot.digest_lines:
             lines.extend(["", "[b][color=#d6c59a]Act II Digest[/color][/b]"])
             lines.extend(escape_kivy_markup(line) for line in snapshot.digest_lines)
-        status_panel.add_widget(self._scroll_label(self._label("\n".join(lines), font_size="13sp")))
+        if snapshot.active_party:
+            lines.extend(["", "[b][color=#d6c59a]Around The Fire[/color][/b]"])
+            lines.extend(escape_kivy_markup(line) for line in snapshot.active_party)
+        if snapshot.camp_roster:
+            lines.extend(["", "[b][color=#d6c59a]Resting At Camp[/color][/b]"])
+            lines.extend(escape_kivy_markup(line) for line in snapshot.camp_roster)
+        else:
+            lines.extend(["", "[b][color=#d6c59a]Resting At Camp[/color][/b]", "[color=#8f7d62]No companions are resting at camp right now.[/color]"])
+        status_panel.add_widget(self._scroll_label(self._label("\n".join(lines), font_size="14sp")))
 
         action_panel = self._panel(size_hint=action_hint, padding=6)
         scroll, grid = self._scrolling_grid()
         action_map = {
-            "party": lambda: self.render_camp(view="party"),
-            "supplies": lambda: self.render_camp(view="supplies"),
             "recovery": lambda: self.render_camp(view="recovery"),
             "talk": lambda: self.render_camp(view="talk"),
-            "journal": lambda: self.render_journal(),
             "mirror": self._show_magic_mirror_reason,
-            "break": self.screen.close_side_command_panel,
             "banter": lambda: self.render_camp(view="banter"),
         }
         for action in snapshot.actions:
@@ -1822,8 +2012,8 @@ class NativeCommandWorkspace(BoxLayout):
                 self._button(
                     text,
                     action_map.get(action.key, lambda: None),
-                    height=48,
-                    font_size="12sp",
+                    height=54,
+                    font_size="14sp",
                     disabled=not action.enabled and action.key != "mirror",
                 )
             )
@@ -1939,7 +2129,7 @@ class NativeCommandWorkspace(BoxLayout):
                 grid.add_widget(
                     self._button(
                         f"{escape_kivy_markup(companion.name)}\n[size=11sp]{escape_kivy_markup(game.relationship_label_for(companion))} ({companion.disposition})[/size]",
-                        lambda idx=index: self._show_companion_talk(idx),
+                        lambda idx=index: self.screen.start_camp_companion_talk(idx),
                         height=48,
                         font_size="12sp",
                     )
@@ -2138,6 +2328,7 @@ class ClickableGameBridge:
         *,
         final: bool = False,
         use_tray: bool = False,
+        use_roll_tray: bool = False,
         tray_height: float | None = None,
         tray_parts: tuple[str, str, str] | None = None,
         pulse_scale: float = 1.0,
@@ -2150,6 +2341,7 @@ class ClickableGameBridge:
                 markup,
                 final=final,
                 use_tray=use_tray,
+                use_roll_tray=use_roll_tray,
                 tray_height=tray_height,
                 tray_parts=tray_parts,
                 pulse_scale=pulse_scale,
@@ -2288,6 +2480,9 @@ class ClickableGameBridge:
 
     def refresh_combat_panel(self) -> None:
         Clock.schedule_once(lambda _dt: self.screen.refresh_combat_panel())
+
+    def refresh_active_initiative_tray(self) -> None:
+        Clock.schedule_once(lambda _dt: self.screen.refresh_active_initiative_tray())
 
     def fade_out_initiative_tray(self) -> None:
         Clock.schedule_once(lambda _dt: self.screen.fade_out_initiative_tray())
@@ -2843,7 +3038,7 @@ class ClickableTextDnDGame(TextDnDGame):
     ) -> str:
         escaped = escape_kivy_markup(str(value).rjust(max(1, int(width))))
         if animate_size:
-            value_size = max(17.0, min(28.0, 20.0 * max(0.82, pop_scale)))
+            value_size = max(28.0, min(38.0, 34.0 * max(0.82, pop_scale)))
             escaped = f"[size={value_size:.1f}sp]{escaped}[/size]"
         if muted:
             return f"[color=#8f7d62]{escaped}[/color]"
@@ -2878,7 +3073,7 @@ class ClickableTextDnDGame(TextDnDGame):
                     width=value_width,
                     animate_size=animate_size,
                 )
-                return f"Die: {value}"
+                return value
             lanes: list[str] = []
             kept_index = self.dice_kept_index(rolls, kept) if final else None
             for index, value in enumerate(rolls):
@@ -2893,7 +3088,7 @@ class ClickableTextDnDGame(TextDnDGame):
                     width=value_width,
                     animate_size=animate_size,
                 )
-                lane = f"Die {chr(65 + index)}: {rendered}"
+                lane = rendered
                 if kept_index == index:
                     lane += f" [b][color=#{highlight_color or accent}][kept][/color][/b]"
                 lanes.append(lane)
@@ -2932,7 +3127,7 @@ class ClickableTextDnDGame(TextDnDGame):
         pop_scale: float,
     ) -> str:
         escaped = escape_kivy_markup(str(total))
-        value_size = max(17.0, min(28.0, 20.0 * max(0.82, pop_scale)))
+        value_size = max(28.0, min(38.0, 34.0 * max(0.82, pop_scale)))
         escaped = f"[size={value_size:.1f}sp]{escaped}[/size]"
         return f"[b][color=#{color}]{escaped}[/color][/b]"
 
@@ -2941,9 +3136,9 @@ class ClickableTextDnDGame(TextDnDGame):
         roll_count = max(1, int(roll_count))
         if kind == "d20":
             if roll_count == 1:
-                visible = f"Die: {value}"
+                visible = value
             else:
-                lanes = [f"Die {chr(65 + index)}: {value} [kept]" for index in range(roll_count)]
+                lanes = [f"{value} [kept]" for _index in range(roll_count)]
                 visible = " | ".join(lanes)
         else:
             visible = " + ".join(value for _index in range(roll_count))
@@ -2987,7 +3182,7 @@ class ClickableTextDnDGame(TextDnDGame):
             value_width=value_width,
             animate_size=True,
         )
-        prefix = escape_kivy_markup(strip_ansi(str(context_label or label)))
+        prefix = escape_kivy_markup(strip_ansi(str(context_label or "")))
         suffix_parts: list[str] = []
         if target_number is not None and total_reveal_stage < 2:
             suffix_parts.append(f"vs {escape_kivy_markup(str(target_label or target_number))}")
@@ -3012,17 +3207,18 @@ class ClickableTextDnDGame(TextDnDGame):
         if final and rerolls:
             suffix_parts.append(f"reroll {escape_kivy_markup(', '.join(f'{old}->{new}' for old, new in rerolls))}")
         suffix = "  ".join(suffix_parts)
-        text = f"{prefix}: {core}"
+        text = f"{prefix}: {core}" if prefix else core
         if suffix:
             text += f" | {suffix}"
         markup = self._kivy_mono_span(f"[b][color=#{accent}]{text}[/color][/b]")
-        prefix_markup = self._kivy_mono_span(f"[b][color=#{accent}]{prefix}: [/color][/b]")
+        prefix_markup = self._kivy_mono_span(f"[b][color=#{accent}]{prefix}: [/color][/b]") if prefix else ""
         core_markup = self._kivy_mono_span(f"[b][color=#{accent}]{core}[/color][/b]")
         suffix_markup = self._kivy_mono_span(f"[b][color=#{accent}]{suffix}[/color][/b]") if suffix else ""
         self.bridge.show_dice_animation_frame(
             markup,
             final=final if clear_animation is None else clear_animation,
             use_tray=True,
+            use_roll_tray=True,
             tray_parts=(prefix_markup, core_markup, suffix_markup),
             pulse_scale=pop_scale,
             core_slot_width=self._kivy_dice_core_slot_width(kind, len(rolls), value_width),
@@ -3158,6 +3354,19 @@ class ClickableTextDnDGame(TextDnDGame):
     def _kivy_initiative_tray_height(self, entries: list[dict[str, object]]) -> int:
         return min(320, max(150, 104 + 24 * max(1, len(entries))))
 
+    def _kivy_initiative_actor_is_defeated_enemy(self, actor) -> bool:
+        is_enemy = actor in list(getattr(self, "_active_combat_enemies", []) or []) or "enemy" in set(
+            getattr(actor, "tags", []) or []
+        )
+        return bool(is_enemy and (getattr(actor, "dead", False) or int(getattr(actor, "current_hp", 0) or 0) <= 0))
+
+    def _kivy_visible_initiative_entries(self, entries: list[dict[str, object]]) -> list[dict[str, object]]:
+        return [
+            entry
+            for entry in entries
+            if not self._kivy_initiative_actor_is_defeated_enemy(entry.get("actor"))
+        ]
+
     def _kivy_initiative_turn_arrow(self, *, active: bool, arrow_phase: int = 0) -> str:
         if not active:
             return ""
@@ -3256,7 +3465,7 @@ class ClickableTextDnDGame(TextDnDGame):
         return self._kivy_mono_span("\n".join(lines))
 
     def kivy_active_initiative_panel(self, *, active_actor_name: str, arrow_phase: int = 0) -> tuple[str, int] | None:
-        entries = list(getattr(self, "_kivy_active_initiative_entries", []) or [])
+        entries = self._kivy_visible_initiative_entries(list(getattr(self, "_kivy_active_initiative_entries", []) or []))
         if not entries:
             return None
         markup = self._kivy_initiative_panel_markup(
@@ -3312,6 +3521,7 @@ class ClickableTextDnDGame(TextDnDGame):
     ) -> None:
         if final:
             self._kivy_active_initiative_entries = list(entries)
+            entries = self._kivy_visible_initiative_entries(list(entries))
         markup = self._kivy_initiative_panel_markup(
             entries,
             shown_rolls=shown_rolls,
@@ -3423,6 +3633,8 @@ class ClickableTextDnDGame(TextDnDGame):
         if getattr(self, "_in_combat", False):
             if self.kivy_combat_is_ending():
                 self.bridge.fade_out_initiative_tray()
+            elif self._kivy_initiative_actor_is_defeated_enemy(target):
+                self.bridge.refresh_active_initiative_tray()
             self.bridge.refresh_combat_panel()
 
     def kivy_side_panel_available(self) -> bool:
@@ -3439,6 +3651,9 @@ class ClickableTextDnDGame(TextDnDGame):
             "helpconsole": "Console Commands",
             "console help": "Console Commands",
             "load": "Load Game",
+            "save/load": "Save/Load",
+            "save load": "Save/Load",
+            "saveload": "Save/Load",
             "saves": "Save Files",
             "save files": "Save Files",
             "settings": "Settings",
@@ -3475,6 +3690,9 @@ class ClickableTextDnDGame(TextDnDGame):
             "helpconsole",
             "console help",
             "load",
+            "save/load",
+            "save load",
+            "saveload",
             "saves",
             "save files",
             "settings",
@@ -3503,6 +3721,9 @@ class ClickableTextDnDGame(TextDnDGame):
         normalized = " ".join(str(raw).strip().lower().split())
         return normalized in {
             "camp",
+            "map",
+            "maps",
+            "map menu",
             "journal",
             "inventory",
             "backpack",
@@ -3531,12 +3752,6 @@ class ClickableTextDnDGame(TextDnDGame):
                     selected = options[value - 1]
             else:
                 aliases = {
-                    "quit to main menu": "Quit to Main Menu",
-                    "main menu": "Quit to Main Menu",
-                    "menu": "Quit to Main Menu",
-                    "quit to title": "Quit to Main Menu",
-                    "title": "Quit to Main Menu",
-                    "title screen": "Quit to Main Menu",
                     "quit to desktop": "Quit to Desktop",
                     "desktop": "Quit to Desktop",
                     "exit": "Quit to Desktop",
@@ -3545,6 +3760,17 @@ class ClickableTextDnDGame(TextDnDGame):
                     "cancel": "Back",
                     "stay": "Back",
                 }
+                menu_aliases = {
+                    "quit to main menu",
+                    "main menu",
+                    "menu",
+                    "quit to title",
+                    "title",
+                    "title screen",
+                }
+                aliases.update(
+                    {alias: "Quit to Main Menu" if active_adventure else "Back" for alias in menu_aliases}
+                )
                 selected = aliases.get(normalized, "")
                 if selected not in options:
                     selected = ""
@@ -3564,8 +3790,71 @@ class ClickableTextDnDGame(TextDnDGame):
                 return True
             self.say("Please choose one of the listed quit options.")
 
+    def open_kivy_save_load_menu(self) -> bool:
+        active_adventure = bool(
+            getattr(self, "state", None) is not None
+            and not getattr(self, "_at_title_screen", False)
+        )
+        options = ["Save Game", "Load Game", "Back"] if active_adventure else ["Load Game", "Back"]
+        display_options = [self.format_option_text(option) for option in options]
+        while True:
+            raw = self.bridge.request_choice("Save/Load.", display_options).strip()
+            if raw == KIVY_SIDE_COMMAND_CLOSE_TOKEN:
+                self.handle_kivy_close_token()
+                continue
+            normalized = " ".join(raw.strip().lower().split())
+            selected = ""
+            if raw.isdigit():
+                value = int(raw)
+                if 1 <= value <= len(options):
+                    selected = options[value - 1]
+            else:
+                aliases = {
+                    "save": "Save Game",
+                    "save game": "Save Game",
+                    "load": "Load Game",
+                    "load game": "Load Game",
+                    "saves": "Load Game",
+                    "save files": "Load Game",
+                    "back": "Back",
+                    "cancel": "Back",
+                }
+                selected = aliases.get(normalized, "")
+                if selected not in options:
+                    selected = ""
+
+            if selected == "Save Game":
+                self.inline_save()
+                return True
+            if selected == "Load Game":
+                return self.open_save_files_menu()
+            if selected == "Back":
+                return True
+            self.say("Please choose one of the listed save/load options.")
+
     def handle_meta_command(self, raw: str) -> bool:
         normalized = " ".join(str(raw).strip().lower().split())
+        camp_talk_match = re.fullmatch(r"(?:camp talk|talk companion|talk to companion)(?: (?P<index>\d+))?", normalized)
+        if camp_talk_match:
+            if self.state is None:
+                self.say("There is no active adventure yet, so camp is not available.")
+                return True
+            if getattr(self, "_in_combat", False):
+                self.say("You cannot head to camp during combat.")
+                return True
+            companion = None
+            index_text = camp_talk_match.group("index")
+            if index_text is not None:
+                roster = self.state.all_companions()
+                companion_index = int(index_text) - 1
+                if not 0 <= companion_index < len(roster):
+                    self.say("Choose a valid companion to talk to at camp.")
+                    return True
+                companion = roster[companion_index]
+            self.talk_to_companion(companion)
+            return True
+        if normalized in {"save/load", "save load", "saveload"}:
+            return self.open_kivy_save_load_menu()
         if normalized == "quit":
             return self.open_kivy_quit_menu()
         if self.kivy_should_show_native_command(raw):
@@ -4017,6 +4306,8 @@ class GameScreen(BoxLayout):
     COMBAT_HP_IMPACT_RED_SECONDS = 0.18
     COMBAT_HP_IMPACT_RECOVER_SECONDS = 0.16
     COMBAT_HP_IMPACT_SHAKE_OFFSETS = (1, 0, 2, 0, 1, 0)
+    COMBAT_DAMAGE_NUMBER_HOLD_SECONDS = 0.18
+    COMBAT_DAMAGE_NUMBER_FADE_SECONDS = 0.72
     COMBAT_ENTRY_TRANSITION_SECONDS = 0.35
     COMBAT_EXIT_TRANSITION_SECONDS = 1.05
     DEFEATED_ENEMY_HOLD_SECONDS = 0.25
@@ -4027,40 +4318,63 @@ class GameScreen(BoxLayout):
     SPLIT_TEXT_WINDOW_FONT_SIZE = "15sp"
     OPTION_BUTTON_MIN_HEIGHT = 48
     OPTION_BUTTON_ROW_GAP = 6
+    OPTION_BUTTON_VISIBLE_ROWS = 4
     BUTTON_FONT_MIN_SP = 7
     BUTTON_FONT_MAX_SP = 24
     BUTTON_TEXT_HORIZONTAL_PADDING = 16
     BUTTON_TEXT_VERTICAL_PADDING = 8
-    DICE_ANIMATION_TRAY_HEIGHT = 92
-    DICE_ANIMATION_TRAY_MAX_HEIGHT = 320
+    DICE_ANIMATION_TRAY_HEIGHT = 118
+    DICE_ANIMATION_TRAY_MAX_HEIGHT = 340
     DICE_ANIMATION_TRAY_HIDE_SECONDS = 5.0
     DICE_ANIMATION_TRAY_FADE_SECONDS = 0.22
     SEND_BUTTON_FONT_SIZE = "14sp"
-    COMMAND_BUTTON_FONT_SIZE = "12sp"
-    COMMAND_BAR_HEIGHT = 34
+    COMMAND_BUTTON_FONT_SIZE = "15sp"
+    COMMAND_BAR_HEIGHT = 40
     COMMAND_BAR_ANIMATION_SECONDS = 0.18
     RIGHT_PANEL_WIDTH_FRACTION = 0.40
     NATIVE_COMMAND_PANEL_WIDTH_FRACTION = 0.40
+    LOG_EXAMINE_STOP_LABELS = frozenset(
+        {
+            "audio",
+            "bonus",
+            "campaign",
+            "commands",
+            "current consequences",
+            "current site",
+            "latest",
+            "location",
+            "note",
+            "objective",
+            "outcome",
+            "presentation",
+            "recent updates",
+            "reroll",
+            "roll",
+            "saves",
+            "source",
+            "target",
+            "total",
+            "value",
+        }
+    )
     TITLE_MENU_TRANSITION_SECONDS = 0.38
     COMMANDS = [
-        "load",
+        "save/load",
         "map",
         "journal",
         "inventory",
         "gear",
         "camp",
-        "save",
         "settings",
         "quit",
     ]
     COMMAND_LABELS = {
-        "load": "Load",
+        "save/load": "Save/Load",
         "map": "Map",
         "journal": "Journal",
         "inventory": "Inventory",
         "gear": "Gear",
         "camp": "Camp",
-        "save": "Save",
         "settings": "Settings",
         "quit": "Quit",
     }
@@ -4193,7 +4507,11 @@ class GameScreen(BoxLayout):
         self._dice_animation_line_index: int | None = None
         self._dice_tray_active = False
         self._dice_tray_hide_event = None
+        self._dice_tray_hide_ready_at = 0.0
+        self._dice_tray_transient_hold_until = 0.0
         self._dice_tray_fade_generation = 0
+        self._dice_roll_tray_active = False
+        self._dice_roll_tray_fade_generation = 0
         self._persistent_dice_tray_markup = ""
         self._persistent_dice_tray_height: float | None = None
         self._persistent_dice_tray_parts: tuple[str, str, str] | None = None
@@ -4210,6 +4528,7 @@ class GameScreen(BoxLayout):
         self._combat_resource_targets: dict[tuple[int, str], int] = {}
         self._combat_resource_animation_event = None
         self._combat_hp_impact_elapsed: dict[tuple[int, str], float] = {}
+        self._combat_damage_popups: dict[tuple[int, str], tuple[int, float]] = {}
         self._defeated_enemy_fade_elapsed: dict[int, float] = {}
         self._hidden_defeated_enemy_ids: set[int] = set()
         self._defeated_enemy_fade_event = None
@@ -4224,6 +4543,8 @@ class GameScreen(BoxLayout):
         self._examine_panel_visible = False
         self._examine_ref_entries: dict[str, ExamineEntry] = {}
         self._examine_ref_counter = 0
+        self._log_examine_ref_entries: dict[str, ExamineEntry] = {}
+        self._log_examine_ref_counter = 0
         self._save_browser_active = False
         self._save_browser_root: PanelBox | None = None
         self._save_browser_detail_panel: PanelBox | None = None
@@ -4239,6 +4560,7 @@ class GameScreen(BoxLayout):
         self._input_row_visible = False
         self._console_drawer_visible = False
         self._active_text_prompt_is_console = False
+        self._active_text_prompt_uses_input = False
         self.kivy_dark_mode_enabled = self.load_kivy_dark_mode_setting()
         self.kivy_fullscreen_enabled = self.load_kivy_fullscreen_setting()
         self.command_buttons: list[Button] = []
@@ -4332,7 +4654,7 @@ class GameScreen(BoxLayout):
             background_color=(0.08, 0.07, 0.055, 1),
             radius=6,
         )
-        self.log_label = WrappedLabel(
+        self.log_label = ExaminableWrappedLabel(
             text="[color=#8f7d62]Launching...[/color]",
             markup=True,
             color=(0.92, 0.86, 0.74, 1),
@@ -4342,6 +4664,7 @@ class GameScreen(BoxLayout):
             size_hint_y=None,
         )
         self._apply_font(self.log_label, "story")
+        self.log_label.bind(on_ref_press=lambda _label, ref_name: self.show_examine_ref(str(ref_name)))
         self.title_card_label = Label(
             text="",
             markup=True,
@@ -4408,7 +4731,7 @@ class GameScreen(BoxLayout):
             orientation="vertical",
             size_hint_y=None,
             height=0,
-            padding=[dp(8), dp(4), dp(8), dp(4)],
+            padding=[dp(10), dp(6), dp(10), dp(8)],
             background_color=(0.105, 0.085, 0.055, 1),
             radius=5,
             opacity=0,
@@ -4426,6 +4749,47 @@ class GameScreen(BoxLayout):
         self._apply_font(self.dice_animation_label, "mono")
         self.dice_animation_label.bind(size=self._sync_dice_animation_label)
         self.dice_animation_tray.add_widget(self.dice_animation_label)
+        self.dice_roll_tray = PanelBox(
+            orientation="vertical",
+            size_hint_y=None,
+            height=0,
+            padding=[dp(10), dp(6), dp(10), dp(8)],
+            spacing=dp(3),
+            background_color=(0.105, 0.085, 0.055, 1),
+            radius=5,
+            opacity=0,
+            disabled=True,
+        )
+        self.dice_roll_header = BoxLayout(
+            orientation="horizontal",
+            size_hint_y=None,
+            height=dp(26),
+        )
+        self.dice_roll_header.add_widget(Widget())
+        self.dice_roll_close_button = Button(
+            text="X",
+            size_hint_x=None,
+            width=dp(28),
+            background_normal="",
+            background_color=(0.48, 0.36, 0.18, 1),
+            color=(1, 0.94, 0.78, 1),
+            font_size="12sp",
+            bold=True,
+        )
+        self._apply_font(self.dice_roll_close_button, "ui")
+        self.dice_roll_close_button.bind(on_release=lambda *_args: self._clear_dice_roll_tray())
+        self.dice_roll_header.add_widget(self.dice_roll_close_button)
+        self.dice_roll_panel_label = Label(
+            text="",
+            markup=True,
+            color=(0.96, 0.86, 0.62, 1),
+            font_size="16sp",
+            halign="left",
+            valign="middle",
+            size_hint=(1, 1),
+        )
+        self._apply_font(self.dice_roll_panel_label, "mono")
+        self.dice_roll_panel_label.bind(size=self._sync_dice_animation_label)
         self.dice_roll_row = BoxLayout(
             orientation="vertical",
             spacing=dp(2),
@@ -4438,37 +4802,39 @@ class GameScreen(BoxLayout):
             text="",
             markup=True,
             color=(0.96, 0.86, 0.62, 1),
-            font_size="13sp",
+            font_size="15sp",
             halign="center",
             valign="middle",
             size_hint=(1, None),
-            height=dp(18),
+            height=dp(26),
         )
         self.dice_roll_core_label = Label(
             text="",
             markup=True,
             color=(0.96, 0.86, 0.62, 1),
-            font_size="20sp",
+            font_size="34sp",
             halign="center",
             valign="middle",
             size_hint=(1, None),
-            height=dp(32),
+            height=dp(58),
         )
         self.dice_roll_suffix_label = Label(
             text="",
             markup=True,
             color=(0.96, 0.86, 0.62, 1),
-            font_size="13sp",
+            font_size="15sp",
             halign="center",
             valign="middle",
             size_hint=(1, None),
-            height=dp(18),
+            height=dp(42),
         )
         for label in (self.dice_roll_prefix_label, self.dice_roll_core_label, self.dice_roll_suffix_label):
             self._apply_font(label, "mono")
             label.bind(size=self._sync_dice_roll_label)
             self.dice_roll_row.add_widget(label)
-        self.dice_animation_tray.add_widget(self.dice_roll_row)
+        self.dice_roll_tray.add_widget(self.dice_roll_header)
+        self.dice_roll_tray.add_widget(self.dice_roll_panel_label)
+        self.dice_roll_tray.add_widget(self.dice_roll_row)
         self.log_shell.add_widget(self.dice_animation_tray)
         self.left_column.add_widget(self.log_shell)
 
@@ -4499,8 +4865,15 @@ class GameScreen(BoxLayout):
             background_color=(0.11, 0.13, 0.10, 1),
             radius=6,
         )
-        self.options_grid = GridLayout(cols=1, spacing=dp(self.OPTION_BUTTON_ROW_GAP), size_hint=(1, 1))
-        self.options_shell.add_widget(self.options_grid)
+        self.options_scroll = ScrollView(do_scroll_x=False, bar_width=dp(5))
+        self.options_grid = GridLayout(
+            cols=1,
+            spacing=dp(self.OPTION_BUTTON_ROW_GAP),
+            size_hint=(1, None),
+        )
+        self.options_grid.bind(minimum_height=self.options_grid.setter("height"))
+        self.options_scroll.add_widget(self.options_grid)
+        self.options_shell.add_widget(self.options_scroll)
         self.options_area.add_widget(self.options_shell)
 
         self.examine_shell = PanelBox(
@@ -4534,11 +4907,11 @@ class GameScreen(BoxLayout):
         self.examine_close_button = Button(
             text="X",
             size_hint_x=None,
-            width=dp(32),
+            width=dp(26),
             background_normal="",
             background_color=(0.48, 0.36, 0.18, 1),
             color=(1, 0.94, 0.78, 1),
-            font_size="14sp",
+            font_size="11sp",
             bold=True,
         )
         self._apply_font(self.examine_close_button, "ui")
@@ -4600,11 +4973,11 @@ class GameScreen(BoxLayout):
         self.side_command_close_button = Button(
             text="X",
             size_hint_x=None,
-            width=dp(34),
+            width=dp(28),
             background_normal="",
             background_color=(0.48, 0.36, 0.18, 1),
             color=(1, 0.94, 0.78, 1),
-            font_size="15sp",
+            font_size="12sp",
             bold=True,
         )
         self._apply_font(self.side_command_close_button, "ui")
@@ -4620,6 +4993,7 @@ class GameScreen(BoxLayout):
         self.combat_panel.add_widget(self.native_map_view)
         self.combat_panel.add_widget(self.command_workspace)
         self.combat_panel.add_widget(self.combat_stats_scroll)
+        self.combat_panel.add_widget(self.dice_roll_tray)
         self.add_widget(self.main_body)
 
         self.input_row = BoxLayout(size_hint_y=None, height=dp(42), spacing=dp(6))
@@ -4841,8 +5215,8 @@ class GameScreen(BoxLayout):
 
     def _sync_dice_roll_label(self, instance: Label, _value=None) -> None:
         instance.text_size = (
-            max(1, instance.width - dp(4)),
-            max(1, instance.height - dp(4)),
+            max(1, instance.width - dp(6)),
+            max(1, instance.height - dp(2)),
         )
 
     def _fit_label_to_texture_width(self, instance: Label, maximum_width: float) -> None:
@@ -4947,6 +5321,7 @@ class GameScreen(BoxLayout):
         if self._console_drawer_visible:
             self._console_drawer_visible = False
             self._active_text_prompt_is_console = False
+            self._active_text_prompt_uses_input = False
             self._set_input_row_visible(False, animate=True)
             self.submit_direct("back")
             return
@@ -4972,7 +5347,7 @@ class GameScreen(BoxLayout):
             if widget.parent is not self:
                 self.add_widget(widget)
         self._set_input_row_visible(
-            self.bridge.waiting_for_input and self._active_text_prompt_is_console,
+            self.bridge.waiting_for_input and self._active_text_prompt_uses_input,
             animate=False,
         )
         self.apply_theme()
@@ -5225,8 +5600,8 @@ class GameScreen(BoxLayout):
         width, height = self._button_inner_size(button)
         button.text_size = (width, height)
 
-    def _bind_fixed_button_alignment(self, button: Button) -> None:
-        button.halign = "center"
+    def _bind_fixed_button_alignment(self, button: Button, *, halign: str = "center") -> None:
+        button.halign = halign
         button.valign = "middle"
         self._sync_button_text_size(button)
         button.bind(size=lambda instance, _value: self._sync_button_text_size(instance))
@@ -5269,7 +5644,16 @@ class GameScreen(BoxLayout):
         game = self.active_game()
         state = getattr(game, "state", None) if game is not None else None
         in_combat = self.combat_active()
-        if normalized in {"load", "settings", "quit"}:
+        is_camp_talk = bool(
+            re.fullmatch(r"(?:camp talk|talk companion|talk to companion)(?: \d+)?", normalized)
+        )
+        if normalized in {"save/load", "save load", "saveload", "load", "settings", "quit"}:
+            return ""
+        if is_camp_talk:
+            if state is None:
+                return "There is no active adventure yet, so camp is not available."
+            if in_combat:
+                return "You cannot head to camp during combat."
             return ""
         if state is None:
             no_state_reasons = {
@@ -5285,8 +5669,12 @@ class GameScreen(BoxLayout):
             return "Maps are unavailable during combat."
         if normalized == "gear" and in_combat:
             return "You cannot reorganize equipment in the middle of combat."
-        if normalized == "camp" and in_combat:
-            return "You cannot head to camp during combat."
+        if normalized == "camp":
+            if in_combat:
+                return "You cannot head to camp during combat."
+            if state is None:
+                return "There is no active adventure yet, so camp is not available."
+            return ""
         return ""
 
     def _apply_command_button_theme(self, button: Button) -> None:
@@ -5466,6 +5854,7 @@ class GameScreen(BoxLayout):
             (self.header, "header"),
             (self.log_shell, "title_panel" if self._title_menu_active else "panel"),
             (self.dice_animation_tray, "dice_tray"),
+            (self.dice_roll_tray, "dice_tray"),
             (self.options_shell, "title_options" if self._title_menu_active else "options"),
             (self.combat_panel, "combat"),
             (self.examine_shell, "examine"),
@@ -5482,13 +5871,20 @@ class GameScreen(BoxLayout):
             for label in self._title_info_value_widgets:
                 label.color = theme["title_info_value"]
         self.dice_animation_label.color = theme["dice_tray_text"]
-        for label in (self.dice_roll_prefix_label, self.dice_roll_core_label, self.dice_roll_suffix_label):
+        for label in (
+            self.dice_roll_panel_label,
+            self.dice_roll_prefix_label,
+            self.dice_roll_core_label,
+            self.dice_roll_suffix_label,
+        ):
             label.color = theme["dice_tray_text"]
         self.prompt_label.color = theme["prompt"]
         self.combat_stats_label.color = theme["text"]
         self.side_command_title_label.color = theme["title"]
         self.side_command_close_button.background_color = theme["command_bg"]
         self.side_command_close_button.color = theme["command_text"]
+        self.dice_roll_close_button.background_color = theme["command_bg"]
+        self.dice_roll_close_button.color = theme["command_text"]
         self.examine_title_label.color = theme["title"]
         self.examine_label.color = theme["text"]
         self.examine_close_button.background_color = theme["command_bg"]
@@ -5594,6 +5990,9 @@ class GameScreen(BoxLayout):
         normalized = " ".join(str(command).strip().lower().split())
         title = {
             "journal": "Journal",
+            "map": "Map",
+            "maps": "Map",
+            "map menu": "Map",
             "inventory": "Inventory",
             "backpack": "Inventory",
             "bag": "Inventory",
@@ -5606,8 +6005,8 @@ class GameScreen(BoxLayout):
         self._set_prompt_controls_docked_to_left(True)
         self.update_combat_layout()
         self.native_map_view.hide_map()
-        self._set_side_command_header_visible(True)
-        self.side_command_title_label.text = escape_kivy_markup(title)
+        self._set_side_command_header_visible(False)
+        self.side_command_title_label.text = ""
         self._clear_combat_resource_animation()
         self._show_command_workspace()
         self.command_workspace.render_command(normalized)
@@ -5756,6 +6155,10 @@ class GameScreen(BoxLayout):
         else:
             self._render_party_stats_panel()
 
+    def start_camp_companion_talk(self, companion_index: int) -> None:
+        self.close_side_command_panel()
+        self.submit_command(f"camp talk {int(companion_index) + 1}")
+
     def _examine_entry_markup(self, entry: ExamineEntry) -> str:
         lines = [
             f"[size=18sp][b][color=#facc15]{escape_kivy_markup(entry.title)}[/color][/b][/size]",
@@ -5790,8 +6193,14 @@ class GameScreen(BoxLayout):
 
     def show_examine_ref(self, ref_name: str) -> None:
         entry = self._examine_ref_entries.get(ref_name)
+        if entry is None:
+            entry = getattr(self, "_log_examine_ref_entries", {}).get(ref_name)
         if entry is not None:
             self.show_examine_entry(entry)
+
+    def _active_game_for_examine_markup(self):
+        bridge = getattr(self, "bridge", None)
+        return getattr(bridge, "game", None)
 
     def _reset_examine_refs(self) -> None:
         self._examine_ref_entries = {}
@@ -5802,6 +6211,197 @@ class GameScreen(BoxLayout):
         ref_name = f"examine_{self._examine_ref_counter}"
         self._examine_ref_entries[ref_name] = entry
         return ref_name
+
+    def _register_log_examine_ref(self, entry: ExamineEntry) -> str:
+        if not hasattr(self, "_log_examine_ref_entries"):
+            self._log_examine_ref_entries = {}
+            self._log_examine_ref_counter = 0
+        self._log_examine_ref_counter += 1
+        ref_name = f"log_examine_{self._log_examine_ref_counter}"
+        self._log_examine_ref_entries[ref_name] = entry
+        return ref_name
+
+    def _clean_log_examine_label(self, label: str) -> str:
+        cleaned = " ".join(str(label).replace("\n", " ").split()).strip()
+        if re.fullmatch(r"\[[^\]]+\]", cleaned):
+            return cleaned
+        cleaned = re.sub(r"^\d+\.\s*", "", cleaned).strip()
+        return cleaned.strip(" \t\r\n\"'.,:;!?()[]{}")
+
+    def _log_examine_label_allowed(self, label: str) -> bool:
+        normalized = " ".join(label.lower().split())
+        if not normalized or normalized in self.LOG_EXAMINE_STOP_LABELS:
+            return False
+        if "\n" in label or len(label) > 64:
+            return False
+        if "|" in label or re.fullmatch(r"[\d\s/+.,:%-]+", label):
+            return False
+        if not any(character.isalnum() for character in label):
+            return False
+        if not re.fullmatch(r"\[[^\]]+\]", label) and len(label.split()) > 6:
+            return False
+        return True
+
+    def _log_examine_entry_for_label(self, label: str, *, allow_generic: bool) -> ExamineEntry | None:
+        cleaned = self._clean_log_examine_label(label)
+        if not self._log_examine_label_allowed(cleaned):
+            return None
+        entry = examine_entry_for_text(cleaned, game=self._active_game_for_examine_markup())
+        if not allow_generic and entry.category == "Examine":
+            return None
+        return entry
+
+    def _visible_index_at_markup_position(self, markup: str, target: int) -> int:
+        visible_index = 0
+        position = 0
+        limit = max(0, min(int(target), len(markup)))
+        while position < limit:
+            if markup[position] == "[":
+                end = markup.find("]", position)
+                if end != -1 and end < limit:
+                    position = end + 1
+                    continue
+            if markup[position] == "&":
+                end = markup.find(";", position)
+                if end != -1 and end < limit:
+                    visible_index += 1
+                    position = end + 1
+                    continue
+            visible_index += 1
+            position += 1
+        return visible_index
+
+    def _markup_visible_character_bounds(self, markup: str) -> list[tuple[int, int, bool]]:
+        bounds: list[tuple[int, int, bool]] = []
+        position = 0
+        ref_depth = 0
+        while position < len(markup):
+            if markup[position] == "[":
+                end = markup.find("]", position)
+                if end != -1:
+                    tag = markup[position + 1 : end].strip().lower()
+                    if tag.startswith("ref="):
+                        ref_depth += 1
+                    elif tag == "/ref" and ref_depth > 0:
+                        ref_depth -= 1
+                    position = end + 1
+                    continue
+            if markup[position] == "&":
+                end = markup.find(";", position)
+                if end != -1:
+                    bounds.append((position, end + 1, ref_depth > 0))
+                    position = end + 1
+                    continue
+            bounds.append((position, position + 1, ref_depth > 0))
+            position += 1
+        return bounds
+
+    def _log_examine_known_terms(self, visible: str) -> list[str]:
+        game = self._active_game_for_examine_markup()
+        terms: set[str] = set()
+        if game is None:
+            return []
+        intros = getattr(game, "NAMED_CHARACTER_INTROS", {})
+        if isinstance(intros, dict):
+            terms.update(str(name) for name in intros)
+        scene_labels = getattr(game, "SCENE_LABELS", {})
+        if isinstance(scene_labels, dict):
+            terms.update(str(label) for label in scene_labels.values())
+            terms.update(str(scene_key).replace("_", " ").title() for scene_key in scene_labels)
+        hud_location = getattr(game, "hud_location_label", None)
+        if callable(hud_location):
+            try:
+                terms.add(str(hud_location()))
+            except Exception:
+                pass
+        state = getattr(game, "state", None)
+        party_members = getattr(state, "party_members", None)
+        members = []
+        if callable(party_members):
+            try:
+                members.extend(party_members())
+            except Exception:
+                pass
+        for attr_name in ("companions", "camp_companions"):
+            members.extend(getattr(state, attr_name, []) or [])
+        public_character_name = getattr(game, "public_character_name", None)
+        for member in members:
+            name = str(getattr(member, "name", "")).strip()
+            if not name:
+                continue
+            terms.add(name)
+            if callable(public_character_name):
+                terms.add(str(public_character_name(name)))
+        return sorted(
+            {
+                term.strip()
+                for term in terms
+                if term and len(term.strip()) > 1 and term.strip().lower() in visible.lower()
+            },
+            key=len,
+            reverse=True,
+        )
+
+    def _add_log_examine_range(
+        self,
+        ranges: list[tuple[int, int, ExamineEntry]],
+        start: int,
+        end: int,
+        entry: ExamineEntry | None,
+    ) -> None:
+        if entry is None or start < 0 or end <= start:
+            return
+        for used_start, used_end, _entry in ranges:
+            if start < used_end and end > used_start:
+                return
+        ranges.append((start, end, entry))
+
+    def _annotate_log_examine_markup(self, markup: str) -> str:
+        if not markup or "[ref=" in markup:
+            return markup
+        visible = visible_markup_text(markup)
+        if not visible.strip():
+            return markup
+
+        ranges: list[tuple[int, int, ExamineEntry]] = []
+        for match in KIVY_COLOR_SPAN_RE.finditer(markup):
+            label = visible_markup_text(match.group("body"))
+            entry = self._log_examine_entry_for_label(label, allow_generic=True)
+            start = self._visible_index_at_markup_position(markup, match.start("body"))
+            end = self._visible_index_at_markup_position(markup, match.end("body"))
+            self._add_log_examine_range(ranges, start, end, entry)
+
+        for term in self._log_examine_known_terms(visible):
+            entry = self._log_examine_entry_for_label(term, allow_generic=False)
+            if entry is None:
+                continue
+            pattern = re.compile(rf"(?<![A-Za-z0-9']){re.escape(term)}(?![A-Za-z0-9'])", re.IGNORECASE)
+            for match in pattern.finditer(visible):
+                self._add_log_examine_range(ranges, match.start(), match.end(), entry)
+
+        for pattern in (KIVY_SKILL_TAG_RE, KIVY_TITLE_PHRASE_RE):
+            for match in pattern.finditer(visible):
+                label = match.group(0)
+                entry = self._log_examine_entry_for_label(label, allow_generic=False)
+                self._add_log_examine_range(ranges, match.start(), match.end(), entry)
+
+        if not ranges:
+            return markup
+        bounds = self._markup_visible_character_bounds(markup)
+        insertions: list[tuple[int, int, str]] = []
+        occupied: list[tuple[int, int]] = []
+        for start, end, entry in sorted(ranges, key=lambda item: (item[0], -(item[1] - item[0]))):
+            if start >= len(bounds) or end > len(bounds) or any(bounds[index][2] for index in range(start, end)):
+                continue
+            if any(start < used_end and end > used_start for used_start, used_end in occupied):
+                continue
+            ref_name = self._register_log_examine_ref(entry)
+            insertions.append((bounds[end - 1][1], 0, "[/ref]"))
+            insertions.append((bounds[start][0], 1, f"[ref={ref_name}]"))
+            occupied.append((start, end))
+        for position, _order, text in sorted(insertions, key=lambda item: (item[0], item[1]), reverse=True):
+            markup = f"{markup[:position]}{text}{markup[position:]}"
+        return markup
 
     def _examine_ref_markup(
         self,
@@ -5905,6 +6505,7 @@ class GameScreen(BoxLayout):
         self._combat_resource_display_values.clear()
         self._combat_resource_targets.clear()
         self._combat_hp_impact_elapsed.clear()
+        self._combat_damage_popups.clear()
 
     def _clear_defeated_enemy_fades(self) -> None:
         event = self._defeated_enemy_fade_event
@@ -6065,12 +6666,22 @@ class GameScreen(BoxLayout):
             key = self._combat_resource_key(combatant, resource_name)
             active_keys.add(key)
             displayed = self._combat_resource_display_values.setdefault(key, current)
+            previous_target = self._combat_resource_targets.get(key, displayed)
             self._combat_resource_targets[key] = current
             if resource_name == "hp":
+                damage_amount = max(
+                    1,
+                    (previous_target - current) if current < previous_target else (displayed - current),
+                )
                 if current < displayed and key not in self._combat_hp_impact_elapsed:
                     self._combat_hp_impact_elapsed[key] = 0.0
+                    self._combat_damage_popups[key] = (damage_amount, 0.0)
+                elif current < previous_target:
+                    self._combat_damage_popups[key] = (damage_amount, 0.0)
                 elif current >= displayed:
                     self._combat_hp_impact_elapsed.pop(key, None)
+                    if current > displayed:
+                        self._combat_damage_popups.pop(key, None)
 
         for key in list(self._combat_resource_display_values):
             if key not in active_keys:
@@ -6081,11 +6692,14 @@ class GameScreen(BoxLayout):
         for key in list(self._combat_hp_impact_elapsed):
             if key not in active_keys:
                 del self._combat_hp_impact_elapsed[key]
+        for key in list(self._combat_damage_popups):
+            if key not in active_keys:
+                del self._combat_damage_popups[key]
 
         if any(
             self._combat_resource_display_values.get(key, target) != target
             for key, target in self._combat_resource_targets.items()
-        ) or bool(self._combat_hp_impact_elapsed):
+        ) or bool(self._combat_hp_impact_elapsed) or bool(self._combat_damage_popups):
             self._start_combat_resource_animation()
         elif self._combat_resource_animation_event is not None:
             self._combat_resource_animation_event.cancel()
@@ -6107,10 +6721,14 @@ class GameScreen(BoxLayout):
         for key, target in self._combat_resource_targets.items():
             self._combat_resource_display_values[key] = target
         self._combat_hp_impact_elapsed.clear()
+        self._combat_damage_popups.clear()
         self._render_combat_panel(scroll_to_top=False)
 
     def _combat_hp_impact_duration(self) -> float:
         return self.COMBAT_HP_IMPACT_RED_SECONDS + self.COMBAT_HP_IMPACT_RECOVER_SECONDS
+
+    def _combat_damage_number_duration(self) -> float:
+        return self.COMBAT_DAMAGE_NUMBER_HOLD_SECONDS + self.COMBAT_DAMAGE_NUMBER_FADE_SECONDS
 
     def _advance_combat_resource_animation(self, dt) -> bool:
         if not self.combat_active():
@@ -6118,6 +6736,15 @@ class GameScreen(BoxLayout):
             return False
         changed = False
         remaining = False
+        popup_dt = max(0.0, float(dt))
+        for key, (amount, elapsed) in list(self._combat_damage_popups.items()):
+            next_elapsed = elapsed + popup_dt
+            if next_elapsed >= self._combat_damage_number_duration():
+                del self._combat_damage_popups[key]
+            else:
+                self._combat_damage_popups[key] = (amount, next_elapsed)
+                remaining = True
+            changed = True
         for key, target in list(self._combat_resource_targets.items()):
             current = self._combat_resource_display_values.get(key, target)
             impact_elapsed = self._combat_hp_impact_elapsed.get(key)
@@ -6149,6 +6776,17 @@ class GameScreen(BoxLayout):
 
     def _displayed_combat_resource_value(self, combatant, resource_name: str, current: int) -> int:
         return self._combat_resource_display_values.get(self._combat_resource_key(combatant, resource_name), current)
+
+    def combat_damage_popup_markup(self, combatant) -> str:
+        popup = self._combat_damage_popups.get(self._combat_resource_key(combatant, "hp"))
+        if popup is None:
+            return ""
+        amount, elapsed = popup
+        fade_elapsed = max(0.0, elapsed - self.COMBAT_DAMAGE_NUMBER_HOLD_SECONDS)
+        fade_duration = max(0.01, self.COMBAT_DAMAGE_NUMBER_FADE_SECONDS)
+        opacity = 1.0 - min(1.0, fade_elapsed / fade_duration)
+        alpha_hex = f"{int(round(max(0.0, min(1.0, opacity)) * 255)):02x}"
+        return f"  [size=16sp][b][color=#ef4444{alpha_hex}]-{amount}[/color][/b][/size]"
 
     def health_color(self, current_hp: int, max_hp: int) -> str:
         if max_hp <= 0 or current_hp <= 0:
@@ -6284,6 +6922,7 @@ class GameScreen(BoxLayout):
             self._displayed_combat_resource_value(combatant, "hp", current_hp),
             getattr(combatant, "max_hp", 1),
         )
+        damage_popup = self.combat_damage_popup_markup(combatant)
         ac = getattr(combatant, "armor_class", "?")
         temp = f" temp {combatant.temp_hp}" if getattr(combatant, "temp_hp", 0) else ""
         defense_summary = ""
@@ -6294,7 +6933,7 @@ class GameScreen(BoxLayout):
         lines = [
             f"{name_markup}"
             f" [size=14sp][color=#b8a98d]Lv {getattr(combatant, 'level', '?')} AC {ac}{defense_summary}{temp}{status}[/color][/size]",
-            f"[size=14sp]HP: {hp}[/size]",
+            f"[size=14sp]HP: {hp}{damage_popup}[/size]",
         ]
         max_mp = maximum_magic_points(combatant)
         if max_mp > 0:
@@ -6404,6 +7043,7 @@ class GameScreen(BoxLayout):
         *,
         final: bool = False,
         use_tray: bool = False,
+        use_roll_tray: bool = False,
         tray_height: float | None = None,
         tray_parts: tuple[str, str, str] | None = None,
         pulse_scale: float = 1.0,
@@ -6412,6 +7052,17 @@ class GameScreen(BoxLayout):
         done_event: Event | None = None,
     ) -> None:
         self.update_combat_layout()
+        if use_tray and use_roll_tray and self.side_panel_allowed():
+            self._show_dice_roll_side_frame(
+                markup,
+                final=final,
+                tray_height=tray_height,
+                tray_parts=tray_parts,
+                pulse_scale=pulse_scale,
+                core_slot_width=core_slot_width,
+            )
+            self._complete_log_append(done_event)
+            return
         if use_tray:
             self._show_dice_tray_frame(
                 markup,
@@ -6446,17 +7097,53 @@ class GameScreen(BoxLayout):
         if self._dice_tray_hide_event is not None:
             self._dice_tray_hide_event.cancel()
             self._dice_tray_hide_event = None
+        self._dice_tray_hide_ready_at = 0.0
+
+    def _dice_tray_hold_seconds(self) -> float:
+        return max(5.0, float(self.DICE_ANIMATION_TRAY_HIDE_SECONDS))
+
+    def _mark_dice_tray_transient_hold(self) -> None:
+        hold_until = time.monotonic() + self._dice_tray_hold_seconds()
+        self._dice_tray_transient_hold_until = max(
+            float(getattr(self, "_dice_tray_transient_hold_until", 0.0)),
+            hold_until,
+        )
+
+    def _dice_tray_result_hold_active(self) -> bool:
+        hold_until = max(
+            float(getattr(self, "_dice_tray_hide_ready_at", 0.0)),
+            float(getattr(self, "_dice_tray_transient_hold_until", 0.0)),
+        )
+        return bool(
+            hold_until > 0
+            and time.monotonic() < hold_until
+        )
 
     def _schedule_dice_tray_hide(self) -> None:
         self._cancel_dice_tray_hide()
+        visible_seconds = self._dice_tray_hold_seconds()
+        hide_generation = self._dice_tray_fade_generation
+        self._dice_tray_hide_ready_at = time.monotonic() + visible_seconds
+        self._dice_tray_transient_hold_until = max(
+            float(getattr(self, "_dice_tray_transient_hold_until", 0.0)),
+            self._dice_tray_hide_ready_at,
+        )
 
         def hide_tray(_dt) -> None:
+            if hide_generation != self._dice_tray_fade_generation:
+                return
+            remaining = self._dice_tray_hide_ready_at - time.monotonic()
+            if remaining > 0.01:
+                self._dice_tray_hide_event = Clock.schedule_once(hide_tray, remaining)
+                return
             self._dice_tray_hide_event = None
+            self._dice_tray_hide_ready_at = 0.0
+            self._dice_tray_transient_hold_until = 0.0
             if self._restore_persistent_dice_tray():
                 return
             self._clear_dice_tray()
 
-        self._dice_tray_hide_event = Clock.schedule_once(hide_tray, self.DICE_ANIMATION_TRAY_HIDE_SECONDS)
+        self._dice_tray_hide_event = Clock.schedule_once(hide_tray, visible_seconds)
 
     def _remember_persistent_dice_tray(
         self,
@@ -6505,17 +7192,85 @@ class GameScreen(BoxLayout):
         self.dice_animation_tray.opacity = 1 if visible else 0
         self.dice_animation_tray.disabled = not visible
 
+    def _set_dice_roll_tray_visible(self, visible: bool, *, tray_height: float | None = None) -> None:
+        self._dice_roll_tray_active = visible
+        height = max(168.0, float(self.DICE_ANIMATION_TRAY_HEIGHT if tray_height is None else tray_height))
+        self.dice_roll_tray.height = dp(height) if visible else 0
+        self.dice_roll_tray.opacity = 1 if visible else 0
+        self.dice_roll_tray.disabled = not visible
+
+    def _clear_dice_roll_tray(self) -> None:
+        self._dice_roll_tray_fade_generation += 1
+        Animation.cancel_all(self.dice_roll_tray, "opacity")
+        self.dice_roll_panel_label.text = ""
+        self.dice_roll_prefix_label.text = ""
+        self.dice_roll_core_label.text = ""
+        self.dice_roll_suffix_label.text = ""
+        self._set_dice_roll_tray_content_mode("row")
+        self.dice_roll_prefix_label.height = dp(26)
+        self.dice_roll_core_label.height = dp(58)
+        self.dice_roll_suffix_label.height = dp(42)
+        self._set_dice_roll_tray_visible(False)
+
+    def _set_dice_roll_tray_content_mode(self, mode: str) -> None:
+        label_visible = mode == "label"
+        self.dice_roll_panel_label.opacity = 1 if label_visible else 0
+        self.dice_roll_panel_label.disabled = not label_visible
+        self.dice_roll_panel_label.size_hint_y = 1 if label_visible else None
+        self.dice_roll_panel_label.height = max(dp(1), self.dice_roll_tray.height) if label_visible else 0
+        self.dice_roll_row.opacity = 0 if label_visible else 1
+        self.dice_roll_row.disabled = label_visible
+        self.dice_roll_row.size_hint_y = None if label_visible else 1
+        self.dice_roll_row.height = 0 if label_visible else max(dp(1), self.dice_roll_tray.height)
+
+    def _show_dice_roll_side_frame(
+        self,
+        markup: str,
+        *,
+        final: bool,
+        tray_height: float | None = None,
+        tray_parts: tuple[str, str, str] | None = None,
+        pulse_scale: float = 1.0,
+        core_slot_width: float | None = None,
+    ) -> None:
+        del pulse_scale, core_slot_width
+        if not self.side_panel_allowed():
+            return
+        self._dice_roll_tray_fade_generation += 1
+        Animation.cancel_all(self.dice_roll_tray, "opacity")
+        resolved_height = self._dice_tray_height_for_markup(markup, tray_height)
+        self._set_dice_roll_tray_visible(True, tray_height=resolved_height)
+        if tray_parts is None:
+            self._set_dice_roll_tray_content_mode("label")
+            self.dice_roll_panel_label.text = markup
+            self._sync_dice_animation_label(self.dice_roll_panel_label)
+        else:
+            self._set_dice_roll_tray_content_mode("row")
+            prefix, core, suffix = tray_parts
+            self.dice_roll_prefix_label.text = prefix
+            self.dice_roll_prefix_label.height = dp(26) if prefix else 0
+            self.dice_roll_core_label.text = core
+            self.dice_roll_core_label.height = dp(58)
+            self.dice_roll_suffix_label.text = suffix
+            self.dice_roll_suffix_label.height = dp(42) if suffix else dp(22)
+            self.dice_roll_core_label.font_size = "34sp"
+            for label in (self.dice_roll_prefix_label, self.dice_roll_core_label, self.dice_roll_suffix_label):
+                self._sync_dice_roll_label(label)
+        del final
+
     def fade_out_initiative_tray(self) -> None:
         self._fade_out_dice_tray()
 
     def _fade_out_dice_tray(self) -> None:
         if not self._dice_tray_active:
             self._clear_persistent_dice_tray()
+            self._dice_tray_transient_hold_until = 0.0
             self._stop_initiative_turn_arrow_animation()
             return
         self._dice_tray_fade_generation += 1
         fade_generation = self._dice_tray_fade_generation
         self._cancel_dice_tray_hide()
+        self._dice_tray_transient_hold_until = 0.0
         self._clear_persistent_dice_tray()
         self._stop_initiative_turn_arrow_animation()
         self.dice_animation_tray.disabled = True
@@ -6531,15 +7286,11 @@ class GameScreen(BoxLayout):
         animation.start(self.dice_animation_tray)
 
     def _set_dice_tray_content_mode(self, mode: str) -> None:
-        row_visible = mode == "row"
-        self.dice_animation_label.opacity = 0 if row_visible else 1
-        self.dice_animation_label.disabled = row_visible
-        self.dice_animation_label.size_hint_y = None if row_visible else 1
-        self.dice_animation_label.height = 0 if row_visible else max(dp(1), self.dice_animation_tray.height)
-        self.dice_roll_row.opacity = 1 if row_visible else 0
-        self.dice_roll_row.disabled = not row_visible
-        self.dice_roll_row.size_hint_y = 1 if row_visible else None
-        self.dice_roll_row.height = max(dp(1), self.dice_animation_tray.height) if row_visible else 0
+        del mode
+        self.dice_animation_label.opacity = 1
+        self.dice_animation_label.disabled = False
+        self.dice_animation_label.size_hint_y = 1
+        self.dice_animation_label.height = max(dp(1), self.dice_animation_tray.height)
 
     def _show_dice_tray_row(
         self,
@@ -6569,6 +7320,18 @@ class GameScreen(BoxLayout):
         core_slot_width: float | None = None,
         persist: bool = False,
     ) -> None:
+        if persist and self._dice_tray_result_hold_active():
+            resolved_height = self._dice_tray_height_for_markup(markup, tray_height)
+            self._remember_persistent_dice_tray(
+                markup,
+                tray_height=resolved_height,
+                tray_parts=tray_parts,
+                pulse_scale=pulse_scale,
+                core_slot_width=core_slot_width,
+            )
+            return
+        if not persist:
+            self._mark_dice_tray_transient_hold()
         self._dice_tray_fade_generation += 1
         Animation.cancel_all(self.dice_animation_tray, "opacity")
         self._cancel_dice_tray_hide()
@@ -6585,16 +7348,9 @@ class GameScreen(BoxLayout):
             self._set_dice_tray_visible(True, tray_height=resolved_height)
         else:
             self._set_dice_tray_reserved(True, tray_height=resolved_height)
-        if tray_parts is None:
-            self._set_dice_tray_content_mode("label")
-            self.dice_animation_label.text = markup
-            self._sync_dice_animation_label(self.dice_animation_label)
-        else:
-            self._show_dice_tray_row(
-                tray_parts,
-                pulse_scale=pulse_scale,
-                core_slot_width=core_slot_width,
-            )
+        self._set_dice_tray_content_mode("label")
+        self.dice_animation_label.text = markup
+        self._sync_dice_animation_label(self.dice_animation_label)
         if final and not persist:
             self._schedule_dice_tray_hide()
 
@@ -6602,13 +7358,11 @@ class GameScreen(BoxLayout):
         self._dice_tray_fade_generation += 1
         Animation.cancel_all(self.dice_animation_tray, "opacity")
         self._cancel_dice_tray_hide()
+        self._dice_tray_transient_hold_until = 0.0
         if clear_persistent:
             self._clear_persistent_dice_tray()
             self._stop_initiative_turn_arrow_animation()
         self.dice_animation_label.text = ""
-        self.dice_roll_prefix_label.text = ""
-        self.dice_roll_core_label.text = ""
-        self.dice_roll_suffix_label.text = ""
         self._set_dice_tray_content_mode("label")
         self._set_dice_tray_visible(False)
 
@@ -6627,6 +7381,7 @@ class GameScreen(BoxLayout):
         animated: bool = True,
         fast_reveal: bool = False,
     ) -> None:
+        text = self._annotate_log_examine_markup(text)
         if not text or not self.typing_animation_enabled or not animated or visible_markup_length(text) <= 8:
             combat_delay = self.combat_active()
             delay = kivy_non_dialogue_reveal_delay(
@@ -6874,6 +7629,8 @@ class GameScreen(BoxLayout):
             self.toggle_kivy_fullscreen_from_shortcut()
             return True
         if self.is_console_menu_key(key, scancode, codepoint):
+            if self._input_row_visible and not self._active_text_prompt_is_console:
+                return False
             self.toggle_console_drawer()
             return True
         if self._save_browser_active:
@@ -6989,6 +7746,7 @@ class GameScreen(BoxLayout):
         self.status_label.text = "Route desk open. Pick a tag, browse saves, or tune the table."
         self.prompt_label.text = ""
         self._active_text_prompt_is_console = False
+        self._active_text_prompt_uses_input = False
         self._console_drawer_visible = False
         self._set_input_row_visible(False, animate=False)
         self.text_input.disabled = False
@@ -7054,13 +7812,7 @@ class GameScreen(BoxLayout):
 
     def _title_menu_selection_starts_game(self, value: str) -> bool:
         label = " ".join(self._selected_title_menu_label(value).lower().split())
-        raw = " ".join(str(value).strip().lower().split())
-        return (
-            label == "continue"
-            or label == "load this save"
-            or label == "quit"
-            or raw == "quit"
-        )
+        return label in {"continue", "load this save"}
 
     def begin_title_menu_transition(self, value: str) -> float:
         if not self._title_menu_active:
@@ -7087,6 +7839,7 @@ class GameScreen(BoxLayout):
         option_details: dict[str, str] | None = None,
     ) -> None:
         self.update_combat_layout()
+        self._title_menu_transition_active = False
         title_context = self.title_screen_context_active()
         self._title_menu_active = bool(
             (option_details or title_context)
@@ -7098,13 +7851,13 @@ class GameScreen(BoxLayout):
             and bool(option_details)
             and plain_combat_status_text(visible_markup_text(prompt)).strip().lower() == "choose your route."
         )
-        if not main_title_prompt:
-            self._main_title_menu_active = False
-        if not self._title_menu_active or not self._main_title_menu_active:
+        self._main_title_menu_active = bool(main_title_prompt)
+        if not self._title_menu_active or (not title_context and not self._main_title_menu_active):
             self._set_title_card_markup("")
         self._set_app_header_visible(not self._main_title_menu_active)
         self.prompt_label.text = format_kivy_prompt_markup(prompt)
         self._active_text_prompt_is_console = False
+        self._active_text_prompt_uses_input = False
         self._console_drawer_visible = False
         self._set_input_row_visible(False, animate=True)
         if self._title_menu_active:
@@ -7134,9 +7887,10 @@ class GameScreen(BoxLayout):
         self.apply_theme()
         self.prompt_label.text = format_kivy_prompt_markup(prompt)
         console_prompt = self._prompt_is_console_drawer(prompt)
+        self._active_text_prompt_uses_input = True
         self._active_text_prompt_is_console = console_prompt
         self._console_drawer_visible = console_prompt
-        self._set_input_row_visible(console_prompt, animate=True)
+        self._set_input_row_visible(True, animate=True)
         if self._title_menu_active:
             self.status_label.text = "Route desk open. Type a response or command."
         elif self.side_panel_allowed():
@@ -7144,10 +7898,9 @@ class GameScreen(BoxLayout):
         else:
             self.status_label.text = "Type a response below. Commands like save and journal still work."
         self._rebuild_options([])
-        self.text_input.hint_text = "Type a console command, or back"
+        self.text_input.hint_text = "Type a console command, or back" if console_prompt else "Type your answer here"
         self._sync_command_bar_visibility()
-        if console_prompt:
-            Clock.schedule_once(lambda _dt: self._focus_text_input(), 0)
+        Clock.schedule_once(lambda _dt: self._focus_text_input(), 0)
 
     def clear_prompt(self) -> None:
         self.hide_save_browser()
@@ -7173,6 +7926,7 @@ class GameScreen(BoxLayout):
         self.text_input.disabled = False
         self.send_button.disabled = False
         self._active_text_prompt_is_console = False
+        self._active_text_prompt_uses_input = False
         self._console_drawer_visible = False
         self._set_input_row_visible(False, animate=True)
         self._sync_command_bar_visibility()
@@ -7189,6 +7943,7 @@ class GameScreen(BoxLayout):
         self.prompt_label.text = ""
         self._rebuild_options([])
         self._active_text_prompt_is_console = False
+        self._active_text_prompt_uses_input = False
         self._console_drawer_visible = False
         self._set_input_row_visible(False, animate=True)
         self.text_input.disabled = True
@@ -7207,6 +7962,8 @@ class GameScreen(BoxLayout):
     def _option_grid_shape(self, option_count: int, *, detailed: bool = False) -> tuple[int, int]:
         if option_count <= 0:
             return (0, 1)
+        if self._stack_story_choices_vertically():
+            return (option_count, 1)
         if detailed and self._title_menu_active:
             if option_count <= 5:
                 return (1, option_count)
@@ -7228,15 +7985,38 @@ class GameScreen(BoxLayout):
         rows = max(1, math.ceil(option_count / columns))
         return (rows, columns)
 
+    def _stack_story_choices_vertically(self) -> bool:
+        if getattr(self, "_title_menu_active", False):
+            return False
+        try:
+            if self.combat_active():
+                return False
+            game = self.active_game()
+        except AttributeError:
+            return False
+        state = getattr(game, "state", None) if game is not None else None
+        return bool(state is not None and getattr(state, "player", None) is not None)
+
+    def _option_button_height(self, *, detailed: bool = False) -> int:
+        if detailed and self._title_menu_active:
+            return 62
+        return 66 if detailed else self.OPTION_BUTTON_MIN_HEIGHT
+
     def _option_shell_height(self, rows: int, *, detailed: bool = False) -> float:
         if rows <= 0:
             return dp(44)
+        if self._stack_story_choices_vertically():
+            visible_rows = max(1, min(rows, self.OPTION_BUTTON_VISIBLE_ROWS))
+            row_height = self._option_button_height(detailed=detailed)
+            vertical_padding = 14
+            gaps = max(0, visible_rows - 1) * self.OPTION_BUTTON_ROW_GAP
+            return dp(vertical_padding + visible_rows * row_height + gaps)
         if detailed and self._title_menu_active:
             row_height = 62
             vertical_padding = 12
             gaps = max(0, rows - 1) * self.OPTION_BUTTON_ROW_GAP
             return dp(min(176, vertical_padding + rows * row_height + gaps))
-        row_height = 66 if detailed else self.OPTION_BUTTON_MIN_HEIGHT
+        row_height = self._option_button_height(detailed=detailed)
         vertical_padding = 14
         gaps = max(0, rows - 1) * self.OPTION_BUTTON_ROW_GAP
         max_height = 380 if detailed else 260
@@ -7381,6 +8161,13 @@ class GameScreen(BoxLayout):
         detailed_options = bool(option_details)
         self._current_options_detailed = detailed_options
         rows, columns = self._option_grid_shape(len(options), detailed=detailed_options)
+        stack_choices = self._stack_story_choices_vertically()
+        button_halign = "left" if stack_choices else "center"
+        button_height = dp(self._option_button_height(detailed=detailed_options))
+        if hasattr(self, "options_scroll"):
+            self.options_scroll.do_scroll_y = bool(stack_choices)
+            self.options_scroll.bar_width = dp(5) if stack_choices else 0
+        self.options_grid.size_hint_y = None if stack_choices else 1
         self._current_option_rows = rows
         self.options_grid.rows = rows or 1
         self.options_grid.cols = columns
@@ -7406,15 +8193,17 @@ class GameScreen(BoxLayout):
                 background_normal="",
                 background_color=(0.20, 0.42, 0.34, 1),
                 color=(1, 0.98, 0.94, 1),
-                halign="center",
+                halign=button_halign,
                 valign="middle",
+                size_hint_y=None,
+                height=button_height,
             )
             if self._title_menu_active and detailed_options:
                 button._kivy_choice_role = self._title_menu_button_role(option, detail)
                 button._kivy_fixed_font_size = True
                 button.font_size = "15sp"
                 self._apply_font(button, "mono")
-                self._bind_fixed_button_alignment(button)
+                self._bind_fixed_button_alignment(button, halign=button_halign)
                 if self._title_menu_option_disabled(option, detail):
                     button.disabled = True
                     button.opacity = 0.72
@@ -7431,6 +8220,8 @@ class GameScreen(BoxLayout):
             button.bind(on_release=lambda _btn, value=str(index): self.submit_direct(value))
             self.option_buttons.append(button)
             self.options_grid.add_widget(button)
+        if hasattr(self, "options_scroll"):
+            Clock.schedule_once(lambda _dt: setattr(self.options_scroll, "scroll_y", 1), 0)
         self.apply_theme()
         self._schedule_button_font_sync()
 

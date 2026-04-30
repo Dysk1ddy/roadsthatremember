@@ -34,6 +34,82 @@ def build_game_with_player(class_name: str, scores: dict[str, int]) -> tuple[Tex
 
 
 class CombatResolverTests(unittest.TestCase):
+    def test_story_mode_recovers_quarter_max_hp_after_battle(self) -> None:
+        game, Warrior = build_game_with_player(
+            "Warrior",
+            {"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+        )
+        companion = build_character(
+            name="Elira",
+            race="Human",
+            class_name="Mage",
+            background="Acolyte",
+            base_ability_scores={"STR": 8, "DEX": 12, "CON": 13, "INT": 15, "WIS": 14, "CHA": 10},
+            class_skill_choices=["Arcana", "Medicine"],
+        )
+        game.state = GameState(player=Warrior, companions=[companion], current_scene="road_ambush")
+        game.difficulty_mode = "story"
+        Warrior.max_hp = 20
+        Warrior.current_hp = 10
+        companion.max_hp = 13
+        companion.current_hp = 0
+        companion.death_failures = 2
+
+        game.recover_after_battle()
+
+        self.assertEqual(Warrior.current_hp, 15)
+        self.assertEqual(companion.current_hp, 4)
+        self.assertFalse(companion.stable)
+        self.assertEqual(companion.death_failures, 0)
+
+    def test_standard_mode_revives_downed_party_after_battle(self) -> None:
+        game, Warrior = build_game_with_player(
+            "Warrior",
+            {"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+        )
+        companion = build_character(
+            name="Elira",
+            race="Human",
+            class_name="Mage",
+            background="Acolyte",
+            base_ability_scores={"STR": 8, "DEX": 12, "CON": 13, "INT": 15, "WIS": 14, "CHA": 10},
+            class_skill_choices=["Arcana", "Medicine"],
+        )
+        game.state = GameState(player=Warrior, companions=[companion], current_scene="road_ambush")
+        game.difficulty_mode = "standard"
+        Warrior.max_hp = 20
+        Warrior.current_hp = 10
+        companion.max_hp = 13
+        companion.current_hp = 0
+
+        game.recover_after_battle()
+
+        self.assertEqual(Warrior.current_hp, 10)
+        self.assertEqual(companion.current_hp, 1)
+
+    def test_help_downed_ally_restores_twenty_percent_max_hp(self) -> None:
+        game, Warrior = build_game_with_player(
+            "Warrior",
+            {"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
+        )
+        companion = build_character(
+            name="Elira",
+            race="Human",
+            class_name="Mage",
+            background="Acolyte",
+            base_ability_scores={"STR": 8, "DEX": 12, "CON": 13, "INT": 15, "WIS": 14, "CHA": 10},
+            class_skill_choices=["Arcana", "Medicine"],
+        )
+        game.skill_check = lambda actor, skill, dc, context: True  # type: ignore[method-assign]
+        companion.max_hp = 13
+        companion.current_hp = 0
+        companion.death_failures = 2
+
+        game.help_downed_ally(Warrior, companion)
+
+        self.assertEqual(companion.current_hp, 3)
+        self.assertEqual(companion.death_failures, 0)
+
     def test_catalog_armor_and_shields_emit_percent_defense(self) -> None:
         self.assertEqual(ITEMS["traveler_clothes_common"].armor.defense_percent, 0)
         self.assertEqual(ITEMS["leather_armor_common"].armor.defense_percent, 10)
@@ -653,7 +729,7 @@ class CombatResolverTests(unittest.TestCase):
         self.assertEqual(captured["expression"], "1d4")
         self.assertEqual(captured["bonus"], mage.ability_mod("INT"))
         self.assertEqual(target.current_hp, before_hp - 5)
-        self.assertEqual(mage.conditions.get("arcane_bolt_cooldown"), 3)
+        self.assertEqual(mage.conditions.get("arcane_bolt_cooldown"), 2)
         cooldown_options = game.get_player_combat_options(mage, encounter, heroes=[mage])
         self.assertNotIn("Arcane Bolt (Action, 2 MP)", cooldown_options)
         self.assertNotIn("Arcane Bolt (Bonus, 1 MP)", cooldown_options)
@@ -664,7 +740,7 @@ class CombatResolverTests(unittest.TestCase):
 
         self.assertEqual(mage.resources["mp"], 10)
         self.assertEqual(target.current_hp, before_hp - 10)
-        self.assertEqual(mage.conditions.get("arcane_bolt_cooldown"), 3)
+        self.assertEqual(mage.conditions.get("arcane_bolt_cooldown"), 2)
 
         for level in (2, 3, 4):
             game.level_up_character(mage, level)

@@ -714,7 +714,7 @@ def mage_offensive_action_candidates(game, actor, target, *, heroes: list | None
                 damage_bonus=damage_bonus,
                 damage_multiplier=2,
                 advantage_state=advantage,
-                cooldown_cycle_turns=3,
+                cooldown_cycle_turns=2,
             )
         )
     return candidates
@@ -747,7 +747,7 @@ def mage_bonus_offensive_action_candidates(game, actor, target, *, heroes: list,
             damage_bonus=damage_bonus,
             damage_multiplier=1,
             advantage_state=advantage,
-            cooldown_cycle_turns=3,
+            cooldown_cycle_turns=2,
         )
     ]
 
@@ -923,7 +923,7 @@ def _action_magic_point_cost(game, actor, action_name: str) -> int:
 
 def _action_uses_for_encounter(action_name: str, simulated_rounds: int) -> int:
     if action_name.endswith("Arcane Bolt"):
-        return max(1, ceil(max(1, simulated_rounds) / 3))
+        return max(1, ceil(max(1, simulated_rounds) / 2))
     return max(1, simulated_rounds)
 
 

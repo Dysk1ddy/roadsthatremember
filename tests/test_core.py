@@ -37,6 +37,7 @@ from dnd_game.content import (
     point_buy_total,
 )
 from dnd_game.dice import D20Outcome, roll, roll_d20
+from dnd_game.data.story.character_options.classes import CLASS_LEVEL_PROGRESSION
 from dnd_game.game import Encounter, TextDnDGame
 from dnd_game.gameplay.combat_flow import TurnState
 from dnd_game.gameplay.magic_points import current_magic_points, magic_point_cost, magic_point_summary
@@ -1862,10 +1863,20 @@ class CoreTests(unittest.TestCase):
             base_ability_scores={"STR": 15, "DEX": 14, "CON": 13, "INT": 8, "WIS": 12, "CHA": 10},
             class_skill_choices=["Athletics", "Survival"],
         )
+        ally = build_character(
+            name="Tolan",
+            race="Dwarf",
+            class_name="Warrior",
+            background="Soldier",
+            base_ability_scores={"STR": 15, "DEX": 10, "CON": 14, "INT": 8, "WIS": 12, "CHA": 13},
+            class_skill_choices=["Perception", "Survival"],
+        )
+        ally.current_hp = 0
+        ally.death_failures = 2
         enemy = create_enemy("goblin_skirmisher")
         battlefield_calls: list[str] = []
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(900801))
-        game.state = GameState(player=player, current_scene="road_ambush")
+        game.state = GameState(player=player, companions=[ally], current_scene="road_ambush")
         game.pause_for_combat_transition = lambda: None
         game.roll_initiative = lambda heroes, enemies, **kwargs: [player]
         game.hero_turn = lambda actor, heroes, enemies, encounter, dodging: "fled"
@@ -1874,6 +1885,8 @@ class CoreTests(unittest.TestCase):
         outcome = game.run_encounter(Encounter(title="Test Ambush", description="Trouble.", enemies=[enemy]))
 
         self.assertEqual(outcome, "fled")
+        self.assertEqual(ally.current_hp, 1)
+        self.assertEqual(ally.death_failures, 0)
         self.assertEqual(battlefield_calls, [])
 
     def test_run_encounter_starts_combat_music_and_restores_scene_music(self) -> None:
@@ -11379,6 +11392,102 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(game.combat_option_group(game.skill_tag("STEALTH", "Try to Flee")), "Escape")
         self.assertEqual(game.combat_option_group("End Turn"), "End Turn")
 
+    def test_all_known_bonus_action_skills_group_as_bonus_actions(self) -> None:
+        game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(81543))
+        bonus_action_options = [
+            "Use Veil Step",
+            "Warrior Rally",
+            "Iron Draw",
+            "Shoulder In",
+            "Weapon Read",
+            "Measure Twice",
+            "Style Wheel",
+            "Redline",
+            "Teeth Set",
+            "Drink The Hurt",
+            "Red Mark",
+            "Blood Price",
+            "Mark Target",
+            "Tool Read",
+            "Feint",
+            "Skirmish",
+            "False Target",
+            "Cover The Healer",
+            "Death Mark",
+            "Black Drop",
+            "Arcane Bolt (Bonus, 1 MP)",
+            "Pattern Read",
+            "Marked Angle (1 MP)",
+            "Change Weather",
+            "Ground",
+            "Anchor Shell (3 MP)",
+            "Pulse Restore (4 MP)",
+            "Overflow Shell (1 Flow)",
+            "Quick Mix",
+            "Raise Shield",
+            "Change Stance",
+            "Make Off-Hand Strike",
+            "Drink a Healing Potion",
+        ]
+
+        for option in bonus_action_options:
+            with self.subTest(option=option):
+                self.assertEqual(game.combat_option_group(option), "Bonus Action")
+
+    def test_generated_mage_and_rogue_skills_group_by_current_turn_economy(self) -> None:
+        score_sets = {
+            "Mage": {"STR": 8, "DEX": 14, "CON": 13, "INT": 16, "WIS": 12, "CHA": 10},
+            "Rogue": {"STR": 10, "DEX": 16, "CON": 13, "INT": 12, "WIS": 10, "CHA": 12},
+        }
+        skill_sets = {
+            "Mage": ["Arcana", "Medicine", "Investigation"],
+            "Rogue": ["Stealth", "Acrobatics", "Perception", "Investigation"],
+        }
+
+        for class_name in ("Mage", "Rogue"):
+            actor = build_character(
+                name=class_name,
+                race="Human",
+                class_name=class_name,
+                background="Acolyte" if class_name == "Mage" else "Soldier",
+                base_ability_scores=score_sets[class_name],
+                class_skill_choices=skill_sets[class_name],
+            )
+            for level_data in CLASS_LEVEL_PROGRESSION[class_name].values():
+                for feature_id in level_data.get("feature_ids", []):
+                    if feature_id not in actor.features:
+                        actor.features.append(feature_id)
+            game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(81544))
+            game.state = GameState(player=actor, current_scene="road_ambush")
+            game.prepare_class_resources_for_combat(actor)
+            for resource, maximum in actor.max_resources.items():
+                actor.resources[resource] = maximum
+            encounter = SimpleNamespace(allow_parley=False, allow_flee=False)
+
+            bonus_options = game.get_player_combat_options(
+                actor,
+                encounter,
+                turn_state=TurnState(actions_remaining=0, bonus_action_available=True),
+                heroes=[actor],
+            )
+            action_options = game.get_player_combat_options(
+                actor,
+                encounter,
+                turn_state=TurnState(actions_remaining=1, bonus_action_available=False),
+                heroes=[actor],
+            )
+
+            for option in bonus_options:
+                if option == "End Turn":
+                    continue
+                with self.subTest(class_name=class_name, option=option, economy="bonus"):
+                    self.assertEqual(game.combat_option_group(option), "Bonus Action")
+            for option in action_options:
+                if option == "End Turn":
+                    continue
+                with self.subTest(class_name=class_name, option=option, economy="action"):
+                    self.assertIn(game.combat_option_group(option), {"Action", "Item", "Social", "Escape"})
+
     def test_pulse_restore_is_bonus_action_and_still_allows_minor_channel(self) -> None:
         player = build_character(
             name="Ash",
@@ -11469,7 +11578,7 @@ class CoreTests(unittest.TestCase):
         self.assertIn("Warrior Rally", options)
         self.assertIn("hard_lesson", player.features)
 
-    def test_help_downed_ally_can_restore_them_to_one_hp(self) -> None:
+    def test_help_downed_ally_can_restore_them_to_twenty_percent_hp(self) -> None:
         player = build_character(
             name="Velkor",
             race="Human",
@@ -11490,7 +11599,7 @@ class CoreTests(unittest.TestCase):
         game = TextDnDGame(input_fn=lambda _: "1", output_fn=lambda _: None, rng=random.Random(16))
         game.skill_check = lambda actor, skill, dc, context: True
         game.help_downed_ally(player, ally)
-        self.assertEqual(ally.current_hp, 1)
+        self.assertEqual(ally.current_hp, 4)
 
     def test_god_mode_prevents_party_damage(self) -> None:
         player = build_character(
